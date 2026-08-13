@@ -113,17 +113,31 @@ export default function ReportarPagoPage() {
     setFormData((prev) => ({ ...prev, meses: [...mesesPendientes] }));
   };
 
+  const getMontoByMetodo = (metodo: MetodoPago, tipo: "mensual" | "inscripcion"): number => {
+    if (!gymConfig) return 0;
+    switch (metodo) {
+      case "bs":
+        return tipo === "mensual" ? (gymConfig.monto_mensual_bs || 0) : (gymConfig.monto_inscripcion_bs || 0);
+      case "binance":
+        return tipo === "mensual" ? (gymConfig.monto_mensual_binance || 0) : (gymConfig.monto_inscripcion_binance || 0);
+      case "transferencia":
+        return tipo === "mensual" ? (gymConfig.monto_mensual_transferencia || 0) : (gymConfig.monto_inscripcion_transferencia || 0);
+      default:
+        return tipo === "mensual" ? gymConfig.monto_mensual : gymConfig.monto_inscripcion;
+    }
+  };
+
   const montoTotal = useMemo(() => {
     if (!gymConfig) return 0;
     let total = 0;
-    if (formData.pagar_inscripcion && !inscripcionPagada && gymConfig.monto_inscripcion > 0) {
-      total += gymConfig.monto_inscripcion;
+    if (formData.pagar_inscripcion && !inscripcionPagada && getMontoByMetodo(formData.metodo_pago, "inscripcion") > 0) {
+      total += getMontoByMetodo(formData.metodo_pago, "inscripcion");
     }
     if (formData.pagar_mensualidad) {
-      total += formData.meses.length * gymConfig.monto_mensual;
+      total += formData.meses.length * getMontoByMetodo(formData.metodo_pago, "mensual");
     }
     return total;
-  }, [gymConfig, formData.pagar_inscripcion, formData.pagar_mensualidad, formData.meses, inscripcionPagada]);
+  }, [gymConfig, formData.metodo_pago, formData.pagar_inscripcion, formData.pagar_mensualidad, formData.meses, inscripcionPagada]);
 
   const needsComprobante = (metodo: MetodoPago): boolean => {
     return metodo !== "efectivo" && metodo !== "membresia_libre";
@@ -158,10 +172,10 @@ export default function ReportarPagoPage() {
         comprobanteUrl = urlData.publicUrl;
       }
 
-      if (formData.pagar_inscripcion && !inscripcionPagada && gymConfig?.monto_inscripcion && gymConfig.monto_inscripcion > 0) {
+      if (formData.pagar_inscripcion && !inscripcionPagada && getMontoByMetodo(formData.metodo_pago, "inscripcion") > 0) {
         const pagoInscripcion = await pagosService.crearPago({
           usuario_id: targetUserId,
-          monto: gymConfig?.monto_inscripcion || 0,
+          monto: getMontoByMetodo(formData.metodo_pago, "inscripcion"),
           mes_pagar: new Date().getMonth() + 1,
           anio_pagar: new Date().getFullYear(),
           metodo_pago: formData.metodo_pago,
@@ -184,7 +198,7 @@ export default function ReportarPagoPage() {
         for (const { mes, anio } of formData.meses) {
           const pago = await pagosService.crearPago({
             usuario_id: targetUserId,
-            monto: gymConfig?.monto_mensual || 0,
+            monto: getMontoByMetodo(formData.metodo_pago, "mensual"),
             mes_pagar: mes,
             anio_pagar: anio,
             metodo_pago: formData.metodo_pago,
@@ -222,7 +236,7 @@ export default function ReportarPagoPage() {
     );
   }
 
-  const showInscriptionCheckbox = !isAdmin && !inscripcionPagada && gymConfig && gymConfig.monto_inscripcion > 0;
+  const showInscriptionCheckbox = !isAdmin && !inscripcionPagada && gymConfig && getMontoByMetodo(formData.metodo_pago, "inscripcion") > 0;
 
   return (
     <div className="max-w-2xl mx-auto space-y-6 animate-fadeIn">
@@ -280,7 +294,7 @@ export default function ReportarPagoPage() {
               <DollarSign className="w-6 h-6 text-gym-primary" />
               <div>
                 <p className="text-sm text-gym-muted">Mensualidad</p>
-                <p className="text-xl font-bold text-gym-text neon-text">{formatCurrency(gymConfig.monto_mensual)}</p>
+                <p className="text-xl font-bold text-gym-text neon-text">{formatCurrency(getMontoByMetodo(formData.metodo_pago, "mensual"))}</p>
               </div>
             </div>
           </CardContent>
@@ -311,7 +325,7 @@ export default function ReportarPagoPage() {
                     />
                     <div className="flex-1">
                       <p className="font-medium text-gym-text">Inscripción</p>
-                      <p className="text-xs text-gym-muted">{formatCurrency(gymConfig.monto_inscripcion)}</p>
+                      <p className="text-xs text-gym-muted">{formatCurrency(getMontoByMetodo(formData.metodo_pago, "inscripcion"))}</p>
                     </div>
                     <Badge variant="warning">Pendiente</Badge>
                   </label>
@@ -518,10 +532,10 @@ export default function ReportarPagoPage() {
               </div>
               <div className="text-xs text-gym-muted mt-2 space-y-1">
                 {formData.pagar_inscripcion && !inscripcionPagada && gymConfig && (
-                  <p>Inscripción: {formatCurrency(gymConfig.monto_inscripcion)}</p>
+                  <p>Inscripción: {formatCurrency(getMontoByMetodo(formData.metodo_pago, "inscripcion"))}</p>
                 )}
                 {formData.pagar_mensualidad && (
-                  <p>Mensualidad: {formData.meses.length} mes(es) × {formatCurrency(gymConfig?.monto_mensual || 0)}</p>
+                  <p>Mensualidad: {formData.meses.length} mes(es) × {formatCurrency(getMontoByMetodo(formData.metodo_pago, "mensual"))}</p>
                 )}
               </div>
             </div>

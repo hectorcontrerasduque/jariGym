@@ -97,6 +97,12 @@ export interface GymConfig {
   color_secundario: string;
   monto_mensual: number;
   monto_inscripcion: number;
+  monto_mensual_bs: number;
+  monto_inscripcion_bs: number;
+  monto_mensual_binance: number;
+  monto_inscripcion_binance: number;
+  monto_mensual_transferencia: number;
+  monto_inscripcion_transferencia: number;
   acepta_bs: boolean;
   acepta_binance: boolean;
   acepta_transferencia: boolean;

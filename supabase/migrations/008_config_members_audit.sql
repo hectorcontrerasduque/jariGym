@@ -5,6 +5,14 @@
 -- Add nombre_gym to gym_config
 ALTER TABLE gym_config ADD COLUMN IF NOT EXISTS nombre_gym text DEFAULT 'GymApp';
 
+-- Add per-method amount columns to gym_config
+ALTER TABLE gym_config ADD COLUMN IF NOT EXISTS monto_mensual_bs decimal(10,2) DEFAULT 0;
+ALTER TABLE gym_config ADD COLUMN IF NOT EXISTS monto_inscripcion_bs decimal(10,2) DEFAULT 0;
+ALTER TABLE gym_config ADD COLUMN IF NOT EXISTS monto_mensual_binance decimal(10,2) DEFAULT 0;
+ALTER TABLE gym_config ADD COLUMN IF NOT EXISTS monto_inscripcion_binance decimal(10,2) DEFAULT 0;
+ALTER TABLE gym_config ADD COLUMN IF NOT EXISTS monto_mensual_transferencia decimal(10,2) DEFAULT 0;
+ALTER TABLE gym_config ADD COLUMN IF NOT EXISTS monto_inscripcion_transferencia decimal(10,2) DEFAULT 0;
+
 -- Create member_states audit table
 CREATE TABLE IF NOT EXISTS member_states (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

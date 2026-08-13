@@ -1,0 +1,183 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { cn } from "@/lib/utils";
+import { createClient } from "@/lib/supabase/client";
+import { useEffect, useState } from "react";
+import { Avatar } from "@/components/ui/avatar";
+import { ProfileModal } from "@/components/profile-modal";
+import { configService } from "@/lib/services/config/config.service";
+import {
+  LayoutDashboard,
+  CreditCard,
+  Users,
+  Settings,
+  LogOut,
+  Dumbbell,
+  Bell,
+  User,
+} from "lucide-react";
+import type { Profile } from "@/lib/types";
+
+const adminNavItems = [
+  { href: "/dashboard", label: "Inicio", icon: LayoutDashboard },
+  { href: "/dashboard/pagos", label: "Pagos", icon: CreditCard },
+  { href: "/dashboard/reportar-pago", label: "Reportar", icon: Bell },
+  { href: "/dashboard/miembros", label: "Miembros", icon: Users },
+  { href: "/dashboard/configuracion", label: "Config", icon: Settings },
+];
+
+const miembroNavItems = [
+  { href: "/dashboard/mi-perfil", label: "Mi Perfil", icon: User },
+  { href: "/dashboard/mis-pagos", label: "Mis Pagos", icon: CreditCard },
+  { href: "/dashboard/reportar-pago", label: "Reportar", icon: Bell },
+];
+
+export function Sidebar() {
+  const pathname = usePathname();
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [gymName, setGymName] = useState("GymApp");
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const supabase = createClient();
+
+  useEffect(() => {
+    const getProfile = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (user) {
+        const { data } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", user.id)
+          .single();
+        setProfile(data);
+      }
+    };
+    const getGymName = async () => {
+      try {
+        const config = await configService.getConfig();
+        if (config?.nombre_gym) setGymName(config.nombre_gym);
+      } catch {}
+    };
+    getProfile();
+    getGymName();
+  }, []);
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    window.location.href = "/login";
+  };
+
+  const handleProfileUpdate = (updated: Profile) => {
+    setProfile(updated);
+  };
+
+  const isAdmin = profile?.role === "super_admin" || profile?.role === "admin";
+  const navItems = isAdmin ? adminNavItems : miembroNavItems;
+
+  return (
+    <>
+      {/* Desktop sidebar */}
+      <aside className="hidden md:flex fixed left-0 top-0 h-full w-64 bg-gym-surface/80 backdrop-blur-xl border-r border-gym-border/50 flex-col z-40">
+        <div className="p-6 border-b border-gym-border/50">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-gym-primary/20 rounded-xl flex items-center justify-center animate-pulse-glow">
+              <Dumbbell className="w-6 h-6 text-gym-primary" />
+            </div>
+            <div>
+              <h1 className="font-display font-bold text-gym-text neon-text">{gymName}</h1>
+              <p className="text-xs text-gym-muted">Gestión inteligente</p>
+            </div>
+          </div>
+        </div>
+
+        <nav className="flex-1 p-4 space-y-1">
+          {navItems.map((item) => {
+            const isActive = pathname === item.href ||
+              (item.href !== "/dashboard" && pathname.startsWith(item.href));
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn(
+                  "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200",
+                  isActive
+                    ? "bg-gym-primary/10 text-gym-primary shadow-[0_0_15px_rgba(56,189,248,0.15)]"
+                    : "text-gym-muted hover:text-gym-text hover:bg-gym-bg/50"
+                )}
+              >
+                <item.icon className="w-5 h-5" />
+                <span className="font-medium">{item.label}</span>
+              </Link>
+            );
+          })}
+        </nav>
+
+        <div className="p-4 border-t border-gym-border/50">
+          <button
+            onClick={() => setShowProfileModal(true)}
+            className="flex items-center gap-3 mb-3 w-full text-left hover:bg-gym-bg/50 p-2 rounded-xl transition-colors cursor-pointer"
+          >
+            <Avatar
+              src={profile?.avatar_url}
+              alt={profile?.nombre_completo || ""}
+              size="sm"
+            />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-gym-text truncate">
+                {profile?.nombre_completo || "Usuario"}
+              </p>
+              <p className="text-xs text-gym-muted truncate">
+                {profile?.email || ""}
+              </p>
+            </div>
+          </button>
+          <button
+            onClick={handleSignOut}
+            className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gym-muted hover:text-gym-danger transition-colors"
+          >
+            <LogOut className="w-4 h-4" />
+            Cerrar Sesión
+          </button>
+        </div>
+      </aside>
+
+      {/* Mobile bottom nav */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-gym-surface/90 backdrop-blur-xl border-t border-gym-border/50 z-50 safe-area-bottom">
+        <div className="flex items-center justify-around py-2">
+          {navItems.map((item) => {
+            const isActive = pathname === item.href ||
+              (item.href !== "/dashboard" && pathname.startsWith(item.href));
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn(
+                  "flex flex-col items-center gap-1 px-3 py-1 rounded-lg transition-all",
+                  isActive
+                    ? "text-gym-primary shadow-[0_0_10px_rgba(56,189,248,0.3)]"
+                    : "text-gym-muted"
+                )}
+              >
+                <item.icon className="w-5 h-5" />
+                <span className="text-[10px] font-medium">{item.label}</span>
+              </Link>
+            );
+          })}
+        </div>
+      </nav>
+
+      {/* Profile Modal */}
+      {profile && (
+        <ProfileModal
+          isOpen={showProfileModal}
+          onClose={() => setShowProfileModal(false)}
+          profile={profile}
+          onUpdate={handleProfileUpdate}
+        />
+      )}
+    </>
+  );
+}

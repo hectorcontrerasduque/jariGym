@@ -1,0 +1,10 @@
+{
+  "/auth/callback/route": "app/auth/callback/route.js",
+  "/dashboard/miembros/page": "app/dashboard/miembros/page.js",
+  "/dashboard/page": "app/dashboard/page.js",
+  "/dashboard/reportar-pago/page": "app/dashboard/reportar-pago/page.js",
+  "/dashboard/configuracion/page": "app/dashboard/configuracion/page.js",
+  "/dashboard/pagos/page": "app/dashboard/pagos/page.js",
+  "/(auth)/login/page": "app/(auth)/login/page.js",
+  "/dashboard/mis-pagos/page": "app/dashboard/mis-pagos/page.js"
+}

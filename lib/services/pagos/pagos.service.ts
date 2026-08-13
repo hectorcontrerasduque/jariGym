@@ -192,7 +192,7 @@ export class PagosService {
 
     if (error) throw error;
 
-    const anios = [...new Set((data || []).map((p) => p.anio_pagar))];
+    const anios = Array.from(new Set((data || []).map((p) => p.anio_pagar)));
     if (!anios.includes(new Date().getFullYear())) {
       anios.push(new Date().getFullYear());
     }

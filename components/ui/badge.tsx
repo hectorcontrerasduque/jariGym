@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils";
 
 interface BadgeProps {
-  variant?: "default" | "success" | "danger" | "warning";
+  variant?: "default" | "success" | "danger" | "warning" | "primary" | "secondary";
   children: React.ReactNode;
   className?: string;
 }
@@ -16,6 +16,8 @@ export function Badge({ variant = "default", children, className }: BadgeProps) 
           "bg-gym-success/20 text-gym-success": variant === "success",
           "bg-gym-danger/20 text-gym-danger": variant === "danger",
           "bg-gym-warning/20 text-gym-warning": variant === "warning",
+          "bg-gym-primary/20 text-gym-primary": variant === "primary",
+          "bg-gym-secondary/20 text-gym-secondary": variant === "secondary",
         },
         className
       )}

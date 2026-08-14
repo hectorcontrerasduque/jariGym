@@ -104,14 +104,7 @@ export default function MiembrosPage() {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
 
-      const { data: profileAdmin } = await supabase
-        .from("profiles")
-        .select("tenant_id")
-        .eq("id", user!.id)
-        .single();
-
       await supabase.from("member_states").insert({
-        tenant_id: profileAdmin?.tenant_id,
         usuario_id: selectedMiembro.id,
         estado: nuevoEstado,
         notas: notasEstado || null,

@@ -33,12 +33,6 @@ serve(async (req) => {
       throw new Error("Unauthorized");
     }
 
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("tenant_id")
-      .eq("id", user.id)
-      .single();
-
     const body = await req.json();
     const { monto, mes_pagar, anio_pagar, comprobante_url, notas } = body;
 
@@ -46,7 +40,6 @@ serve(async (req) => {
       .from("pagos")
       .insert({
         usuario_id: user.id,
-        tenant_id: profile?.tenant_id,
         monto,
         mes_pagar,
         anio_pagar,

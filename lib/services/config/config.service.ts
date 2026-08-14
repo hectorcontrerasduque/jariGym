@@ -1,29 +1,17 @@
 import { createClient } from "@/lib/supabase/client";
-import type { GymConfig } from "@/lib/types";
+import type { GymConfig, MetodoPago, MetodoPagoConfig } from "@/lib/types";
 
 export class ConfigService {
   private supabase = createClient();
 
   async getConfig(): Promise<GymConfig | null> {
-    const {
-      data: { user },
-    } = await this.supabase.auth.getUser();
-    if (!user) return null;
-
-    const { data: profile } = await this.supabase
-      .from("profiles")
-      .select("tenant_id")
-      .eq("id", user.id)
-      .single();
-
-    if (!profile?.tenant_id) return null;
-
-    const { data } = await this.supabase
+    const { data, error } = await this.supabase
       .from("gym_config")
       .select("*")
-      .eq("tenant_id", profile.tenant_id)
+      .limit(1)
       .single();
 
+    if (error || !data) return null;
     return data;
   }
 
@@ -33,18 +21,10 @@ export class ConfigService {
     } = await this.supabase.auth.getUser();
     if (!user) throw new Error("No autenticado");
 
-    const { data: profile } = await this.supabase
-      .from("profiles")
-      .select("tenant_id")
-      .eq("id", user.id)
-      .single();
-
-    if (!profile?.tenant_id) throw new Error("Sin tenant asignado");
-
     const { data: existing } = await this.supabase
       .from("gym_config")
       .select("id")
-      .eq("tenant_id", profile.tenant_id)
+      .limit(1)
       .single();
 
     if (existing) {
@@ -60,13 +40,46 @@ export class ConfigService {
     } else {
       const { data, error } = await this.supabase
         .from("gym_config")
-        .insert({ ...updates, tenant_id: profile.tenant_id })
+        .insert(updates)
         .select()
         .single();
 
       if (error) throw error;
       return data;
     }
+  }
+
+  async getMetodosPago(): Promise<MetodoPagoConfig[]> {
+    const { data, error } = await this.supabase
+      .from("gym_config_metodos_pago")
+      .select("*")
+      .order("metodo_pago");
+
+    if (error) throw error;
+    return data || [];
+  }
+
+  async updateMetodoPago(id: string, updates: Partial<MetodoPagoConfig>): Promise<MetodoPagoConfig> {
+    const { data, error } = await this.supabase
+      .from("gym_config_metodos_pago")
+      .update(updates)
+      .eq("id", id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  }
+
+  async getMetodoPago(metodo: MetodoPago): Promise<MetodoPagoConfig | null> {
+    const { data, error } = await this.supabase
+      .from("gym_config_metodos_pago")
+      .select("*")
+      .eq("metodo_pago", metodo)
+      .single();
+
+    if (error || !data) return null;
+    return data;
   }
 }
 

@@ -12,7 +12,7 @@ import { miembrosService } from "@/lib/services/miembros/miembros.service";
 import { createClient } from "@/lib/supabase/client";
 import { Upload, CheckCircle, XCircle, DollarSign, User, FileText } from "lucide-react";
 import { getMonthName, formatCurrency } from "@/lib/utils";
-import type { MetodoPago, GymConfig, Profile } from "@/lib/types";
+import type { MetodoPago, GymConfig, MetodoPagoConfig, Profile } from "@/lib/types";
 
 export default function ReportarPagoPage() {
   const router = useRouter();
@@ -22,6 +22,7 @@ export default function ReportarPagoPage() {
   const [userId, setUserId] = useState<string>("");
   const [isAdmin, setIsAdmin] = useState(false);
   const [gymConfig, setGymConfig] = useState<GymConfig | null>(null);
+  const [metodosPago, setMetodosPago] = useState<MetodoPagoConfig[]>([]);
   const [miembros, setMiembros] = useState<Profile[]>([]);
   const [miembroSeleccionado, setMiembroSeleccionado] = useState<string>("");
   const [inscripcionPagada, setInscripcionPagada] = useState(false);
@@ -54,7 +55,7 @@ export default function ReportarPagoPage() {
         setUserId(user.id);
         const { data: profile } = await supabase
           .from("profiles")
-          .select("role, inscripcion_pagada, tenant_id")
+          .select("role, inscripcion_pagada")
           .eq("id", user.id)
           .single();
 
@@ -74,6 +75,9 @@ export default function ReportarPagoPage() {
 
       const config = await configService.getConfig();
       setGymConfig(config);
+
+      const metodos = await configService.getMetodosPago();
+      setMetodosPago(metodos);
     } catch (err) {
       console.error("Error loading data:", err);
     }
@@ -114,17 +118,12 @@ export default function ReportarPagoPage() {
   };
 
   const getMontoByMetodo = (metodo: MetodoPago, tipo: "mensual" | "inscripcion"): number => {
-    if (!gymConfig) return 0;
-    switch (metodo) {
-      case "bs":
-        return tipo === "mensual" ? (gymConfig.monto_mensual_bs || 0) : (gymConfig.monto_inscripcion_bs || 0);
-      case "binance":
-        return tipo === "mensual" ? (gymConfig.monto_mensual_binance || 0) : (gymConfig.monto_inscripcion_binance || 0);
-      case "transferencia":
-        return tipo === "mensual" ? (gymConfig.monto_mensual_transferencia || 0) : (gymConfig.monto_inscripcion_transferencia || 0);
-      default:
-        return tipo === "mensual" ? gymConfig.monto_mensual : gymConfig.monto_inscripcion;
+    const config = metodosPago.find((m) => m.metodo_pago === metodo);
+    if (!config || !config.habilitado) {
+      const defaultConfig = metodosPago.find((m) => m.metodo_pago === "efectivo");
+      return tipo === "mensual" ? (defaultConfig?.monto_mensual || 0) : (defaultConfig?.monto_inscripcion || 0);
     }
+    return tipo === "mensual" ? config.monto_mensual : config.monto_inscripcion;
   };
 
   const montoTotal = useMemo(() => {
@@ -279,7 +278,7 @@ export default function ReportarPagoPage() {
               <CheckCircle className="w-6 h-6 text-gym-success" />
               <div>
                 <p className="font-medium text-gym-text">Inscripción pagada</p>
-                <p className="text-sm text-gym-muted">{formatCurrency(gymConfig?.monto_inscripcion || 0)}</p>
+                <p className="text-sm text-gym-muted">{formatCurrency(getMontoByMetodo(formData.metodo_pago, "inscripcion"))}</p>
               </div>
             </div>
           </CardContent>
@@ -339,7 +338,7 @@ export default function ReportarPagoPage() {
                   />
                   <div className="flex-1">
                     <p className="font-medium text-gym-text">Mensualidad</p>
-                    <p className="text-xs text-gym-muted">{formatCurrency(gymConfig?.monto_mensual || 0)} × {formData.meses.length} mes(es)</p>
+                    <p className="text-xs text-gym-muted">{formatCurrency(getMontoByMetodo(formData.metodo_pago, "mensual"))} × {formData.meses.length} mes(es)</p>
                   </div>
                   <Badge variant="primary">{formData.meses.length} meses</Badge>
                 </label>
@@ -441,7 +440,7 @@ export default function ReportarPagoPage() {
                 >
                   💵 Efectivo
                 </button>
-                {gymConfig?.acepta_bs && (
+                {metodosPago.find(m => m.metodo_pago === "bs")?.habilitado && (
                   <button
                     type="button"
                     onClick={() => setFormData({ ...formData, metodo_pago: "bs" })}
@@ -454,7 +453,7 @@ export default function ReportarPagoPage() {
                     🇻🇪 Bs
                   </button>
                 )}
-                {gymConfig?.acepta_binance && (
+                {metodosPago.find(m => m.metodo_pago === "binance")?.habilitado && (
                   <button
                     type="button"
                     onClick={() => setFormData({ ...formData, metodo_pago: "binance" })}
@@ -467,7 +466,7 @@ export default function ReportarPagoPage() {
                     🟡 Binance
                   </button>
                 )}
-                {gymConfig?.acepta_transferencia && (
+                {metodosPago.find(m => m.metodo_pago === "transferencia")?.habilitado && (
                   <button
                     type="button"
                     onClick={() => setFormData({ ...formData, metodo_pago: "transferencia" })}

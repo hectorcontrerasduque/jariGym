@@ -13,7 +13,7 @@ export async function POST(request: Request) {
 
     const { data: profileAdmin } = await supabase
       .from("profiles")
-      .select("tenant_id, role")
+      .select("role")
       .eq("id", user.id)
       .single();
 
@@ -51,7 +51,6 @@ export async function POST(request: Request) {
       .upsert(
         {
           id: authUser.user.id,
-          tenant_id: profileAdmin?.tenant_id,
           email,
           nombre_completo: nombre,
           role: "miembro",

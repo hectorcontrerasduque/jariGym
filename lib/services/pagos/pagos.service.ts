@@ -21,15 +21,8 @@ export class PagosService {
     } = await this.supabase.auth.getUser();
     if (!user) throw new Error("No autenticado");
 
-    const { data: profile } = await this.supabase
-      .from("profiles")
-      .select("tenant_id")
-      .eq("id", user.id)
-      .single();
-
     const pagoData: Record<string, unknown> = {
       ...input,
-      tenant_id: profile?.tenant_id,
       estado: "pendiente",
     };
 

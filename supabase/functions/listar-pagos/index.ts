@@ -30,7 +30,7 @@ serve(async (req) => {
 
     const { data: profile } = await supabase
       .from("profiles")
-      .select("role, tenant_id")
+      .select("role")
       .eq("id", user.id)
       .single();
 
@@ -42,7 +42,6 @@ serve(async (req) => {
     let query = supabase
       .from("pagos")
       .select("*, profile:profiles(nombre_completo, avatar_url)")
-      .eq("tenant_id", profile.tenant_id)
       .order("created_at", { ascending: false });
 
     if (estado) {

@@ -44,7 +44,6 @@ serve(async (req) => {
         );
 
         await supabase.from("notificaciones_log").insert({
-          tenant_id: pago.tenant_id,
           usuario_id: pago.usuario_id,
           tipo: "pago_pendiente",
           canal: "email",
@@ -64,7 +63,6 @@ serve(async (req) => {
         );
 
         await supabase.from("notificaciones_log").insert({
-          tenant_id: pago.tenant_id,
           usuario_id: pago.usuario_id,
           tipo: "pago_pendiente",
           canal: "whatsapp",

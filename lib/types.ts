@@ -1,17 +1,5 @@
-export interface Tenant {
-  id: string;
-  nombre: string;
-  slug: string;
-  activo: boolean;
-  plan_suscripcion: "free" | "basic" | "pro" | "enterprise";
-  max_miembros: number;
-  created_at: string;
-  updated_at: string;
-}
-
 export interface Profile {
   id: string;
-  tenant_id: string | null;
   email: string | null;
   nombre_completo: string;
   avatar_url: string | null;
@@ -34,7 +22,6 @@ export interface Profile {
 
 export interface Plan {
   id: string;
-  tenant_id: string;
   nombre: string;
   precio: number;
   duracion_dias: number;
@@ -44,7 +31,6 @@ export interface Plan {
 
 export interface Membresia {
   id: string;
-  tenant_id: string;
   usuario_id: string;
   plan_id: string | null;
   fecha_inicio: string;
@@ -58,7 +44,6 @@ export type MetodoPago = "efectivo" | "bs" | "binance" | "transferencia" | "memb
 
 export interface Pago {
   id: string;
-  tenant_id: string;
   usuario_id: string;
   membresia_id: string | null;
   monto: number;
@@ -79,10 +64,33 @@ export interface Pago {
   approved_by_profile?: Profile;
 }
 
+export type TipoMovimiento = "inscripcion" | "mensualidad" | "otros";
+
+export interface Movimiento {
+  id: string;
+  usuario_id: string;
+  tipo: TipoMovimiento;
+  monto: number;
+  metodo_pago: MetodoPago;
+  comprobante_url: string | null;
+  codigo_billete: string | null;
+  notas: string | null;
+  mes_pagar: number | null;
+  anio_pagar: number | null;
+  estado: "pendiente" | "aprobado" | "rechazado";
+  activo: boolean;
+  approved_by: string | null;
+  approved_at: string | null;
+  fecha_pago_real: string | null;
+  created_at: string;
+  updated_at: string;
+  profile?: Profile;
+}
+
 export interface GymConfig {
   id: string;
-  tenant_id: string;
   nombre_gym: string | null;
+  max_miembros: number;
   logo_url: string | null;
   direccion: string | null;
   telefono: string | null;
@@ -93,20 +101,16 @@ export interface GymConfig {
   dueno_telefono: string | null;
   moneda: string;
   timezone: string;
-  color_primario: string;
-  color_secundario: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MetodoPagoConfig {
+  id: string;
+  metodo_pago: MetodoPago;
   monto_mensual: number;
   monto_inscripcion: number;
-  monto_mensual_bs: number;
-  monto_inscripcion_bs: number;
-  monto_mensual_binance: number;
-  monto_inscripcion_binance: number;
-  monto_mensual_transferencia: number;
-  monto_inscripcion_transferencia: number;
-  acepta_bs: boolean;
-  acepta_binance: boolean;
-  acepta_transferencia: boolean;
-  acepta_efectivo: boolean;
+  habilitado: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -123,7 +127,6 @@ export interface NotificacionesConfig {
 
 export interface NotificacionLog {
   id: string;
-  tenant_id: string;
   usuario_id: string | null;
   tipo: "pago_pendiente" | "pago_atrasado" | "pago_confirmado" | "membresia_vence";
   canal: "whatsapp" | "email";

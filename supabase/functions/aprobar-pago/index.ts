@@ -30,7 +30,7 @@ serve(async (req) => {
 
     const { data: profile } = await supabase
       .from("profiles")
-      .select("role, tenant_id")
+      .select("role")
       .eq("id", user.id)
       .single();
 
@@ -58,7 +58,6 @@ serve(async (req) => {
       .from("pagos")
       .update(updates)
       .eq("id", pago_id)
-      .eq("tenant_id", profile.tenant_id)
       .select()
       .single();
 

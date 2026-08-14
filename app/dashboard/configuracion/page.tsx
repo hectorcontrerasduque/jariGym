@@ -5,11 +5,19 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { configService } from "@/lib/services/config/config.service";
-import { Save, Building2, User, DollarSign, CreditCard, Clock, Globe } from "lucide-react";
-import type { GymConfig } from "@/lib/types";
+import { Save, Building2, User, CreditCard, Clock, Globe } from "lucide-react";
+import type { GymConfig, MetodoPagoConfig } from "@/lib/types";
+
+const metodoLabels: Record<string, { label: string; icon: string; alwaysOn?: boolean }> = {
+  efectivo: { label: "Efectivo", icon: "💵", alwaysOn: true },
+  bs: { label: "Bolívares", icon: "🇻🇪" },
+  binance: { label: "Binance USDT", icon: "🟡" },
+  transferencia: { label: "Transferencia", icon: "🏦" },
+};
 
 export default function ConfiguracionPage() {
   const [config, setConfig] = useState<Partial<GymConfig>>({});
+  const [metodos, setMetodos] = useState<MetodoPagoConfig[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -17,7 +25,7 @@ export default function ConfiguracionPage() {
   const [localCountry, setLocalCountry] = useState("");
 
   useEffect(() => {
-    loadConfig();
+    loadData();
     detectDevice();
   }, []);
 
@@ -36,10 +44,14 @@ export default function ConfiguracionPage() {
     }
   };
 
-  const loadConfig = async () => {
+  const loadData = async () => {
     try {
-      const data = await configService.getConfig();
-      if (data) setConfig(data);
+      const [configData, metodosData] = await Promise.all([
+        configService.getConfig(),
+        configService.getMetodosPago(),
+      ]);
+      if (configData) setConfig(configData);
+      setMetodos(metodosData);
     } catch (error) {
       console.error("Error:", error);
     } finally {
@@ -47,7 +59,7 @@ export default function ConfiguracionPage() {
     }
   };
 
-  const handleSave = async () => {
+  const handleSaveConfig = async () => {
     setSaving(true);
     try {
       await configService.updateConfig(config);
@@ -57,6 +69,27 @@ export default function ConfiguracionPage() {
       console.error("Error:", error);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleToggleMetodo = async (metodo: MetodoPagoConfig) => {
+    if (metodoLabels[metodo.metodo_pago]?.alwaysOn) return;
+    try {
+      const updated = await configService.updateMetodoPago(metodo.id, {
+        habilitado: !metodo.habilitado,
+      });
+      setMetodos((prev) => prev.map((m) => (m.id === updated.id ? updated : m)));
+    } catch (error) {
+      console.error("Error:", error);
+    }
+  };
+
+  const handleUpdateMonto = async (metodo: MetodoPagoConfig, field: "monto_mensual" | "monto_inscripcion", value: number) => {
+    try {
+      const updated = await configService.updateMetodoPago(metodo.id, { [field]: value });
+      setMetodos((prev) => prev.map((m) => (m.id === updated.id ? updated : m)));
+    } catch (error) {
+      console.error("Error:", error);
     }
   };
 
@@ -77,7 +110,7 @@ export default function ConfiguracionPage() {
           <h1 className="text-2xl font-display font-bold text-gym-text neon-text">Configuración</h1>
           <p className="text-gym-muted text-sm">Personaliza tu gimnasio</p>
         </div>
-        <Button onClick={handleSave} loading={saving}>
+        <Button onClick={handleSaveConfig} loading={saving}>
           <Save className="w-4 h-4 mr-2" /> Guardar
         </Button>
       </div>
@@ -103,6 +136,7 @@ export default function ConfiguracionPage() {
             <Input label="Email de contacto" placeholder="contacto@miGym.com" type="email" value={config.email_contacto || ""} onChange={(e) => setConfig({ ...config, email_contacto: e.target.value })} />
           </div>
           <Input label="Horario" placeholder="Lun-Vie 6am-10pm" value={config.horario || ""} onChange={(e) => setConfig({ ...config, horario: e.target.value })} />
+          <Input label="Máximo de miembros" type="number" placeholder="50" value={config.max_miembros || ""} onChange={(e) => setConfig({ ...config, max_miembros: parseInt(e.target.value) || 0 })} min="1" />
         </CardContent>
       </Card>
 
@@ -120,104 +154,68 @@ export default function ConfiguracionPage() {
         </CardContent>
       </Card>
 
-      {/* Métodos de Pago + Montos fusionados */}
+      {/* Métodos de Pago */}
       <Card className="neon-card relative z-10">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <CreditCard className="w-5 h-5 text-gym-secondary" /> Métodos de Pago y Montos
+            <CreditCard className="w-5 h-5 text-gym-secondary" /> Métodos de Pago
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <p className="text-sm text-gym-muted">Efectivo siempre habilitado. Los montos se aplican por método de pago.</p>
+          <p className="text-sm text-gym-muted">Configura los métodos de pago aceptados y sus montos.</p>
 
-          {/* Efectivo */}
-          <div className="p-4 bg-gym-bg rounded-xl border border-gym-border/50">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-3">
-                <span className="text-xl">💵</span>
-                <div>
-                  <p className="font-medium text-gym-text">Efectivo</p>
-                  <p className="text-xs text-gym-muted">Siempre habilitado</p>
+          {metodos.map((metodo) => {
+            const info = metodoLabels[metodo.metodo_pago] || { label: metodo.metodo_pago, icon: "💳" };
+            const isAlwaysOn = info.alwaysOn;
+            return (
+              <div
+                key={metodo.id}
+                className={`p-4 rounded-xl border transition-all ${metodo.habilitado ? "bg-gym-bg border-gym-border/50" : "bg-gym-bg/30 border-gym-border/20 opacity-60"}`}
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <span className="text-xl">{info.icon}</span>
+                    <div>
+                      <p className="font-medium text-gym-text">{info.label}</p>
+                      {isAlwaysOn && <p className="text-xs text-gym-muted">Siempre habilitado</p>}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={isAlwaysOn}
+                    onClick={() => handleToggleMetodo(metodo)}
+                    className={`w-11 h-6 rounded-full flex items-center px-1 transition-all ${
+                      metodo.habilitado ? "bg-gym-primary justify-end" : "bg-gym-surface justify-start"
+                    } ${isAlwaysOn ? "cursor-not-allowed opacity-70" : "cursor-pointer"}`}
+                  >
+                    <div className={`w-5 h-5 rounded-full transition-all ${metodo.habilitado ? "bg-white" : "bg-gym-border"}`} />
+                  </button>
                 </div>
+                {metodo.habilitado && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <Input
+                      label={`Mensualidad`}
+                      type="number"
+                      placeholder="0"
+                      value={metodo.monto_mensual || ""}
+                      onChange={(e) => handleUpdateMonto(metodo, "monto_mensual", parseFloat(e.target.value) || 0)}
+                      min="0"
+                      step="0.01"
+                    />
+                    <Input
+                      label={`Inscripción`}
+                      type="number"
+                      placeholder="0"
+                      value={metodo.monto_inscripcion || ""}
+                      onChange={(e) => handleUpdateMonto(metodo, "monto_inscripcion", parseFloat(e.target.value) || 0)}
+                      min="0"
+                      step="0.01"
+                    />
+                  </div>
+                )}
               </div>
-              <div className="w-11 h-6 bg-gym-primary rounded-full flex items-center justify-end px-1">
-                <div className="w-5 h-5 bg-white rounded-full" />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <Input label="Mensualidad ($)" type="number" placeholder="29.99" value={config.monto_mensual || ""} onChange={(e) => setConfig({ ...config, monto_mensual: parseFloat(e.target.value) || 0 })} min="0" step="0.01" />
-              <Input label="Inscripción ($)" type="number" placeholder="0.00" value={config.monto_inscripcion || ""} onChange={(e) => setConfig({ ...config, monto_inscripcion: parseFloat(e.target.value) || 0 })} min="0" step="0.01" />
-            </div>
-          </div>
-
-          {/* BS */}
-          <div className={`p-4 rounded-xl border transition-all ${config.acepta_bs ? "bg-gym-bg border-gym-border/50" : "bg-gym-bg/30 border-gym-border/20 opacity-60"}`}>
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-3">
-                <span className="text-xl">🇻🇪</span>
-                <p className="font-medium text-gym-text">Bolívares</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setConfig({ ...config, acepta_bs: !config.acepta_bs })}
-                className={`w-11 h-6 rounded-full flex items-center px-1 transition-all ${config.acepta_bs ? "bg-gym-primary justify-end" : "bg-gym-surface justify-start"}`}
-              >
-                <div className={`w-5 h-5 rounded-full transition-all ${config.acepta_bs ? "bg-white" : "bg-gym-border"}`} />
-              </button>
-            </div>
-            {config.acepta_bs && (
-              <div className="grid grid-cols-2 gap-3">
-                <Input label="Mensualidad (Bs)" type="number" placeholder="0" value={config.monto_mensual_bs || ""} onChange={(e) => setConfig({ ...config, monto_mensual_bs: parseFloat(e.target.value) || 0 })} min="0" />
-                <Input label="Inscripción (Bs)" type="number" placeholder="0" value={config.monto_inscripcion_bs || ""} onChange={(e) => setConfig({ ...config, monto_inscripcion_bs: parseFloat(e.target.value) || 0 })} min="0" />
-              </div>
-            )}
-          </div>
-
-          {/* Binance */}
-          <div className={`p-4 rounded-xl border transition-all ${config.acepta_binance ? "bg-gym-bg border-gym-border/50" : "bg-gym-bg/30 border-gym-border/20 opacity-60"}`}>
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-3">
-                <span className="text-xl">🟡</span>
-                <p className="font-medium text-gym-text">Binance</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setConfig({ ...config, acepta_binance: !config.acepta_binance })}
-                className={`w-11 h-6 rounded-full flex items-center px-1 transition-all ${config.acepta_binance ? "bg-gym-primary justify-end" : "bg-gym-surface justify-start"}`}
-              >
-                <div className={`w-5 h-5 rounded-full transition-all ${config.acepta_binance ? "bg-white" : "bg-gym-border"}`} />
-              </button>
-            </div>
-            {config.acepta_binance && (
-              <div className="grid grid-cols-2 gap-3">
-                <Input label="Mensualidad (USDT)" type="number" placeholder="0" value={config.monto_mensual_binance || ""} onChange={(e) => setConfig({ ...config, monto_mensual_binance: parseFloat(e.target.value) || 0 })} min="0" />
-                <Input label="Inscripción (USDT)" type="number" placeholder="0" value={config.monto_inscripcion_binance || ""} onChange={(e) => setConfig({ ...config, monto_inscripcion_binance: parseFloat(e.target.value) || 0 })} min="0" />
-              </div>
-            )}
-          </div>
-
-          {/* Transferencia */}
-          <div className={`p-4 rounded-xl border transition-all ${config.acepta_transferencia ? "bg-gym-bg border-gym-border/50" : "bg-gym-bg/30 border-gym-border/20 opacity-60"}`}>
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-3">
-                <span className="text-xl">🏦</span>
-                <p className="font-medium text-gym-text">Transferencia</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setConfig({ ...config, acepta_transferencia: !config.acepta_transferencia })}
-                className={`w-11 h-6 rounded-full flex items-center px-1 transition-all ${config.acepta_transferencia ? "bg-gym-primary justify-end" : "bg-gym-surface justify-start"}`}
-              >
-                <div className={`w-5 h-5 rounded-full transition-all ${config.acepta_transferencia ? "bg-white" : "bg-gym-border"}`} />
-              </button>
-            </div>
-            {config.acepta_transferencia && (
-              <div className="grid grid-cols-2 gap-3">
-                <Input label="Mensualidad ($)" type="number" placeholder="0" value={config.monto_mensual_transferencia || ""} onChange={(e) => setConfig({ ...config, monto_mensual_transferencia: parseFloat(e.target.value) || 0 })} min="0" />
-                <Input label="Inscripción ($)" type="number" placeholder="0" value={config.monto_inscripcion_transferencia || ""} onChange={(e) => setConfig({ ...config, monto_inscripcion_transferencia: parseFloat(e.target.value) || 0 })} min="0" />
-              </div>
-            )}
-          </div>
+            );
+          })}
         </CardContent>
       </Card>
 

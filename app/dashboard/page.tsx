@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { pagosService } from "@/lib/services/pagos/pagos.service";
-import { formatCurrency, getMonthName, formatDateTime } from "@/lib/utils";
+import { formatCurrency, getMonthName } from "@/lib/utils";
 import {
   Users,
   CreditCard,

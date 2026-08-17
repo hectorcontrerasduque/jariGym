@@ -257,7 +257,7 @@ export class PagosService {
         .select("usuario_id")
         .is("fecha_fin", null),
       this.supabase
-        .from("metodos_pago_config")
+        .from("gym_config_metodos_pago")
         .select("monto_mensual")
         .eq("habilitado", true)
         .limit(1)

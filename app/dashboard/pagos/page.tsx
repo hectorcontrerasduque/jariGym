@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
 import { pagosService } from "@/lib/services/pagos/pagos.service";
 import { miembrosService } from "@/lib/services/miembros/miembros.service";
-import { formatCurrency, getMonthName, formatDateTime } from "@/lib/utils";
+import { formatCurrency, getMonthName } from "@/lib/utils";
 import { Check, X, Eye, CreditCard, Clock, CheckCircle, AlertTriangle, Bell, Calendar, Trash2, FileText, Search } from "lucide-react";
 import type { Pago, MetodoPago, Profile } from "@/lib/types";
 import Link from "next/link";

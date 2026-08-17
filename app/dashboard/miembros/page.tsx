@@ -10,7 +10,7 @@ import { Avatar } from "@/components/ui/avatar";
 import { miembrosService } from "@/lib/services/miembros/miembros.service";
 import { formatDate, formatCurrency, formatDateTime } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
-import { Users, Search, Plus, Eye, Shield, ShieldOff, UserX, UserCheck, Gift, GiftOff } from "lucide-react";
+import { Users, Search, Plus, Eye, UserX, UserCheck } from "lucide-react";
 import type { Profile, Pago } from "@/lib/types";
 
 export default function MiembrosPage() {

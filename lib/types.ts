@@ -7,37 +7,25 @@ export interface Profile {
   cedula: string | null;
   horario_entreno: string | null;
   role: "super_admin" | "admin" | "miembro";
-  estado: "activo" | "suspendido" | "inactivo";
   activo: boolean;
   fecha_inscripcion: string;
   monto_inscripcion_pagado: number;
   inscripcion_pagada: boolean;
   inscripcion_fecha: string | null;
-  membresia_libre: boolean;
   notas_admin: string | null;
-  notas_estado: string | null;
   created_at: string;
   updated_at: string;
-}
-
-export interface Plan {
-  id: string;
-  nombre: string;
-  precio: number;
-  duracion_dias: number;
-  activo: boolean;
-  created_at: string;
 }
 
 export interface Membresia {
   id: string;
   usuario_id: string;
-  plan_id: string | null;
   fecha_inicio: string;
-  fecha_fin: string;
+  fecha_fin: string | null;
+  asignado_por: string | null;
+  asignado_por_nombre: string | null;
   estado: "activa" | "vencida" | "cancelada";
   created_at: string;
-  plan?: Plan;
 }
 
 export type MetodoPago = "efectivo" | "bs" | "binance" | "transferencia" | "membresia_libre";
@@ -45,7 +33,6 @@ export type MetodoPago = "efectivo" | "bs" | "binance" | "transferencia" | "memb
 export interface Pago {
   id: string;
   usuario_id: string;
-  membresia_id: string | null;
   monto: number;
   comprobante_url: string | null;
   estado: "pendiente" | "aprobado" | "rechazado";
@@ -60,7 +47,6 @@ export interface Pago {
   created_at: string;
   updated_at: string;
   profile?: Profile;
-  membresia?: Membresia;
   approved_by_profile?: Profile;
 }
 

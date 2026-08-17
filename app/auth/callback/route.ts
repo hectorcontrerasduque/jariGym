@@ -34,7 +34,16 @@ export async function GET(request: Request) {
           .eq("id", user.id);
       }
 
-      return NextResponse.redirect(`${origin}${next}`);
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .single();
+
+      const isAdmin = profile?.role === "super_admin" || profile?.role === "admin";
+      const redirectPath = isAdmin ? next : (next === "/dashboard" ? "/dashboard/mis-pagos" : next);
+
+      return NextResponse.redirect(`${origin}${redirectPath}`);
     }
 
     console.error("Code exchange error:", exchangeError?.message);

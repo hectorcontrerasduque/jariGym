@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/client";
+import { getMonthName } from "@/lib/utils";
 import type { Pago, MetodoPago } from "@/lib/types";
 
 export interface CreatePagoInput {
@@ -10,6 +11,7 @@ export interface CreatePagoInput {
   comprobante_url?: string;
   codigo_billete?: string;
   notas?: string;
+  fecha_pago_real?: string;
 }
 
 export class PagosService {
@@ -34,6 +36,10 @@ export class PagosService {
 
     if (input.metodo_pago === "efectivo") {
       pagoData.comprobante_url = null;
+    }
+
+    if (input.fecha_pago_real) {
+      pagoData.fecha_pago_real = input.fecha_pago_real;
     }
 
     const { data, error } = await this.supabase
@@ -81,6 +87,21 @@ export class PagosService {
 
     if (error) throw error;
     return data;
+  }
+
+  async eliminarPago(pagoId: string): Promise<void> {
+    const {
+      data: { user },
+    } = await this.supabase.auth.getUser();
+    if (!user) throw new Error("No autenticado");
+
+    const { error } = await this.supabase
+      .from("pagos")
+      .delete()
+      .eq("id", pagoId)
+      .eq("estado", "pendiente");
+
+    if (error) throw error;
   }
 
   async listarMisPagos(usuarioId: string, anio?: number): Promise<Pago[]> {
@@ -134,9 +155,9 @@ export class PagosService {
 
     const { data, error } = await this.supabase
       .from("pagos")
-      .select("mes_pagar, anio_pagar")
+      .select("mes_pagar, anio_pagar, estado")
       .eq("usuario_id", usuarioId)
-      .eq("estado", "aprobado")
+      .in("estado", ["aprobado", "pendiente"])
       .order("anio_pagar", { ascending: false })
       .order("mes_pagar", { ascending: false });
 
@@ -177,11 +198,30 @@ export class PagosService {
     return this.mesesPendientes(usuarioId);
   }
 
-  async aniosConPagos(): Promise<number[]> {
-    const { data, error } = await this.supabase
+  async tieneInscripcionPendiente(usuarioId: string): Promise<boolean> {
+    const { data } = await this.supabase
+      .from("pagos")
+      .select("id")
+      .eq("usuario_id", usuarioId)
+      .ilike("notas", "%inscripción%")
+      .in("estado", ["pendiente", "aprobado"])
+      .limit(1)
+      .maybeSingle();
+
+    return !!data;
+  }
+
+  async aniosConPagos(usuarioId?: string): Promise<number[]> {
+    let query = this.supabase
       .from("pagos")
       .select("anio_pagar")
       .order("anio_pagar", { ascending: false });
+
+    if (usuarioId) {
+      query = query.eq("usuario_id", usuarioId);
+    }
+
+    const { data, error } = await query;
 
     if (error) throw error;
 
@@ -195,75 +235,154 @@ export class PagosService {
   async stats(anio?: number) {
     const hoy = new Date();
     const anioConsulta = anio || hoy.getFullYear();
+    const mesActual = hoy.getMonth() + 1;
 
-    const [pendientes, aprobados, allMiembros, pagosAnio] = await Promise.all([
+    const [pendientes, allMiembros, pagosAnio, libres, config] = await Promise.all([
       this.supabase
         .from("pagos")
         .select("id, monto, usuario_id, mes_pagar, anio_pagar", { count: "exact", head: true })
         .eq("estado", "pendiente")
         .eq("anio_pagar", anioConsulta),
       this.supabase
-        .from("pagos")
-        .select("monto, usuario_id")
-        .eq("estado", "aprobado")
-        .eq("anio_pagar", anioConsulta),
-      this.supabase
         .from("profiles")
-        .select("id, inscripcion_pagada, membresia_libre, estado, fecha_inscripcion")
-        .eq("role", "miembro"),
+        .select("id, inscripcion_pagada, fecha_inscripcion")
+        .eq("role", "miembro")
+        .eq("activo", true),
       this.supabase
         .from("pagos")
         .select("monto, usuario_id, estado, anio_pagar, mes_pagar")
         .eq("anio_pagar", anioConsulta),
+      this.supabase
+        .from("membresias")
+        .select("usuario_id")
+        .is("fecha_fin", null),
+      this.supabase
+        .from("metodos_pago_config")
+        .select("monto_mensual")
+        .eq("habilitado", true)
+        .limit(1)
+        .maybeSingle(),
     ]);
 
     const miembros = allMiembros.data || [];
-    const pagosAprobados = aprobados.data || [];
     const pagosAnioData = pagosAnio.data || [];
+    const miembrosLibresIds = new Set((libres.data || []).map((l) => l.usuario_id));
+    const montoMensual = config?.data?.monto_mensual || 5;
 
-    const miembrosActivos = miembros.filter((m) => m.estado === "activo");
-    const miembrosLibres = miembros.filter((m) => m.membresia_libre);
-
+    // Inscritos: solo miembros activos
     const inscritosPagados = miembros.filter((m) => m.inscripcion_pagada).length;
     const inscritosPendientes = miembros.filter((m) => !m.inscripcion_pagada).length;
 
-    const usuariosConPagoMesActual = new Set(
-      pagosAprobados
-        .filter((p) => {
-          const hoy = new Date();
-          return true;
-        })
-        .map((p) => p.usuario_id)
+    // Deudores: meses no pagados por miembros activos (no libres)
+    const todosPagosAprobados = pagosAnioData.filter((p) => p.estado === "aprobado");
+    let totalMesesDeuda = 0;
+    const deudoresSet = new Set<string>();
+
+    for (const m of miembros) {
+      if (miembrosLibresIds.has(m.id)) continue;
+      if (!m.inscripcion_pagada) continue;
+
+      const fechaInicio = m.fecha_inscripcion ? new Date(m.fecha_inscripcion) : new Date(anioConsulta, 0, 1);
+      const mesInicio = fechaInicio.getFullYear() === anioConsulta ? fechaInicio.getMonth() + 1 : 1;
+      const mesMax = anioConsulta < hoy.getFullYear() ? 12 : (anioConsulta === hoy.getFullYear() ? mesActual : 12);
+
+      const pagosMiembro = todosPagosAprobados.filter((p) => p.usuario_id === m.id);
+      const mesesPagados = new Set(pagosMiembro.map((p) => p.mes_pagar));
+
+      let mesesDeudaMiembro = 0;
+      for (let mes = mesInicio; mes <= mesMax; mes++) {
+        if (!mesesPagados.has(mes)) {
+          mesesDeudaMiembro++;
+        }
+      }
+      if (mesesDeudaMiembro > 0) {
+        deudoresSet.add(m.id);
+        totalMesesDeuda += mesesDeudaMiembro;
+      }
+    }
+
+    const montoDeuda = totalMesesDeuda * montoMensual;
+
+    // Al día: pagos aceptados en mes actual (solo de miembros con inscripción pagada)
+    const pagosMesActual = pagosAnioData.filter(
+      (p) => p.estado === "aprobado" && p.mes_pagar === mesActual && p.anio_pagar === anioConsulta
     );
-
-    const usuariosConPago = new Set(pagosAprobados.map((p) => p.usuario_id));
-    const deudoresMensualidad = miembrosActivos.filter(
-      (m) => !usuariosConPago.has(m.id) && !m.membresia_libre
-    ).length;
-    const alDiaMensualidad = miembrosActivos.filter(
-      (m) => usuariosConPago.has(m.id) || m.membresia_libre
-    ).length;
-
-    const montoDeuda = deudoresMensualidad * 0;
-    const montoPagado = pagosAprobados.reduce((sum, p) => sum + (p.monto || 0), 0);
-
-    const ingresosMes = pagosAprobados
-      .filter((p) => true)
+    const miembrosConInscripcion = new Set(
+      miembros.filter((m) => m.inscripcion_pagada).map((m) => m.id)
+    );
+    const alDiaMensualidad = pagosMesActual.filter((p) => miembrosConInscripcion.has(p.usuario_id)).length;
+    const montoPagado = pagosMesActual
+      .filter((p) => miembrosConInscripcion.has(p.usuario_id))
       .reduce((sum, p) => sum + (p.monto || 0), 0);
 
     return {
       totalMiembros: miembros.length,
       inscritosPagados,
       inscritosPendientes,
-      deudoresMensualidad,
+      deudoresMensualidad: deudoresSet.size,
       alDiaMensualidad,
       montoDeuda,
       montoPagado,
-      membresiaLibre: miembrosLibres.length,
-      pagosConfirmados: pagosAprobados.length,
+      membresiaLibre: miembrosLibresIds.size,
+      pagosConfirmados: todosPagosAprobados.length,
       pagosPendientes: pendientes.count || 0,
-      ingresosMes,
+      ingresosMes: montoPagado,
     };
+  }
+
+  async monthlyStats() {
+    const hoy = new Date();
+    const meses = [];
+    for (let i = 2; i >= 0; i--) {
+      const fecha = new Date(hoy.getFullYear(), hoy.getMonth() - i, 1);
+      meses.push({
+        mes: fecha.getMonth() + 1,
+        anio: fecha.getFullYear(),
+        nombre: getMonthName(fecha.getMonth() + 1),
+      });
+    }
+
+    const totalMiembros = (await this.supabase
+      .from("profiles")
+      .select("id", { count: "exact", head: true })
+      .eq("role", "miembro")).count || 0;
+
+    const libres = (await this.supabase
+      .from("membresias")
+      .select("usuario_id", { count: "exact", head: true })
+      .is("fecha_fin", null)).count || 0;
+
+    const statsMeses = await Promise.all(
+      meses.map(async (m) => {
+        const { data: pagosMes } = await this.supabase
+          .from("pagos")
+          .select("usuario_id, estado")
+          .eq("mes_pagar", m.mes)
+          .eq("anio_pagar", m.anio);
+
+        const pagados = new Set(
+          (pagosMes || []).filter((p) => p.estado === "aprobado").map((p) => p.usuario_id)
+        ).size;
+
+        const pendientes = new Set(
+          (pagosMes || []).filter((p) => p.estado === "pendiente").map((p) => p.usuario_id)
+        ).size;
+
+        const sinPago = totalMiembros - pagados - libres;
+
+        return {
+          mes: m.mes,
+          anio: m.anio,
+          nombre: m.nombre,
+          pagados,
+          pendientes,
+          sinPago: Math.max(0, sinPago),
+          libres,
+        };
+      })
+    );
+
+    return { totalMiembros, libres, meses: statsMeses };
   }
 }
 

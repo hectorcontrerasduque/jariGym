@@ -39,5 +39,20 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  if (user && request.nextUrl.pathname === "/dashboard") {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+
+    const isAdmin = profile?.role === "super_admin" || profile?.role === "admin";
+    if (!isAdmin) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/dashboard/mis-pagos";
+      return NextResponse.redirect(url);
+    }
+  }
+
   return supabaseResponse;
 }

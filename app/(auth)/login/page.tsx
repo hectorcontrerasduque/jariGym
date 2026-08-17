@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { authService } from "@/lib/services/auth/auth.service";
 import { createClient } from "@/lib/supabase/client";
-import { Dumbbell } from "lucide-react";
+import { Dumbbell, CheckCircle } from "lucide-react";
 
 export default function LoginPage() {
   return (
@@ -24,6 +24,10 @@ function LoginForm() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [resetSent, setResetSent] = useState(false);
+  const [showResetForm, setShowResetForm] = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetLoading, setResetLoading] = useState(false);
 
   useEffect(() => {
     const err = searchParams.get("error");
@@ -48,10 +52,10 @@ function LoginForm() {
       if (isAdmin) {
         router.push("/dashboard");
       } else {
-        router.push("/dashboard");
+        router.push("/dashboard/mis-pagos");
       }
     } else {
-      router.push("/dashboard");
+      router.push("/login");
     }
   };
 
@@ -76,6 +80,20 @@ function LoginForm() {
     } catch (err: any) {
       setError(err.message || "Error al iniciar sesión");
       setLoading(false);
+    }
+  };
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setResetLoading(true);
+    setError("");
+    try {
+      await authService.resetPassword(resetEmail);
+      setResetSent(true);
+    } catch (err: any) {
+      setError(err.message || "Error al enviar correo de recuperación");
+    } finally {
+      setResetLoading(false);
     }
   };
 
@@ -116,6 +134,15 @@ function LoginForm() {
           <form onSubmit={handleEmailLogin} className="space-y-3">
             <Input type="email" placeholder="tu@email.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
             <Input type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required />
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => { setShowResetForm(true); setResetEmail(email); }}
+                className="text-xs text-gym-primary hover:text-gym-primary/80 transition-colors"
+              >
+                ¿Olvidaste tu contraseña?
+              </button>
+            </div>
             {error && <p className="text-sm text-gym-danger text-center bg-gym-danger/10 p-2 rounded-xl">{error}</p>}
             <Button type="submit" className="w-full" loading={loading}>
               Iniciar Sesión
@@ -123,6 +150,63 @@ function LoginForm() {
           </form>
         </CardContent>
       </Card>
+
+      {/* Forgot Password Modal */}
+      {showResetForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <Card className="w-full max-w-md border-gym-primary/20">
+            <CardHeader className="text-center">
+              <CardTitle className="text-lg font-display text-gym-text">
+                {resetSent ? "Correo Enviado" : "Recuperar Contraseña"}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {resetSent ? (
+                <div className="text-center space-y-4">
+                  <CheckCircle className="w-12 h-12 text-gym-success mx-auto" />
+                  <p className="text-sm text-gym-muted">
+                    Se envió un correo a <strong>{resetEmail}</strong> con las instrucciones para restablecer tu contraseña.
+                  </p>
+                  <Button
+                    variant="secondary"
+                    className="w-full"
+                    onClick={() => { setShowResetForm(false); setResetSent(false); }}
+                  >
+                    Cerrar
+                  </Button>
+                </div>
+              ) : (
+                <form onSubmit={handleResetPassword} className="space-y-4">
+                  <p className="text-sm text-gym-muted">
+                    Ingresa tu correo electrónico y te enviaremos las instrucciones para restablecer tu contraseña.
+                  </p>
+                  <Input
+                    type="email"
+                    placeholder="tu@email.com"
+                    value={resetEmail}
+                    onChange={(e) => setResetEmail(e.target.value)}
+                    required
+                  />
+                  {error && <p className="text-sm text-gym-danger text-center bg-gym-danger/10 p-2 rounded-xl">{error}</p>}
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      className="flex-1"
+                      onClick={() => { setShowResetForm(false); setError(""); }}
+                    >
+                      Cancelar
+                    </Button>
+                    <Button type="submit" className="flex-1" loading={resetLoading}>
+                      Enviar
+                    </Button>
+                  </div>
+                </form>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }

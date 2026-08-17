@@ -48,3 +48,7 @@ yarn-error.log*
 
 # misc
 *.pem
+
+# local scripts
+check.sh
+check.ps1

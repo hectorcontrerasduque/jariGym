@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, useMemo, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,23 +10,42 @@ import { pagosService } from "@/lib/services/pagos/pagos.service";
 import { configService } from "@/lib/services/config/config.service";
 import { miembrosService } from "@/lib/services/miembros/miembros.service";
 import { createClient } from "@/lib/supabase/client";
-import { Upload, CheckCircle, XCircle, DollarSign, User, FileText } from "lucide-react";
-import { getMonthName, formatCurrency } from "@/lib/utils";
+import { Upload, CheckCircle, XCircle, DollarSign, User, FileText, Gift, Calendar, ArrowLeft, AlertTriangle, Send } from "lucide-react";
+import { getMonthName, formatCurrency, formatDate } from "@/lib/utils";
 import type { MetodoPago, GymConfig, MetodoPagoConfig, Profile } from "@/lib/types";
+import Link from "next/link";
+
+interface MembresiaLibreInfo {
+  fecha_inicio: string;
+  fecha_fin: string | null;
+  asignado_por_nombre: string | null;
+}
 
 export default function ReportarPagoPage() {
+  return (
+    <Suspense>
+      <ReportarPagoForm />
+    </Suspense>
+  );
+}
+
+function ReportarPagoForm() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const memberParam = searchParams.get("member");
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
   const [userId, setUserId] = useState<string>("");
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [userRole, setUserRole] = useState<string>("");
   const [gymConfig, setGymConfig] = useState<GymConfig | null>(null);
   const [metodosPago, setMetodosPago] = useState<MetodoPagoConfig[]>([]);
   const [miembros, setMiembros] = useState<Profile[]>([]);
   const [miembroSeleccionado, setMiembroSeleccionado] = useState<string>("");
   const [inscripcionPagada, setInscripcionPagada] = useState(false);
+  const [inscripcionPendiente, setInscripcionPendiente] = useState(false);
   const [mesesPendientes, setMesesPendientes] = useState<{ mes: number; anio: number }[]>([]);
+  const [membresiaLibreInfo, setMembresiaLibreInfo] = useState<MembresiaLibreInfo | null>(null);
 
   const [formData, setFormData] = useState({
     meses: [] as { mes: number; anio: number }[],
@@ -34,15 +53,24 @@ export default function ReportarPagoPage() {
     codigo_billete: "",
     notas: "",
     pagar_inscripcion: false,
-    pagar_mensualidad: true,
+    pagar_mensualidad: false,
     estado_pago: "aprobado" as "pendiente" | "aprobado",
+    fecha_pago: new Date().toISOString().split("T")[0],
   });
   const [comprobante, setComprobante] = useState<File | null>(null);
+
+  const isAdmin = userRole === "super_admin" || userRole === "admin";
 
   useEffect(() => { loadData(); }, []);
 
   useEffect(() => {
-    if (miembroSeleccionado) {
+    if (isAdmin && memberParam && miembros.length > 0) {
+      setMiembroSeleccionado(memberParam);
+    }
+  }, [memberParam, miembros, isAdmin]);
+
+  useEffect(() => {
+    if (isAdmin && miembroSeleccionado) {
       loadMiembroPendientes(miembroSeleccionado);
     }
   }, [miembroSeleccionado]);
@@ -60,16 +88,34 @@ export default function ReportarPagoPage() {
           .single();
 
         if (profile) {
-          setIsAdmin(profile.role === "super_admin" || profile.role === "admin");
+          setUserRole(profile.role);
           setInscripcionPagada(profile.inscripcion_pagada);
         }
 
-        if (profile?.role === "super_admin" || profile?.role === "admin") {
-          const members = await miembrosService.listarMiembros("activo");
+        const currentIsAdmin = profile?.role === "super_admin" || profile?.role === "admin";
+
+        if (currentIsAdmin) {
+          const members = await miembrosService.listarMiembros();
           setMiembros(members);
         } else {
-          const meses = await pagosService.mesesPendientes(user.id);
+          const [meses, tienePendiente] = await Promise.all([
+            pagosService.mesesPendientes(user.id),
+            pagosService.tieneInscripcionPendiente(user.id),
+          ]);
           setMesesPendientes(meses);
+          setInscripcionPendiente(tienePendiente);
+
+          const { data: libreData } = await supabase
+            .from("membresias")
+            .select("fecha_inicio, fecha_fin, asignado_por_nombre")
+            .eq("usuario_id", user.id)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (libreData) {
+            setMembresiaLibreInfo(libreData as MembresiaLibreInfo);
+          }
         }
       }
 
@@ -85,19 +131,24 @@ export default function ReportarPagoPage() {
 
   const loadMiembroPendientes = async (miembroId: string) => {
     try {
-      const meses = await pagosService.mesesPendientesAdmin(miembroId);
+      const [meses, profile, libreData, tienePendiente] = await Promise.all([
+        pagosService.mesesPendientesAdmin(miembroId),
+        createClient().from("profiles").select("inscripcion_pagada").eq("id", miembroId).single(),
+        createClient().from("membresias").select("fecha_inicio, fecha_fin, asignado_por_nombre").eq("usuario_id", miembroId).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+        pagosService.tieneInscripcionPendiente(miembroId),
+      ]);
+
       setMesesPendientes(meses);
+      if (profile.data) setInscripcionPagada(profile.data.inscripcion_pagada);
+      setInscripcionPendiente(tienePendiente);
 
-      const supabase = createClient();
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("inscripcion_pagada")
-        .eq("id", miembroId)
-        .single();
+      if (libreData.data) {
+        setMembresiaLibreInfo(libreData.data as MembresiaLibreInfo);
+      } else {
+        setMembresiaLibreInfo(null);
+      }
 
-      if (profile) setInscripcionPagada(profile.inscripcion_pagada);
-
-      setFormData(prev => ({ ...prev, meses: [], pagar_inscripcion: false }));
+      setFormData(prev => ({ ...prev, meses: [], pagar_inscripcion: false, pagar_mensualidad: false }));
     } catch (err) {
       console.error("Error loading member:", err);
     }
@@ -109,12 +160,12 @@ export default function ReportarPagoPage() {
       const meses = existe
         ? prev.meses.filter((m) => !(m.mes === mes && m.anio === anio))
         : [...prev.meses, { mes, anio }];
-      return { ...prev, meses };
+      return { ...prev, meses, pagar_mensualidad: meses.length > 0 ? true : prev.pagar_mensualidad };
     });
   };
 
   const selectAll = () => {
-    setFormData((prev) => ({ ...prev, meses: [...mesesPendientes] }));
+    setFormData((prev) => ({ ...prev, meses: [...mesesPendientes], pagar_mensualidad: true }));
   };
 
   const getMontoByMetodo = (metodo: MetodoPago, tipo: "mensual" | "inscripcion"): number => {
@@ -127,16 +178,15 @@ export default function ReportarPagoPage() {
   };
 
   const montoTotal = useMemo(() => {
-    if (!gymConfig) return 0;
     let total = 0;
     if (formData.pagar_inscripcion && !inscripcionPagada && getMontoByMetodo(formData.metodo_pago, "inscripcion") > 0) {
       total += getMontoByMetodo(formData.metodo_pago, "inscripcion");
     }
-    if (formData.pagar_mensualidad) {
+    if (formData.pagar_mensualidad && formData.meses.length > 0) {
       total += formData.meses.length * getMontoByMetodo(formData.metodo_pago, "mensual");
     }
     return total;
-  }, [gymConfig, formData.metodo_pago, formData.pagar_inscripcion, formData.pagar_mensualidad, formData.meses, inscripcionPagada]);
+  }, [formData.metodo_pago, formData.pagar_inscripcion, formData.pagar_mensualidad, formData.meses, inscripcionPagada]);
 
   const needsComprobante = (metodo: MetodoPago): boolean => {
     return metodo !== "efectivo" && metodo !== "membresia_libre";
@@ -150,12 +200,16 @@ export default function ReportarPagoPage() {
     try {
       const targetUserId = isAdmin && miembroSeleccionado ? miembroSeleccionado : userId;
 
-      if (!isAdmin && formData.pagar_inscripcion && inscripcionPagada) {
-        throw new Error("La inscripción ya está pagada");
+      if (!formData.pagar_inscripcion && !formData.pagar_mensualidad) {
+        throw new Error("Selecciona al menos inscripción o mensualidad");
       }
 
       if (formData.pagar_mensualidad && formData.meses.length === 0) {
         throw new Error("Selecciona al menos un mes");
+      }
+
+      if (!isAdmin && formData.pagar_inscripcion && inscripcionPagada) {
+        throw new Error("La inscripción ya está pagada");
       }
 
       let comprobanteUrl = "";
@@ -181,6 +235,7 @@ export default function ReportarPagoPage() {
           comprobante_url: comprobanteUrl || undefined,
           codigo_billete: formData.metodo_pago === "efectivo" ? formData.codigo_billete : undefined,
           notas: `Inscripción - ${formData.notas || ""}`,
+          fecha_pago_real: formData.fecha_pago,
         });
 
         if (isAdmin && formData.estado_pago === "aprobado") {
@@ -193,7 +248,7 @@ export default function ReportarPagoPage() {
         }
       }
 
-      if (formData.pagar_mensualidad) {
+      if (formData.pagar_mensualidad && formData.meses.length > 0) {
         for (const { mes, anio } of formData.meses) {
           const pago = await pagosService.crearPago({
             usuario_id: targetUserId,
@@ -204,6 +259,7 @@ export default function ReportarPagoPage() {
             comprobante_url: comprobanteUrl || undefined,
             codigo_billete: formData.metodo_pago === "efectivo" ? formData.codigo_billete : undefined,
             notas: formData.notas || undefined,
+            fecha_pago_real: formData.fecha_pago,
           });
 
           if (isAdmin && formData.estado_pago === "aprobado") {
@@ -235,16 +291,45 @@ export default function ReportarPagoPage() {
     );
   }
 
-  const showInscriptionCheckbox = !isAdmin && !inscripcionPagada && gymConfig && getMontoByMetodo(formData.metodo_pago, "inscripcion") > 0;
+  const showInscriptionCheckbox = !inscripcionPagada && !inscripcionPendiente && gymConfig && getMontoByMetodo(formData.metodo_pago, "inscripcion") > 0;
+  const isLibre = membresiaLibreInfo && !membresiaLibreInfo.fecha_fin;
 
   return (
     <div className="max-w-2xl mx-auto space-y-6 animate-fadeIn">
-      <div>
-        <h1 className="text-2xl font-display font-bold text-gym-text neon-text">Reportar Pago</h1>
-        <p className="text-gym-muted text-sm">
-          {isAdmin ? "Selecciona el miembro, concepto y método de pago" : "Selecciona los meses y método de pago"}
-        </p>
+      <div className="flex items-center gap-3">
+        <Link href={isAdmin ? "/dashboard/pagos" : "/dashboard/mis-pagos"} className="p-2 hover:bg-gym-bg/50 rounded-xl transition-colors">
+          <ArrowLeft className="w-5 h-5 text-gym-muted" />
+        </Link>
+        <div>
+          <h1 className="text-2xl font-display font-bold text-gym-text neon-text">Reportar Pago</h1>
+          <p className="text-gym-muted text-sm">
+            {isAdmin ? "Selecciona el miembro, concepto y método de pago" : "Selecciona los meses y método de pago"}
+          </p>
+        </div>
       </div>
+
+      {/* Membresía libre info - para ambos perfiles */}
+      {isLibre && (
+        <Card className="neon-border-secondary bg-gradient-to-r from-gym-secondary/10 to-transparent">
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <Gift className="w-8 h-8 text-gym-secondary flex-shrink-0" />
+              <div>
+                <p className="font-medium text-gym-text">Membresía Libre</p>
+                <div className="flex items-center gap-2 text-xs text-gym-muted">
+                  <Calendar className="w-3 h-3" />
+                  <span>Desde: {new Date(membresiaLibreInfo!.fecha_inicio).toLocaleDateString("es-ES")}</span>
+                </div>
+                {membresiaLibreInfo!.asignado_por_nombre && (
+                  <p className="text-xs text-gym-muted">
+                    Asignada por: {membresiaLibreInfo!.asignado_por_nombre}
+                  </p>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Admin: Member selector */}
       {isAdmin && (
@@ -270,8 +355,8 @@ export default function ReportarPagoPage() {
         </Card>
       )}
 
-      {/* Inscription status for members */}
-      {!isAdmin && inscripcionPagada && (
+      {/* Inscription status */}
+      {inscripcionPagada && (
         <Card className="neon-border-success">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
@@ -309,7 +394,7 @@ export default function ReportarPagoPage() {
               <p className="text-xs text-gym-muted mt-1">No se encontró la configuración del gimnasio. Contacta al administrador.</p>
             </div>
           ) : (
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form id="pago-form" onSubmit={handleSubmit} className="space-y-6">
             {/* Payment concept checkboxes */}
             <div>
               <label className="text-sm font-medium text-gym-muted mb-3 block">Concepto de pago</label>
@@ -343,6 +428,14 @@ export default function ReportarPagoPage() {
                   <Badge variant="primary">{formData.meses.length} meses</Badge>
                 </label>
               </div>
+
+              {/* Alert: no concepto seleccionado */}
+              {!formData.pagar_inscripcion && !formData.pagar_mensualidad && (
+                <div className="flex items-center gap-2 mt-3 p-3 bg-gym-warning/10 border border-gym-warning/30 rounded-xl">
+                  <AlertTriangle className="w-4 h-4 text-gym-warning flex-shrink-0" />
+                  <p className="text-sm text-gym-warning">Debe seleccionar un concepto de pago</p>
+                </div>
+              )}
             </div>
 
             {/* Months selector */}
@@ -391,11 +484,19 @@ export default function ReportarPagoPage() {
                 <p className="text-xs text-gym-muted mt-2">
                   {formData.meses.length} mes(es) seleccionados
                 </p>
+
+                {/* Alert: sin meses seleccionados */}
+                {formData.meses.length === 0 && mesesPendientes.length > 0 && (
+                  <div className="flex items-center gap-2 mt-3 p-3 bg-gym-warning/10 border border-gym-warning/30 rounded-xl">
+                    <AlertTriangle className="w-4 h-4 text-gym-warning flex-shrink-0" />
+                    <p className="text-sm text-gym-warning">Debe seleccionar mes(es) a pagar</p>
+                  </div>
+                )}
               </div>
             )}
 
             {/* Admin: Status selector */}
-            {isAdmin && (formData.pagar_inscripcion || formData.pagar_mensualidad) && (
+            {isAdmin && (formData.pagar_inscripcion || (formData.pagar_mensualidad && formData.meses.length > 0)) && (
               <div>
                 <label className="text-sm font-medium text-gym-muted mb-3 block">Estado del pago</label>
                 <div className="grid grid-cols-2 gap-2">
@@ -523,6 +624,21 @@ export default function ReportarPagoPage() {
               />
             </div>
 
+            {/* Fecha de pago */}
+            <div>
+              <label className="block text-sm font-medium text-gym-muted mb-2">
+                <Calendar className="w-4 h-4 inline mr-1" />
+                Fecha de pago
+              </label>
+              <input
+                type="date"
+                value={formData.fecha_pago}
+                onChange={(e) => setFormData({ ...formData, fecha_pago: e.target.value })}
+                className="w-full px-4 py-2.5 bg-gym-bg border border-gym-border rounded-xl text-gym-text focus:outline-none focus:ring-2 focus:ring-gym-primary"
+              />
+              <p className="text-xs text-gym-muted mt-1">Puede editarse mientras el pago esté pendiente</p>
+            </div>
+
             {/* Total */}
             <div className="p-4 bg-gym-bg rounded-xl neon-border">
               <div className="flex items-center justify-between">
@@ -533,7 +649,7 @@ export default function ReportarPagoPage() {
                 {formData.pagar_inscripcion && !inscripcionPagada && gymConfig && (
                   <p>Inscripción: {formatCurrency(getMontoByMetodo(formData.metodo_pago, "inscripcion"))}</p>
                 )}
-                {formData.pagar_mensualidad && (
+                {formData.pagar_mensualidad && formData.meses.length > 0 && (
                   <p>Mensualidad: {formData.meses.length} mes(es) × {formatCurrency(getMontoByMetodo(formData.metodo_pago, "mensual"))}</p>
                 )}
               </div>
@@ -541,9 +657,11 @@ export default function ReportarPagoPage() {
 
             {error && <p className="text-sm text-gym-danger text-center bg-gym-danger/10 p-2 rounded-xl">{error}</p>}
 
+            {/* Desktop button */}
             <Button
+              id="form-submit-btn"
               type="submit"
-              className="w-full"
+              className="w-full hidden sm:flex"
               loading={loading}
               disabled={
                 (isAdmin && !miembroSeleccionado) ||
@@ -556,6 +674,27 @@ export default function ReportarPagoPage() {
             </Button>
           </form>
           )}
+
+          {/* Mobile floating button */}
+          <button
+            onClick={() => {
+              document.getElementById("pago-form")?.requestSubmit();
+            }}
+            disabled={
+              loading ||
+              (isAdmin && !miembroSeleccionado) ||
+              (!formData.pagar_inscripcion && !formData.pagar_mensualidad) ||
+              (formData.pagar_mensualidad && formData.meses.length === 0) ||
+              montoTotal === 0
+            }
+            className="sm:hidden fixed bottom-20 right-4 z-40 w-14 h-14 rounded-full bg-gym-primary text-gym-bg shadow-lg shadow-gym-primary/30 flex items-center justify-center disabled:opacity-40 disabled:shadow-none active:scale-95 transition-all"
+          >
+            {loading ? (
+              <div className="w-5 h-5 border-2 border-gym-bg border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <Send className="w-6 h-6" />
+            )}
+          </button>
         </CardContent>
       </Card>
     </div>

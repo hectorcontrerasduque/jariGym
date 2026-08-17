@@ -2,19 +2,41 @@
 
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { pagosService } from "@/lib/services/pagos/pagos.service";
 import { createClient } from "@/lib/supabase/client";
-import { formatCurrency, getMonthName, formatDateTime } from "@/lib/utils";
-import { CreditCard, CheckCircle, Clock, Gift, Calendar } from "lucide-react";
+import { formatCurrency, getMonthName } from "@/lib/utils";
+import { CreditCard, CheckCircle, Clock, Gift, Calendar, Bell, Trash2, FileText, ArrowRight } from "lucide-react";
+import Link from "next/link";
 import type { Pago, Profile } from "@/lib/types";
+
+interface MembresiaLibre {
+  fecha_inicio: string;
+  fecha_fin: string | null;
+  asignado_por_nombre: string | null;
+}
+
+function getPagoLabel(pago: Pago): string {
+  const isInscripcion = pago.notas?.toLowerCase().includes("inscripción") || pago.notas?.toLowerCase().includes("inscripcion");
+  if (isInscripcion) return "Inscripción";
+  return `${getMonthName(pago.mes_pagar)} ${pago.anio_pagar}`;
+}
+
+function getPagoIcon(pago: Pago) {
+  const isInscripcion = pago.notas?.toLowerCase().includes("inscripción") || pago.notas?.toLowerCase().includes("inscripcion");
+  if (isInscripcion) return <FileText className="w-5 h-5 text-gym-primary" />;
+  return <Calendar className="w-5 h-5 text-gym-secondary" />;
+}
 
 export default function MisPagosPage() {
   const [pagos, setPagos] = useState<Pago[]>([]);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [deleting, setDeleting] = useState<string | null>(null);
   const [anios, setAnios] = useState<number[]>([]);
   const [anioSeleccionado, setAnioSeleccionado] = useState(new Date().getFullYear());
+  const [membresiaLibre, setMembresiaLibre] = useState<MembresiaLibre | null>(null);
 
   useEffect(() => { loadData(); }, [anioSeleccionado]);
 
@@ -33,16 +55,47 @@ export default function MisPagosPage() {
 
       const [pagosData, aniosData] = await Promise.all([
         pagosService.listarMisPagos(user.id, anioSeleccionado),
-        pagosService.aniosConPagos(),
+        pagosService.aniosConPagos(user.id),
       ]);
       setPagos(pagosData);
       setAnios(aniosData);
+
+      const { data: libreData } = await supabase
+        .from("membresias")
+        .select("fecha_inicio, fecha_fin, asignado_por_nombre")
+        .eq("usuario_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (libreData && !libreData.fecha_fin) {
+        setMembresiaLibre(libreData as MembresiaLibre);
+      }
     } catch (error) {
       console.error("Error:", error);
     } finally {
       setLoading(false);
     }
   };
+
+  const handleDelete = async (pagoId: string) => {
+    if (!confirm("¿Eliminar este pago pendiente?")) return;
+    setDeleting(pagoId);
+    try {
+      await pagosService.eliminarPago(pagoId);
+      await loadData();
+    } catch (err: any) {
+      console.error("Error:", err);
+      alert(err.message || "Error al eliminar el pago");
+    } finally {
+      setDeleting(null);
+    }
+  };
+
+  const aprobados = pagos.filter((p) => p.estado === "aprobado");
+  const pendientes = pagos.filter((p) => p.estado === "pendiente");
+  const montoAprobado = aprobados.reduce((sum, p) => sum + (p.monto || 0), 0);
+  const montoPendiente = pendientes.reduce((sum, p) => sum + (p.monto || 0), 0);
 
   if (loading) {
     return (
@@ -53,60 +106,60 @@ export default function MisPagosPage() {
   }
 
   return (
-    <div className="space-y-6 animate-fadeIn">
+    <div className="space-y-4 animate-fadeIn">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-2xl font-display font-bold text-gym-text neon-text">Mis Pagos</h1>
-          <p className="text-gym-muted text-sm">Historial de tus pagos realizados</p>
+          <p className="text-gym-muted text-sm">Historial de tus pagos</p>
         </div>
-        <select
-          value={anioSeleccionado}
-          onChange={(e) => setAnioSeleccionado(Number(e.target.value))}
-          className="px-4 py-2 bg-gym-surface border border-gym-border rounded-xl text-gym-text focus:outline-none focus:ring-2 focus:ring-gym-primary"
-        >
-          {anios.map((a) => (
-            <option key={a} value={a}>{a}</option>
-          ))}
-        </select>
+        <div className="flex items-center gap-2">
+          <Link href="/dashboard/reportar-pago">
+            <Button>
+              <Bell className="w-4 h-4 mr-2" />
+              Reportar Pago
+            </Button>
+          </Link>
+          <select
+            value={anioSeleccionado}
+            onChange={(e) => setAnioSeleccionado(Number(e.target.value))}
+            className="px-4 py-2 bg-gym-surface border border-gym-border rounded-xl text-gym-text focus:outline-none focus:ring-2 focus:ring-gym-primary"
+          >
+            {anios.map((a) => (
+              <option key={a} value={a}>{a}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {/* Estado de inscripción y membresía */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-3">
         <Card className={profile?.inscripcion_pagada ? "neon-border-success" : "neon-border-warning"}>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
+          <CardContent className="p-3">
+            <div className="flex items-center gap-2">
               {profile?.inscripcion_pagada ? (
-                <CheckCircle className="w-8 h-8 text-gym-success" />
+                <CheckCircle className="w-6 h-6 text-gym-success" />
               ) : (
-                <Clock className="w-8 h-8 text-gym-warning" />
+                <Clock className="w-6 h-6 text-gym-warning" />
               )}
               <div>
-                <p className="text-sm text-gym-muted">Inscripción</p>
-                <p className="font-semibold text-gym-text">
+                <p className="text-xs text-gym-muted">Inscripción</p>
+                <p className="text-sm font-semibold text-gym-text">
                   {profile?.inscripcion_pagada ? "Pagada" : "Pendiente"}
                 </p>
-                {profile?.inscripcion_pagada && profile?.inscripcion_fecha && (
-                  <p className="text-xs text-gym-muted">
-                    {new Date(profile.inscripcion_fecha).toLocaleDateString("es-ES")}
-                  </p>
-                )}
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card className={profile?.membresia_libre ? "neon-border-secondary" : "neon-border"}>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <Gift className={`w-8 h-8 ${profile?.membresia_libre ? "text-gym-secondary" : "text-gym-muted"}`} />
+        <Card className={membresiaLibre ? "neon-border-secondary" : "neon-border"}>
+          <CardContent className="p-3">
+            <div className="flex items-center gap-2">
+              <Gift className={`w-6 h-6 ${membresiaLibre ? "text-gym-secondary" : "text-gym-muted"}`} />
               <div>
-                <p className="text-sm text-gym-muted">Membresía</p>
-                <p className="font-semibold text-gym-text">
-                  {profile?.membresia_libre ? "Membresía Libre" : "Mensualidad"}
+                <p className="text-xs text-gym-muted">Membresía</p>
+                <p className="text-sm font-semibold text-gym-text">
+                  {membresiaLibre ? "Libre" : "Mensual"}
                 </p>
-                {profile?.membresia_libre && (
-                  <p className="text-xs text-gym-muted">Otorgada por admin</p>
-                )}
               </div>
             </div>
           </CardContent>
@@ -115,10 +168,13 @@ export default function MisPagosPage() {
 
       {/* Lista de pagos */}
       <Card className="neon-card">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <CreditCard className="w-5 h-5 text-gym-primary" />
-            Pagos Realizados
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <CreditCard className="w-5 h-5 text-gym-primary" />
+              Pagos Realizados
+            </div>
+            <span className="text-sm font-normal text-gym-muted">{pagos.length} pago(s)</span>
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -128,56 +184,59 @@ export default function MisPagosPage() {
               <p className="text-gym-muted">No hay pagos registrados</p>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-2">
               {pagos.map((pago) => (
                 <div
                   key={pago.id}
-                  className="p-4 bg-gym-bg rounded-xl hover:bg-gym-surface transition-colors"
+                  className="p-3 bg-gym-bg rounded-xl hover:bg-gym-surface transition-colors"
                 >
-                  <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    {getPagoIcon(pago)}
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="font-semibold text-gym-text">
-                          {getMonthName(pago.mes_pagar)}
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-gym-text truncate">
+                          {getPagoLabel(pago)}
                         </span>
-                        <span className="text-gym-muted text-sm">
-                          {pago.anio_pagar}
-                        </span>
-                      </div>
-                      <p className="text-xs text-gym-muted">
-                        Reportado: {formatDateTime(pago.created_at)}
-                      </p>
-                      {pago.approved_at && (
-                        <p className="text-xs text-gym-success">
-                          Confirmado: {formatDateTime(pago.approved_at)}
-                        </p>
-                      )}
-                      {pago.notas && (
-                        <p className="text-xs text-gym-muted mt-1 italic">
-                          {pago.notas}
-                        </p>
-                      )}
-                    </div>
-                    <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                      <p className="font-bold text-gym-text neon-text">
-                        {formatCurrency(pago.monto)}
-                      </p>
-                      <Badge
-                        variant={
-                          pago.estado === "aprobado"
-                            ? "success"
+                        <Badge
+                          variant={
+                            pago.estado === "aprobado"
+                              ? "success"
+                              : pago.estado === "rechazado"
+                              ? "danger"
+                              : "warning"
+                          }
+                          className="text-[10px] px-1.5 py-0"
+                        >
+                          {pago.estado === "aprobado"
+                            ? "Aprobado"
                             : pago.estado === "rechazado"
-                            ? "danger"
-                            : "warning"
-                        }
-                      >
-                        {pago.estado === "aprobado"
-                          ? "Aprobado"
-                          : pago.estado === "rechazado"
-                          ? "Rechazado"
-                          : "Pendiente"}
-                      </Badge>
+                            ? "Rechazado"
+                            : "Pendiente"}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-gym-muted">
+                        <span>{pago.metodo_pago === "efectivo" ? "💵" : pago.metodo_pago === "bs" ? "🇻🇪" : pago.metodo_pago === "binance" ? "🟡" : "🏦"} {pago.monto > 0 ? formatCurrency(pago.monto) : "Gratis"}</span>
+                        {pago.fecha_pago_real && (
+                          <>
+                            <span>·</span>
+                            <span>{new Date(pago.fecha_pago_real).toLocaleDateString("es-ES")}</span>
+                          </>
+                        )}
+                      </div>
                     </div>
+                    {pago.estado === "pendiente" && (
+                      <button
+                        onClick={() => handleDelete(pago.id)}
+                        disabled={deleting === pago.id}
+                        className="p-1.5 text-gym-danger hover:bg-gym-danger/10 rounded-lg transition-colors disabled:opacity-50"
+                      >
+                        {deleting === pago.id ? (
+                          <div className="w-4 h-4 border-2 border-gym-danger border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <Trash2 className="w-4 h-4" />
+                        )}
+                      </button>
+                    )}
                   </div>
                 </div>
               ))}
@@ -185,6 +244,36 @@ export default function MisPagosPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Totales */}
+      {pagos.length > 0 && (
+        <Card className="neon-card">
+          <CardContent className="p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-gym-muted flex items-center gap-2">
+                <CheckCircle className="w-4 h-4 text-gym-success" />
+                Aprobado
+              </span>
+              <span className="text-sm font-semibold text-gym-success">{formatCurrency(montoAprobado)}</span>
+            </div>
+            {montoPendiente > 0 && (
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gym-muted flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-gym-warning" />
+                  Pendiente
+                </span>
+                <span className="text-sm font-semibold text-gym-warning">{formatCurrency(montoPendiente)}</span>
+              </div>
+            )}
+            <div className="pt-2 border-t border-gym-border">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-gym-text">Total</span>
+                <span className="text-lg font-bold text-gym-text neon-text">{formatCurrency(montoAprobado + montoPendiente)}</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

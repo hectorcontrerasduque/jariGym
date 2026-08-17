@@ -47,6 +47,20 @@ export class AuthService {
     window.location.href = "/login";
   }
 
+  async resetPassword(email: string) {
+    const { error } = await this.supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/auth/callback?next=/dashboard/perfil`,
+    });
+    if (error) throw error;
+  }
+
+  async updatePassword(newPassword: string) {
+    const { error } = await this.supabase.auth.updateUser({
+      password: newPassword,
+    });
+    if (error) throw error;
+  }
+
   async getProfile(): Promise<Profile | null> {
     const {
       data: { user },

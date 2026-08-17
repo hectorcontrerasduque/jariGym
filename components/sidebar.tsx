@@ -6,7 +6,6 @@ import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { useEffect, useState } from "react";
 import { Avatar } from "@/components/ui/avatar";
-import { ProfileModal } from "@/components/profile-modal";
 import { configService } from "@/lib/services/config/config.service";
 import {
   LayoutDashboard,
@@ -21,24 +20,20 @@ import {
 import type { Profile } from "@/lib/types";
 
 const adminNavItems = [
-  { href: "/dashboard", label: "Inicio", icon: LayoutDashboard },
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/dashboard/pagos", label: "Pagos", icon: CreditCard },
-  { href: "/dashboard/reportar-pago", label: "Reportar", icon: Bell },
   { href: "/dashboard/miembros", label: "Miembros", icon: Users },
   { href: "/dashboard/configuracion", label: "Config", icon: Settings },
 ];
 
 const miembroNavItems = [
-  { href: "/dashboard/mi-perfil", label: "Mi Perfil", icon: User },
   { href: "/dashboard/mis-pagos", label: "Mis Pagos", icon: CreditCard },
-  { href: "/dashboard/reportar-pago", label: "Reportar", icon: Bell },
 ];
 
 export function Sidebar() {
   const pathname = usePathname();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [gymName, setGymName] = useState("GymApp");
-  const [showProfileModal, setShowProfileModal] = useState(false);
   const supabase = createClient();
 
   useEffect(() => {
@@ -70,15 +65,36 @@ export function Sidebar() {
     window.location.href = "/login";
   };
 
-  const handleProfileUpdate = (updated: Profile) => {
-    setProfile(updated);
-  };
-
   const isAdmin = profile?.role === "super_admin" || profile?.role === "admin";
   const navItems = isAdmin ? adminNavItems : miembroNavItems;
 
   return (
     <>
+      {/* Mobile top bar */}
+      <div className="md:hidden fixed top-0 left-0 right-0 bg-gym-surface/90 backdrop-blur-xl border-b border-gym-border/50 z-50 px-4 py-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3 min-w-0">
+            <Link href="/dashboard/perfil">
+              <Avatar src={profile?.avatar_url} alt={profile?.nombre_completo || ""} size="sm" />
+            </Link>
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-gym-text truncate">
+                {profile?.nombre_completo || "Usuario"}
+              </p>
+              <p className="text-[10px] text-gym-muted truncate">
+                {profile?.email || ""}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={handleSignOut}
+            className="p-2 text-gym-muted hover:text-gym-danger transition-colors"
+          >
+            <LogOut className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+
       {/* Desktop sidebar */}
       <aside className="hidden md:flex fixed left-0 top-0 h-full w-64 bg-gym-surface/80 backdrop-blur-xl border-r border-gym-border/50 flex-col z-40">
         <div className="p-6 border-b border-gym-border/50">
@@ -116,9 +132,12 @@ export function Sidebar() {
         </nav>
 
         <div className="p-4 border-t border-gym-border/50">
-          <button
-            onClick={() => setShowProfileModal(true)}
-            className="flex items-center gap-3 mb-3 w-full text-left hover:bg-gym-bg/50 p-2 rounded-xl transition-colors cursor-pointer"
+          <Link
+            href="/dashboard/perfil"
+            className={cn(
+              "flex items-center gap-3 mb-3 w-full text-left hover:bg-gym-bg/50 p-2 rounded-xl transition-colors",
+              pathname === "/dashboard/perfil" && "bg-gym-bg/50"
+            )}
           >
             <Avatar
               src={profile?.avatar_url}
@@ -133,7 +152,7 @@ export function Sidebar() {
                 {profile?.email || ""}
               </p>
             </div>
-          </button>
+          </Link>
           <button
             onClick={handleSignOut}
             className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gym-muted hover:text-gym-danger transition-colors"
@@ -166,18 +185,20 @@ export function Sidebar() {
               </Link>
             );
           })}
+          <Link
+            href="/dashboard/perfil"
+            className={cn(
+              "flex flex-col items-center gap-1 px-3 py-1 rounded-lg transition-all",
+              pathname === "/dashboard/perfil"
+                ? "text-gym-primary shadow-[0_0_10px_rgba(56,189,248,0.3)]"
+                : "text-gym-muted"
+            )}
+          >
+            <User className="w-5 h-5" />
+            <span className="text-[10px] font-medium">Perfil</span>
+          </Link>
         </div>
       </nav>
-
-      {/* Profile Modal */}
-      {profile && (
-        <ProfileModal
-          isOpen={showProfileModal}
-          onClose={() => setShowProfileModal(false)}
-          profile={profile}
-          onUpdate={handleProfileUpdate}
-        />
-      )}
     </>
   );
 }

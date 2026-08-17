@@ -8,35 +8,44 @@ import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/ui/modal";
 import { Avatar } from "@/components/ui/avatar";
 import { miembrosService } from "@/lib/services/miembros/miembros.service";
-import { pagosService } from "@/lib/services/pagos/pagos.service";
 import { formatDate, formatCurrency, formatDateTime } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
-import { Users, Search, UserCheck, UserX, Pause, Plus, Eye, ShieldAlert, ArrowDownCircle } from "lucide-react";
+import { Users, Search, Plus, Eye, Shield, ShieldOff, UserX, UserCheck, Gift, GiftOff } from "lucide-react";
 import type { Profile, Pago } from "@/lib/types";
-
-type FilterStatus = "todos" | "activo" | "suspendido" | "inactivo";
 
 export default function MiembrosPage() {
   const [miembros, setMiembros] = useState<Profile[]>([]);
-  const [filtro, setFiltro] = useState<FilterStatus>("todos");
   const [busqueda, setBusqueda] = useState("");
   const [loading, setLoading] = useState(true);
-  const [stats, setStats] = useState({ totalMiembros: 0, activos: 0, suspendidos: 0, inactivos: 0, membresiaLibre: 0 });
+  const [stats, setStats] = useState({ totalMiembros: 0, membresiaLibre: 0 });
 
   const [selectedMiembro, setSelectedMiembro] = useState<Profile | null>(null);
   const [modalDetalle, setModalDetalle] = useState(false);
-  const [modalEstado, setModalEstado] = useState(false);
   const [modalNuevo, setModalNuevo] = useState(false);
-  const [notasEstado, setNotasEstado] = useState("");
   const [nuevoEmail, setNuevoEmail] = useState("");
   const [nuevoNombre, setNuevoNombre] = useState("");
+  const [nuevoUsername, setNuevoUsername] = useState("");
+  const [nuevoPassword, setNuevoPassword] = useState("");
   const [emailError, setEmailError] = useState("");
   const [pagoInscripcion, setPagoInscripcion] = useState<Pago | null>(null);
+  const [isMembresiaLibre, setIsMembresiaLibre] = useState(false);
+  const [currentUser, setCurrentUser] = useState<Profile | null>(null);
 
   useEffect(() => { loadMiembros(); }, []);
 
   const loadMiembros = async () => {
     try {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", user.id)
+          .single();
+        setCurrentUser(profile);
+      }
+
       const [data, statsData] = await Promise.all([
         miembrosService.listarMiembros(),
         miembrosService.stats(),
@@ -66,11 +75,26 @@ export default function MiembrosPage() {
 
   const handleCrearMiembro = async () => {
     if (!nuevoEmail || !nuevoNombre || !validateEmail(nuevoEmail)) return;
+    const isGmail = nuevoEmail.toLowerCase().endsWith("@gmail.com");
+    if (!isGmail && (!nuevoUsername || !nuevoPassword)) return;
     try {
-      await miembrosService.crearMiembroPorEmail(nuevoEmail, nuevoNombre);
+      const res = await fetch("/api/miembros", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: nuevoEmail,
+          nombre: nuevoNombre,
+          username: nuevoUsername || undefined,
+          password: nuevoPassword || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
       setModalNuevo(false);
       setNuevoEmail("");
       setNuevoNombre("");
+      setNuevoUsername("");
+      setNuevoPassword("");
       setEmailError("");
       await loadMiembros();
     } catch (error) {
@@ -81,60 +105,62 @@ export default function MiembrosPage() {
   const verDetalle = async (miembro: Profile) => {
     setSelectedMiembro(miembro);
     setPagoInscripcion(null);
+    setIsMembresiaLibre(false);
     try {
       const supabase = createClient();
-      const { data: pagoIns } = await supabase
-        .from("pagos")
-        .select("*")
-        .eq("usuario_id", miembro.id)
-        .ilike("notas", "%Inscripción%")
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (pagoIns) setPagoInscripcion(pagoIns);
+      const [pagoIns, libreData] = await Promise.all([
+        supabase
+          .from("pagos")
+          .select("*")
+          .eq("usuario_id", miembro.id)
+          .ilike("notas", "%Inscripción%")
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+        supabase
+          .from("membresias")
+          .select("id, fecha_fin")
+          .eq("usuario_id", miembro.id)
+          .is("fecha_fin", null)
+          .limit(1)
+          .maybeSingle(),
+      ]);
+      if (pagoIns.data) setPagoInscripcion(pagoIns.data);
+      setIsMembresiaLibre(!!libreData.data);
     } catch (error) {
       console.error("Error:", error);
     }
     setModalDetalle(true);
   };
 
-  const handleCambiarEstado = async (nuevoEstado: "activo" | "suspendido" | "inactivo") => {
-    if (!selectedMiembro) return;
+  const handleToggleStatus = async (miembro: Profile, activar: boolean) => {
+    const accion = activar ? "activar" : (miembro.activo === false ? "activar" : "desactivar");
+    if (!confirm(`¿${accion.charAt(0).toUpperCase() + accion.slice(1)} a ${miembro.nombre_completo}?`)) return;
     try {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-
-      await supabase.from("member_states").insert({
-        usuario_id: selectedMiembro.id,
-        estado: nuevoEstado,
-        notas: notasEstado || null,
-        changed_by: user!.id,
-        fecha_evidencia: new Date().toISOString(),
-      });
-
-      await miembrosService.actualizarMiembro(selectedMiembro.id, { estado: nuevoEstado });
-
-      setModalEstado(false);
-      setNotasEstado("");
-      setSelectedMiembro(null);
+      await miembrosService.actualizarEstado(miembro.id, activar);
       await loadMiembros();
     } catch (error) {
       console.error("Error:", error);
     }
   };
 
-  const miembrosFiltrados = miembros
-    .filter((m) => (filtro === "todos" ? true : m.estado === filtro))
-    .filter((m) => m.nombre_completo.toLowerCase().includes(busqueda.toLowerCase()) || (m.email && m.email.toLowerCase().includes(busqueda.toLowerCase())));
-
-  const getEstadoBadge = (estado: string) => {
-    switch (estado) {
-      case "activo": return <Badge variant="success">Activo</Badge>;
-      case "suspendido": return <Badge variant="warning">Suspendido</Badge>;
-      case "inactivo": return <Badge variant="danger">Inactivo</Badge>;
-      default: return <Badge>{estado}</Badge>;
+  const handleToggleMembresiaLibre = async (miembro: Profile) => {
+    if (!currentUser) return;
+    const accion = isMembresiaLibre ? "remover membresía libre de" : "asignar membresía libre a";
+    if (!confirm(`¿${accion.charAt(0).toUpperCase() + accion.slice(1)} ${miembro.nombre_completo}?`)) return;
+    try {
+      await miembrosService.toggleMembresiaLibre(miembro.id, currentUser.id, currentUser.nombre_completo);
+      setIsMembresiaLibre(!isMembresiaLibre);
+      await loadMiembros();
+    } catch (error) {
+      console.error("Error:", error);
     }
   };
+
+  const miembrosFiltrados = miembros.filter((m) =>
+    m.nombre_completo.toLowerCase().includes(busqueda.toLowerCase()) ||
+    (m.email && m.email.toLowerCase().includes(busqueda.toLowerCase()))
+  );
 
   if (loading) {
     return (
@@ -153,42 +179,29 @@ export default function MiembrosPage() {
           <h1 className="text-2xl font-display font-bold text-gym-text neon-text">Miembros</h1>
           <p className="text-gym-muted text-sm">Gestiona los miembros de tu gym</p>
         </div>
-        <Button onClick={() => setModalNuevo(true)}>
+        <Button onClick={() => setModalNuevo(true)} className="hidden sm:flex">
           <Plus className="w-4 h-4 mr-2" /> Nuevo Miembro
         </Button>
       </div>
 
+      {/* Mobile floating button */}
+      <button
+        onClick={() => setModalNuevo(true)}
+        className="sm:hidden fixed bottom-20 right-4 z-40 w-14 h-14 rounded-full bg-gym-primary text-gym-bg shadow-lg shadow-gym-primary/30 flex items-center justify-center active:scale-95 transition-all"
+      >
+        <Plus className="w-6 h-6" />
+      </button>
+
       {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 relative z-10">
-        <Card className="neon-card hover:border-gym-primary/50 transition-all cursor-pointer" onClick={() => setFiltro("todos")}>
+      <div className="grid grid-cols-2 gap-3 relative z-10">
+        <Card className="neon-card">
           <CardContent className="p-3 text-center">
             <Users className="w-5 h-5 text-gym-primary mx-auto mb-1" />
             <p className="text-xl font-bold text-gym-text neon-text">{stats.totalMiembros}</p>
             <p className="text-xs text-gym-muted">Total</p>
           </CardContent>
         </Card>
-        <Card className="neon-card hover:border-gym-success/50 transition-all cursor-pointer" onClick={() => setFiltro("activo")}>
-          <CardContent className="p-3 text-center">
-            <UserCheck className="w-5 h-5 text-gym-success mx-auto mb-1" />
-            <p className="text-xl font-bold text-gym-success neon-text-success">{stats.activos}</p>
-            <p className="text-xs text-gym-muted">Activos</p>
-          </CardContent>
-        </Card>
-        <Card className="neon-card hover:border-gym-warning/50 transition-all cursor-pointer" onClick={() => setFiltro("suspendido")}>
-          <CardContent className="p-3 text-center">
-            <Pause className="w-5 h-5 text-gym-warning mx-auto mb-1" />
-            <p className="text-xl font-bold text-gym-warning neon-text-secondary">{stats.suspendidos}</p>
-            <p className="text-xs text-gym-muted">Suspendidos</p>
-          </CardContent>
-        </Card>
-        <Card className="neon-card hover:border-gym-danger/50 transition-all cursor-pointer" onClick={() => setFiltro("inactivo")}>
-          <CardContent className="p-3 text-center">
-            <UserX className="w-5 h-5 text-gym-danger mx-auto mb-1" />
-            <p className="text-xl font-bold text-gym-danger neon-text-danger">{stats.inactivos}</p>
-            <p className="text-xs text-gym-muted">Inactivos</p>
-          </CardContent>
-        </Card>
-        <Card className="neon-card hover:border-gym-secondary/50 transition-all">
+        <Card className="neon-card">
           <CardContent className="p-3 text-center">
             <p className="text-xl font-bold text-gym-secondary neon-text-secondary">{stats.membresiaLibre}</p>
             <p className="text-xs text-gym-muted">Libres</p>
@@ -215,7 +228,7 @@ export default function MiembrosPage() {
               <thead>
                 <tr className="border-b border-gym-border text-left text-xs text-gym-muted">
                   <th className="px-4 py-3">Nombre</th>
-                  <th className="px-4 py-3">Inscrito</th>
+                  <th className="px-4 py-3">Admin</th>
                   <th className="px-4 py-3">Estado</th>
                   <th className="px-4 py-3">Registro</th>
                   <th className="px-4 py-3">WhatsApp</th>
@@ -235,11 +248,15 @@ export default function MiembrosPage() {
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <Badge variant={miembro.inscripcion_pagada ? "success" : "warning"}>
-                        {miembro.inscripcion_pagada ? "Sí" : "No"}
+                      <Badge variant={miembro.role === "super_admin" || miembro.role === "admin" ? "primary" : "secondary"}>
+                        {miembro.role === "super_admin" || miembro.role === "admin" ? "Sí" : "No"}
                       </Badge>
                     </td>
-                    <td className="px-4 py-3">{getEstadoBadge(miembro.estado)}</td>
+                    <td className="px-4 py-3">
+                      <Badge variant={miembro.activo !== false ? "success" : "danger"}>
+                        {miembro.activo !== false ? "Activo" : "Inactivo"}
+                      </Badge>
+                    </td>
                     <td className="px-4 py-3 text-xs text-gym-muted">{formatDate(miembro.fecha_inscripcion || miembro.created_at)}</td>
                     <td className="px-4 py-3 text-xs text-gym-muted">{miembro.whatsapp || "—"}</td>
                     <td className="px-4 py-3">
@@ -247,9 +264,15 @@ export default function MiembrosPage() {
                         <Button variant="ghost" size="sm" onClick={() => verDetalle(miembro)}>
                           <Eye className="w-4 h-4" />
                         </Button>
-                        <Button variant="ghost" size="sm" onClick={() => { setSelectedMiembro(miembro); setModalEstado(true); }}>
-                          <ShieldAlert className="w-4 h-4" />
-                        </Button>
+                        {miembro.activo !== false ? (
+                          <Button variant="ghost" size="sm" onClick={() => handleToggleStatus(miembro, false)} className="text-gym-danger hover:text-gym-danger" title="Desactivar">
+                            <UserX className="w-4 h-4" />
+                          </Button>
+                        ) : (
+                          <Button variant="ghost" size="sm" onClick={() => handleToggleStatus(miembro, true)} className="text-gym-success hover:text-gym-success" title="Activar">
+                            <UserCheck className="w-4 h-4" />
+                          </Button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -273,19 +296,27 @@ export default function MiembrosPage() {
                     <p className="text-xs text-gym-muted">{miembro.email || "Sin email"}</p>
                   </div>
                 </div>
-                {getEstadoBadge(miembro.estado)}
+                <Badge variant={miembro.activo !== false ? "success" : "danger"}>
+                  {miembro.activo !== false ? "Activo" : "Inactivo"}
+                </Badge>
               </div>
               <div className="flex items-center gap-4 text-xs text-gym-muted mb-3">
-                <span>{miembro.inscripcion_pagada ? "✓ Inscrito" : "✗ Sin inscribir"}</span>
+                <span>{miembro.role === "super_admin" || miembro.role === "admin" ? "Admin" : "Miembro"}</span>
                 <span>{formatDate(miembro.fecha_inscripcion || miembro.created_at)}</span>
               </div>
               <div className="flex gap-2">
                 <Button variant="ghost" size="sm" className="flex-1" onClick={() => verDetalle(miembro)}>
-                  <Eye className="w-4 h-4 mr-1" /> Ver
+                  <Eye className="w-4 h-4 mr-1" /> Ver detalle
                 </Button>
-                <Button variant="ghost" size="sm" onClick={() => { setSelectedMiembro(miembro); setModalEstado(true); }}>
-                  <ShieldAlert className="w-4 h-4" />
-                </Button>
+                {miembro.activo !== false ? (
+                  <Button variant="ghost" size="sm" onClick={() => handleToggleStatus(miembro, false)} className="text-gym-danger">
+                    <UserX className="w-4 h-4" />
+                  </Button>
+                ) : (
+                  <Button variant="ghost" size="sm" onClick={() => handleToggleStatus(miembro, true)} className="text-gym-success">
+                    <UserCheck className="w-4 h-4" />
+                  </Button>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -310,7 +341,14 @@ export default function MiembrosPage() {
               <div>
                 <h3 className="font-semibold text-gym-text">{selectedMiembro.nombre_completo}</h3>
                 <p className="text-sm text-gym-muted">{selectedMiembro.email || "Sin email"}</p>
-                {getEstadoBadge(selectedMiembro.estado)}
+                <div className="flex gap-2 mt-1">
+                  <Badge variant={selectedMiembro.role === "super_admin" ? "primary" : selectedMiembro.role === "admin" ? "primary" : "secondary"}>
+                    {selectedMiembro.role === "super_admin" ? "Super Admin" : selectedMiembro.role === "admin" ? "Admin" : "Miembro"}
+                  </Badge>
+                  <Badge variant={selectedMiembro.activo !== false ? "success" : "danger"}>
+                    {selectedMiembro.activo !== false ? "Activo" : "Inactivo"}
+                  </Badge>
+                </div>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3 text-sm">
@@ -355,56 +393,53 @@ export default function MiembrosPage() {
               )}
             </div>
 
+            {/* Membresía libre toggle */}
             <div className="p-4 bg-gym-bg rounded-xl">
-              <p className="text-sm font-medium text-gym-muted mb-2">Membresía</p>
-              <Badge variant={selectedMiembro.membresia_libre ? "default" : "success"}>
-                {selectedMiembro.membresia_libre ? "Libre" : "Mensualidad"}
-              </Badge>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gym-muted">Membresía Libre</p>
+                  <p className="text-xs text-gym-muted">Sin cargo mensual</p>
+                </div>
+                <button
+                  onClick={() => handleToggleMembresiaLibre(selectedMiembro)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    isMembresiaLibre ? "bg-gym-secondary" : "bg-gym-border"
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      isMembresiaLibre ? "translate-x-6" : "translate-x-1"
+                    }`}
+                  />
+                </button>
+              </div>
+              {isMembresiaLibre && (
+                <p className="text-xs text-gym-secondary mt-2">Este miembro no paga mensualidad</p>
+              )}
+            </div>
+
+            {/* Status toggle */}
+            <div className="p-4 bg-gym-bg rounded-xl">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gym-muted">Estado</p>
+                  <p className="text-xs text-gym-muted">{selectedMiembro.activo !== false ? "Activo" : "Inactivo"}</p>
+                </div>
+                <div className="flex gap-2">
+                  {selectedMiembro.activo !== false ? (
+                    <Button variant="danger" size="sm" onClick={() => { handleToggleStatus(selectedMiembro, false); setModalDetalle(false); }}>
+                      <UserX className="w-4 h-4 mr-1" /> Desactivar
+                    </Button>
+                  ) : (
+                    <Button size="sm" onClick={() => { handleToggleStatus(selectedMiembro, true); setModalDetalle(false); }}>
+                      <UserCheck className="w-4 h-4 mr-1" /> Activar
+                    </Button>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         )}
-      </Modal>
-
-      {/* Modal Estado */}
-      <Modal isOpen={modalEstado} onClose={() => setModalEstado(false)} title="Cambiar Estado">
-        <div className="space-y-4">
-          <p className="text-sm text-gym-muted">
-            Cambiar estado de <strong>{selectedMiembro?.nombre_completo}</strong>
-          </p>
-          <textarea
-            placeholder="Nota sobre el cambio de estado (opcional)"
-            value={notasEstado}
-            onChange={(e) => setNotasEstado(e.target.value)}
-            className="w-full px-4 py-2.5 bg-gym-bg border border-gym-border rounded-xl text-gym-text placeholder:text-gym-muted focus:outline-none focus:ring-2 focus:ring-gym-primary resize-none h-20"
-          />
-          <div className="flex gap-2">
-            <Button
-              className="flex-1"
-              disabled={selectedMiembro?.estado === "activo"}
-              onClick={() => handleCambiarEstado("activo")}
-              style={selectedMiembro?.estado === "activo" ? { opacity: 0.4, cursor: "not-allowed" } : { backgroundColor: "#34D399", color: "white" }}
-            >
-              <UserCheck className="w-4 h-4 mr-2" /> Activo
-            </Button>
-            <Button
-              className="flex-1"
-              disabled={selectedMiembro?.estado === "suspendido"}
-              onClick={() => handleCambiarEstado("suspendido")}
-              style={selectedMiembro?.estado === "suspendido" ? { opacity: 0.4, cursor: "not-allowed" } : { backgroundColor: "#FBBF24", color: "#0B1120" }}
-            >
-              <Pause className="w-4 h-4 mr-2" /> Suspendido
-            </Button>
-            <Button
-              variant="danger"
-              className="flex-1"
-              disabled={selectedMiembro?.estado === "inactivo"}
-              onClick={() => handleCambiarEstado("inactivo")}
-              style={selectedMiembro?.estado === "inactivo" ? { opacity: 0.4, cursor: "not-allowed" } : {}}
-            >
-              <UserX className="w-4 h-4 mr-2" /> Inactivar
-            </Button>
-          </div>
-        </div>
       </Modal>
 
       {/* Modal Nuevo Miembro */}
@@ -419,7 +454,7 @@ export default function MiembrosPage() {
           />
           <div>
             <Input
-              label="Correo (de preferencia Gmail) *"
+              label="Correo *"
               type="email"
               placeholder="correo@gmail.com"
               value={nuevoEmail}
@@ -427,7 +462,32 @@ export default function MiembrosPage() {
             />
             {emailError && <p className="text-xs text-gym-danger mt-1">{emailError}</p>}
           </div>
-          <Button className="w-full" onClick={handleCrearMiembro} disabled={!nuevoEmail || !nuevoNombre || !validateEmail(nuevoEmail)}>
+          {nuevoEmail && !nuevoEmail.toLowerCase().endsWith("@gmail.com") && (
+            <>
+              <Input
+                label="Usuario *"
+                placeholder="nombreusuario"
+                value={nuevoUsername}
+                onChange={(e) => setNuevoUsername(e.target.value)}
+              />
+              <Input
+                label="Contraseña *"
+                type="password"
+                placeholder="••••••••"
+                value={nuevoPassword}
+                onChange={(e) => setNuevoPassword(e.target.value)}
+              />
+              <p className="text-xs text-gym-muted">Para correos no-Gmail, el usuario y contraseña son requeridos para iniciar sesión.</p>
+            </>
+          )}
+          <Button
+            className="w-full"
+            onClick={handleCrearMiembro}
+            disabled={
+              !nuevoEmail || !nuevoNombre || !validateEmail(nuevoEmail) ||
+              (nuevoEmail && !nuevoEmail.toLowerCase().endsWith("@gmail.com") && (!nuevoUsername || !nuevoPassword))
+            }
+          >
             <Plus className="w-4 h-4 mr-2" /> Agregar Miembro
           </Button>
         </div>

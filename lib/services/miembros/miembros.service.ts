@@ -4,17 +4,12 @@ import type { Profile, Membresia } from "@/lib/types";
 export class MiembrosService {
   private supabase = createClient();
 
-  async listarMiembros(estado?: string): Promise<Profile[]> {
-    let query = this.supabase
+  async listarMiembros(): Promise<Profile[]> {
+    const { data, error } = await this.supabase
       .from("profiles")
       .select("*")
       .order("nombre_completo", { ascending: true });
 
-    if (estado) {
-      query = query.eq("estado", estado);
-    }
-
-    const { data, error } = await query;
     if (error) throw error;
     return data || [];
   }
@@ -42,14 +37,6 @@ export class MiembrosService {
     return data;
   }
 
-  async cambiarEstado(
-    id: string,
-    estado: "activo" | "suspendido" | "inactivo",
-    notas_estado?: string
-  ): Promise<Profile> {
-    return this.actualizarMiembro(id, { estado, notas_estado });
-  }
-
   async crearMiembroPorEmail(email: string, nombre: string): Promise<Profile> {
     const res = await fetch("/api/miembros", {
       method: "POST",
@@ -65,7 +52,7 @@ export class MiembrosService {
   async obtenerMembresia(usuarioId: string): Promise<Membresia | null> {
     const { data } = await this.supabase
       .from("membresias")
-      .select("*, plan:planes(*)")
+      .select("*")
       .eq("usuario_id", usuarioId)
       .eq("estado", "activa")
       .single();
@@ -74,37 +61,57 @@ export class MiembrosService {
   }
 
   async stats() {
-    const baseQuery = this.supabase
-      .from("profiles")
-      .select("id", { count: "exact", head: true });
-
-    const [total, activos, suspendidos, inactivos, libre] = await Promise.all([
-      baseQuery,
+    const [total, libre] = await Promise.all([
       this.supabase
         .from("profiles")
-        .select("id", { count: "exact", head: true })
-        .eq("estado", "activo"),
+        .select("id", { count: "exact", head: true }),
       this.supabase
-        .from("profiles")
-        .select("id", { count: "exact", head: true })
-        .eq("estado", "suspendido"),
-      this.supabase
-        .from("profiles")
-        .select("id", { count: "exact", head: true })
-        .eq("estado", "inactivo"),
-      this.supabase
-        .from("profiles")
-        .select("id", { count: "exact", head: true })
-        .eq("membresia_libre", true),
+        .from("membresias")
+        .select("usuario_id", { count: "exact", head: true })
+        .is("fecha_fin", null),
     ]);
 
     return {
       totalMiembros: total.count || 0,
-      activos: activos.count || 0,
-      suspendidos: suspendidos.count || 0,
-      inactivos: inactivos.count || 0,
       membresiaLibre: libre.count || 0,
     };
+  }
+
+  async toggleMembresiaLibre(usuarioId: string, asignadoPor: string, asignadoPorNombre: string): Promise<void> {
+    const { data: existing } = await this.supabase
+      .from("membresias")
+      .select("id, fecha_fin")
+      .eq("usuario_id", usuarioId)
+      .is("fecha_fin", null)
+      .limit(1)
+      .maybeSingle();
+
+    if (existing) {
+      await this.supabase
+        .from("membresias")
+        .update({ fecha_fin: new Date().toISOString() })
+        .eq("id", existing.id);
+    } else {
+      await this.supabase
+        .from("membresias")
+        .insert({
+          usuario_id: usuarioId,
+          fecha_inicio: new Date().toISOString(),
+          fecha_fin: null,
+          estado: "activa",
+          asignado_por: asignadoPor,
+          asignado_por_nombre: asignadoPorNombre,
+        });
+    }
+  }
+
+  async actualizarEstado(usuarioId: string, activo: boolean): Promise<void> {
+    const { error } = await this.supabase
+      .from("profiles")
+      .update({ activo })
+      .eq("id", usuarioId);
+
+    if (error) throw error;
   }
 }
 

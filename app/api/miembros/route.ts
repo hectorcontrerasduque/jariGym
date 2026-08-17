@@ -21,10 +21,19 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "No autorizado" }, { status: 403 });
     }
 
-    const { email, nombre } = await request.json();
+    const { email, nombre, username, password } = await request.json();
 
     if (!email || !nombre) {
       return NextResponse.json({ error: "Email y nombre requeridos" }, { status: 400 });
+    }
+
+    const isGmail = email.toLowerCase().endsWith("@gmail.com");
+
+    if (!isGmail && (!username || !password)) {
+      return NextResponse.json(
+        { error: "Para correos no-Gmail, usuario y contraseña son requeridos" },
+        { status: 400 }
+      );
     }
 
     const serviceSupabase = createServiceClient(
@@ -32,13 +41,17 @@ export async function POST(request: Request) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
-    const password = Math.random().toString(36).slice(-12) + "A1!";
+    const userPassword = isGmail
+      ? Math.random().toString(36).slice(-12) + "A1!"
+      : password;
+
+    const userEmail = isGmail ? email : `${username}@gymapp.local`;
 
     const { data: authUser, error: authError } = await serviceSupabase.auth.admin.createUser({
-      email,
+      email: userEmail,
       email_confirm: true,
-      password,
-      user_metadata: { nombre_completo: nombre },
+      password: userPassword,
+      user_metadata: { nombre_completo: nombre, display_email: email },
     });
 
     if (authError) {
@@ -65,7 +78,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: profileError.message }, { status: 400 });
     }
 
-    return NextResponse.json({ miembro: data, password });
+    return NextResponse.json({ miembro: data, password: userPassword, loginEmail: userEmail });
   } catch (error: any) {
     console.error("Error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });

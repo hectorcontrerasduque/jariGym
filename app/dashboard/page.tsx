@@ -14,8 +14,18 @@ import {
   AlertTriangle,
   UserCheck,
   Gift,
-  Calendar,
+  BarChart3,
 } from "lucide-react";
+
+interface MonthlyStat {
+  mes: number;
+  anio: number;
+  nombre: string;
+  pagados: number;
+  pendientes: number;
+  sinPago: number;
+  libres: number;
+}
 
 export default function DashboardPage() {
   const [stats, setStats] = useState<any>(null);
@@ -23,6 +33,7 @@ export default function DashboardPage() {
   const [anios, setAnios] = useState<number[]>([]);
   const [anioSeleccionado, setAnioSeleccionado] = useState(new Date().getFullYear());
   const [loading, setLoading] = useState(true);
+  const [monthlyStats, setMonthlyStats] = useState<{ totalMiembros: number; libres: number; meses: MonthlyStat[] } | null>(null);
 
   useEffect(() => {
     loadData();
@@ -31,14 +42,16 @@ export default function DashboardPage() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [statsData, pagosData, aniosData] = await Promise.all([
+      const [statsData, pagosData, aniosData, monthlyData] = await Promise.all([
         pagosService.stats(anioSeleccionado),
         pagosService.listarPagos(undefined, anioSeleccionado),
         pagosService.aniosConPagos(),
+        pagosService.monthlyStats(),
       ]);
       setStats(statsData);
       setPagosRecientes(pagosData.slice(0, 5));
       setAnios(aniosData);
+      setMonthlyStats(monthlyData);
     } catch (error) {
       console.error("Error loading dashboard:", error);
     } finally {
@@ -54,9 +67,10 @@ export default function DashboardPage() {
     );
   }
 
+  const maxMiembros = monthlyStats ? Math.max(...monthlyStats.meses.map(m => m.pagados + m.sinPago + m.libres), 1) : 1;
+
   return (
     <div className="space-y-6 animate-fadeIn relative">
-      {/* Neon background orbs */}
       <div className="absolute top-0 right-0 w-72 h-72 bg-gym-primary/5 rounded-full blur-3xl animate-pulse" />
       <div className="absolute bottom-0 left-0 w-72 h-72 bg-gym-secondary/5 rounded-full blur-3xl animate-pulse" style={{ animationDelay: "1s" }} />
 
@@ -78,7 +92,7 @@ export default function DashboardPage() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 relative z-10">
-        {/* Inscritos */}
+        {/* Inscritos - miembros activos que pagaron + pendientes */}
         <Card className="neon-card hover:border-gym-primary/50 transition-all hover:shadow-[0_0_20px_rgba(56,189,248,0.15)]">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
@@ -101,7 +115,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Mensualidad - Deudores */}
+        {/* Deudores - meses no pagados por miembros activos */}
         <Card className="neon-card hover:border-gym-danger/50 transition-all hover:shadow-[0_0_20px_rgba(251,113,133,0.15)]">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
@@ -119,7 +133,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Al día */}
+        {/* Al día - sumatoria pagos aceptados en mes actual + inscripción pagada */}
         <Card className="neon-card hover:border-gym-success/50 transition-all hover:shadow-[0_0_20px_rgba(52,211,153,0.15)]">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
@@ -153,9 +167,87 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      {/* Pagos recientes */}
+      {/* Bar Chart - Last 3 months */}
+      {monthlyStats && (
+        <Card className="neon-card relative z-10">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <BarChart3 className="w-5 h-5 text-gym-primary" />
+              Pagos por Mes (Últimos 3 meses)
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {monthlyStats.meses.map((m) => {
+                const total = m.pagados + m.sinPago + m.libres;
+                const pagadosWidth = total > 0 ? (m.pagados / maxMiembros) * 100 : 0;
+                const sinPagoWidth = total > 0 ? (m.sinPago / maxMiembros) * 100 : 0;
+                const libresWidth = total > 0 ? (m.libres / maxMiembros) * 100 : 0;
+
+                return (
+                  <div key={`${m.anio}-${m.mes}`} className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-gym-text">{m.nombre} {m.anio}</span>
+                      <div className="flex items-center gap-4 text-xs">
+                        <span className="flex items-center gap-1">
+                          <span className="w-3 h-3 rounded-sm bg-gym-success" />
+                          {m.pagados} pagados
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <span className="w-3 h-3 rounded-sm bg-gym-danger" />
+                          {m.sinPago} sin pago
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <span className="w-3 h-3 rounded-sm bg-gym-secondary" />
+                          {m.libres} libres
+                        </span>
+                      </div>
+                    </div>
+                    <div className="h-6 bg-gym-bg rounded-lg overflow-hidden flex">
+                      {pagadosWidth > 0 && (
+                        <div
+                          className="h-full bg-gym-success transition-all duration-500"
+                          style={{ width: `${pagadosWidth}%` }}
+                        />
+                      )}
+                      {sinPagoWidth > 0 && (
+                        <div
+                          className="h-full bg-gym-danger transition-all duration-500"
+                          style={{ width: `${sinPagoWidth}%` }}
+                        />
+                      )}
+                      {libresWidth > 0 && (
+                        <div
+                          className="h-full bg-gym-secondary transition-all duration-500"
+                          style={{ width: `${libresWidth}%` }}
+                        />
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="flex items-center justify-center gap-6 mt-4 text-xs text-gym-muted">
+              <span className="flex items-center gap-1">
+                <span className="w-3 h-3 rounded-sm bg-gym-success" />
+                Pagado
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="w-3 h-3 rounded-sm bg-gym-danger" />
+                Sin pago
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="w-3 h-3 rounded-sm bg-gym-secondary" />
+                Membresía Libre
+              </span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Pagos recientes - siempre visible */}
       <Card className="neon-card relative z-10">
-        <CardHeader>
+        <CardHeader className="pb-2">
           <CardTitle className="flex items-center gap-2">
             <CreditCard className="w-5 h-5 text-gym-primary" />
             Pagos Recientes

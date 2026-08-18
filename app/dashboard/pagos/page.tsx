@@ -158,7 +158,7 @@ export default function PagosPage() {
           <select
             value={anioSeleccionado}
             onChange={(e) => setAnioSeleccionado(Number(e.target.value))}
-            className="px-4 py-2 bg-gym-surface border border-gym-border rounded-xl text-gym-text focus:outline-none focus:ring-2 focus:ring-gym-primary"
+            className="px-3 py-2 bg-gym-surface border border-gym-border rounded-xl text-gym-text text-sm focus:outline-none focus:ring-2 focus:ring-gym-primary w-auto"
           >
             {anios.map((a) => (
               <option key={a} value={a}>{a}</option>
@@ -305,16 +305,10 @@ export default function PagosPage() {
                   className="p-3 bg-gym-bg rounded-xl hover:bg-gym-surface transition-colors"
                 >
                   <div className="flex items-center gap-3">
-                    {getPagoIcon(pago)}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        {!miembroSeleccionado && (
-                          <span className="text-xs font-medium text-gym-primary truncate">
-                            {pago.profile?.nombre_completo || "—"}
-                          </span>
-                        )}
                         <span className="text-sm font-medium text-gym-text truncate">
-                          {getPagoLabel(pago)}
+                          {pago.profile?.nombre_completo || "—"}
                         </span>
                         <Badge
                           variant={
@@ -333,47 +327,11 @@ export default function PagosPage() {
                             : "Pendiente"}
                         </Badge>
                       </div>
-                      <div className="flex items-center gap-2 text-xs text-gym-muted">
-                        <span>{pago.metodo_pago === "efectivo" ? "💵" : pago.metodo_pago === "bs" ? "🇻🇪" : pago.metodo_pago === "binance" ? "🟡" : "🏦"} {pago.monto > 0 ? formatCurrency(pago.monto) : "Gratis"}</span>
-                        {pago.fecha_pago_real && (
-                          <>
-                            <span>·</span>
-                            <span>{new Date(pago.fecha_pago_real).toLocaleDateString("es-ES")}</span>
-                          </>
-                        )}
-                      </div>
                     </div>
-                    <div className="flex items-center gap-1 flex-shrink-0">
-                      {pago.estado === "pendiente" && (
-                        <>
-                          <button
-                            onClick={() => handleAprobar(pago.id)}
-                            className="p-1.5 text-gym-success hover:bg-gym-success/10 rounded-lg transition-colors"
-                            title="Aprobar"
-                          >
-                            <Check className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleRechazar(pago.id)}
-                            className="p-1.5 text-gym-danger hover:bg-gym-danger/10 rounded-lg transition-colors"
-                            title="Rechazar"
-                          >
-                            <X className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDelete(pago.id)}
-                            disabled={deleting === pago.id}
-                            className="p-1.5 text-gym-muted hover:bg-gym-danger/10 rounded-lg transition-colors disabled:opacity-50"
-                            title="Eliminar"
-                          >
-                            {deleting === pago.id ? (
-                              <div className="w-4 h-4 border-2 border-gym-danger border-t-transparent rounded-full animate-spin" />
-                            ) : (
-                              <Trash2 className="w-4 h-4" />
-                            )}
-                          </button>
-                        </>
-                      )}
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <span className="font-semibold text-gym-text text-sm">
+                        {pago.monto > 0 ? formatCurrency(pago.monto) : "Gratis"}
+                      </span>
                       <button
                         onClick={() => { setSelectedPago(pago); setModalOpen(true); }}
                         className="p-1.5 text-gym-muted hover:text-gym-text rounded-lg transition-colors"
@@ -396,11 +354,22 @@ export default function PagosPage() {
           <div className="space-y-4">
             <div>
               <p className="text-sm text-gym-muted">Miembro</p>
-              <p className="text-gym-text">{selectedPago.profile?.nombre_completo}</p>
+              <p className="text-gym-text font-medium">{selectedPago.profile?.nombre_completo || "—"}</p>
             </div>
             <div>
               <p className="text-sm text-gym-muted">Concepto</p>
-              <p className="text-gym-text">{getPagoLabel(selectedPago)}</p>
+              <div className="flex items-center gap-2">
+                {getPagoIcon(selectedPago)}
+                <p className="text-gym-text font-medium">{getPagoLabel(selectedPago)}</p>
+              </div>
+            </div>
+            <div>
+              <p className="text-sm text-gym-muted">Tipo</p>
+              <p className="text-gym-text">
+                {selectedPago.notas?.toLowerCase().includes("inscripción") || selectedPago.notas?.toLowerCase().includes("inscripcion")
+                  ? "Inscripción"
+                  : "Mensualidad"}
+              </p>
             </div>
             <div>
               <p className="text-sm text-gym-muted">Monto</p>

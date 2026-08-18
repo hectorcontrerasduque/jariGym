@@ -356,15 +356,16 @@ export class PagosService {
     };
   }
 
-  async monthlyStats() {
+  async monthlyStats(anio?: number) {
     const hoy = new Date();
+    const anioConsulta = anio || hoy.getFullYear();
+
     const meses = [];
-    for (let i = 2; i >= 0; i--) {
-      const fecha = new Date(hoy.getFullYear(), hoy.getMonth() - i, 1);
+    for (let mes = 1; mes <= 12; mes++) {
       meses.push({
-        mes: fecha.getMonth() + 1,
-        anio: fecha.getFullYear(),
-        nombre: getMonthName(fecha.getMonth() + 1),
+        mes,
+        anio: anioConsulta,
+        nombre: getMonthName(mes),
       });
     }
 

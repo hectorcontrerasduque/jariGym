@@ -32,6 +32,7 @@ function LoginForm() {
   const [resetLoading, setResetLoading] = useState(false);
   const [gymName, setGymName] = useState("GymApp");
   const [gymOwnerEmail, setGymOwnerEmail] = useState("");
+  const [gymLogo, setGymLogo] = useState("");
 
   useEffect(() => {
     const err = searchParams.get("error");
@@ -39,6 +40,7 @@ function LoginForm() {
     configService.getConfig().then((config) => {
       if (config?.nombre_gym) setGymName(config.nombre_gym);
       if (config?.dueno_email) setGymOwnerEmail(config.dueno_email);
+      if (config?.logo_url) setGymLogo(config.logo_url);
     }).catch(() => {});
   }, [searchParams]);
 
@@ -121,8 +123,12 @@ function LoginForm() {
 
       <Card className="w-full max-w-md relative z-10 border-gym-primary/20 shadow-[0_0_40px_rgba(56,189,248,0.15)]">
         <CardHeader className="text-center">
-          <div className="mx-auto w-16 h-16 bg-gym-primary/20 rounded-2xl flex items-center justify-center mb-4 animate-pulse-glow">
-            <Dumbbell className="w-8 h-8 text-gym-primary" />
+          <div className="mx-auto w-16 h-16 bg-gym-primary/20 rounded-2xl flex items-center justify-center mb-4 animate-pulse-glow overflow-hidden">
+            {gymLogo ? (
+              <img src={gymLogo} alt={gymName} className="w-full h-full object-cover" />
+            ) : (
+              <Dumbbell className="w-8 h-8 text-gym-primary" />
+            )}
           </div>
           <CardTitle className="text-2xl font-display neon-text">{gymName}</CardTitle>
           <p className="text-gym-muted text-sm">{messages.auth.loginSubtitle}</p>
@@ -172,8 +178,12 @@ function LoginForm() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
           <Card className="w-full max-w-md border-gym-primary/20">
             <CardHeader className="text-center">
-              <div className="mx-auto w-12 h-12 bg-gym-primary/20 rounded-xl flex items-center justify-center mb-3">
-                <Dumbbell className="w-6 h-6 text-gym-primary" />
+              <div className="mx-auto w-12 h-12 bg-gym-primary/20 rounded-xl flex items-center justify-center mb-3 overflow-hidden">
+                {gymLogo ? (
+                  <img src={gymLogo} alt={gymName} className="w-full h-full object-cover" />
+                ) : (
+                  <Dumbbell className="w-6 h-6 text-gym-primary" />
+                )}
               </div>
               <CardTitle className="text-lg font-display text-gym-text">
                 {resetSent ? messages.auth.resetPasswordSent : messages.auth.resetPasswordTitle}

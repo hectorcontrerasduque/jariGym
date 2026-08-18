@@ -66,13 +66,28 @@ export async function POST(request: Request) {
       user_metadata: { nombre_completo: nombre, display_email: email },
     });
 
+    let userId = authUser?.user?.id;
+
     if (authError) {
-      console.error("Auth error:", authError);
-      return NextResponse.json({ error: authError.message }, { status: 400 });
+      if (authError.message?.includes("already") || authError.message?.includes("exists")) {
+        const { data: existingUsers } = await serviceSupabase.auth.admin.listUsers();
+        const existing = existingUsers?.users?.find((u) => u.email === userEmail);
+        if (existing) {
+          userId = existing.id;
+        } else {
+          return NextResponse.json({ error: authError.message }, { status: 400 });
+        }
+      } else {
+        return NextResponse.json({ error: authError.message }, { status: 400 });
+      }
+    }
+
+    if (!userId) {
+      return NextResponse.json({ error: "No se pudo obtener el ID del usuario" }, { status: 500 });
     }
 
     const profileData: Record<string, unknown> = {
-      id: authUser.user.id,
+      id: userId,
       nombre_completo: nombre,
       role: "miembro",
     };
@@ -95,14 +110,22 @@ export async function POST(request: Request) {
     if (hasEmail) {
       try {
         const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-        const { error: inviteError } = await serviceSupabase.auth.admin.inviteUserByEmail(email, {
+        const { error: inviteError } = await serviceSupabase.auth.admin.inviteUserByEmail(userEmail, {
           data: { nombre_completo: nombre },
           redirectTo: `${siteUrl}/login`,
         });
         if (!inviteError) {
           welcomeEmailSent = true;
         } else {
-          console.error("Invite email error:", inviteError);
+          const { error: resetError } = await serviceSupabase.auth.admin.generateLink({
+            type: "magiclink",
+            email: userEmail,
+          });
+          if (!resetError) {
+            welcomeEmailSent = true;
+          } else {
+            console.error("Email error:", inviteError, resetError);
+          }
         }
       } catch (emailErr) {
         console.error("Error sending welcome email:", emailErr);

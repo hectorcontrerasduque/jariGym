@@ -34,6 +34,7 @@ export function Sidebar() {
   const pathname = usePathname();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [gymName, setGymName] = useState("GymApp");
+  const [gymLogo, setGymLogo] = useState("");
   const supabase = createClient();
 
   useEffect(() => {
@@ -54,6 +55,7 @@ export function Sidebar() {
       try {
         const config = await configService.getConfig();
         if (config?.nombre_gym) setGymName(config.nombre_gym);
+        if (config?.logo_url) setGymLogo(config.logo_url);
       } catch {}
     };
     getProfile();
@@ -99,8 +101,12 @@ export function Sidebar() {
       <aside className="hidden md:flex fixed left-0 top-0 h-full w-64 bg-gym-surface/80 backdrop-blur-xl border-r border-gym-border/50 flex-col z-40">
         <div className="p-6 border-b border-gym-border/50">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gym-primary/20 rounded-xl flex items-center justify-center animate-pulse-glow">
-              <Dumbbell className="w-6 h-6 text-gym-primary" />
+            <div className="w-10 h-10 bg-gym-primary/20 rounded-xl flex items-center justify-center animate-pulse-glow overflow-hidden">
+              {gymLogo ? (
+                <img src={gymLogo} alt={gymName} className="w-full h-full object-cover" />
+              ) : (
+                <Dumbbell className="w-6 h-6 text-gym-primary" />
+              )}
             </div>
             <div>
               <h1 className="font-display font-bold text-gym-text neon-text">{gymName}</h1>

@@ -38,6 +38,7 @@ export default function DashboardPage() {
   const [anioSeleccionado, setAnioSeleccionado] = useState(new Date().getFullYear());
   const [loading, setLoading] = useState(true);
   const [monthlyStats, setMonthlyStats] = useState<{ totalMiembros: number; libres: number; meses: MonthlyStat[] } | null>(null);
+  const [showAllMonths, setShowAllMonths] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -50,7 +51,7 @@ export default function DashboardPage() {
         pagosService.stats(anioSeleccionado),
         pagosService.pagosRecientesAprobados(),
         pagosService.aniosConPagos(),
-        pagosService.monthlyStats(),
+        pagosService.monthlyStats(anioSeleccionado),
       ]);
       if (statsResult.status === "fulfilled") setStats(statsResult.value);
       if (pagosResult.status === "fulfilled") setPagosRecientes(pagosResult.value.slice(0, 5));
@@ -171,18 +172,18 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      {/* Bar Chart - Last 3 months */}
+      {/* Bar Chart */}
       {monthlyStats && (
         <Card className="neon-card relative z-10">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <BarChart3 className="w-5 h-5 text-gym-primary" />
-              Pagos por Mes (Últimos 3 meses)
+              Pagos por Mes - {anioSeleccionado}
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {monthlyStats.meses.map((m) => {
+              {(showAllMonths ? [...monthlyStats.meses].reverse() : [...monthlyStats.meses].reverse().slice(0, 3)).map((m) => {
                 const total = m.pagados + m.sinPago + m.libres;
                 const pagadosWidth = total > 0 ? (m.pagados / maxMiembros) * 100 : 0;
                 const sinPagoWidth = total > 0 ? (m.sinPago / maxMiembros) * 100 : 0;
@@ -245,6 +246,16 @@ export default function DashboardPage() {
                 Membresía Libre
               </span>
             </div>
+            {monthlyStats.meses.length > 3 && (
+              <div className="text-center mt-3">
+                <button
+                  onClick={() => setShowAllMonths(!showAllMonths)}
+                  className="text-sm text-gym-primary hover:text-gym-primary/80 transition-colors font-medium"
+                >
+                  {showAllMonths ? "Ver menos" : `Ver todos los meses (${monthlyStats.meses.length})`}
+                </button>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

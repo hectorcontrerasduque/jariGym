@@ -261,7 +261,8 @@ export class PagosService {
         .select("monto_mensual")
         .eq("habilitado", true)
         .limit(1)
-        .maybeSingle(),
+        .maybeSingle()
+        .catch(() => ({ data: null })),
     ]);
 
     const miembros = allMiembros.data || [];

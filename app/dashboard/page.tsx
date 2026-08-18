@@ -44,16 +44,16 @@ export default function DashboardPage() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [statsData, pagosData, aniosData, monthlyData] = await Promise.all([
+      const [statsResult, pagosResult, aniosResult, monthlyResult] = await Promise.allSettled([
         pagosService.stats(anioSeleccionado),
         pagosService.listarPagos(undefined, anioSeleccionado),
         pagosService.aniosConPagos(),
         pagosService.monthlyStats(),
       ]);
-      setStats(statsData);
-      setPagosRecientes(pagosData.slice(0, 5));
-      setAnios(aniosData);
-      setMonthlyStats(monthlyData);
+      if (statsResult.status === "fulfilled") setStats(statsResult.value);
+      if (pagosResult.status === "fulfilled") setPagosRecientes(pagosResult.value.slice(0, 5));
+      if (aniosResult.status === "fulfilled") setAnios(aniosResult.value);
+      if (monthlyResult.status === "fulfilled") setMonthlyStats(monthlyResult.value);
     } catch (error) {
       showToast(messages.toast.errorCargaDatos, "error");
     } finally {

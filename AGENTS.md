@@ -24,10 +24,13 @@ app/
   (auth)/login/     # Auth pages (route group, no /auth prefix)
   auth/callback/    # OAuth callback route handler
   dashboard/        # All app pages under /dashboard/*
-    configuracion/
-    miembros/
-    pagos/
-    reportar-pago/
+    configuracion/   # Gym config, logos, payment methods
+    miembros/        # Member management (CRUD, toggle status, notas_admin)
+    pagos/           # Payment list (super_admin), inline filter by member
+    reportar-pago/   # Create payments (admin for others, miembro for self)
+    mis-pagos/       # Miembro's own payment history
+    perfil/          # Profile edit (supports ?user_id for super_admin)
+  api/miembros/      # POST endpoint for creating members
 lib/
   supabase/
     client.ts       # Browser client (createBrowserClient)
@@ -36,9 +39,13 @@ lib/
   services/         # Service layer per domain (auth, pagos, miembros, config, notificaciones)
   types.ts          # All TypeScript interfaces
   utils.ts          # cn(), formatCurrency(), formatDate(), getMonthName()
+  messages.ts       # Centralized i18n messages for all modules
 components/
   ui/               # Reusable primitives (button, card, input, avatar, badge, modal)
+  ui/toast.tsx      # showToast(message, type) + ToastContainer
+  ui/loading-overlay.tsx  # LoadingOverlay component
   sidebar.tsx       # Desktop sidebar + mobile bottom nav
+  providers.tsx     # Client wrapper with ToastContainer
 supabase/
   migrations/       # SQL migrations (run manually in Supabase SQL Editor)
   functions/        # Deno Edge Functions (deploy via Supabase CLI)
@@ -86,3 +93,52 @@ RLS uses helper functions (`get_user_role()`, `get_user_tenant_id()`) with `SECU
 - All pages are responsive: mobile gets bottom nav (via `sidebar.tsx`), desktop gets sidebar
 - Component pattern: `"use client"` directive at top of client components
 - Service classes instantiated as singletons (`export const pagosService = new PagosService()`)
+
+## Key Patterns
+
+### Toast Notifications
+```tsx
+import { showToast } from "@/components/ui/toast";
+showToast(messages.toast.success, "success"); // or "error", "warning", "info"
+```
+
+### Modal Component
+- Auto-scrollable (`max-h-[90vh] overflow-y-auto`)
+- Sticky title bar
+- Escape key closes
+
+### Profile Type
+```ts
+role: "super_admin" | "admin" | "miembro"
+activo: boolean | null  // null = active
+notas_admin: string | null
+inscripcion_pagada: boolean
+inscripcion_fecha: string | null
+```
+
+### Dashboard Stats Logic
+- **Inscritos**: From `pagos` table (approved payments with "inscripción" in notas) + `profile.inscripcion_pagada`
+- **Deudores**: Active members (no libre, inscription paid) without approved payment for current month
+- **Al día**: Active members with approved payment for current month
+- **Pagos recientes**: Approved payments only, with fallback when profile join fails
+
+### Payment Approval
+- `aprobarPago()` now auto-updates `profiles.inscripcion_pagada = true` when approving inscription payments
+
+### Member Creation
+- POST `/api/miembros`: email required (no username), handles existing auth users, generates random password if empty
+
+### Profile Page
+- Accepts `?user_id=<uuid>` query param for super_admin to edit other users' profiles
+
+## Known Issues / TODO
+
+- [ ] No test suite configured
+- [ ] No CI/CD pipelines
+- [ ] No rate limiting on API routes
+- [ ] Storage bucket `comprobantes` is private — need signed URLs for viewing
+- [ ] `gym_config_metodos_pago` monto_mensual fallback hardcoded to 5 when config missing
+- [ ] No confirmation modal for payment deletion (uses `confirm()`)
+- [ ] No pagination on pagos/miembros lists
+- [ ] No dark mode support
+- [ ] No PWA / offline support

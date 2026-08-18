@@ -23,13 +23,21 @@ export async function POST(request: Request) {
 
     const { email, nombre, username, password } = await request.json();
 
-    if (!email || !nombre) {
-      return NextResponse.json({ error: "Email y nombre requeridos" }, { status: 400 });
+    if (!nombre) {
+      return NextResponse.json({ error: "Nombre requerido" }, { status: 400 });
     }
 
-    const isGmail = email.toLowerCase().endsWith("@gmail.com");
+    const hasEmail = !!email;
+    const isGmail = hasEmail && email.toLowerCase().endsWith("@gmail.com");
 
-    if (!isGmail && (!username || !password)) {
+    if (!hasEmail && (!username || !password)) {
+      return NextResponse.json(
+        { error: "Si no se ingresa correo, usuario y contraseña son requeridos" },
+        { status: 400 }
+      );
+    }
+
+    if (hasEmail && !isGmail && (!username || !password)) {
       return NextResponse.json(
         { error: "Para correos no-Gmail, usuario y contraseña son requeridos" },
         { status: 400 }
@@ -41,11 +49,15 @@ export async function POST(request: Request) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
-    const userPassword = isGmail
-      ? Math.random().toString(36).slice(-12) + "A1!"
+    const userPassword = (!hasEmail || isGmail)
+      ? (password || Math.random().toString(36).slice(-12) + "A1!")
       : password;
 
-    const userEmail = isGmail ? email : `${username}@gymapp.local`;
+    const userEmail = hasEmail && isGmail
+      ? email
+      : hasEmail
+      ? email
+      : `${username}@gymapp.local`;
 
     const { data: authUser, error: authError } = await serviceSupabase.auth.admin.createUser({
       email: userEmail,
@@ -59,17 +71,18 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: authError.message }, { status: 400 });
     }
 
+    const profileData: Record<string, unknown> = {
+      id: authUser.user.id,
+      nombre_completo: nombre,
+      role: "miembro",
+    };
+    if (hasEmail) {
+      profileData.email = email;
+    }
+
     const { data, error: profileError } = await serviceSupabase
       .from("profiles")
-      .upsert(
-        {
-          id: authUser.user.id,
-          email,
-          nombre_completo: nombre,
-          role: "miembro",
-        },
-        { onConflict: "id" }
-      )
+      .upsert(profileData, { onConflict: "id" })
       .select()
       .single();
 
@@ -78,7 +91,30 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: profileError.message }, { status: 400 });
     }
 
-    return NextResponse.json({ miembro: data, password: userPassword, loginEmail: userEmail });
+    let welcomeEmailSent = false;
+    if (hasEmail) {
+      try {
+        const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+        const { error: inviteError } = await serviceSupabase.auth.admin.inviteUserByEmail(email, {
+          data: { nombre_completo: nombre },
+          redirectTo: `${siteUrl}/login`,
+        });
+        if (!inviteError) {
+          welcomeEmailSent = true;
+        } else {
+          console.error("Invite email error:", inviteError);
+        }
+      } catch (emailErr) {
+        console.error("Error sending welcome email:", emailErr);
+      }
+    }
+
+    return NextResponse.json({
+      miembro: data,
+      password: userPassword,
+      loginEmail: userEmail,
+      welcomeEmailSent,
+    });
   } catch (error: any) {
     console.error("Error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });

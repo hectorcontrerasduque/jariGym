@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { configService } from "@/lib/services/config/config.service";
 import { Save, Building2, User, CreditCard, Clock, Globe } from "lucide-react";
+import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import type { GymConfig, MetodoPagoConfig } from "@/lib/types";
 
 const metodoLabels: Record<string, { label: string; icon: string; alwaysOn?: boolean }> = {
@@ -103,6 +104,7 @@ export default function ConfiguracionPage() {
 
   return (
     <div className="max-w-3xl mx-auto space-y-6 animate-fadeIn relative">
+      <LoadingOverlay show={saving} message="Guardando configuración..." />
       <div className="absolute top-0 left-1/2 -translate-x-1/2 w-96 h-96 bg-gym-primary/5 rounded-full blur-3xl animate-pulse" />
 
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 relative z-10">

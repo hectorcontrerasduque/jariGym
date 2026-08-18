@@ -11,12 +11,14 @@ import { miembrosService } from "@/lib/services/miembros/miembros.service";
 import { formatDate, formatCurrency, formatDateTime } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { Users, Search, Plus, Eye, UserX, UserCheck } from "lucide-react";
+import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import type { Profile, Pago } from "@/lib/types";
 
 export default function MiembrosPage() {
   const [miembros, setMiembros] = useState<Profile[]>([]);
   const [busqueda, setBusqueda] = useState("");
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [stats, setStats] = useState({ totalMiembros: 0, membresiaLibre: 0 });
 
   const [selectedMiembro, setSelectedMiembro] = useState<Profile | null>(null);
@@ -77,13 +79,15 @@ export default function MiembrosPage() {
     if (!nuevoNombre) return;
     if (nuevoEmail && !validateEmail(nuevoEmail)) return;
     const isGmail = nuevoEmail && nuevoEmail.toLowerCase().endsWith("@gmail.com");
-    if (!isGmail && (!nuevoUsername || !nuevoPassword)) return;
+    if (!nuevoEmail && (!nuevoUsername || !nuevoPassword)) return;
+    if (nuevoEmail && !isGmail && (!nuevoUsername || !nuevoPassword)) return;
+    setSaving(true);
     try {
       const res = await fetch("/api/miembros", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          email: nuevoEmail,
+          email: nuevoEmail || undefined,
           nombre: nuevoNombre,
           username: nuevoUsername || undefined,
           password: nuevoPassword || undefined,
@@ -100,6 +104,8 @@ export default function MiembrosPage() {
       await loadMiembros();
     } catch (error) {
       console.error("Error:", error);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -173,6 +179,7 @@ export default function MiembrosPage() {
 
   return (
     <div className="space-y-6 animate-fadeIn relative">
+      <LoadingOverlay show={saving} message="Creando miembro..." />
       <div className="absolute top-0 right-0 w-72 h-72 bg-gym-secondary/5 rounded-full blur-3xl animate-pulse" />
 
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 relative z-10">

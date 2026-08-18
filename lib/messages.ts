@@ -104,6 +104,12 @@ export const messages = {
     usuario: "Usuario",
     contraseña: "Contraseña",
     usuarioRequerido: "Para correos no-Gmail, el usuario y contraseña son requeridos para iniciar sesión.",
+    camposOpcionales: "Si dejas usuario y contraseña vacíos, se generarán automáticamente.",
+    correoOpcional: "Correo (opcional)",
+    usuarioLabel: "Usuario",
+    contrasenaLabel: "Contraseña",
+    creandoMiembro: "Creando miembro...",
+    bienvenidaEnviada: "Correo de bienvenida enviado",
     confirmActivar: "¿Activar a",
     confirmDesactivar: "¿Desactivar a",
     confirmAsignarLibre: "¿Asignar membresía libre a",
@@ -174,6 +180,7 @@ export const messages = {
   },
   common: {
     cargar: "Cargando...",
+    procesando: "Procesando...",
     guardar: "Guardar",
     cancelar: "Cancelar",
     eliminar: "Eliminar",
@@ -187,6 +194,9 @@ export const messages = {
     no: "No",
     aceptar: "Aceptar",
     Close: "Cerrar",
+    guardando: "Guardando...",
+    actualizando: "Actualizando...",
+    eliminando: "Eliminando...",
   },
 } as const;
 

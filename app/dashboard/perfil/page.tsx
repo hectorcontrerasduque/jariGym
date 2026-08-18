@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -24,6 +24,18 @@ import type { Profile } from "@/lib/types";
 import Link from "next/link";
 
 export default function PerfilPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="animate-spin w-8 h-8 border-2 border-gym-primary border-t-transparent rounded-full" />
+      </div>
+    }>
+      <PerfilContent />
+    </Suspense>
+  );
+}
+
+function PerfilContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const targetUserId = searchParams.get("user_id");

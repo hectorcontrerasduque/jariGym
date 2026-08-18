@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,11 +25,14 @@ import Link from "next/link";
 
 export default function PerfilPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const targetUserId = searchParams.get("user_id");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [currentUserRole, setCurrentUserRole] = useState<string>("");
   const [formData, setFormData] = useState({
     nombre_completo: "",
     email: "",
@@ -52,10 +55,21 @@ export default function PerfilPage() {
         router.push("/login");
         return;
       }
+
+      const { data: currentProfile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .single();
+      setCurrentUserRole(currentProfile?.role || "");
+
+      const isSuperAdmin = currentProfile?.role === "super_admin";
+      const profileUserId = isSuperAdmin && targetUserId ? targetUserId : user.id;
+
       const { data } = await supabase
         .from("profiles")
         .select("*")
-        .eq("id", user.id)
+        .eq("id", profileUserId)
         .single();
       if (data) {
         setProfile(data);
@@ -89,7 +103,7 @@ export default function PerfilPage() {
     setSaving(true);
     try {
       const supabase = createClient();
-      const isSuperAdmin = profile?.role === "super_admin";
+      const isSuperAdmin = currentUserRole === "super_admin";
       const updates: Record<string, unknown> = {
         nombre_completo: formData.nombre_completo || profile!.nombre_completo || "Sin nombre",
         email: formData.email,

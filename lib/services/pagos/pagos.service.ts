@@ -58,7 +58,7 @@ export class PagosService {
     } = await this.supabase.auth.getUser();
     if (!user) throw new Error("No autenticado");
 
-    const { data, error } = await this.supabase
+    const { data: pagoData, error: pagoError } = await this.supabase
       .from("pagos")
       .update({
         estado: "aprobado",
@@ -70,8 +70,20 @@ export class PagosService {
       .select()
       .single();
 
-    if (error) throw error;
-    return data;
+    if (pagoError) throw pagoError;
+
+    const isInscripcion = pagoData.notas?.toLowerCase().includes("inscripción") || pagoData.notas?.toLowerCase().includes("inscripcion");
+    if (isInscripcion) {
+      await this.supabase
+        .from("profiles")
+        .update({
+          inscripcion_pagada: true,
+          inscripcion_fecha: new Date().toISOString(),
+        })
+        .eq("id", pagoData.usuario_id);
+    }
+
+    return pagoData;
   }
 
   async rechazarPago(pagoId: string, notas?: string): Promise<Pago> {
@@ -226,7 +238,16 @@ export class PagosService {
       .order("created_at", { ascending: false })
       .limit(10);
 
-    if (error) throw error;
+    if (error) {
+      const fallback = await this.supabase
+        .from("pagos")
+        .select("*")
+        .eq("estado", "aprobado")
+        .order("created_at", { ascending: false })
+        .limit(10);
+      if (fallback.error) throw fallback.error;
+      return fallback.data || [];
+    }
     return data || [];
   }
 
@@ -268,7 +289,7 @@ export class PagosService {
         .eq("role", "miembro"),
       this.supabase
         .from("pagos")
-        .select("monto, usuario_id, estado, anio_pagar, mes_pagar")
+        .select("monto, usuario_id, estado, anio_pagar, mes_pagar, notas")
         .eq("anio_pagar", anioConsulta),
       this.supabase
         .from("membresias")
@@ -294,19 +315,35 @@ export class PagosService {
     const miembrosLibresIds = new Set((libres.data || []).map((l) => l.usuario_id));
     const montoMensual = config?.data?.monto_mensual || 5;
 
-    // Inscritos: solo miembros activos
+    // Determine inscription status from pagos table (approved payments with "inscripción")
+    const todosPagosAprobados = pagosAnioData.filter((p) => p.estado === "aprobado");
+    const miembrosConInscripcionPagada = new Set<string>();
+    for (const pago of todosPagosAprobados) {
+      const isInscripcion = pago.notas?.toLowerCase().includes("inscripción") || pago.notas?.toLowerCase().includes("inscripcion");
+      if (isInscripcion) {
+        miembrosConInscripcionPagada.add(pago.usuario_id);
+      }
+    }
+
+    // Also include profiles where inscripcion_pagada is true (for backwards compatibility)
+    for (const m of miembros) {
+      if (m.inscripcion_pagada) {
+        miembrosConInscripcionPagada.add(m.id);
+      }
+    }
+
+    // Inscritos: activos con inscripción pagada (por pagos o profile)
     const miembrosActivos = miembros.filter((m) => m.activo !== false);
-    const inscritosPagados = miembrosActivos.filter((m) => m.inscripcion_pagada).length;
-    const inscritosPendientes = miembrosActivos.filter((m) => !m.inscripcion_pagada).length;
+    const inscritosPagados = miembrosActivos.filter((m) => miembrosConInscripcionPagada.has(m.id)).length;
+    const inscritosPendientes = miembrosActivos.filter((m) => !miembrosConInscripcionPagada.has(m.id)).length;
 
     // Deudores: miembros activos (no libres, inscripción pagada) sin pago aprobado en mes actual
-    const todosPagosAprobados = pagosAnioData.filter((p) => p.estado === "aprobado");
     const deudoresSet = new Set<string>();
     let totalMesesDeuda = 0;
 
     for (const m of miembrosActivos) {
       if (miembrosLibresIds.has(m.id)) continue;
-      if (!m.inscripcion_pagada) continue;
+      if (!miembrosConInscripcionPagada.has(m.id)) continue;
 
       const pagosMiembro = todosPagosAprobados.filter((p) => p.usuario_id === m.id);
       const mesesPagados = new Set(pagosMiembro.map((p) => p.mes_pagar));
@@ -333,12 +370,9 @@ export class PagosService {
     const pagosMesActual = pagosAnioData.filter(
       (p) => p.estado === "aprobado" && p.mes_pagar === mesActual && p.anio_pagar === anioConsulta
     );
-    const miembrosConInscripcion = new Set(
-      miembrosActivos.filter((m) => m.inscripcion_pagada).map((m) => m.id)
-    );
-    const alDiaMensualidad = pagosMesActual.filter((p) => miembrosConInscripcion.has(p.usuario_id)).length;
+    const alDiaMensualidad = pagosMesActual.filter((p) => miembrosConInscripcionPagada.has(p.usuario_id)).length;
     const montoPagado = pagosMesActual
-      .filter((p) => miembrosConInscripcion.has(p.usuario_id))
+      .filter((p) => miembrosConInscripcionPagada.has(p.usuario_id))
       .reduce((sum, p) => sum + (p.monto || 0), 0);
 
     return {
@@ -402,13 +436,17 @@ export class PagosService {
 
         const { data: pagosMes } = await this.supabase
           .from("pagos")
-          .select("usuario_id, estado")
+          .select("usuario_id, estado, monto")
           .eq("mes_pagar", m.mes)
           .eq("anio_pagar", m.anio);
 
         const pagados = new Set(
           (pagosMes || []).filter((p) => p.estado === "aprobado" && idsMes.has(p.usuario_id)).map((p) => p.usuario_id)
         ).size;
+
+        const montoAcumulado = (pagosMes || [])
+          .filter((p) => p.estado === "aprobado" && idsMes.has(p.usuario_id))
+          .reduce((sum, p) => sum + (p.monto || 0), 0);
 
         const libresMes = miembrosMes.filter((p) => libresIds.has(p.id)).length;
 
@@ -422,6 +460,7 @@ export class PagosService {
           pendientes: 0,
           sinPago,
           libres: libresMes,
+          montoAcumulado,
         };
       })
     );

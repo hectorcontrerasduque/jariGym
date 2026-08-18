@@ -4,8 +4,9 @@ import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { pagosService } from "@/lib/services/pagos/pagos.service";
+import { miembrosService } from "@/lib/services/miembros/miembros.service";
 import { formatCurrency, getMonthName } from "@/lib/utils";
-import type { Pago } from "@/lib/types";
+import type { Pago, Profile } from "@/lib/types";
 import { showToast } from "@/components/ui/toast";
 import { messages } from "@/lib/messages";
 import {
@@ -29,6 +30,7 @@ interface MonthlyStat {
   pendientes: number;
   sinPago: number;
   libres: number;
+  montoAcumulado: number;
 }
 
 export default function DashboardPage() {
@@ -39,6 +41,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [monthlyStats, setMonthlyStats] = useState<{ totalMiembros: number; libres: number; meses: MonthlyStat[] } | null>(null);
   const [showAllMonths, setShowAllMonths] = useState(false);
+  const [miembros, setMiembros] = useState<Profile[]>([]);
 
   useEffect(() => {
     loadData();
@@ -47,21 +50,29 @@ export default function DashboardPage() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [statsResult, pagosResult, aniosResult, monthlyResult] = await Promise.allSettled([
+      const [statsResult, pagosResult, aniosResult, monthlyResult, miembrosResult] = await Promise.allSettled([
         pagosService.stats(anioSeleccionado),
         pagosService.pagosRecientesAprobados(),
         pagosService.aniosConPagos(),
         pagosService.monthlyStats(anioSeleccionado),
+        miembrosService.listarMiembros(),
       ]);
       if (statsResult.status === "fulfilled") setStats(statsResult.value);
       if (pagosResult.status === "fulfilled") setPagosRecientes(pagosResult.value.slice(0, 5));
       if (aniosResult.status === "fulfilled") setAnios(aniosResult.value);
       if (monthlyResult.status === "fulfilled") setMonthlyStats(monthlyResult.value);
+      if (miembrosResult.status === "fulfilled") setMiembros(miembrosResult.value);
     } catch (error) {
       showToast(messages.toast.errorCargaDatos, "error");
     } finally {
       setLoading(false);
     }
+  };
+
+  const getNombreMiembro = (pago: Pago): string => {
+    if (pago.profile?.nombre_completo) return pago.profile.nombre_completo;
+    const miembro = miembros.find((m) => m.id === pago.usuario_id);
+    return miembro?.nombre_completo || "Desconocido";
   };
 
   if (loading) {
@@ -228,6 +239,12 @@ export default function DashboardPage() {
                         />
                       )}
                     </div>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-gym-success font-medium">{formatCurrency(m.montoAcumulado)} cobrado</span>
+                      {m.sinPago > 0 && (
+                        <span className="text-gym-danger">{m.sinPago} sin pagar</span>
+                      )}
+                    </div>
                   </div>
                 );
               })}
@@ -287,7 +304,7 @@ export default function DashboardPage() {
                       </div>
                       <div className="min-w-0">
                         <p className="font-medium text-gym-text text-sm truncate">
-                          {pago.profile?.nombre_completo || "Desconocido"}
+                          {getNombreMiembro(pago)}
                         </p>
                         <p className="text-xs text-gym-muted">
                           {isInscripcion ? "Inscripción" : `${getMonthName(pago.mes_pagar)} ${pago.anio_pagar}`}

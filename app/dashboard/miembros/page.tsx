@@ -383,6 +383,16 @@ export default function MiembrosPage() {
       <Modal isOpen={modalDetalle} onClose={() => setModalDetalle(false)} title="Detalle del Miembro">
         {selectedMiembro && (
           <div className="space-y-4">
+            {currentUser?.role === "super_admin" && (
+              <Link
+                href={`/dashboard/perfil?user_id=${selectedMiembro.id}`}
+                onClick={() => setModalDetalle(false)}
+                className="flex items-center gap-2 p-3 bg-gym-primary/10 rounded-xl hover:bg-gym-primary/20 transition-colors text-gym-primary"
+              >
+                <Settings className="w-4 h-4" />
+                <span className="text-sm font-medium">Editar perfil de este miembro</span>
+              </Link>
+            )}
             <div className="flex items-center gap-4">
               <Avatar src={selectedMiembro.avatar_url} alt={selectedMiembro.nombre_completo} size="lg" />
               <div>
@@ -524,16 +534,6 @@ export default function MiembrosPage() {
                 </div>
               </div>
             </div>
-
-            {/* Editar perfil */}
-            <Link
-              href="/dashboard/perfil"
-              onClick={() => setModalDetalle(false)}
-              className="flex items-center gap-2 p-4 bg-gym-bg rounded-xl hover:bg-gym-surface transition-colors text-gym-primary"
-            >
-              <Settings className="w-5 h-5" />
-              <span className="text-sm font-medium">Editar perfil</span>
-            </Link>
           </div>
         )}
       </Modal>

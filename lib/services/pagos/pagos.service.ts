@@ -237,7 +237,7 @@ export class PagosService {
     const anioConsulta = anio || hoy.getFullYear();
     const mesActual = hoy.getMonth() + 1;
 
-    const [pendientes, allMiembros, pagosAnio, libres, config] = await Promise.all([
+    const [pendientes, allMiembros, pagosAnio, libres] = await Promise.all([
       this.supabase
         .from("pagos")
         .select("id, monto, usuario_id, mes_pagar, anio_pagar", { count: "exact", head: true })
@@ -256,14 +256,20 @@ export class PagosService {
         .from("membresias")
         .select("usuario_id")
         .is("fecha_fin", null),
-      this.supabase
+    ]);
+
+    let config = null;
+    try {
+      const { data } = await this.supabase
         .from("gym_config_metodos_pago")
         .select("monto_mensual")
         .eq("habilitado", true)
         .limit(1)
-        .maybeSingle()
-        .catch(() => ({ data: null })),
-    ]);
+        .maybeSingle();
+      config = { data };
+    } catch {
+      config = { data: null };
+    }
 
     const miembros = allMiembros.data || [];
     const pagosAnioData = pagosAnio.data || [];

@@ -13,6 +13,8 @@ import { createClient } from "@/lib/supabase/client";
 import { Upload, CheckCircle, XCircle, DollarSign, User, FileText, Gift, Calendar, ArrowLeft, AlertTriangle, Send } from "lucide-react";
 import { getMonthName, formatCurrency, formatDate } from "@/lib/utils";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
+import { showToast } from "@/components/ui/toast";
+import { messages } from "@/lib/messages";
 import type { MetodoPago, GymConfig, MetodoPagoConfig, Profile } from "@/lib/types";
 import Link from "next/link";
 
@@ -126,7 +128,7 @@ function ReportarPagoForm() {
       const metodos = await configService.getMetodosPago();
       setMetodosPago(metodos);
     } catch (err) {
-      console.error("Error loading data:", err);
+      showToast(messages.toast.errorCargaDatos, "error");
     }
   };
 
@@ -151,7 +153,7 @@ function ReportarPagoForm() {
 
       setFormData(prev => ({ ...prev, meses: [], pagar_inscripcion: false, pagar_mensualidad: false }));
     } catch (err) {
-      console.error("Error loading member:", err);
+      showToast(messages.toast.errorCargaDatos, "error");
     }
   };
 

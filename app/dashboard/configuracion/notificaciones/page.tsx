@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { notificacionesService } from "@/lib/services/notificaciones/notificaciones.service";
 import { Save, Bell, MessageCircle, Mail } from "lucide-react";
+import { showToast } from "@/components/ui/toast";
+import { messages } from "@/lib/messages";
 import type { NotificacionesConfig } from "@/lib/types";
 
 export default function NotificacionesPage() {
@@ -27,7 +29,7 @@ export default function NotificacionesPage() {
       const data = await notificacionesService.getConfig();
       if (data) setConfig(data);
     } catch (error) {
-      console.error("Error loading config:", error);
+      showToast(messages.toast.errorCargaDatos, "error");
     } finally {
       setLoading(false);
     }
@@ -40,7 +42,7 @@ export default function NotificacionesPage() {
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
     } catch (error) {
-      console.error("Error saving config:", error);
+      showToast(messages.toast.notificacionesError, "error");
     } finally {
       setSaving(false);
     }

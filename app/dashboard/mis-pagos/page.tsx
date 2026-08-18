@@ -8,6 +8,8 @@ import { pagosService } from "@/lib/services/pagos/pagos.service";
 import { createClient } from "@/lib/supabase/client";
 import { formatCurrency, getMonthName } from "@/lib/utils";
 import { CreditCard, CheckCircle, Clock, Gift, Calendar, Bell, Trash2, FileText, ArrowRight } from "lucide-react";
+import { showToast } from "@/components/ui/toast";
+import { messages } from "@/lib/messages";
 import Link from "next/link";
 import type { Pago, Profile } from "@/lib/types";
 
@@ -72,21 +74,21 @@ export default function MisPagosPage() {
         setMembresiaLibre(libreData as MembresiaLibre);
       }
     } catch (error) {
-      console.error("Error:", error);
+      showToast(messages.toast.errorCargaDatos, "error");
     } finally {
       setLoading(false);
     }
   };
 
   const handleDelete = async (pagoId: string) => {
-    if (!confirm("¿Eliminar este pago pendiente?")) return;
+    if (!confirm(messages.pagos.eliminarPagoConfirm)) return;
     setDeleting(pagoId);
     try {
       await pagosService.eliminarPago(pagoId);
+      showToast(messages.toast.pagoEliminado, "success");
       await loadData();
     } catch (err: any) {
-      console.error("Error:", err);
-      alert(err.message || "Error al eliminar el pago");
+      showToast(err.message || messages.toast.pagoEliminadoError, "error");
     } finally {
       setDeleting(null);
     }

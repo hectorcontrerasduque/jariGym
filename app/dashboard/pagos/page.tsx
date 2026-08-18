@@ -9,6 +9,8 @@ import { pagosService } from "@/lib/services/pagos/pagos.service";
 import { miembrosService } from "@/lib/services/miembros/miembros.service";
 import { formatCurrency, getMonthName } from "@/lib/utils";
 import { Check, X, Eye, CreditCard, Clock, CheckCircle, AlertTriangle, Bell, Calendar, Trash2, FileText, Search } from "lucide-react";
+import { showToast } from "@/components/ui/toast";
+import { messages } from "@/lib/messages";
 import type { Pago, MetodoPago, Profile } from "@/lib/types";
 import Link from "next/link";
 
@@ -56,7 +58,7 @@ export default function PagosPage() {
           setMiembros(results);
           setShowDropdown(true);
         } catch (error) {
-          console.error("Error searching:", error);
+          showToast(messages.toast.errorCargaDatos, "error");
         }
       }, 300);
       return () => clearTimeout(timer);
@@ -75,7 +77,7 @@ export default function PagosPage() {
       setPagos(data);
       setAnios(aniosData);
     } catch (error) {
-      console.error("Error loading pagos:", error);
+      showToast(messages.toast.errorCargaDatos, "error");
     } finally {
       setLoading(false);
     }
@@ -84,31 +86,34 @@ export default function PagosPage() {
   const handleAprobar = async (pagoId: string) => {
     try {
       await pagosService.aprobarPago(pagoId);
+      showToast(messages.toast.pagoAprobado, "success");
       await loadData();
       setModalOpen(false);
     } catch (error) {
-      console.error("Error approving:", error);
+      showToast(messages.toast.pagoAprobadoError, "error");
     }
   };
 
   const handleRechazar = async (pagoId: string) => {
     try {
       await pagosService.rechazarPago(pagoId);
+      showToast(messages.toast.pagoRechazado, "success");
       await loadData();
       setModalOpen(false);
     } catch (error) {
-      console.error("Error rejecting:", error);
+      showToast(messages.toast.pagoRechazadoError, "error");
     }
   };
 
   const handleDelete = async (pagoId: string) => {
-    if (!confirm("¿Eliminar este pago pendiente?")) return;
+    if (!confirm(messages.pagos.eliminarPagoConfirm)) return;
     setDeleting(pagoId);
     try {
       await pagosService.eliminarPago(pagoId);
+      showToast(messages.toast.pagoEliminado, "success");
       await loadData();
     } catch (err) {
-      console.error("Error:", err);
+      showToast(messages.toast.pagoEliminadoError, "error");
     } finally {
       setDeleting(null);
     }

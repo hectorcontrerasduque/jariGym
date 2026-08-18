@@ -5,6 +5,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { pagosService } from "@/lib/services/pagos/pagos.service";
 import { formatCurrency, getMonthName } from "@/lib/utils";
+import { showToast } from "@/components/ui/toast";
+import { messages } from "@/lib/messages";
 import {
   Users,
   CreditCard,
@@ -53,7 +55,7 @@ export default function DashboardPage() {
       setAnios(aniosData);
       setMonthlyStats(monthlyData);
     } catch (error) {
-      console.error("Error loading dashboard:", error);
+      showToast(messages.toast.errorCargaDatos, "error");
     } finally {
       setLoading(false);
     }

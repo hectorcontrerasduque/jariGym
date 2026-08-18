@@ -9,6 +9,8 @@ import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { createClient } from "@/lib/supabase/client";
 import { formatDate, formatCurrency } from "@/lib/utils";
+import { showToast } from "@/components/ui/toast";
+import { messages } from "@/lib/messages";
 import {
   ArrowLeft,
   Save,
@@ -70,7 +72,7 @@ export default function PerfilPage() {
         });
       }
     } catch (err) {
-      console.error("Error:", err);
+      showToast(messages.toast.errorCargaDatos, "error");
     } finally {
       setLoading(false);
     }

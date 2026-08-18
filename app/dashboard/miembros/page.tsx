@@ -12,6 +12,8 @@ import { formatDate, formatCurrency, formatDateTime } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { Users, Search, Plus, Eye, UserX, UserCheck } from "lucide-react";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
+import { showToast } from "@/components/ui/toast";
+import { messages } from "@/lib/messages";
 import type { Profile, Pago } from "@/lib/types";
 
 export default function MiembrosPage() {
@@ -55,7 +57,7 @@ export default function MiembrosPage() {
       setMiembros(data);
       setStats(statsData);
     } catch (error) {
-      console.error("Error:", error);
+      showToast(messages.toast.errorCargaDatos, "error");
     } finally {
       setLoading(false);
     }
@@ -103,7 +105,7 @@ export default function MiembrosPage() {
       setEmailError("");
       await loadMiembros();
     } catch (error) {
-      console.error("Error:", error);
+      showToast(messages.toast.miembroError, "error");
     } finally {
       setSaving(false);
     }
@@ -135,7 +137,7 @@ export default function MiembrosPage() {
       if (pagoIns.data) setPagoInscripcion(pagoIns.data);
       setIsMembresiaLibre(!!libreData.data);
     } catch (error) {
-      console.error("Error:", error);
+      showToast(messages.toast.errorCargaDatos, "error");
     }
     setModalDetalle(true);
   };
@@ -145,9 +147,10 @@ export default function MiembrosPage() {
     if (!confirm(`¿${accion.charAt(0).toUpperCase() + accion.slice(1)} a ${miembro.nombre_completo}?`)) return;
     try {
       await miembrosService.actualizarEstado(miembro.id, activar);
+      showToast(activar ? messages.toast.miembroActivado : messages.toast.miembroDesactivado, "success");
       await loadMiembros();
     } catch (error) {
-      console.error("Error:", error);
+      showToast(messages.toast.miembroEstadoError, "error");
     }
   };
 
@@ -160,7 +163,7 @@ export default function MiembrosPage() {
       setIsMembresiaLibre(!isMembresiaLibre);
       await loadMiembros();
     } catch (error) {
-      console.error("Error:", error);
+      showToast(messages.toast.membresiaLibreError, "error");
     }
   };
 

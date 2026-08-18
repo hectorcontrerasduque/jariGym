@@ -7,6 +7,8 @@ import { Input } from "@/components/ui/input";
 import { configService } from "@/lib/services/config/config.service";
 import { Save, Building2, User, CreditCard, Clock, Globe } from "lucide-react";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
+import { showToast } from "@/components/ui/toast";
+import { messages } from "@/lib/messages";
 import type { GymConfig, MetodoPagoConfig } from "@/lib/types";
 
 const metodoLabels: Record<string, { label: string; icon: string; alwaysOn?: boolean }> = {
@@ -54,7 +56,7 @@ export default function ConfiguracionPage() {
       if (configData) setConfig(configData);
       setMetodos(metodosData);
     } catch (error) {
-      console.error("Error:", error);
+      showToast(messages.toast.errorCargaDatos, "error");
     } finally {
       setLoading(false);
     }
@@ -64,10 +66,11 @@ export default function ConfiguracionPage() {
     setSaving(true);
     try {
       await configService.updateConfig(config);
+      showToast(messages.toast.configuracionGuardada, "success");
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
     } catch (error) {
-      console.error("Error:", error);
+      showToast(messages.toast.configuracionError, "error");
     } finally {
       setSaving(false);
     }
@@ -80,8 +83,9 @@ export default function ConfiguracionPage() {
         habilitado: !metodo.habilitado,
       });
       setMetodos((prev) => prev.map((m) => (m.id === updated.id ? updated : m)));
+      showToast(messages.toast.metodoPagoActualizado, "success");
     } catch (error) {
-      console.error("Error:", error);
+      showToast(messages.toast.metodoPagoError, "error");
     }
   };
 
@@ -90,7 +94,7 @@ export default function ConfiguracionPage() {
       const updated = await configService.updateMetodoPago(metodo.id, { [field]: value });
       setMetodos((prev) => prev.map((m) => (m.id === updated.id ? updated : m)));
     } catch (error) {
-      console.error("Error:", error);
+      showToast(messages.toast.metodoPagoError, "error");
     }
   };
 

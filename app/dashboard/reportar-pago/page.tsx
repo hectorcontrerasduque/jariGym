@@ -678,7 +678,8 @@ function ReportarPagoForm() {
           {/* Mobile floating button */}
           <button
             onClick={() => {
-              document.getElementById("pago-form")?.requestSubmit();
+              const form = document.getElementById("pago-form") as HTMLFormElement | null;
+              form?.requestSubmit();
             }}
             disabled={
               loading ||

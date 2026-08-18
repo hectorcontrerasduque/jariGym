@@ -485,7 +485,7 @@ export default function MiembrosPage() {
             onClick={handleCrearMiembro}
             disabled={
               !nuevoEmail || !nuevoNombre || !validateEmail(nuevoEmail) ||
-              (nuevoEmail && !nuevoEmail.toLowerCase().endsWith("@gmail.com") && (!nuevoUsername || !nuevoPassword))
+              (!!nuevoEmail && !nuevoEmail.toLowerCase().endsWith("@gmail.com") && (!nuevoUsername || !nuevoPassword))
             }
           >
             <Plus className="w-4 h-4 mr-2" /> Agregar Miembro

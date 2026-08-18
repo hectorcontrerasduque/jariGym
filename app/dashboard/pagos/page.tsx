@@ -131,7 +131,7 @@ export default function PagosPage() {
   const getAvatarMiembro = (pago: Pago): string | undefined => {
     if (pago.profile?.avatar_url) return pago.profile.avatar_url;
     const miembro = miembros.find((m) => m.id === pago.usuario_id);
-    return miembro?.avatar_url;
+    return miembro?.avatar_url ?? undefined;
   };
 
   if (loading) {

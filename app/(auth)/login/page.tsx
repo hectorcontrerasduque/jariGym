@@ -7,8 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { authService } from "@/lib/services/auth/auth.service";
 import { createClient } from "@/lib/supabase/client";
-import { Dumbbell, CheckCircle } from "lucide-react";
+import { Dumbbell, CheckCircle, Mail } from "lucide-react";
 import { configService } from "@/lib/services/config/config.service";
+import { messages } from "@/lib/messages";
 
 export default function LoginPage() {
   return (
@@ -30,38 +31,34 @@ function LoginForm() {
   const [resetEmail, setResetEmail] = useState("");
   const [resetLoading, setResetLoading] = useState(false);
   const [gymName, setGymName] = useState("GymApp");
+  const [gymOwnerEmail, setGymOwnerEmail] = useState("");
 
   useEffect(() => {
     const err = searchParams.get("error");
     if (err) setError(decodeURIComponent(err));
     configService.getConfig().then((config) => {
       if (config?.nombre_gym) setGymName(config.nombre_gym);
+      if (config?.dueno_email) setGymOwnerEmail(config.dueno_email);
     }).catch(() => {});
   }, [searchParams]);
 
-  const redirectByRole = async () => {
+  const isAuthorizedUser = async (userEmail: string, userId: string): Promise<boolean> => {
+    const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL;
+    if (adminEmail && userEmail === adminEmail) return true;
+    if (gymOwnerEmail && userEmail === gymOwnerEmail && userEmail.endsWith("@gmail.com")) return true;
+
     const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL;
-      const isAdminByEmail = adminEmail && user.email === adminEmail;
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role, activo")
+      .eq("id", userId)
+      .single();
 
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", user.id)
-        .single();
+    if (!profile) return false;
+    if (profile.role === "super_admin" || profile.role === "admin") return true;
+    if (profile.activo !== false) return true;
 
-      const isAdmin = isAdminByEmail || profile?.role === "super_admin" || profile?.role === "admin";
-
-      if (isAdmin) {
-        router.push("/dashboard");
-      } else {
-        router.push("/dashboard/mis-pagos");
-      }
-    } else {
-      router.push("/login");
-    }
+    return false;
   };
 
   const handleGoogleLogin = async () => {
@@ -70,7 +67,7 @@ function LoginForm() {
     try {
       await authService.signInWithGoogle();
     } catch (err: any) {
-      setError(err.message || "Error al iniciar sesión con Google");
+      setError(err.message || messages.auth.googleLoginError);
       setLoading(false);
     }
   };
@@ -80,10 +77,24 @@ function LoginForm() {
     setLoading(true);
     setError("");
     try {
-      await authService.signInWithEmail(email, password);
-      await redirectByRole();
+      const result = await authService.signInWithEmail(email, password);
+      const userId = result.user?.id;
+      if (userId) {
+        const authorized = await isAuthorizedUser(result.user?.email || "", userId);
+        if (!authorized) {
+          const supabase = createClient();
+          await supabase.auth.signOut();
+          setError(messages.auth.userNotRegistered);
+          setLoading(false);
+          return;
+        }
+        const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL;
+        const isAdmin = (adminEmail && result.user?.email === adminEmail) ||
+          (result.user?.email === gymOwnerEmail && result.user?.email?.endsWith("@gmail.com"));
+        router.push(isAdmin ? "/dashboard" : "/dashboard/mis-pagos");
+      }
     } catch (err: any) {
-      setError(err.message || "Error al iniciar sesión");
+      setError(err.message || messages.auth.emailLoginError);
       setLoading(false);
     }
   };
@@ -96,7 +107,7 @@ function LoginForm() {
       await authService.resetPassword(resetEmail);
       setResetSent(true);
     } catch (err: any) {
-      setError(err.message || "Error al enviar correo de recuperación");
+      setError(err.message || messages.auth.resetPasswordError);
     } finally {
       setResetLoading(false);
     }
@@ -114,7 +125,7 @@ function LoginForm() {
             <Dumbbell className="w-8 h-8 text-gym-primary" />
           </div>
           <CardTitle className="text-2xl font-display neon-text">{gymName}</CardTitle>
-          <p className="text-gym-muted text-sm">Gestiona tu gimnasio de forma inteligente</p>
+          <p className="text-gym-muted text-sm">{messages.auth.loginSubtitle}</p>
         </CardHeader>
         <CardContent className="space-y-4">
           <Button variant="secondary" className="w-full border-gym-border hover:border-gym-primary/50 hover:shadow-[0_0_15px_rgba(56,189,248,0.2)]" onClick={handleGoogleLogin} disabled={loading}>
@@ -124,7 +135,7 @@ function LoginForm() {
               <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
               <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
             </svg>
-            Continuar con Google
+            {messages.auth.loginWithGoogle}
           </Button>
 
           <div className="relative">
@@ -132,7 +143,7 @@ function LoginForm() {
               <div className="w-full border-t border-gym-border" />
             </div>
             <div className="relative flex justify-center text-xs uppercase">
-              <span className="px-2 bg-gym-surface text-gym-muted">o</span>
+              <span className="px-2 bg-gym-surface text-gym-muted">{messages.auth.or}</span>
             </div>
           </div>
 
@@ -145,45 +156,66 @@ function LoginForm() {
                 onClick={() => { setShowResetForm(true); setResetEmail(email); }}
                 className="text-xs text-gym-primary hover:text-gym-primary/80 transition-colors"
               >
-                ¿Olvidaste tu contraseña?
+                {messages.auth.forgotPassword}
               </button>
             </div>
             {error && <p className="text-sm text-gym-danger text-center bg-gym-danger/10 p-2 rounded-xl">{error}</p>}
             <Button type="submit" className="w-full" loading={loading}>
-              Iniciar Sesión
+              {messages.auth.loginButton}
             </Button>
           </form>
         </CardContent>
       </Card>
 
-      {/* Forgot Password Modal */}
+      {/* Forgot Password Modal - personalized with gym branding */}
       {showResetForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
           <Card className="w-full max-w-md border-gym-primary/20">
             <CardHeader className="text-center">
+              <div className="mx-auto w-12 h-12 bg-gym-primary/20 rounded-xl flex items-center justify-center mb-3">
+                <Dumbbell className="w-6 h-6 text-gym-primary" />
+              </div>
               <CardTitle className="text-lg font-display text-gym-text">
-                {resetSent ? "Correo Enviado" : "Recuperar Contraseña"}
+                {resetSent ? messages.auth.resetPasswordSent : messages.auth.resetPasswordTitle}
               </CardTitle>
+              {!resetSent && (
+                <p className="text-xs text-gym-muted mt-1">{gymName}</p>
+              )}
             </CardHeader>
             <CardContent>
               {resetSent ? (
                 <div className="text-center space-y-4">
-                  <CheckCircle className="w-12 h-12 text-gym-success mx-auto" />
-                  <p className="text-sm text-gym-muted">
-                    Se envió un correo a <strong>{resetEmail}</strong> con las instrucciones para restablecer tu contraseña.
-                  </p>
+                  <div className="w-16 h-16 bg-gym-success/20 rounded-full flex items-center justify-center mx-auto">
+                    <Mail className="w-8 h-8 text-gym-success" />
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-sm text-gym-text font-medium">
+                      {messages.auth.resetPasswordSentTo}
+                    </p>
+                    <p className="text-sm text-gym-primary font-semibold bg-gym-primary/10 p-2 rounded-lg">
+                      {resetEmail}
+                    </p>
+                    <p className="text-sm text-gym-muted">
+                      {messages.auth.resetPasswordSentInstructions}
+                    </p>
+                  </div>
+                  <div className="p-3 bg-gym-bg rounded-xl">
+                    <p className="text-xs text-gym-muted">
+                      Si no recibes el correo, revisa tu carpeta de spam o contacta al administrador de <strong className="text-gym-text">{gymName}</strong>.
+                    </p>
+                  </div>
                   <Button
                     variant="secondary"
                     className="w-full"
                     onClick={() => { setShowResetForm(false); setResetSent(false); }}
                   >
-                    Cerrar
+                    {messages.auth.resetPasswordCloseButton}
                   </Button>
                 </div>
               ) : (
                 <form onSubmit={handleResetPassword} className="space-y-4">
-                  <p className="text-sm text-gym-muted">
-                    Ingresa tu correo electrónico y te enviaremos las instrucciones para restablecer tu contraseña.
+                  <p className="text-sm text-gym-muted text-center">
+                    {messages.auth.resetPasswordSubtitle}
                   </p>
                   <Input
                     type="email"
@@ -200,10 +232,10 @@ function LoginForm() {
                       className="flex-1"
                       onClick={() => { setShowResetForm(false); setError(""); }}
                     >
-                      Cancelar
+                      {messages.auth.resetPasswordCancelButton}
                     </Button>
                     <Button type="submit" className="flex-1" loading={resetLoading}>
-                      Enviar
+                      {messages.auth.resetPasswordButton}
                     </Button>
                   </div>
                 </form>

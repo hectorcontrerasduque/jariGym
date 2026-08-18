@@ -36,12 +36,31 @@ export async function GET(request: Request) {
 
       const { data: profile } = await supabase
         .from("profiles")
-        .select("role")
+        .select("role, activo")
         .eq("id", user.id)
         .single();
 
-      const isAdmin = profile?.role === "super_admin" || profile?.role === "admin";
-      const redirectPath = isAdmin ? next : (next === "/dashboard" ? "/dashboard/mis-pagos" : next);
+      const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL;
+      const isAdminByEmail = adminEmail && user.email === adminEmail;
+
+      const { data: gymConfig } = await supabase
+        .from("gym_config")
+        .select("dueno_email")
+        .limit(1)
+        .single();
+
+      const isGymOwner = gymConfig?.dueno_email && user.email === gymConfig.dueno_email && user.email?.endsWith("@gmail.com");
+
+      const isAdmin = isAdminByEmail || profile?.role === "super_admin" || profile?.role === "admin";
+      const isActiveMember = profile?.activo !== false && profile?.role === "miembro";
+
+      if (!isAdmin && !isGymOwner && !isActiveMember) {
+        await supabase.auth.signOut();
+        const msg = encodeURIComponent("Este usuario no está registrado o no está activo");
+        return NextResponse.redirect(`${origin}/login?error=${msg}`);
+      }
+
+      const redirectPath = isAdmin || isGymOwner ? next : (next === "/dashboard" ? "/dashboard/mis-pagos" : next);
 
       return NextResponse.redirect(`${origin}${redirectPath}`);
     }

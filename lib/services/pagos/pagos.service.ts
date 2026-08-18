@@ -247,7 +247,7 @@ export class PagosService {
         .from("profiles")
         .select("id, inscripcion_pagada, fecha_inscripcion")
         .eq("role", "miembro")
-        .eq("activo", true),
+        .or("activo.is.true,activo.is.null"),
       this.supabase
         .from("pagos")
         .select("monto, usuario_id, estado, anio_pagar, mes_pagar")

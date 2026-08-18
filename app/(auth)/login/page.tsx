@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { authService } from "@/lib/services/auth/auth.service";
 import { createClient } from "@/lib/supabase/client";
 import { Dumbbell, CheckCircle } from "lucide-react";
+import { configService } from "@/lib/services/config/config.service";
 
 export default function LoginPage() {
   return (
@@ -28,10 +29,14 @@ function LoginForm() {
   const [showResetForm, setShowResetForm] = useState(false);
   const [resetEmail, setResetEmail] = useState("");
   const [resetLoading, setResetLoading] = useState(false);
+  const [gymName, setGymName] = useState("GymApp");
 
   useEffect(() => {
     const err = searchParams.get("error");
     if (err) setError(decodeURIComponent(err));
+    configService.getConfig().then((config) => {
+      if (config?.nombre_gym) setGymName(config.nombre_gym);
+    }).catch(() => {});
   }, [searchParams]);
 
   const redirectByRole = async () => {
@@ -108,7 +113,7 @@ function LoginForm() {
           <div className="mx-auto w-16 h-16 bg-gym-primary/20 rounded-2xl flex items-center justify-center mb-4 animate-pulse-glow">
             <Dumbbell className="w-8 h-8 text-gym-primary" />
           </div>
-          <CardTitle className="text-2xl font-display neon-text">GymApp</CardTitle>
+          <CardTitle className="text-2xl font-display neon-text">{gymName}</CardTitle>
           <p className="text-gym-muted text-sm">Gestiona tu gimnasio de forma inteligente</p>
         </CardHeader>
         <CardContent className="space-y-4">

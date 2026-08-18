@@ -14,6 +14,18 @@ export class MiembrosService {
     return data || [];
   }
 
+  async buscarMiembros(busqueda: string): Promise<Profile[]> {
+    const { data, error } = await this.supabase
+      .from("profiles")
+      .select("*")
+      .or(`nombre_completo.ilike.%${busqueda}%,email.ilike.%${busqueda}%`)
+      .order("nombre_completo", { ascending: true })
+      .limit(10);
+
+    if (error) throw error;
+    return data || [];
+  }
+
   async obtenerMiembro(id: string): Promise<Profile | null> {
     const { data, error } = await this.supabase
       .from("profiles")

@@ -48,17 +48,32 @@ export default function PagosPage() {
 
   useEffect(() => { loadData(); }, [anioSeleccionado]);
 
+  useEffect(() => {
+    if (busquedaMiembro.length >= 2) {
+      const timer = setTimeout(async () => {
+        try {
+          const results = await miembrosService.buscarMiembros(busquedaMiembro);
+          setMiembros(results);
+          setShowDropdown(true);
+        } catch (error) {
+          console.error("Error searching:", error);
+        }
+      }, 300);
+      return () => clearTimeout(timer);
+    } else {
+      setMiembros([]);
+    }
+  }, [busquedaMiembro]);
+
   const loadData = async () => {
     setLoading(true);
     try {
-      const [data, aniosData, miembrosData] = await Promise.all([
+      const [data, aniosData] = await Promise.all([
         pagosService.listarPagos(undefined, anioSeleccionado),
         pagosService.aniosConPagos(),
-        miembrosService.listarMiembros(),
       ]);
       setPagos(data);
       setAnios(aniosData);
-      setMiembros(miembrosData);
     } catch (error) {
       console.error("Error loading pagos:", error);
     } finally {
@@ -168,15 +183,10 @@ export default function PagosPage() {
               onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
               className="w-full pl-10 pr-4 py-3 bg-gym-bg border border-gym-border rounded-xl text-gym-text focus:outline-none focus:ring-2 focus:ring-gym-primary focus:border-gym-primary"
             />
-            {showDropdown && busquedaMiembro && (
+            {showDropdown && busquedaMiembro.length >= 2 && (
               <div className="absolute top-full left-0 right-0 mt-1 bg-gym-surface border border-gym-border rounded-xl shadow-lg z-20 max-h-60 overflow-y-auto">
-                {miembros
-                  .filter((m) =>
-                    m.nombre_completo.toLowerCase().includes(busquedaMiembro.toLowerCase()) ||
-                    (m.email && m.email.toLowerCase().includes(busquedaMiembro.toLowerCase()))
-                  )
-                  .slice(0, 10)
-                  .map((m) => (
+                {miembros.length > 0 ? (
+                  miembros.map((m) => (
                     <button
                       key={m.id}
                       type="button"
@@ -197,11 +207,8 @@ export default function PagosPage() {
                         <p className="text-xs text-gym-muted truncate">{m.email || "sin email"} {m.activo === false ? "[Inactivo]" : ""}</p>
                       </div>
                     </button>
-                  ))}
-                {miembros.filter((m) =>
-                  m.nombre_completo.toLowerCase().includes(busquedaMiembro.toLowerCase()) ||
-                  (m.email && m.email.toLowerCase().includes(busquedaMiembro.toLowerCase()))
-                ).length === 0 && (
+                  ))
+                ) : (
                   <div className="px-4 py-3 text-sm text-gym-muted text-center">No se encontraron miembros</div>
                 )}
               </div>

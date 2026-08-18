@@ -74,8 +74,9 @@ export default function MiembrosPage() {
   };
 
   const handleCrearMiembro = async () => {
-    if (!nuevoEmail || !nuevoNombre || !validateEmail(nuevoEmail)) return;
-    const isGmail = nuevoEmail.toLowerCase().endsWith("@gmail.com");
+    if (!nuevoNombre) return;
+    if (nuevoEmail && !validateEmail(nuevoEmail)) return;
+    const isGmail = nuevoEmail && nuevoEmail.toLowerCase().endsWith("@gmail.com");
     if (!isGmail && (!nuevoUsername || !nuevoPassword)) return;
     try {
       const res = await fetch("/api/miembros", {
@@ -454,7 +455,7 @@ export default function MiembrosPage() {
           />
           <div>
             <Input
-              label="Correo *"
+              label="Correo"
               type="email"
               placeholder="correo@gmail.com"
               value={nuevoEmail}
@@ -462,31 +463,28 @@ export default function MiembrosPage() {
             />
             {emailError && <p className="text-xs text-gym-danger mt-1">{emailError}</p>}
           </div>
-          {nuevoEmail && !nuevoEmail.toLowerCase().endsWith("@gmail.com") && (
-            <>
-              <Input
-                label="Usuario *"
-                placeholder="nombreusuario"
-                value={nuevoUsername}
-                onChange={(e) => setNuevoUsername(e.target.value)}
-              />
-              <Input
-                label="Contraseña *"
-                type="password"
-                placeholder="••••••••"
-                value={nuevoPassword}
-                onChange={(e) => setNuevoPassword(e.target.value)}
-              />
-              <p className="text-xs text-gym-muted">Para correos no-Gmail, el usuario y contraseña son requeridos para iniciar sesión.</p>
-            </>
-          )}
+          <Input
+            label={`Usuario ${!nuevoEmail || !nuevoEmail.toLowerCase().endsWith("@gmail.com") ? "*" : ""}`}
+            placeholder="nombreusuario"
+            value={nuevoUsername}
+            onChange={(e) => setNuevoUsername(e.target.value)}
+          />
+          <Input
+            label={`Contraseña ${!nuevoEmail || !nuevoEmail.toLowerCase().endsWith("@gmail.com") ? "*" : ""}`}
+            type="password"
+            placeholder="••••••••"
+            value={nuevoPassword}
+            onChange={(e) => setNuevoPassword(e.target.value)}
+          />
+          <p className="text-xs text-gym-muted">
+            {!nuevoEmail || !nuevoEmail.toLowerCase().endsWith("@gmail.com")
+              ? "Para correos no-Gmail, el usuario y contraseña son requeridos para iniciar sesión."
+              : "Si dejas usuario y contraseña vacíos, se generarán automáticamente."}
+          </p>
           <Button
             className="w-full"
             onClick={handleCrearMiembro}
-            disabled={
-              !nuevoEmail || !nuevoNombre || !validateEmail(nuevoEmail) ||
-              (!!nuevoEmail && !nuevoEmail.toLowerCase().endsWith("@gmail.com") && (!nuevoUsername || !nuevoPassword))
-            }
+            disabled={!nuevoNombre}
           >
             <Plus className="w-4 h-4 mr-2" /> Agregar Miembro
           </Button>

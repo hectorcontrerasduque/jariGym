@@ -80,7 +80,6 @@ export async function POST(request: Request) {
       .single();
 
     if (profileError) {
-      console.error("Profile error:", profileError);
       return NextResponse.json({ error: profileError.message }, { status: 400 });
     }
 

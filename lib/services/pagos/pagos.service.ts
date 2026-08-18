@@ -264,9 +264,8 @@ export class PagosService {
         .eq("anio_pagar", anioConsulta),
       this.supabase
         .from("profiles")
-        .select("id, inscripcion_pagada, fecha_inscripcion")
-        .eq("role", "miembro")
-        .or("activo.is.true,activo.is.null"),
+        .select("id, inscripcion_pagada, fecha_inscripcion, activo")
+        .eq("role", "miembro"),
       this.supabase
         .from("pagos")
         .select("monto, usuario_id, estado, anio_pagar, mes_pagar")
@@ -296,45 +295,46 @@ export class PagosService {
     const montoMensual = config?.data?.monto_mensual || 5;
 
     // Inscritos: solo miembros activos
-    const inscritosPagados = miembros.filter((m) => m.inscripcion_pagada).length;
-    const inscritosPendientes = miembros.filter((m) => !m.inscripcion_pagada).length;
+    const miembrosActivos = miembros.filter((m) => m.activo !== false);
+    const inscritosPagados = miembrosActivos.filter((m) => m.inscripcion_pagada).length;
+    const inscritosPendientes = miembrosActivos.filter((m) => !m.inscripcion_pagada).length;
 
-    // Deudores: meses no pagados por miembros activos (no libres)
+    // Deudores: miembros activos (no libres, inscripción pagada) sin pago aprobado en mes actual
     const todosPagosAprobados = pagosAnioData.filter((p) => p.estado === "aprobado");
-    let totalMesesDeuda = 0;
     const deudoresSet = new Set<string>();
+    let totalMesesDeuda = 0;
 
-    for (const m of miembros) {
+    for (const m of miembrosActivos) {
       if (miembrosLibresIds.has(m.id)) continue;
       if (!m.inscripcion_pagada) continue;
-
-      const fechaInicio = m.fecha_inscripcion ? new Date(m.fecha_inscripcion) : new Date(anioConsulta, 0, 1);
-      const mesInicio = fechaInicio.getFullYear() === anioConsulta ? fechaInicio.getMonth() + 1 : 1;
-      const mesMax = anioConsulta < hoy.getFullYear() ? 12 : (anioConsulta === hoy.getFullYear() ? mesActual : 12);
 
       const pagosMiembro = todosPagosAprobados.filter((p) => p.usuario_id === m.id);
       const mesesPagados = new Set(pagosMiembro.map((p) => p.mes_pagar));
 
-      let mesesDeudaMiembro = 0;
-      for (let mes = mesInicio; mes <= mesMax; mes++) {
-        if (!mesesPagados.has(mes)) {
-          mesesDeudaMiembro++;
+      // Solo verificar mes actual (si el año de consulta es el actual)
+      if (anioConsulta === hoy.getFullYear()) {
+        if (!mesesPagados.has(mesActual)) {
+          deudoresSet.add(m.id);
+          totalMesesDeuda++;
         }
-      }
-      if (mesesDeudaMiembro > 0) {
-        deudoresSet.add(m.id);
-        totalMesesDeuda += mesesDeudaMiembro;
+      } else {
+        // Para años pasados, verificar si tiene al menos un pago pendiente en ese año
+        const tienePagoEnAnio = pagosMiembro.some((p) => p.anio_pagar === anioConsulta);
+        if (!tienePagoEnAnio) {
+          deudoresSet.add(m.id);
+          totalMesesDeuda++;
+        }
       }
     }
 
     const montoDeuda = totalMesesDeuda * montoMensual;
 
-    // Al día: pagos aceptados en mes actual (solo de miembros con inscripción pagada)
+    // Al día: miembros con inscripción pagada que tienen pago aprobado en mes actual
     const pagosMesActual = pagosAnioData.filter(
       (p) => p.estado === "aprobado" && p.mes_pagar === mesActual && p.anio_pagar === anioConsulta
     );
     const miembrosConInscripcion = new Set(
-      miembros.filter((m) => m.inscripcion_pagada).map((m) => m.id)
+      miembrosActivos.filter((m) => m.inscripcion_pagada).map((m) => m.id)
     );
     const alDiaMensualidad = pagosMesActual.filter((p) => miembrosConInscripcion.has(p.usuario_id)).length;
     const montoPagado = pagosMesActual
@@ -343,6 +343,7 @@ export class PagosService {
 
     return {
       totalMiembros: miembros.length,
+      miembrosActivos: miembrosActivos.length,
       inscritosPagados,
       inscritosPendientes,
       deudoresMensualidad: deudoresSet.size,

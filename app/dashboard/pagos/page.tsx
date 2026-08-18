@@ -41,37 +41,21 @@ export default function PagosPage() {
   const [miembros, setMiembros] = useState<Profile[]>([]);
   const [miembroSeleccionado, setMiembroSeleccionado] = useState<string>("");
   const [busquedaMiembro, setBusquedaMiembro] = useState("");
-  const [showDropdown, setShowDropdown] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
 
   useEffect(() => { loadData(); }, [anioSeleccionado]);
 
-  useEffect(() => {
-    if (busquedaMiembro.length >= 2) {
-      const timer = setTimeout(async () => {
-        try {
-          const results = await miembrosService.buscarMiembros(busquedaMiembro);
-          setMiembros(results);
-          setShowDropdown(true);
-        } catch (error) {
-          showToast(messages.toast.errorCargaDatos, "error");
-        }
-      }, 300);
-      return () => clearTimeout(timer);
-    } else {
-      setMiembros([]);
-    }
-  }, [busquedaMiembro]);
-
   const loadData = async () => {
     setLoading(true);
     try {
-      const [pagosResult, aniosResult] = await Promise.allSettled([
+      const [pagosResult, aniosResult, miembrosResult] = await Promise.allSettled([
         pagosService.listarPagos(undefined, anioSeleccionado),
         pagosService.aniosConPagos(),
+        miembrosService.listarMiembros(),
       ]);
       if (pagosResult.status === "fulfilled") setPagos(pagosResult.value);
       if (aniosResult.status === "fulfilled") setAnios(aniosResult.value);
+      if (miembrosResult.status === "fulfilled") setMiembros(miembrosResult.value);
     } catch (error) {
       showToast(messages.toast.errorCargaDatos, "error");
     } finally {
@@ -115,9 +99,20 @@ export default function PagosPage() {
     }
   };
 
-  const pagosFiltrados = miembroSeleccionado
-    ? pagos.filter((p) => p.usuario_id === miembroSeleccionado && (filtro === "todos" || p.estado === filtro))
-    : filtro === "todos" ? pagos : pagos.filter((p) => p.estado === filtro);
+  const pagosFiltrados = (() => {
+    let result = filtro === "todos" ? pagos : pagos.filter((p) => p.estado === filtro);
+    if (busquedaMiembro) {
+      const q = busquedaMiembro.toLowerCase();
+      const matchedMiembroIds = miembros
+        .filter((m) => m.nombre_completo.toLowerCase().includes(q) || (m.email && m.email.toLowerCase().includes(q)))
+        .map((m) => m.id);
+      result = result.filter((p) => matchedMiembroIds.includes(p.usuario_id));
+    }
+    if (miembroSeleccionado) {
+      result = result.filter((p) => p.usuario_id === miembroSeleccionado);
+    }
+    return result;
+  })();
 
   const selectedMiembroData = miembros.find((m) => m.id === miembroSeleccionado);
   const isActive = selectedMiembroData?.activo !== false;
@@ -126,6 +121,18 @@ export default function PagosPage() {
   const pendientes = pagosFiltrados.filter((p) => p.estado === "pendiente");
   const montoAprobado = aprobados.reduce((sum, p) => sum + (p.monto || 0), 0);
   const montoPendiente = pendientes.reduce((sum, p) => sum + (p.monto || 0), 0);
+
+  const getNombreMiembro = (pago: Pago): string => {
+    if (pago.profile?.nombre_completo) return pago.profile.nombre_completo;
+    const miembro = miembros.find((m) => m.id === pago.usuario_id);
+    return miembro?.nombre_completo || "—";
+  };
+
+  const getAvatarMiembro = (pago: Pago): string | undefined => {
+    if (pago.profile?.avatar_url) return pago.profile.avatar_url;
+    const miembro = miembros.find((m) => m.id === pago.usuario_id);
+    return miembro?.avatar_url;
+  };
 
   if (loading) {
     return (
@@ -163,60 +170,17 @@ export default function PagosPage() {
         </div>
       </div>
 
-      {/* Member selector - autocomplete */}
-      <Card className="neon-card relative z-10">
-        <CardContent className="p-4">
-          <div className="flex items-center gap-3 mb-3">
-            <label className="text-sm font-medium text-gym-muted">Seleccionar Miembro</label>
-          </div>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gym-muted" />
-            <input
-              type="text"
-              placeholder="Buscar miembro por nombre o email..."
-              value={busquedaMiembro}
-              onChange={(e) => {
-                setBusquedaMiembro(e.target.value);
-                setShowDropdown(true);
-                if (e.target.value === "") setMiembroSeleccionado("");
-              }}
-              onFocus={() => setShowDropdown(true)}
-              onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
-              className="w-full pl-10 pr-4 py-3 bg-gym-bg border border-gym-border rounded-xl text-gym-text focus:outline-none focus:ring-2 focus:ring-gym-primary focus:border-gym-primary"
-            />
-            {showDropdown && busquedaMiembro.length >= 2 && (
-              <div className="absolute top-full left-0 right-0 mt-1 bg-gym-surface border border-gym-border rounded-xl shadow-lg z-30 max-h-60 overflow-y-auto">
-                {miembros.length > 0 ? (
-                  miembros.map((m) => (
-                    <button
-                      key={m.id}
-                      type="button"
-                      onClick={() => {
-                        setMiembroSeleccionado(m.id);
-                        setBusquedaMiembro(`${m.nombre_completo} (${m.email || "sin email"})`);
-                        setShowDropdown(false);
-                      }}
-                      className="w-full text-left px-4 py-3 hover:bg-gym-bg transition-colors flex items-center gap-3"
-                    >
-                      <div className="w-8 h-8 bg-gym-primary/20 rounded-full flex items-center justify-center flex-shrink-0">
-                        <span className="text-xs font-bold text-gym-primary">
-                          {m.nombre_completo.charAt(0).toUpperCase()}
-                        </span>
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-gym-text truncate">{m.nombre_completo}</p>
-                        <p className="text-xs text-gym-muted truncate">{m.email || "sin email"} {m.activo === false ? "[Inactivo]" : ""}</p>
-                      </div>
-                    </button>
-                  ))
-                ) : (
-                  <div className="px-4 py-3 text-sm text-gym-muted text-center">No se encontraron miembros</div>
-                )}
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+      {/* Member filter */}
+      <div className="relative z-10">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gym-muted" />
+        <input
+          type="text"
+          placeholder="Filtrar por nombre o correo del miembro..."
+          value={busquedaMiembro}
+          onChange={(e) => setBusquedaMiembro(e.target.value)}
+          className="w-full pl-10 pr-4 py-3 bg-transparent border-0 border-b border-gym-border text-gym-text placeholder:text-gym-muted focus:outline-none focus:ring-0 focus:border-gym-primary"
+        />
+      </div>
 
       {/* Alert for inactive member */}
       {miembroSeleccionado && !isActive && (
@@ -282,7 +246,7 @@ export default function PagosPage() {
           <CardTitle className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <CreditCard className="w-5 h-5 text-gym-primary" />
-              {miembroSeleccionado ? `Pagos de ${selectedMiembroData?.nombre_completo || ""}` : "Todos los Pagos"}
+              {busquedaMiembro ? `Pagos filtrados` : "Todos los Pagos"}
             </div>
             <span className="text-sm font-normal text-gym-muted">{pagosFiltrados.length} pago(s)</span>
           </CardTitle>
@@ -303,9 +267,11 @@ export default function PagosPage() {
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gym-text truncate">
-                        {pago.profile?.nombre_completo || "—"}
+                        {getNombreMiembro(pago)}
                       </p>
                       <div className="flex items-center gap-2 mt-0.5">
+                        <span className="text-xs text-gym-muted">{getMonthName(pago.mes_pagar)} {pago.anio_pagar}</span>
+                        <span className="text-xs text-gym-muted">·</span>
                         <span className={`text-xs ${isInscripcion(pago) ? "text-gym-primary" : "text-gym-secondary"}`}>
                           {getTipoLabel(pago)}
                         </span>
@@ -354,7 +320,7 @@ export default function PagosPage() {
           <div className="space-y-4">
             <div>
               <p className="text-sm text-gym-muted">Miembro</p>
-              <p className="text-gym-text font-medium">{selectedPago.profile?.nombre_completo || "—"}</p>
+              <p className="text-gym-text font-medium">{getNombreMiembro(selectedPago)}</p>
             </div>
             <div>
               <p className="text-sm text-gym-muted">Concepto</p>

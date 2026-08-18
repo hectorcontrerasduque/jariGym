@@ -43,13 +43,13 @@ export function Modal({ isOpen, onClose, title, children, className }: ModalProp
     >
       <div
         className={cn(
-          "bg-gym-surface border border-gym-border rounded-2xl w-full max-w-md mx-4 overflow-hidden",
+          "bg-gym-surface border border-gym-border rounded-2xl w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto",
           "animate-in fade-in zoom-in-95 duration-200",
           className
         )}
       >
         {title && (
-          <div className="flex items-center justify-between p-6 border-b border-gym-border">
+          <div className="flex items-center justify-between p-6 border-b border-gym-border sticky top-0 bg-gym-surface z-10">
             <h2 className="text-lg font-semibold text-gym-text">{title}</h2>
             <button
               onClick={onClose}

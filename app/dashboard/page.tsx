@@ -97,7 +97,7 @@ export default function DashboardPage() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 relative z-10">
-        {/* Inscritos - miembros activos que pagaron + pendientes */}
+        {/* Miembros Activos */}
         <Card className="neon-card hover:border-gym-primary/50 transition-all hover:shadow-[0_0_20px_rgba(56,189,248,0.15)]">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
@@ -105,13 +105,13 @@ export default function DashboardPage() {
                 <Users className="w-5 h-5 text-gym-primary" />
               </div>
               <div>
-                <p className="text-xs text-gym-muted">Inscritos</p>
-                <p className="text-xl font-bold text-gym-text neon-text">{stats?.totalMiembros || 0}</p>
+                <p className="text-xs text-gym-muted">Miembros Activos</p>
+                <p className="text-xl font-bold text-gym-text neon-text">{stats?.miembrosActivos || 0}</p>
               </div>
             </div>
             <div className="mt-3 flex gap-2 text-xs">
               <span className="text-gym-success flex items-center gap-1">
-                <CheckCircle className="w-3 h-3" /> {stats?.inscritosPagados || 0} pagados
+                <CheckCircle className="w-3 h-3" /> {stats?.inscritosPagados || 0} inscritos
               </span>
               <span className="text-gym-warning flex items-center gap-1">
                 <Clock className="w-3 h-3" /> {stats?.inscritosPendientes || 0} pendientes
@@ -120,7 +120,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Deudores - meses no pagados por miembros activos */}
+        {/* Deudores - sin pago en mes actual */}
         <Card className="neon-card hover:border-gym-danger/50 transition-all hover:shadow-[0_0_20px_rgba(251,113,133,0.15)]">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
@@ -138,7 +138,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Al día - sumatoria pagos aceptados en mes actual + inscripción pagada */}
+        {/* Al día - pagaron mes actual */}
         <Card className="neon-card hover:border-gym-success/50 transition-all hover:shadow-[0_0_20px_rgba(52,211,153,0.15)]">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">

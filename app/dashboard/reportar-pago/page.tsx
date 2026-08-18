@@ -42,6 +42,7 @@ function ReportarPagoForm() {
   const [userId, setUserId] = useState<string>("");
   const [userRole, setUserRole] = useState<string>("");
   const [gymConfig, setGymConfig] = useState<GymConfig | null>(null);
+  const [configLoading, setConfigLoading] = useState(true);
   const [metodosPago, setMetodosPago] = useState<MetodoPagoConfig[]>([]);
   const [miembros, setMiembros] = useState<Profile[]>([]);
   const [miembroSeleccionado, setMiembroSeleccionado] = useState<string>("");
@@ -129,6 +130,8 @@ function ReportarPagoForm() {
       setMetodosPago(metodos);
     } catch (err) {
       showToast(messages.toast.errorCargaDatos, "error");
+    } finally {
+      setConfigLoading(false);
     }
   };
 
@@ -391,7 +394,12 @@ function ReportarPagoForm() {
 
       <Card className="neon-card">
         <CardContent className="p-6">
-          {!gymConfig ? (
+          {configLoading ? (
+            <div className="text-center py-8">
+              <div className="animate-spin w-8 h-8 border-2 border-gym-primary border-t-transparent rounded-full mx-auto mb-3" />
+              <p className="text-gym-muted text-sm">Cargando configuración...</p>
+            </div>
+          ) : !gymConfig ? (
             <div className="text-center py-8">
               <DollarSign className="w-12 h-12 text-gym-warning mx-auto mb-3" />
               <p className="text-gym-warning font-medium">Configuración no disponible</p>

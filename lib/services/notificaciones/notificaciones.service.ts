@@ -87,8 +87,6 @@ export class NotificacionesService {
       .eq("id", usuarioId)
       .single();
 
-    console.log(`Enviando email a ${profile?.nombre_completo}: ${tipo}`);
-
     await this.supabase.from("notificaciones_log").insert({
       usuario_id: usuarioId,
       tipo,
@@ -98,8 +96,6 @@ export class NotificacionesService {
   }
 
   private async enviarWhatsApp(numero: string, tipo: string) {
-    console.log(`Enviando WhatsApp a ${numero}: ${tipo}`);
-
     await this.supabase.from("notificaciones_log").insert({
       tipo,
       canal: "whatsapp",

@@ -10,11 +10,12 @@ import { Avatar } from "@/components/ui/avatar";
 import { miembrosService } from "@/lib/services/miembros/miembros.service";
 import { formatDate, formatCurrency, formatDateTime } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
-import { Users, Search, Plus, Eye, UserX, UserCheck } from "lucide-react";
+import { Users, Search, Plus, Eye, UserX, UserCheck, Settings } from "lucide-react";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { showToast } from "@/components/ui/toast";
 import { messages } from "@/lib/messages";
 import type { Profile, Pago } from "@/lib/types";
+import Link from "next/link";
 
 export default function MiembrosPage() {
   const [miembros, setMiembros] = useState<Profile[]>([]);
@@ -523,6 +524,16 @@ export default function MiembrosPage() {
                 </div>
               </div>
             </div>
+
+            {/* Editar perfil */}
+            <Link
+              href="/dashboard/perfil"
+              onClick={() => setModalDetalle(false)}
+              className="flex items-center gap-2 p-4 bg-gym-bg rounded-xl hover:bg-gym-surface transition-colors text-gym-primary"
+            >
+              <Settings className="w-5 h-5" />
+              <span className="text-sm font-medium">Editar perfil</span>
+            </Link>
           </div>
         )}
       </Modal>

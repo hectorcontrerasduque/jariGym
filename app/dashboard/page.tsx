@@ -5,18 +5,20 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { pagosService } from "@/lib/services/pagos/pagos.service";
 import { formatCurrency, getMonthName } from "@/lib/utils";
+import type { Pago } from "@/lib/types";
 import { showToast } from "@/components/ui/toast";
 import { messages } from "@/lib/messages";
 import {
   Users,
   CreditCard,
-  TrendingUp,
   CheckCircle,
   Clock,
   AlertTriangle,
   UserCheck,
   Gift,
   BarChart3,
+  FileText,
+  Calendar,
 } from "lucide-react";
 
 interface MonthlyStat {
@@ -46,7 +48,7 @@ export default function DashboardPage() {
     try {
       const [statsResult, pagosResult, aniosResult, monthlyResult] = await Promise.allSettled([
         pagosService.stats(anioSeleccionado),
-        pagosService.listarPagos(undefined, anioSeleccionado),
+        pagosService.pagosRecientesAprobados(),
         pagosService.aniosConPagos(),
         pagosService.monthlyStats(),
       ]);
@@ -247,7 +249,7 @@ export default function DashboardPage() {
         </Card>
       )}
 
-      {/* Pagos recientes - siempre visible */}
+      {/* Pagos recientes - solo aprobados */}
       <Card className="neon-card relative z-10">
         <CardHeader className="pb-2">
           <CardTitle className="flex items-center gap-2">
@@ -257,32 +259,39 @@ export default function DashboardPage() {
         </CardHeader>
         <CardContent>
           {pagosRecientes.length === 0 ? (
-            <p className="text-center text-gym-muted py-8">No hay pagos registrados aún</p>
+            <p className="text-center text-gym-muted py-8">{messages.dashboard.noPagosRegistrados}</p>
           ) : (
             <div className="space-y-3">
-              {pagosRecientes.map((pago) => (
-                <div key={pago.id} className="flex items-center justify-between p-3 bg-gym-bg rounded-xl hover:bg-gym-surface transition-colors">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-9 h-9 bg-gym-surface rounded-full flex items-center justify-center flex-shrink-0">
-                      <CreditCard className="w-4 h-4 text-gym-muted" />
+              {pagosRecientes.map((pago: Pago) => {
+                const isInscripcion = pago.notas?.toLowerCase().includes("inscripción") || pago.notas?.toLowerCase().includes("inscripcion");
+                return (
+                  <div key={pago.id} className="flex items-center justify-between p-3 bg-gym-bg rounded-xl hover:bg-gym-surface transition-colors">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-9 h-9 bg-gym-surface rounded-full flex items-center justify-center flex-shrink-0">
+                        {isInscripcion ? (
+                          <FileText className="w-4 h-4 text-gym-primary" />
+                        ) : (
+                          <Calendar className="w-4 h-4 text-gym-secondary" />
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-medium text-gym-text text-sm truncate">
+                          {pago.profile?.nombre_completo || "Desconocido"}
+                        </p>
+                        <p className="text-xs text-gym-muted">
+                          {isInscripcion ? "Inscripción" : `${getMonthName(pago.mes_pagar)} ${pago.anio_pagar}`}
+                        </p>
+                      </div>
                     </div>
-                    <div className="min-w-0">
-                      <p className="font-medium text-gym-text text-sm truncate">
-                        {pago.profile?.nombre_completo || "Desconocido"}
-                      </p>
-                      <p className="text-xs text-gym-muted">
-                        {getMonthName(pago.mes_pagar)} {pago.anio_pagar} • {pago.metodo_pago}
-                      </p>
+                    <div className="flex items-center gap-3 flex-shrink-0">
+                      <p className="font-semibold text-gym-text text-sm">{formatCurrency(pago.monto)}</p>
+                      <Badge variant="success">
+                        <CheckCircle className="w-3 h-3 mr-1" /> ✓
+                      </Badge>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3 flex-shrink-0">
-                    <p className="font-semibold text-gym-text text-sm">{formatCurrency(pago.monto)}</p>
-                    <Badge variant={pago.estado === "aprobado" ? "success" : pago.estado === "rechazado" ? "danger" : "warning"}>
-                      {pago.estado === "aprobado" ? "✓" : pago.estado === "rechazado" ? "✗" : "…"}
-                    </Badge>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </CardContent>

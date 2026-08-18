@@ -34,6 +34,8 @@ export default function MiembrosPage() {
   const [pagoInscripcion, setPagoInscripcion] = useState<Pago | null>(null);
   const [isMembresiaLibre, setIsMembresiaLibre] = useState(false);
   const [currentUser, setCurrentUser] = useState<Profile | null>(null);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [notasAdmin, setNotasAdmin] = useState("");
 
   useEffect(() => { loadMiembros(); }, []);
 
@@ -115,6 +117,8 @@ export default function MiembrosPage() {
     setSelectedMiembro(miembro);
     setPagoInscripcion(null);
     setIsMembresiaLibre(false);
+    setIsSuperAdmin(miembro.role === "super_admin");
+    setNotasAdmin(miembro.notas_admin || "");
     try {
       const supabase = createClient();
       const [pagoIns, libreData] = await Promise.all([
@@ -164,6 +168,42 @@ export default function MiembrosPage() {
       await loadMiembros();
     } catch (error) {
       showToast(messages.toast.membresiaLibreError, "error");
+    }
+  };
+
+  const handleToggleSuperAdmin = async (miembro: Profile) => {
+    const newRole = isSuperAdmin ? "miembro" : "super_admin";
+    try {
+      const supabase = createClient();
+      const { error } = await supabase
+        .from("profiles")
+        .update({
+          role: newRole,
+          notas_admin: newRole === "super_admin" ? notasAdmin || null : null,
+        })
+        .eq("id", miembro.id);
+      if (error) throw error;
+      setIsSuperAdmin(newRole === "super_admin");
+      if (newRole === "miembro") setNotasAdmin("");
+      showToast(newRole === "super_admin" ? "Ahora es Super Admin" : "Rol cambiado a Miembro", "success");
+      await loadMiembros();
+    } catch (error) {
+      showToast("Error al cambiar rol", "error");
+    }
+  };
+
+  const handleSaveNotasAdmin = async (miembro: Profile) => {
+    try {
+      const supabase = createClient();
+      const { error } = await supabase
+        .from("profiles")
+        .update({ notas_admin: notasAdmin || null })
+        .eq("id", miembro.id);
+      if (error) throw error;
+      showToast("Notas actualizadas", "success");
+      await loadMiembros();
+    } catch (error) {
+      showToast("Error al guardar notas", "error");
     }
   };
 
@@ -426,6 +466,45 @@ export default function MiembrosPage() {
               </div>
               {isMembresiaLibre && (
                 <p className="text-xs text-gym-secondary mt-2">Este miembro no paga mensualidad</p>
+              )}
+            </div>
+
+            {/* Super Admin toggle */}
+            <div className="p-4 bg-gym-bg rounded-xl">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gym-muted">Super Admin</p>
+                  <p className="text-xs text-gym-muted">Acceso total al sistema</p>
+                </div>
+                <button
+                  onClick={() => handleToggleSuperAdmin(selectedMiembro)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    isSuperAdmin ? "bg-gym-primary" : "bg-gym-border"
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      isSuperAdmin ? "translate-x-6" : "translate-x-1"
+                    }`}
+                  />
+                </button>
+              </div>
+              {isSuperAdmin && (
+                <div className="mt-3 space-y-2">
+                  <div>
+                    <label className="text-xs text-gym-muted mb-1 block">Nota de admin</label>
+                    <textarea
+                      value={notasAdmin}
+                      onChange={(e) => setNotasAdmin(e.target.value)}
+                      placeholder="Notas internas sobre este miembro..."
+                      rows={2}
+                      className="w-full px-3 py-2 bg-gym-surface border border-gym-border rounded-xl text-sm text-gym-text focus:outline-none focus:ring-2 focus:ring-gym-primary/50 resize-none"
+                    />
+                  </div>
+                  <Button size="sm" onClick={() => handleSaveNotasAdmin(selectedMiembro)}>
+                    Guardar Nota
+                  </Button>
+                </div>
               )}
             </div>
 

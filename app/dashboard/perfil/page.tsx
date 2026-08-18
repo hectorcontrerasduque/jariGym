@@ -19,8 +19,6 @@ import {
   CreditCard,
   Clock,
   CheckCircle,
-  Shield,
-  FileText,
 } from "lucide-react";
 import type { Profile } from "@/lib/types";
 import Link from "next/link";
@@ -133,15 +131,20 @@ export default function PerfilPage() {
   const isAdmin = profile.role === "super_admin" || profile.role === "admin";
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6 animate-fadeIn">
-      <div className="flex items-center gap-3">
-        <Link href="/dashboard/mis-pagos" className="p-2 hover:bg-gym-bg/50 rounded-xl transition-colors">
-          <ArrowLeft className="w-5 h-5 text-gym-muted" />
-        </Link>
-        <div>
-          <h1 className="text-2xl font-display font-bold text-gym-text neon-text">Mi Perfil</h1>
-          <p className="text-gym-muted text-sm">Edita tu información personal</p>
+    <div className="max-w-2xl mx-auto space-y-6 animate-fadeIn relative">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 relative z-10">
+        <div className="flex items-center gap-3">
+          <Link href="/dashboard/mis-pagos" className="p-2 hover:bg-gym-bg/50 rounded-xl transition-colors">
+            <ArrowLeft className="w-5 h-5 text-gym-muted" />
+          </Link>
+          <div>
+            <h1 className="text-2xl font-display font-bold text-gym-text neon-text">Mi Perfil</h1>
+            <p className="text-gym-muted text-sm">Edita tu información personal</p>
+          </div>
         </div>
+        <Button onClick={handleSave} loading={saving} className="hidden sm:flex">
+          <Save className="w-4 h-4 mr-2" /> Guardar
+        </Button>
       </div>
 
       {/* Avatar + role */}
@@ -246,53 +249,6 @@ export default function PerfilPage() {
         </CardContent>
       </Card>
 
-      {/* Membership */}
-      <Card className="neon-card">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Shield className="w-5 h-5 text-gym-secondary" />
-            Membresía
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {isAdmin ? (
-            <div className="space-y-3">
-              <div>
-                <label className="text-xs text-gym-muted mb-1 block">Rol</label>
-                <select
-                  value={formData.role}
-                  onChange={(e) => setFormData({ ...formData, role: e.target.value as Profile["role"] })}
-                  className="w-full px-3 py-2 bg-gym-surface border border-gym-border rounded-xl text-sm text-gym-text focus:outline-none focus:ring-2 focus:ring-gym-primary/50"
-                >
-                  <option value="miembro">Miembro</option>
-                  <option value="super_admin">Super Admin</option>
-                </select>
-              </div>
-              <div>
-                <label className="text-xs text-gym-muted mb-1 block">Notas admin</label>
-                <textarea
-                  value={formData.notas_admin}
-                  onChange={(e) => setFormData({ ...formData, notas_admin: e.target.value })}
-                  placeholder="Notas internas sobre este miembro..."
-                  rows={3}
-                  className="w-full px-3 py-2 bg-gym-surface border border-gym-border rounded-xl text-sm text-gym-text focus:outline-none focus:ring-2 focus:ring-gym-primary/50 resize-none"
-                />
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-1">
-              <p className="text-sm text-gym-text">Mensualidad</p>
-              {profile.notas_admin && (
-                <p className="text-xs text-gym-muted flex items-center gap-1 mt-2">
-                  <FileText className="w-3 h-3" />
-                  {profile.notas_admin}
-                </p>
-              )}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
       {/* Messages */}
       {error && (
         <p className="text-sm text-gym-danger text-center bg-gym-danger/10 p-2 rounded-xl">{error}</p>
@@ -303,10 +259,18 @@ export default function PerfilPage() {
         </p>
       )}
 
-      <Button onClick={handleSave} loading={saving} className="w-full">
-        <Save className="w-4 h-4 mr-2" />
-        Guardar Cambios
-      </Button>
+      {/* Mobile floating save button */}
+      <button
+        onClick={handleSave}
+        disabled={saving}
+        className="sm:hidden fixed bottom-20 right-4 z-40 w-14 h-14 rounded-full bg-gym-success/80 text-white shadow-lg shadow-gym-success/20 flex items-center justify-center disabled:opacity-40 active:scale-95 transition-all"
+      >
+        {saving ? (
+          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+        ) : (
+          <Save className="w-6 h-6" />
+        )}
+      </button>
     </div>
   );
 }

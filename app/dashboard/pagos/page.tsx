@@ -70,12 +70,12 @@ export default function PagosPage() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [data, aniosData] = await Promise.all([
+      const [pagosResult, aniosResult] = await Promise.allSettled([
         pagosService.listarPagos(undefined, anioSeleccionado),
         pagosService.aniosConPagos(),
       ]);
-      setPagos(data);
-      setAnios(aniosData);
+      if (pagosResult.status === "fulfilled") setPagos(pagosResult.value);
+      if (aniosResult.status === "fulfilled") setAnios(aniosResult.value);
     } catch (error) {
       showToast(messages.toast.errorCargaDatos, "error");
     } finally {
@@ -189,7 +189,7 @@ export default function PagosPage() {
               className="w-full pl-10 pr-4 py-3 bg-gym-bg border border-gym-border rounded-xl text-gym-text focus:outline-none focus:ring-2 focus:ring-gym-primary focus:border-gym-primary"
             />
             {showDropdown && busquedaMiembro.length >= 2 && (
-              <div className="absolute top-full left-0 right-0 mt-1 bg-gym-surface border border-gym-border rounded-xl shadow-lg z-20 max-h-60 overflow-y-auto">
+              <div className="absolute top-full left-0 right-0 mt-1 bg-gym-surface border border-gym-border rounded-xl shadow-lg z-30 max-h-60 overflow-y-auto">
                 {miembros.length > 0 ? (
                   miembros.map((m) => (
                     <button
@@ -238,7 +238,7 @@ export default function PagosPage() {
       )}
 
       {/* Filters */}
-      <div className="flex gap-2 overflow-x-auto pb-2 relative z-10">
+      <div className="flex gap-2 overflow-x-auto pb-2 relative z-20">
         {["todos", "pendiente", "aprobado", "rechazado"].map((f) => (
           <Button
             key={f}

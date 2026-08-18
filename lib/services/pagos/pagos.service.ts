@@ -134,7 +134,14 @@ export class PagosService {
     }
 
     const { data, error } = await query;
-    if (error) throw error;
+    if (error) {
+      const fallback = await this.supabase
+        .from("pagos")
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (fallback.error) throw fallback.error;
+      return fallback.data || [];
+    }
     return data || [];
   }
 
@@ -161,7 +168,7 @@ export class PagosService {
       .order("anio_pagar", { ascending: false })
       .order("mes_pagar", { ascending: false });
 
-    if (error) throw error;
+    if (error) return [];
 
     const pagosAprobados = (data || []).map((p) => ({
       mes: p.mes_pagar,
@@ -209,6 +216,18 @@ export class PagosService {
       .maybeSingle();
 
     return !!data;
+  }
+
+  async pagosRecientesAprobados(): Promise<Pago[]> {
+    const { data, error } = await this.supabase
+      .from("pagos")
+      .select("*, profile:profiles(nombre_completo, avatar_url)")
+      .eq("estado", "aprobado")
+      .order("created_at", { ascending: false })
+      .limit(10);
+
+    if (error) throw error;
+    return data || [];
   }
 
   async aniosConPagos(usuarioId?: string): Promise<number[]> {
@@ -349,18 +368,35 @@ export class PagosService {
       });
     }
 
-    const totalMiembros = (await this.supabase
+    const { data: allProfiles } = await this.supabase
       .from("profiles")
-      .select("id", { count: "exact", head: true })
-      .eq("role", "miembro")).count || 0;
+      .select("id, fecha_inscripcion, role")
+      .eq("role", "miembro");
 
-    const libres = (await this.supabase
+    const profiles = allProfiles || [];
+
+    const { data: libreData } = await this.supabase
       .from("membresias")
-      .select("usuario_id", { count: "exact", head: true })
-      .is("fecha_fin", null)).count || 0;
+      .select("usuario_id")
+      .is("fecha_fin", null);
+
+    const libresIds = new Set((libreData || []).map((l) => l.usuario_id));
+    const libresCount = libresIds.size;
 
     const statsMeses = await Promise.all(
       meses.map(async (m) => {
+        const fechaMes = new Date(m.anio, m.mes - 1, 1);
+        const finMes = new Date(m.anio, m.mes, 0);
+
+        const miembrosMes = profiles.filter((p) => {
+          const fechaInsc = p.fecha_inscripcion ? new Date(p.fecha_inscripcion) : null;
+          if (fechaInsc && fechaInsc > finMes) return false;
+          return true;
+        });
+
+        const totalMiembrosMes = miembrosMes.length;
+        const idsMes = new Set(miembrosMes.map((p) => p.id));
+
         const { data: pagosMes } = await this.supabase
           .from("pagos")
           .select("usuario_id, estado")
@@ -368,28 +404,26 @@ export class PagosService {
           .eq("anio_pagar", m.anio);
 
         const pagados = new Set(
-          (pagosMes || []).filter((p) => p.estado === "aprobado").map((p) => p.usuario_id)
+          (pagosMes || []).filter((p) => p.estado === "aprobado" && idsMes.has(p.usuario_id)).map((p) => p.usuario_id)
         ).size;
 
-        const pendientes = new Set(
-          (pagosMes || []).filter((p) => p.estado === "pendiente").map((p) => p.usuario_id)
-        ).size;
+        const libresMes = miembrosMes.filter((p) => libresIds.has(p.id)).length;
 
-        const sinPago = totalMiembros - pagados - libres;
+        const sinPago = Math.max(0, totalMiembrosMes - pagados - libresMes);
 
         return {
           mes: m.mes,
           anio: m.anio,
           nombre: m.nombre,
           pagados,
-          pendientes,
-          sinPago: Math.max(0, sinPago),
-          libres,
+          pendientes: 0,
+          sinPago,
+          libres: libresMes,
         };
       })
     );
 
-    return { totalMiembros, libres, meses: statsMeses };
+    return { totalMiembros: profiles.length, libres: libresCount, meses: statsMeses };
   }
 }
 

@@ -8,7 +8,7 @@ export class MiembrosService {
     const { data, error } = await this.supabase
       .from("profiles")
       .select("*")
-      .order("nombre_completo", { ascending: true });
+      .order("fecha_inscripcion", { ascending: false });
 
     if (error) throw error;
     return data || [];

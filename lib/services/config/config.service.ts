@@ -53,6 +53,7 @@ export class ConfigService {
     const { data, error } = await this.supabase
       .from("gym_config_metodos_pago")
       .select("*")
+      .eq("habilitado", true)
       .order("metodo_pago");
 
     if (error) throw error;
@@ -60,10 +61,29 @@ export class ConfigService {
   }
 
   async updateMetodoPago(id: string, updates: Partial<MetodoPagoConfig>): Promise<MetodoPagoConfig> {
+    const { data: current } = await this.supabase
+      .from("gym_config_metodos_pago")
+      .select("metodo_pago, monto_mensual, monto_inscripcion")
+      .eq("id", id)
+      .single();
+
+    if (!current) throw new Error("Método de pago no encontrado");
+
+    await this.supabase
+      .from("gym_config_metodos_pago")
+      .update({ habilitado: false })
+      .eq("id", id);
+
+    const nuevoRegistro = {
+      metodo_pago: current.metodo_pago,
+      monto_mensual: updates.monto_mensual ?? current.monto_mensual,
+      monto_inscripcion: updates.monto_inscripcion ?? current.monto_inscripcion,
+      habilitado: updates.habilitado !== undefined ? updates.habilitado : true,
+    };
+
     const { data, error } = await this.supabase
       .from("gym_config_metodos_pago")
-      .update(updates)
-      .eq("id", id)
+      .insert(nuevoRegistro)
       .select()
       .single();
 
@@ -76,7 +96,9 @@ export class ConfigService {
       .from("gym_config_metodos_pago")
       .select("*")
       .eq("metodo_pago", metodo)
-      .single();
+      .eq("habilitado", true)
+      .limit(1)
+      .maybeSingle();
 
     if (error || !data) return null;
     return data;

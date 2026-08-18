@@ -66,7 +66,6 @@ export default function ConfiguracionPage() {
     setSaving(true);
     try {
       await configService.updateConfig(config);
-      showToast(messages.toast.configuracionGuardada, "success");
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
     } catch (error) {
@@ -82,7 +81,7 @@ export default function ConfiguracionPage() {
       const updated = await configService.updateMetodoPago(metodo.id, {
         habilitado: !metodo.habilitado,
       });
-      setMetodos((prev) => prev.map((m) => (m.id === updated.id ? updated : m)));
+      setMetodos((prev) => prev.map((m) => m.metodo_pago === updated.metodo_pago ? updated : m.id === updated.id ? m : m));
       showToast(messages.toast.metodoPagoActualizado, "success");
     } catch (error) {
       showToast(messages.toast.metodoPagoError, "error");
@@ -92,7 +91,7 @@ export default function ConfiguracionPage() {
   const handleUpdateMonto = async (metodo: MetodoPagoConfig, field: "monto_mensual" | "monto_inscripcion", value: number) => {
     try {
       const updated = await configService.updateMetodoPago(metodo.id, { [field]: value });
-      setMetodos((prev) => prev.map((m) => (m.id === updated.id ? updated : m)));
+      setMetodos((prev) => prev.map((m) => m.metodo_pago === updated.metodo_pago ? updated : m.id === updated.id ? m : m));
     } catch (error) {
       showToast(messages.toast.metodoPagoError, "error");
     }

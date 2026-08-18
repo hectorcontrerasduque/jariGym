@@ -21,27 +21,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "No autorizado" }, { status: 403 });
     }
 
-    const { email, nombre, username, password } = await request.json();
+    const { email, nombre, password } = await request.json();
 
     if (!nombre) {
       return NextResponse.json({ error: "Nombre requerido" }, { status: 400 });
     }
 
-    const hasEmail = !!email;
-    const isGmail = hasEmail && email.toLowerCase().endsWith("@gmail.com");
-
-    if (!hasEmail && (!username || !password)) {
-      return NextResponse.json(
-        { error: "Si no se ingresa correo, usuario y contraseña son requeridos" },
-        { status: 400 }
-      );
-    }
-
-    if (hasEmail && !isGmail && (!username || !password)) {
-      return NextResponse.json(
-        { error: "Para correos no-Gmail, usuario y contraseña son requeridos" },
-        { status: 400 }
-      );
+    if (!email) {
+      return NextResponse.json({ error: "Correo requerido" }, { status: 400 });
     }
 
     const serviceSupabase = createServiceClient(
@@ -49,18 +36,11 @@ export async function POST(request: Request) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
-    const userPassword = (!hasEmail || isGmail)
-      ? (password || Math.random().toString(36).slice(-12) + "A1!")
-      : password;
-
-    const userEmail = hasEmail && isGmail
-      ? email
-      : hasEmail
-      ? email
-      : `${username}@gymapp.local`;
+    const isGmail = email.toLowerCase().endsWith("@gmail.com");
+    const userPassword = password || Math.random().toString(36).slice(-12) + "A1!";
 
     const { data: authUser, error: authError } = await serviceSupabase.auth.admin.createUser({
-      email: userEmail,
+      email: email,
       email_confirm: true,
       password: userPassword,
       user_metadata: { nombre_completo: nombre, display_email: email },
@@ -71,7 +51,7 @@ export async function POST(request: Request) {
     if (authError) {
       if (authError.message?.includes("already") || authError.message?.includes("exists")) {
         const { data: existingUsers } = await serviceSupabase.auth.admin.listUsers();
-        const existing = existingUsers?.users?.find((u) => u.email === userEmail);
+        const existing = existingUsers?.users?.find((u) => u.email === email);
         if (existing) {
           userId = existing.id;
         } else {
@@ -90,10 +70,8 @@ export async function POST(request: Request) {
       id: userId,
       nombre_completo: nombre,
       role: "miembro",
+      email: email,
     };
-    if (hasEmail) {
-      profileData.email = email;
-    }
 
     const { data, error: profileError } = await serviceSupabase
       .from("profiles")
@@ -107,39 +85,34 @@ export async function POST(request: Request) {
     }
 
     let welcomeEmailSent = false;
-    if (hasEmail) {
-      try {
-        const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-        const { error: inviteError } = await serviceSupabase.auth.admin.inviteUserByEmail(userEmail, {
-          data: { nombre_completo: nombre },
-          redirectTo: `${siteUrl}/login`,
+    try {
+      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const { error: inviteError } = await serviceSupabase.auth.admin.inviteUserByEmail(email, {
+        data: { nombre_completo: nombre },
+        redirectTo: `${siteUrl}/login`,
+      });
+      if (!inviteError) {
+        welcomeEmailSent = true;
+      } else {
+        const { error: resetError } = await serviceSupabase.auth.admin.generateLink({
+          type: "magiclink",
+          email: email,
         });
-        if (!inviteError) {
+        if (!resetError) {
           welcomeEmailSent = true;
-        } else {
-          const { error: resetError } = await serviceSupabase.auth.admin.generateLink({
-            type: "magiclink",
-            email: userEmail,
-          });
-          if (!resetError) {
-            welcomeEmailSent = true;
-          } else {
-            console.error("Email error:", inviteError, resetError);
-          }
         }
-      } catch (emailErr) {
-        console.error("Error sending welcome email:", emailErr);
       }
+    } catch (emailErr) {
+      // Email error non-critical
     }
 
     return NextResponse.json({
       miembro: data,
       password: userPassword,
-      loginEmail: userEmail,
+      loginEmail: email,
       welcomeEmailSent,
     });
   } catch (error: any) {
-    console.error("Error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

@@ -28,7 +28,6 @@ export default function MiembrosPage() {
   const [modalNuevo, setModalNuevo] = useState(false);
   const [nuevoEmail, setNuevoEmail] = useState("");
   const [nuevoNombre, setNuevoNombre] = useState("");
-  const [nuevoUsername, setNuevoUsername] = useState("");
   const [nuevoPassword, setNuevoPassword] = useState("");
   const [emailError, setEmailError] = useState("");
   const [pagoInscripcion, setPagoInscripcion] = useState<Pago | null>(null);
@@ -82,18 +81,15 @@ export default function MiembrosPage() {
   const handleCrearMiembro = async () => {
     if (!nuevoNombre) return;
     if (nuevoEmail && !validateEmail(nuevoEmail)) return;
-    const isGmail = nuevoEmail && nuevoEmail.toLowerCase().endsWith("@gmail.com");
-    if (!nuevoEmail && (!nuevoUsername || !nuevoPassword)) return;
-    if (nuevoEmail && !isGmail && (!nuevoUsername || !nuevoPassword)) return;
+    if (!nuevoEmail) return;
     setSaving(true);
     try {
       const res = await fetch("/api/miembros", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          email: nuevoEmail || undefined,
+          email: nuevoEmail,
           nombre: nuevoNombre,
-          username: nuevoUsername || undefined,
           password: nuevoPassword || undefined,
         }),
       });
@@ -102,7 +98,6 @@ export default function MiembrosPage() {
       setModalNuevo(false);
       setNuevoEmail("");
       setNuevoNombre("");
-      setNuevoUsername("");
       setNuevoPassword("");
       setEmailError("");
       await loadMiembros();
@@ -544,36 +539,29 @@ export default function MiembrosPage() {
           />
           <div>
             <Input
-              label="Correo"
+              label="Correo * (será el usuario para inicio de sesión)"
               type="email"
               placeholder="correo@gmail.com"
               value={nuevoEmail}
               onChange={(e) => handleEmailChange(e.target.value)}
+              required
             />
             {emailError && <p className="text-xs text-gym-danger mt-1">{emailError}</p>}
           </div>
           <Input
-            label={`Usuario ${!nuevoEmail || !nuevoEmail.toLowerCase().endsWith("@gmail.com") ? "*" : ""}`}
-            placeholder="nombreusuario"
-            value={nuevoUsername}
-            onChange={(e) => setNuevoUsername(e.target.value)}
-          />
-          <Input
-            label={`Contraseña ${!nuevoEmail || !nuevoEmail.toLowerCase().endsWith("@gmail.com") ? "*" : ""}`}
+            label="Contraseña (opcional, se genera si se deja vacía)"
             type="password"
             placeholder="••••••••"
             value={nuevoPassword}
             onChange={(e) => setNuevoPassword(e.target.value)}
           />
           <p className="text-xs text-gym-muted">
-            {!nuevoEmail || !nuevoEmail.toLowerCase().endsWith("@gmail.com")
-              ? "Para correos no-Gmail, el usuario y contraseña son requeridos para iniciar sesión."
-              : "Si dejas usuario y contraseña vacíos, se generarán automáticamente."}
+            El correo será el usuario de inicio de sesión. Si es Gmail, podrá iniciar con Google.
           </p>
           <Button
             className="w-full"
             onClick={handleCrearMiembro}
-            disabled={!nuevoNombre}
+            disabled={!nuevoNombre || !nuevoEmail}
           >
             <Plus className="w-4 h-4 mr-2" /> Agregar Miembro
           </Button>

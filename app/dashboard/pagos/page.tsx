@@ -22,16 +22,12 @@ const metodoLabels: Record<MetodoPago, string> = {
   membresia_libre: "🎁 Libre",
 };
 
-function getPagoLabel(pago: Pago): string {
-  const isInscripcion = pago.notas?.toLowerCase().includes("inscripción") || pago.notas?.toLowerCase().includes("inscripcion");
-  if (isInscripcion) return "Inscripción";
-  return `${getMonthName(pago.mes_pagar)} ${pago.anio_pagar}`;
+function isInscripcion(pago: Pago): boolean {
+  return pago.notas?.toLowerCase().includes("inscripción") || pago.notas?.toLowerCase().includes("inscripcion") || false;
 }
 
-function getPagoIcon(pago: Pago) {
-  const isInscripcion = pago.notas?.toLowerCase().includes("inscripción") || pago.notas?.toLowerCase().includes("inscripcion");
-  if (isInscripcion) return <FileText className="w-5 h-5 text-gym-primary" />;
-  return <Calendar className="w-5 h-5 text-gym-secondary" />;
+function getTipoLabel(pago: Pago): string {
+  return isInscripcion(pago) ? "Inscripción" : "Mensualidad";
 }
 
 export default function PagosPage() {
@@ -238,7 +234,7 @@ export default function PagosPage() {
       )}
 
       {/* Filters */}
-      <div className="flex gap-2 overflow-x-auto pb-2 relative z-20">
+      <div className="flex gap-2 overflow-x-auto pb-2 relative z-10">
         {["todos", "pendiente", "aprobado", "rechazado"].map((f) => (
           <Button
             key={f}
@@ -304,12 +300,16 @@ export default function PagosPage() {
                   key={pago.id}
                   className="p-3 bg-gym-bg rounded-xl hover:bg-gym-surface transition-colors"
                 >
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center justify-between gap-3">
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-gym-text truncate">
-                          {pago.profile?.nombre_completo || "—"}
+                      <p className="text-sm font-medium text-gym-text truncate">
+                        {pago.profile?.nombre_completo || "—"}
+                      </p>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className={`text-xs ${isInscripcion(pago) ? "text-gym-primary" : "text-gym-secondary"}`}>
+                          {getTipoLabel(pago)}
                         </span>
+                        <span className="text-xs text-gym-muted">·</span>
                         <Badge
                           variant={
                             pago.estado === "aprobado"
@@ -358,18 +358,11 @@ export default function PagosPage() {
             </div>
             <div>
               <p className="text-sm text-gym-muted">Concepto</p>
-              <div className="flex items-center gap-2">
-                {getPagoIcon(selectedPago)}
-                <p className="text-gym-text font-medium">{getPagoLabel(selectedPago)}</p>
-              </div>
+              <p className="text-gym-text font-medium">{getMonthName(selectedPago.mes_pagar)} {selectedPago.anio_pagar}</p>
             </div>
             <div>
               <p className="text-sm text-gym-muted">Tipo</p>
-              <p className="text-gym-text">
-                {selectedPago.notas?.toLowerCase().includes("inscripción") || selectedPago.notas?.toLowerCase().includes("inscripcion")
-                  ? "Inscripción"
-                  : "Mensualidad"}
-              </p>
+              <p className="text-gym-text">{getTipoLabel(selectedPago)}</p>
             </div>
             <div>
               <p className="text-sm text-gym-muted">Monto</p>

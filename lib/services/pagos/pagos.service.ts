@@ -359,9 +359,10 @@ export class PagosService {
   async monthlyStats(anio?: number) {
     const hoy = new Date();
     const anioConsulta = anio || hoy.getFullYear();
+    const mesMaximo = anioConsulta === hoy.getFullYear() ? hoy.getMonth() + 1 : 12;
 
     const meses = [];
-    for (let mes = 1; mes <= 12; mes++) {
+    for (let mes = 1; mes <= mesMaximo; mes++) {
       meses.push({
         mes,
         anio: anioConsulta,

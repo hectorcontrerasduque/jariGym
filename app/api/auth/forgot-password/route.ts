@@ -5,7 +5,7 @@ import crypto from "crypto";
 import { createClient } from "@supabase/supabase-js";
 
 const RATE_LIMIT_WINDOW = 60 * 60 * 1000;
-const MAX_REQUESTS_PER_WINDOW = 3;
+const MAX_REQUESTS_PER_WINDOW = 5;
 
 function getAdminClient() {
   return createClient(
@@ -33,6 +33,12 @@ export async function POST(request: Request) {
     if (!profile) {
       return NextResponse.json({ message: messages.auth.resetPasswordSent });
     }
+
+    await supabase
+      .from("password_reset_tokens")
+      .delete()
+      .eq("user_id", profile.id)
+      .or("used_at.not.is.null,expires_at.lt." + new Date().toISOString());
 
     const { count } = await supabase
       .from("password_reset_tokens")

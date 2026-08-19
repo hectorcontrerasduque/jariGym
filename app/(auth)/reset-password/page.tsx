@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PasswordInput } from "@/components/ui/password-input";
-import { Dumbbell } from "lucide-react";
+import { Dumbbell, CheckCircle } from "lucide-react";
 import { configService } from "@/lib/services/config/config.service";
 import { messages } from "@/lib/messages";
 import Link from "next/link";
@@ -127,19 +127,19 @@ function ResetPasswordForm() {
 
         <Card className="w-full max-w-md relative z-10 border-gym-primary/20 shadow-[0_0_40px_rgba(56,189,248,0.15)]">
           <CardHeader className="text-center">
-            <div className="mx-auto w-16 h-16 bg-gym-success/20 rounded-2xl flex items-center justify-center mb-4">
-              <Dumbbell className="w-8 h-8 text-gym-success" />
+            <div className="mx-auto w-16 h-16 bg-gym-success/20 rounded-full flex items-center justify-center mb-4">
+              <CheckCircle className="w-8 h-8 text-gym-success" />
             </div>
             <CardTitle className="text-2xl font-display neon-text">{messages.auth.resetPasswordSuccess}</CardTitle>
           </CardHeader>
           <CardContent className="text-center space-y-4">
-            <p className="text-gym-muted">{messages.auth.resetPasswordSentInstructions}</p>
+            <p className="text-sm text-gym-muted">{messages.auth.resetPasswordSentInstructions}</p>
+            <div className="p-3 bg-gym-bg rounded-xl">
+              <p className="text-xs text-gym-muted">
+                Si no recibes el correo, revisa tu carpeta de spam o contacta al administrador de <strong className="text-gym-text">{gymName}</strong>.
+              </p>
+            </div>
             <Link href="/login">
-              <Button className="w-full">
-                {messages.auth.loginButton}
-              </Button>
-            </Link>
-            <Link href="/">
               <Button variant="secondary" className="w-full border-gym-border hover:border-gym-primary/50">
                 {messages.auth.resetPasswordCloseButton}
               </Button>

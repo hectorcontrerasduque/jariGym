@@ -20,12 +20,16 @@ async function sendEmail({ to, subject, html }: SendEmailParams): Promise<void> 
     throw new Error("GMAIL_USER and GMAIL_APP_PASSWORD must be configured");
   }
 
-  await transporter.sendMail({
+  const result = await transporter.sendMail({
     from: `"${process.env.GMAIL_USER}" <${process.env.GMAIL_USER}>`,
     to,
     subject,
     html,
   });
+
+  if (!result.messageId) {
+    throw new Error("Email sent but no messageId returned");
+  }
 }
 
 export async function sendPasswordResetEmail(

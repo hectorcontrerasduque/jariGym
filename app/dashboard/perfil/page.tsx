@@ -54,6 +54,7 @@ function PerfilContent() {
     role: "" as Profile["role"],
     notas_admin: "",
     password: "",
+    currentPassword: "",
   });
 
   useEffect(() => {
@@ -95,6 +96,7 @@ function PerfilContent() {
           role: data.role,
           notas_admin: data.notas_admin || "",
           password: "",
+          currentPassword: "",
         });
       }
     } catch (err) {
@@ -131,12 +133,13 @@ function PerfilContent() {
             notas_admin: currentUserRole === "super_admin" ? formData.notas_admin || null : undefined,
           },
           password: formData.password || undefined,
+          currentPassword: formData.currentPassword || undefined,
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Error al guardar");
       setProfile(data.profile);
-      setFormData((prev) => ({ ...prev, password: "" }));
+      setFormData((prev) => ({ ...prev, password: "", currentPassword: "" }));
       showToast(messages.toast.perfilGuardado, "success");
     } catch (err) {
       const raw = err instanceof Error ? err.message : "";
@@ -220,14 +223,20 @@ function PerfilContent() {
               required
             />
           </div>
-          {targetUserId && (
+          {!targetUserId && (
             <PasswordInput
-              label="Contraseña (opcional)"
-              placeholder="Dejar vacío para no cambiar"
-              value={formData.password}
-              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+              label="Contraseña actual (requerida para cambiar contraseña)"
+              placeholder="Ingresa tu contraseña actual"
+              value={formData.currentPassword}
+              onChange={(e) => setFormData({ ...formData, currentPassword: e.target.value })}
             />
           )}
+          <PasswordInput
+            label="Nueva contraseña (opcional)"
+            placeholder="Dejar vacío para no cambiar"
+            value={formData.password}
+            onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+          />
           <div>
             <label className="text-xs text-gym-muted mb-1 block">WhatsApp</label>
             <Input

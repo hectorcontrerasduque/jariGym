@@ -33,6 +33,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: messages.miembros.correoRequerido }, { status: 400 });
     }
 
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return NextResponse.json({ error: "Email inválido" }, { status: 400 });
+    }
+    if (email.length > 254) {
+      return NextResponse.json({ error: "Email demasiado largo" }, { status: 400 });
+    }
+    if (nombre.length > 200) {
+      return NextResponse.json({ error: "Nombre demasiado largo" }, { status: 400 });
+    }
+
     const serviceSupabase = createServiceClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!

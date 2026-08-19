@@ -97,6 +97,7 @@ export class PagosService {
         notas: notas || "Pago rechazado",
       })
       .eq("id", pagoId)
+      .eq("estado", "pendiente")
       .select()
       .single();
 
@@ -150,6 +151,20 @@ export class PagosService {
   }
 
   async listarPagos(estado?: string, anio?: number): Promise<Pago[]> {
+    const {
+      data: { user },
+    } = await this.supabase.auth.getUser();
+    if (!user) throw new Error(messages.toast.noAutenticado);
+
+    const { data: profile } = await this.supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+    if (profile?.role !== "super_admin" && profile?.role !== "admin") {
+      throw new Error(messages.toast.noAutorizado);
+    }
+
     let query = this.supabase
       .from("pagos")
       .select("*, profile:profiles(nombre_completo, avatar_url, email)")
@@ -248,6 +263,11 @@ export class PagosService {
   }
 
   async pagosRecientesAprobados(): Promise<Pago[]> {
+    const {
+      data: { user },
+    } = await this.supabase.auth.getUser();
+    if (!user) throw new Error(messages.toast.noAutenticado);
+
     const { data, error } = await this.supabase
       .from("pagos")
       .select("*, profile:profiles(nombre_completo, avatar_url)")

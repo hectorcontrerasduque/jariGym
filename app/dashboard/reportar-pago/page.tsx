@@ -246,11 +246,6 @@ function ReportarPagoForm() {
 
         if (isAdmin && formData.estado_pago === "aprobado") {
           await pagosService.aprobarPago(pagoInscripcion.id);
-          const supabase = createClient();
-          await supabase
-            .from("profiles")
-            .update({ inscripcion_pagada: true, inscripcion_fecha: new Date().toISOString() })
-            .eq("id", targetUserId);
         }
       }
 

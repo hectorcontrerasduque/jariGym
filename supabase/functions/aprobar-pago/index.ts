@@ -2,7 +2,7 @@ import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Origin": process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type",
 };
@@ -42,6 +42,16 @@ serve(async (req) => {
 
     if (!pago_id || !accion) {
       throw new Error("pago_id and accion are required");
+    }
+
+    const { data: existingPago } = await supabase
+      .from("pagos")
+      .select("estado")
+      .eq("id", pago_id)
+      .single();
+
+    if (existingPago && existingPago.estado !== "pendiente") {
+      throw new Error("El pago ya fue procesado");
     }
 
     const updates: any = {

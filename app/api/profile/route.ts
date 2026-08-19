@@ -21,7 +21,7 @@ export async function PUT(request: Request) {
     const isAdmin = profileAdmin?.role === "super_admin" || profileAdmin?.role === "admin";
 
     const body = await request.json();
-    const { user_id, updates, password } = body;
+    const { user_id, updates, password, currentPassword } = body;
 
     const targetUserId = user_id || user.id;
 
@@ -64,6 +64,19 @@ export async function PUT(request: Request) {
     }
 
     if (password && password.trim()) {
+      if (targetUserId === user.id) {
+        if (!currentPassword) {
+          return NextResponse.json({ error: "Contraseña actual requerida" }, { status: 400 });
+        }
+        const { error: verifyError } = await supabase.auth.signInWithPassword({
+          email: data.email,
+          password: currentPassword,
+        });
+        if (verifyError) {
+          return NextResponse.json({ error: "Contraseña actual incorrecta" }, { status: 400 });
+        }
+      }
+
       const { data: authUser, error: fetchError } = await serviceSupabase.auth.admin.getUserById(targetUserId);
       if (fetchError || !authUser?.user) {
         return NextResponse.json({ 

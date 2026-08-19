@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/client";
+import { messages } from "@/lib/messages";
 import type { Profile } from "@/lib/types";
 
 export class AuthService {
@@ -48,10 +49,13 @@ export class AuthService {
   }
 
   async resetPassword(email: string) {
-    const { error } = await this.supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/auth/callback?next=/dashboard/perfil`,
+    const res = await fetch("/api/auth/forgot-password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
     });
-    if (error) throw error;
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || messages.auth.resetPasswordError);
   }
 
   async updatePassword(newPassword: string) {

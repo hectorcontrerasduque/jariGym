@@ -54,7 +54,7 @@ export async function PUT(request: Request) {
       .single();
 
     if (profileError) {
-      return NextResponse.json({ error: profileError.message }, { status: 400 });
+      return NextResponse.json({ error: messages.toast.perfilError }, { status: 400 });
     }
 
     if (password && password.trim()) {
@@ -79,14 +79,14 @@ export async function PUT(request: Request) {
       );
       if (pwError) {
         return NextResponse.json({ 
-          error: messages.toast.errorCambiarContrasena + ": " + pwError.message,
+          error: messages.toast.errorCambiarContrasena,
           profile: data 
         }, { status: 500 });
       }
     }
 
     return NextResponse.json({ profile: data });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch {
+    return NextResponse.json({ error: messages.toast.errorGenerico }, { status: 500 });
   }
 }

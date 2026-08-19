@@ -59,35 +59,28 @@ export class PagosService {
     } = await this.supabase.auth.getUser();
     if (!user) throw new Error(messages.toast.noAutenticado);
 
-    const { data: pagoData, error: pagoError } = await this.supabase
-      .from("pagos")
-      .update({
-        estado: "aprobado",
-        approved_by: user.id,
-        approved_at: new Date().toISOString(),
-        fecha_pago_real: new Date().toISOString(),
-      })
-      .eq("id", pagoId)
-      .select()
-      .single();
+    const { data, error } = await this.supabase
+      .rpc("aprobar_pago_atomico", { p_pago_id: pagoId, p_user_id: user.id });
 
-    if (pagoError) throw pagoError;
-
-    const isInscripcion = pagoData.notas?.toLowerCase().includes("inscripción") || pagoData.notas?.toLowerCase().includes("inscripcion");
-    if (isInscripcion) {
-      await this.supabase
-        .from("profiles")
-        .update({
-          inscripcion_pagada: true,
-          inscripcion_fecha: new Date().toISOString(),
-        })
-        .eq("id", pagoData.usuario_id);
-    }
-
-    return pagoData;
+    if (error) throw error;
+    return data as Pago;
   }
 
   async rechazarPago(pagoId: string, notas?: string): Promise<Pago> {
+    const {
+      data: { user },
+    } = await this.supabase.auth.getUser();
+    if (!user) throw new Error(messages.toast.noAutenticado);
+
+    const { data: profile } = await this.supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+    if (profile?.role !== "super_admin" && profile?.role !== "admin") {
+      throw new Error(messages.toast.noAutorizado);
+    }
+
     const { data, error } = await this.supabase
       .from("pagos")
       .update({
@@ -108,6 +101,15 @@ export class PagosService {
     } = await this.supabase.auth.getUser();
     if (!user) throw new Error(messages.toast.noAutenticado);
 
+    const { data: profile } = await this.supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+    if (profile?.role !== "super_admin" && profile?.role !== "admin") {
+      throw new Error(messages.toast.noAutorizado);
+    }
+
     const { error } = await this.supabase
       .from("pagos")
       .delete()
@@ -117,11 +119,16 @@ export class PagosService {
     if (error) throw error;
   }
 
-  async listarMisPagos(usuarioId: string, anio?: number): Promise<Pago[]> {
+  async listarMisPagos(anio?: number): Promise<Pago[]> {
+    const {
+      data: { user },
+    } = await this.supabase.auth.getUser();
+    if (!user) throw new Error(messages.toast.noAutenticado);
+
     let query = this.supabase
       .from("pagos")
       .select("*")
-      .eq("usuario_id", usuarioId)
+      .eq("usuario_id", user.id)
       .order("created_at", { ascending: false });
 
     if (anio) {
@@ -476,40 +483,48 @@ export class PagosService {
         const totalMiembrosMes = miembrosMes.length;
         const idsMes = new Set(miembrosMes.map((p) => p.id));
 
-        const { data: pagosMes } = await this.supabase
-          .from("pagos")
-          .select("usuario_id, estado, monto")
-          .eq("mes_pagar", m.mes)
-          .eq("anio_pagar", m.anio);
-
-        const pagados = new Set(
-          (pagosMes || []).filter((p) => p.estado === "aprobado" && idsMes.has(p.usuario_id)).map((p) => p.usuario_id)
-        ).size;
-
-        const montoAcumulado = (pagosMes || [])
-          .filter((p) => p.estado === "aprobado" && idsMes.has(p.usuario_id))
-          .reduce((sum, p) => sum + (p.monto || 0), 0);
-
-        const libresMes = miembrosMes.filter((p) => libresIds.has(p.id)).length;
-
-        const sinPago = Math.max(0, totalMiembrosMes - pagados - libresMes);
-        const montoAdeudado = sinPago * montoMensual;
-
-        return {
-          mes: m.mes,
-          anio: m.anio,
-          nombre: m.nombre,
-          pagados,
-          pendientes: 0,
-          sinPago,
-          libres: libresMes,
-          montoAcumulado,
-          montoAdeudado,
-        };
+        return { mes: m.mes, anio: m.anio, nombre: m.nombre, totalMiembrosMes, idsMes };
       })
     );
 
-    return { totalMiembros: profiles.length, libres: libresCount, meses: statsMeses };
+    const { data: allPagos } = await this.supabase
+      .from("pagos")
+      .select("usuario_id, estado, monto, mes_pagar, anio_pagar")
+      .eq("anio_pagar", anioConsulta)
+      .in("estado", ["aprobado", "pendiente"]);
+
+    const pagosAll = allPagos || [];
+
+    const mesesFinal = statsMeses.map((m) => {
+      const pagosMes = pagosAll.filter((p) => p.mes_pagar === m.mes && p.anio_pagar === m.anio);
+
+      const pagados = new Set(
+        pagosMes.filter((p) => p.estado === "aprobado" && m.idsMes.has(p.usuario_id)).map((p) => p.usuario_id)
+      ).size;
+
+      const montoAcumulado = pagosMes
+        .filter((p) => p.estado === "aprobado" && m.idsMes.has(p.usuario_id))
+        .reduce((sum, p) => sum + (p.monto || 0), 0);
+
+      const libresMes = profiles.filter((p) => m.idsMes.has(p.id) && libresIds.has(p.id)).length;
+
+      const sinPago = Math.max(0, m.totalMiembrosMes - pagados - libresMes);
+      const montoAdeudado = sinPago * montoMensual;
+
+      return {
+        mes: m.mes,
+        anio: m.anio,
+        nombre: m.nombre,
+        pagados,
+        pendientes: 0,
+        sinPago,
+        libres: libresMes,
+        montoAcumulado,
+        montoAdeudado,
+      };
+    });
+
+    return { totalMiembros: profiles.length, libres: libresCount, meses: mesesFinal };
   }
 }
 

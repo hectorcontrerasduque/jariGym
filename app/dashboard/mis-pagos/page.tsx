@@ -56,7 +56,7 @@ export default function MisPagosPage() {
       setProfile(profileData);
 
       const [pagosData, aniosData] = await Promise.all([
-        pagosService.listarMisPagos(user.id, anioSeleccionado),
+        pagosService.listarMisPagos(anioSeleccionado),
         pagosService.aniosConPagos(user.id),
       ]);
       setPagos(pagosData);

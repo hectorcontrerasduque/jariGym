@@ -1,0 +1,523 @@
+diff --git a/app/api/miembros/route.ts b/app/api/miembros/route.ts
+index 4910a90..2447b35 100644
+--- a/app/api/miembros/route.ts
++++ b/app/api/miembros/route.ts
+@@ -51,15 +51,18 @@ export async function POST(request: Request) {
+ 
+     if (authError) {
+       if (authError.message?.includes("already") || authError.message?.includes("exists")) {
+-        const { data: existingUsers } = await serviceSupabase.auth.admin.listUsers();
++        const { data: existingUsers } = await serviceSupabase.auth.admin.listUsers({
++          page: 1,
++          perPage: 1000,
++        });
+         const existing = existingUsers?.users?.find((u) => u.email === email);
+         if (existing) {
+           userId = existing.id;
+         } else {
+-          return NextResponse.json({ error: authError.message }, { status: 400 });
++          return NextResponse.json({ error: messages.toast.miembroError }, { status: 400 });
+         }
+       } else {
+-        return NextResponse.json({ error: authError.message }, { status: 400 });
++        return NextResponse.json({ error: messages.toast.miembroError }, { status: 400 });
+       }
+     }
+ 
+@@ -67,30 +70,18 @@ export async function POST(request: Request) {
+       return NextResponse.json({ error: messages.miembros.errorObtenerUsuario }, { status: 500 });
+     }
+ 
+-    const profileData: Record<string, unknown> = {
+-      id: userId,
+-      nombre_completo: nombre,
+-      role: "miembro",
+-      email: email,
+-    };
+-
+-    const { data, error: profileError } = await serviceSupabase
+-      .from("profiles")
+-      .upsert(profileData, { onConflict: "id" })
+-      .select()
+-      .single();
++    const { data, error: rpcError } = await serviceSupabase
++      .rpc("crear_miembro_completo", {
++        p_user_id: userId,
++        p_nombre: nombre,
++        p_email: email,
++        p_changed_by: user.id,
++      });
+ 
+-    if (profileError) {
+-      return NextResponse.json({ error: profileError.message }, { status: 400 });
++    if (rpcError) {
++      return NextResponse.json({ error: messages.toast.miembroError }, { status: 400 });
+     }
+ 
+-    await serviceSupabase.from("member_states").insert({
+-      usuario_id: userId,
+-      estado: "activo",
+-      changed_by: user.id,
+-      notas: "Miembro creado",
+-    });
+-
+     let welcomeEmailSent = false;
+     try {
+       const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+@@ -119,7 +110,7 @@ export async function POST(request: Request) {
+       loginEmail: email,
+       welcomeEmailSent,
+     });
+-  } catch (error: any) {
+-    return NextResponse.json({ error: error.message }, { status: 500 });
++  } catch {
++    return NextResponse.json({ error: messages.toast.errorGenerico }, { status: 500 });
+   }
+ }
+diff --git a/app/api/profile/route.ts b/app/api/profile/route.ts
+index d23a85d..ff90c1a 100644
+--- a/app/api/profile/route.ts
++++ b/app/api/profile/route.ts
+@@ -54,7 +54,7 @@ export async function PUT(request: Request) {
+       .single();
+ 
+     if (profileError) {
+-      return NextResponse.json({ error: profileError.message }, { status: 400 });
++      return NextResponse.json({ error: messages.toast.perfilError }, { status: 400 });
+     }
+ 
+     if (password && password.trim()) {
+@@ -79,14 +79,14 @@ export async function PUT(request: Request) {
+       );
+       if (pwError) {
+         return NextResponse.json({ 
+-          error: messages.toast.errorCambiarContrasena + ": " + pwError.message,
++          error: messages.toast.errorCambiarContrasena,
+           profile: data 
+         }, { status: 500 });
+       }
+     }
+ 
+     return NextResponse.json({ profile: data });
+-  } catch (error: any) {
+-    return NextResponse.json({ error: error.message }, { status: 500 });
++  } catch {
++    return NextResponse.json({ error: messages.toast.errorGenerico }, { status: 500 });
+   }
+ }
+diff --git a/app/dashboard/miembros/page.tsx b/app/dashboard/miembros/page.tsx
+index 3948346..734b5a4 100644
+--- a/app/dashboard/miembros/page.tsx
++++ b/app/dashboard/miembros/page.tsx
+@@ -184,6 +184,8 @@ export default function MiembrosPage() {
+ 
+   const handleToggleSuperAdmin = async (miembro: Profile) => {
+     const newRole = isSuperAdmin ? "miembro" : "super_admin";
++    const accion = isSuperAdmin ? "remover Super Admin de" : "asignar Super Admin a";
++    if (!confirm(`¿${accion.charAt(0).toUpperCase() + accion.slice(1)} ${miembro.nombre_completo}?`)) return;
+     try {
+       const supabase = createClient();
+       const { error } = await supabase
+diff --git a/app/dashboard/mis-pagos/page.tsx b/app/dashboard/mis-pagos/page.tsx
+index 84266ff..c99605c 100644
+--- a/app/dashboard/mis-pagos/page.tsx
++++ b/app/dashboard/mis-pagos/page.tsx
+@@ -56,7 +56,7 @@ export default function MisPagosPage() {
+       setProfile(profileData);
+ 
+       const [pagosData, aniosData] = await Promise.all([
+-        pagosService.listarMisPagos(user.id, anioSeleccionado),
++        pagosService.listarMisPagos(anioSeleccionado),
+         pagosService.aniosConPagos(user.id),
+       ]);
+       setPagos(pagosData);
+diff --git a/app/dashboard/perfil/page.tsx b/app/dashboard/perfil/page.tsx
+index 19a0507..112a4c4 100644
+--- a/app/dashboard/perfil/page.tsx
++++ b/app/dashboard/perfil/page.tsx
+@@ -109,6 +109,11 @@ function PerfilContent() {
+       showToast(messages.miembros.correoRequerido, "error");
+       return;
+     }
++    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
++    if (!emailRegex.test(formData.email)) {
++      showToast("Formato de correo inválido", "error");
++      return;
++    }
+     setSaving(true);
+     try {
+       const res = await fetch("/api/profile", {
+diff --git a/lib/services/config/config.service.ts b/lib/services/config/config.service.ts
+index 93f2de6..0857b16 100644
+--- a/lib/services/config/config.service.ts
++++ b/lib/services/config/config.service.ts
+@@ -22,6 +22,15 @@ export class ConfigService {
+     } = await this.supabase.auth.getUser();
+     if (!user) throw new Error(messages.toast.noAutenticado);
+ 
++    const { data: profile } = await this.supabase
++      .from("profiles")
++      .select("role")
++      .eq("id", user.id)
++      .single();
++    if (profile?.role !== "super_admin" && profile?.role !== "admin") {
++      throw new Error(messages.toast.noAutorizado);
++    }
++
+     const { data: existing } = await this.supabase
+       .from("gym_config")
+       .select("id")
+@@ -62,6 +71,20 @@ export class ConfigService {
+   }
+ 
+   async updateMetodoPago(id: string, updates: Partial<MetodoPagoConfig>): Promise<MetodoPagoConfig> {
++    const {
++      data: { user },
++    } = await this.supabase.auth.getUser();
++    if (!user) throw new Error(messages.toast.noAutenticado);
++
++    const { data: profile } = await this.supabase
++      .from("profiles")
++      .select("role")
++      .eq("id", user.id)
++      .single();
++    if (profile?.role !== "super_admin" && profile?.role !== "admin") {
++      throw new Error(messages.toast.noAutorizado);
++    }
++
+     const { data: current } = await this.supabase
+       .from("gym_config_metodos_pago")
+       .select("metodo_pago, monto_mensual, monto_inscripcion, habilitado")
+@@ -74,30 +97,16 @@ export class ConfigService {
+     const montoInscripcion = updates.monto_inscripcion ?? current.monto_inscripcion;
+     const habilitado = updates.habilitado !== undefined ? updates.habilitado : current.habilitado;
+ 
+-    if (montoMensual === current.monto_mensual && montoInscripcion === current.monto_inscripcion && habilitado === current.habilitado) {
+-      return { ...current, id, metodo_pago: current.metodo_pago, monto_mensual: montoMensual, monto_inscripcion: montoInscripcion, habilitado, created_at: "", updated_at: "" } as MetodoPagoConfig;
+-    }
+-
+-    await this.supabase
+-      .from("gym_config_metodos_pago")
+-      .update({ habilitado: false })
+-      .eq("id", id);
+-
+-    const nuevoRegistro = {
+-      metodo_pago: current.metodo_pago,
+-      monto_mensual: montoMensual,
+-      monto_inscripcion: montoInscripcion,
+-      habilitado,
+-    };
+-
+     const { data, error } = await this.supabase
+-      .from("gym_config_metodos_pago")
+-      .insert(nuevoRegistro)
+-      .select()
+-      .single();
++      .rpc("actualizar_metodo_pago_atomico", {
++        p_id: id,
++        p_monto_mensual: montoMensual,
++        p_monto_inscripcion: montoInscripcion,
++        p_habilitado: habilitado,
++      });
+ 
+     if (error) throw error;
+-    return data;
++    return data as MetodoPagoConfig;
+   }
+ 
+   async getMetodoPago(metodo: MetodoPago): Promise<MetodoPagoConfig | null> {
+diff --git a/lib/services/miembros/miembros.service.ts b/lib/services/miembros/miembros.service.ts
+index f4119af..ed76d95 100644
+--- a/lib/services/miembros/miembros.service.ts
++++ b/lib/services/miembros/miembros.service.ts
+@@ -1,4 +1,5 @@
+ import { createClient } from "@/lib/supabase/client";
++import { messages } from "@/lib/messages";
+ import type { Profile, Membresia } from "@/lib/types";
+ 
+ export class MiembrosService {
+@@ -38,9 +39,22 @@ export class MiembrosService {
+   }
+ 
+   async actualizarMiembro(id: string, updates: Partial<Profile>): Promise<Profile> {
++    const {
++      data: { user },
++    } = await this.supabase.auth.getUser();
++    if (!user) throw new Error(messages.toast.noAutenticado);
++
++    const allowedFields: Record<string, unknown> = {};
++    const allowedKeys = ["nombre_completo", "email", "whatsapp", "cedula", "horario_entreno", "activo", "notas_admin", "inscripcion_pagada", "inscripcion_fecha", "monto_inscripcion_pagado", "membresia_libre"];
++    for (const key of allowedKeys) {
++      if (key in updates) {
++        allowedFields[key] = (updates as Record<string, unknown>)[key];
++      }
++    }
++
+     const { data, error } = await this.supabase
+       .from("profiles")
+-      .update(updates)
++      .update(allowedFields)
+       .eq("id", id)
+       .select()
+       .single();
+@@ -90,47 +104,27 @@ export class MiembrosService {
+   }
+ 
+   async toggleMembresiaLibre(usuarioId: string, asignadoPor: string, asignadoPorNombre: string): Promise<void> {
+-    const { data: existing } = await this.supabase
+-      .from("membresias")
+-      .select("id, fecha_fin")
+-      .eq("usuario_id", usuarioId)
+-      .is("fecha_fin", null)
+-      .limit(1)
+-      .maybeSingle();
++    const { error } = await this.supabase
++      .rpc("toggle_membresia_libre", {
++        p_usuario_id: usuarioId,
++        p_asignado_por: asignadoPor,
++        p_asignado_por_nombre: asignadoPorNombre,
++      });
+ 
+-    if (existing) {
+-      await this.supabase
+-        .from("membresias")
+-        .update({ fecha_fin: new Date().toISOString() })
+-        .eq("id", existing.id);
+-    } else {
+-      await this.supabase
+-        .from("membresias")
+-        .insert({
+-          usuario_id: usuarioId,
+-          fecha_inicio: new Date().toISOString(),
+-          fecha_fin: null,
+-          estado: "activa",
+-          asignado_por: asignadoPor,
+-          asignado_por_nombre: asignadoPorNombre,
+-        });
+-    }
++    if (error) throw error;
+   }
+ 
+   async actualizarEstado(usuarioId: string, activo: boolean): Promise<void> {
+     const { data: { user } } = await this.supabase.auth.getUser();
+ 
+-    await this.supabase
+-      .from("profiles")
+-      .update({ activo })
+-      .eq("id", usuarioId);
+-
+-    await this.supabase.from("member_states").insert({
+-      usuario_id: usuarioId,
+-      estado: activo ? "activo" : "inactivo",
+-      changed_by: user?.id || null,
+-      notas: activo ? "Miembro activado" : "Miembro desactivado",
+-    });
++    const { error } = await this.supabase
++      .rpc("actualizar_estado_miembro", {
++        p_usuario_id: usuarioId,
++        p_activo: activo,
++        p_changed_by: user?.id || null,
++      });
++
++    if (error) throw error;
+   }
+ 
+   async obtenerEstadoActual(usuarioId: string): Promise<{ estado: string; changed_by: string | null; notas: string | null; fecha_evidencia: string } | null> {
+diff --git a/lib/services/pagos/pagos.service.ts b/lib/services/pagos/pagos.service.ts
+index 83e9d32..88b831b 100644
+--- a/lib/services/pagos/pagos.service.ts
++++ b/lib/services/pagos/pagos.service.ts
+@@ -59,35 +59,28 @@ export class PagosService {
+     } = await this.supabase.auth.getUser();
+     if (!user) throw new Error(messages.toast.noAutenticado);
+ 
+-    const { data: pagoData, error: pagoError } = await this.supabase
+-      .from("pagos")
+-      .update({
+-        estado: "aprobado",
+-        approved_by: user.id,
+-        approved_at: new Date().toISOString(),
+-        fecha_pago_real: new Date().toISOString(),
+-      })
+-      .eq("id", pagoId)
+-      .select()
+-      .single();
+-
+-    if (pagoError) throw pagoError;
+-
+-    const isInscripcion = pagoData.notas?.toLowerCase().includes("inscripción") || pagoData.notas?.toLowerCase().includes("inscripcion");
+-    if (isInscripcion) {
+-      await this.supabase
+-        .from("profiles")
+-        .update({
+-          inscripcion_pagada: true,
+-          inscripcion_fecha: new Date().toISOString(),
+-        })
+-        .eq("id", pagoData.usuario_id);
+-    }
++    const { data, error } = await this.supabase
++      .rpc("aprobar_pago_atomico", { p_pago_id: pagoId, p_user_id: user.id });
+ 
+-    return pagoData;
++    if (error) throw error;
++    return data as Pago;
+   }
+ 
+   async rechazarPago(pagoId: string, notas?: string): Promise<Pago> {
++    const {
++      data: { user },
++    } = await this.supabase.auth.getUser();
++    if (!user) throw new Error(messages.toast.noAutenticado);
++
++    const { data: profile } = await this.supabase
++      .from("profiles")
++      .select("role")
++      .eq("id", user.id)
++      .single();
++    if (profile?.role !== "super_admin" && profile?.role !== "admin") {
++      throw new Error(messages.toast.noAutorizado);
++    }
++
+     const { data, error } = await this.supabase
+       .from("pagos")
+       .update({
+@@ -108,6 +101,15 @@ export class PagosService {
+     } = await this.supabase.auth.getUser();
+     if (!user) throw new Error(messages.toast.noAutenticado);
+ 
++    const { data: profile } = await this.supabase
++      .from("profiles")
++      .select("role")
++      .eq("id", user.id)
++      .single();
++    if (profile?.role !== "super_admin" && profile?.role !== "admin") {
++      throw new Error(messages.toast.noAutorizado);
++    }
++
+     const { error } = await this.supabase
+       .from("pagos")
+       .delete()
+@@ -117,11 +119,16 @@ export class PagosService {
+     if (error) throw error;
+   }
+ 
+-  async listarMisPagos(usuarioId: string, anio?: number): Promise<Pago[]> {
++  async listarMisPagos(anio?: number): Promise<Pago[]> {
++    const {
++      data: { user },
++    } = await this.supabase.auth.getUser();
++    if (!user) throw new Error(messages.toast.noAutenticado);
++
+     let query = this.supabase
+       .from("pagos")
+       .select("*")
+-      .eq("usuario_id", usuarioId)
++      .eq("usuario_id", user.id)
+       .order("created_at", { ascending: false });
+ 
+     if (anio) {
+@@ -476,40 +483,48 @@ export class PagosService {
+         const totalMiembrosMes = miembrosMes.length;
+         const idsMes = new Set(miembrosMes.map((p) => p.id));
+ 
+-        const { data: pagosMes } = await this.supabase
+-          .from("pagos")
+-          .select("usuario_id, estado, monto")
+-          .eq("mes_pagar", m.mes)
+-          .eq("anio_pagar", m.anio);
+-
+-        const pagados = new Set(
+-          (pagosMes || []).filter((p) => p.estado === "aprobado" && idsMes.has(p.usuario_id)).map((p) => p.usuario_id)
+-        ).size;
+-
+-        const montoAcumulado = (pagosMes || [])
+-          .filter((p) => p.estado === "aprobado" && idsMes.has(p.usuario_id))
+-          .reduce((sum, p) => sum + (p.monto || 0), 0);
+-
+-        const libresMes = miembrosMes.filter((p) => libresIds.has(p.id)).length;
+-
+-        const sinPago = Math.max(0, totalMiembrosMes - pagados - libresMes);
+-        const montoAdeudado = sinPago * montoMensual;
+-
+-        return {
+-          mes: m.mes,
+-          anio: m.anio,
+-          nombre: m.nombre,
+-          pagados,
+-          pendientes: 0,
+-          sinPago,
+-          libres: libresMes,
+-          montoAcumulado,
+-          montoAdeudado,
+-        };
++        return { mes: m.mes, anio: m.anio, nombre: m.nombre, totalMiembrosMes, idsMes };
+       })
+     );
+ 
+-    return { totalMiembros: profiles.length, libres: libresCount, meses: statsMeses };
++    const { data: allPagos } = await this.supabase
++      .from("pagos")
++      .select("usuario_id, estado, monto, mes_pagar, anio_pagar")
++      .eq("anio_pagar", anioConsulta)
++      .in("estado", ["aprobado", "pendiente"]);
++
++    const pagosAll = allPagos || [];
++
++    const mesesFinal = statsMeses.map((m) => {
++      const pagosMes = pagosAll.filter((p) => p.mes_pagar === m.mes && p.anio_pagar === m.anio);
++
++      const pagados = new Set(
++        pagosMes.filter((p) => p.estado === "aprobado" && m.idsMes.has(p.usuario_id)).map((p) => p.usuario_id)
++      ).size;
++
++      const montoAcumulado = pagosMes
++        .filter((p) => p.estado === "aprobado" && m.idsMes.has(p.usuario_id))
++        .reduce((sum, p) => sum + (p.monto || 0), 0);
++
++      const libresMes = profiles.filter((p) => m.idsMes.has(p.id) && libresIds.has(p.id)).length;
++
++      const sinPago = Math.max(0, m.totalMiembrosMes - pagados - libresMes);
++      const montoAdeudado = sinPago * montoMensual;
++
++      return {
++        mes: m.mes,
++        anio: m.anio,
++        nombre: m.nombre,
++        pagados,
++        pendientes: 0,
++        sinPago,
++        libres: libresMes,
++        montoAcumulado,
++        montoAdeudado,
++      };
++    });
++
++    return { totalMiembros: profiles.length, libres: libresCount, meses: mesesFinal };
+   }
+ }
+ 
+diff --git a/lib/supabase/middleware.ts b/lib/supabase/middleware.ts
+index 2f63ea8..c496663 100644
+--- a/lib/supabase/middleware.ts
++++ b/lib/supabase/middleware.ts
+@@ -32,7 +32,8 @@ export async function updateSession(request: NextRequest) {
+   if (
+     !user &&
+     !request.nextUrl.pathname.startsWith("/login") &&
+-    !request.nextUrl.pathname.startsWith("/auth")
++    !request.nextUrl.pathname.startsWith("/auth") &&
++    !request.nextUrl.pathname.startsWith("/api")
+   ) {
+     const url = request.nextUrl.clone();
+     url.pathname = "/login";
+ M app/api/miembros/route.ts
+ M app/api/profile/route.ts
+ M app/dashboard/miembros/page.tsx
+ M app/dashboard/mis-pagos/page.tsx
+ M app/dashboard/perfil/page.tsx
+ M lib/services/config/config.service.ts
+ M lib/services/miembros/miembros.service.ts
+ M lib/services/pagos/pagos.service.ts
+ M lib/supabase/middleware.ts
+?? REVERT_SECURITY_CHANGES.patch
+?? supabase/migrations/019_create_rpc_functions.sql

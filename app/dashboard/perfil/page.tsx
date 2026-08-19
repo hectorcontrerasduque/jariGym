@@ -109,6 +109,11 @@ function PerfilContent() {
       showToast(messages.miembros.correoRequerido, "error");
       return;
     }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.email)) {
+      showToast("Formato de correo inválido", "error");
+      return;
+    }
     setSaving(true);
     try {
       const res = await fetch("/api/profile", {

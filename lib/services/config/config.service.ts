@@ -22,6 +22,15 @@ export class ConfigService {
     } = await this.supabase.auth.getUser();
     if (!user) throw new Error(messages.toast.noAutenticado);
 
+    const { data: profile } = await this.supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+    if (profile?.role !== "super_admin" && profile?.role !== "admin") {
+      throw new Error(messages.toast.noAutorizado);
+    }
+
     const { data: existing } = await this.supabase
       .from("gym_config")
       .select("id")
@@ -62,6 +71,20 @@ export class ConfigService {
   }
 
   async updateMetodoPago(id: string, updates: Partial<MetodoPagoConfig>): Promise<MetodoPagoConfig> {
+    const {
+      data: { user },
+    } = await this.supabase.auth.getUser();
+    if (!user) throw new Error(messages.toast.noAutenticado);
+
+    const { data: profile } = await this.supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+    if (profile?.role !== "super_admin" && profile?.role !== "admin") {
+      throw new Error(messages.toast.noAutorizado);
+    }
+
     const { data: current } = await this.supabase
       .from("gym_config_metodos_pago")
       .select("metodo_pago, monto_mensual, monto_inscripcion, habilitado")
@@ -74,30 +97,16 @@ export class ConfigService {
     const montoInscripcion = updates.monto_inscripcion ?? current.monto_inscripcion;
     const habilitado = updates.habilitado !== undefined ? updates.habilitado : current.habilitado;
 
-    if (montoMensual === current.monto_mensual && montoInscripcion === current.monto_inscripcion && habilitado === current.habilitado) {
-      return { ...current, id, metodo_pago: current.metodo_pago, monto_mensual: montoMensual, monto_inscripcion: montoInscripcion, habilitado, created_at: "", updated_at: "" } as MetodoPagoConfig;
-    }
-
-    await this.supabase
-      .from("gym_config_metodos_pago")
-      .update({ habilitado: false })
-      .eq("id", id);
-
-    const nuevoRegistro = {
-      metodo_pago: current.metodo_pago,
-      monto_mensual: montoMensual,
-      monto_inscripcion: montoInscripcion,
-      habilitado,
-    };
-
     const { data, error } = await this.supabase
-      .from("gym_config_metodos_pago")
-      .insert(nuevoRegistro)
-      .select()
-      .single();
+      .rpc("actualizar_metodo_pago_atomico", {
+        p_id: id,
+        p_monto_mensual: montoMensual,
+        p_monto_inscripcion: montoInscripcion,
+        p_habilitado: habilitado,
+      });
 
     if (error) throw error;
-    return data;
+    return data as MetodoPagoConfig;
   }
 
   async getMetodoPago(metodo: MetodoPago): Promise<MetodoPagoConfig | null> {

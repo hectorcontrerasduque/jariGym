@@ -51,15 +51,18 @@ export async function POST(request: Request) {
 
     if (authError) {
       if (authError.message?.includes("already") || authError.message?.includes("exists")) {
-        const { data: existingUsers } = await serviceSupabase.auth.admin.listUsers();
+        const { data: existingUsers } = await serviceSupabase.auth.admin.listUsers({
+          page: 1,
+          perPage: 1000,
+        });
         const existing = existingUsers?.users?.find((u) => u.email === email);
         if (existing) {
           userId = existing.id;
         } else {
-          return NextResponse.json({ error: authError.message }, { status: 400 });
+          return NextResponse.json({ error: messages.toast.miembroError }, { status: 400 });
         }
       } else {
-        return NextResponse.json({ error: authError.message }, { status: 400 });
+        return NextResponse.json({ error: messages.toast.miembroError }, { status: 400 });
       }
     }
 
@@ -67,29 +70,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: messages.miembros.errorObtenerUsuario }, { status: 500 });
     }
 
-    const profileData: Record<string, unknown> = {
-      id: userId,
-      nombre_completo: nombre,
-      role: "miembro",
-      email: email,
-    };
+    const { data, error: rpcError } = await serviceSupabase
+      .rpc("crear_miembro_completo", {
+        p_user_id: userId,
+        p_nombre: nombre,
+        p_email: email,
+        p_changed_by: user.id,
+      });
 
-    const { data, error: profileError } = await serviceSupabase
-      .from("profiles")
-      .upsert(profileData, { onConflict: "id" })
-      .select()
-      .single();
-
-    if (profileError) {
-      return NextResponse.json({ error: profileError.message }, { status: 400 });
+    if (rpcError) {
+      return NextResponse.json({ error: messages.toast.miembroError }, { status: 400 });
     }
-
-    await serviceSupabase.from("member_states").insert({
-      usuario_id: userId,
-      estado: "activo",
-      changed_by: user.id,
-      notas: "Miembro creado",
-    });
 
     let welcomeEmailSent = false;
     try {
@@ -119,7 +110,7 @@ export async function POST(request: Request) {
       loginEmail: email,
       welcomeEmailSent,
     });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch {
+    return NextResponse.json({ error: messages.toast.errorGenerico }, { status: 500 });
   }
 }

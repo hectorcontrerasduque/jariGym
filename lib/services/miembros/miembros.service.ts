@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/client";
+import { messages } from "@/lib/messages";
 import type { Profile, Membresia } from "@/lib/types";
 
 export class MiembrosService {
@@ -38,9 +39,22 @@ export class MiembrosService {
   }
 
   async actualizarMiembro(id: string, updates: Partial<Profile>): Promise<Profile> {
+    const {
+      data: { user },
+    } = await this.supabase.auth.getUser();
+    if (!user) throw new Error(messages.toast.noAutenticado);
+
+    const allowedFields: Record<string, unknown> = {};
+    const allowedKeys = ["nombre_completo", "email", "whatsapp", "cedula", "horario_entreno", "activo", "notas_admin", "inscripcion_pagada", "inscripcion_fecha", "monto_inscripcion_pagado", "membresia_libre"];
+    for (const key of allowedKeys) {
+      if (key in updates) {
+        allowedFields[key] = (updates as Record<string, unknown>)[key];
+      }
+    }
+
     const { data, error } = await this.supabase
       .from("profiles")
-      .update(updates)
+      .update(allowedFields)
       .eq("id", id)
       .select()
       .single();
@@ -90,47 +104,27 @@ export class MiembrosService {
   }
 
   async toggleMembresiaLibre(usuarioId: string, asignadoPor: string, asignadoPorNombre: string): Promise<void> {
-    const { data: existing } = await this.supabase
-      .from("membresias")
-      .select("id, fecha_fin")
-      .eq("usuario_id", usuarioId)
-      .is("fecha_fin", null)
-      .limit(1)
-      .maybeSingle();
+    const { error } = await this.supabase
+      .rpc("toggle_membresia_libre", {
+        p_usuario_id: usuarioId,
+        p_asignado_por: asignadoPor,
+        p_asignado_por_nombre: asignadoPorNombre,
+      });
 
-    if (existing) {
-      await this.supabase
-        .from("membresias")
-        .update({ fecha_fin: new Date().toISOString() })
-        .eq("id", existing.id);
-    } else {
-      await this.supabase
-        .from("membresias")
-        .insert({
-          usuario_id: usuarioId,
-          fecha_inicio: new Date().toISOString(),
-          fecha_fin: null,
-          estado: "activa",
-          asignado_por: asignadoPor,
-          asignado_por_nombre: asignadoPorNombre,
-        });
-    }
+    if (error) throw error;
   }
 
   async actualizarEstado(usuarioId: string, activo: boolean): Promise<void> {
     const { data: { user } } = await this.supabase.auth.getUser();
 
-    await this.supabase
-      .from("profiles")
-      .update({ activo })
-      .eq("id", usuarioId);
+    const { error } = await this.supabase
+      .rpc("actualizar_estado_miembro", {
+        p_usuario_id: usuarioId,
+        p_activo: activo,
+        p_changed_by: user?.id || null,
+      });
 
-    await this.supabase.from("member_states").insert({
-      usuario_id: usuarioId,
-      estado: activo ? "activo" : "inactivo",
-      changed_by: user?.id || null,
-      notas: activo ? "Miembro activado" : "Miembro desactivado",
-    });
+    if (error) throw error;
   }
 
   async obtenerEstadoActual(usuarioId: string): Promise<{ estado: string; changed_by: string | null; notas: string | null; fecha_evidencia: string } | null> {

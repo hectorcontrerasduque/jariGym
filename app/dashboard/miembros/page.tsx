@@ -184,6 +184,8 @@ export default function MiembrosPage() {
 
   const handleToggleSuperAdmin = async (miembro: Profile) => {
     const newRole = isSuperAdmin ? "miembro" : "super_admin";
+    const accion = isSuperAdmin ? "remover Super Admin de" : "asignar Super Admin a";
+    if (!confirm(`¿${accion.charAt(0).toUpperCase() + accion.slice(1)} ${miembro.nombre_completo}?`)) return;
     try {
       const supabase = createClient();
       const { error } = await supabase

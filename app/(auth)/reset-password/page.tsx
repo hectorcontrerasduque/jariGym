@@ -135,6 +135,11 @@ function ResetPasswordForm() {
           <CardContent className="text-center space-y-4">
             <p className="text-gym-muted">{messages.auth.resetPasswordSentInstructions}</p>
             <Link href="/login">
+              <Button className="w-full">
+                {messages.auth.loginButton}
+              </Button>
+            </Link>
+            <Link href="/">
               <Button variant="secondary" className="w-full border-gym-border hover:border-gym-primary/50">
                 {messages.auth.resetPasswordCloseButton}
               </Button>

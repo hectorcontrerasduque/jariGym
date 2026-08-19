@@ -12,6 +12,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Dumbbell, CheckCircle, Mail } from "lucide-react";
 import { configService } from "@/lib/services/config/config.service";
 import { messages } from "@/lib/messages";
+import { AuthFooter } from "@/components/auth-footer";
 
 export default function LoginPage() {
   return (
@@ -267,6 +268,7 @@ function LoginForm() {
           </Card>
         </div>
       )}
+      <AuthFooter />
     </div>
   );
 }

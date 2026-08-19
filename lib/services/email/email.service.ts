@@ -13,18 +13,20 @@ interface SendEmailParams {
   to: string;
   subject: string;
   html: string;
+  fromName?: string;
 }
 
-async function sendEmail({ to, subject, html }: SendEmailParams): Promise<void> {
+async function sendEmail({ to, subject, html, fromName }: SendEmailParams): Promise<void> {
   if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) {
     throw new Error("GMAIL_USER and GMAIL_APP_PASSWORD must be configured");
   }
 
   const result = await transporter.sendMail({
-    from: `"${process.env.GMAIL_USER}" <${process.env.GMAIL_USER}>`,
+    from: `"${fromName || "GymApp"} - No Reply" <${process.env.GMAIL_USER}>`,
     to,
     subject,
     html,
+    replyTo: "no-reply@noreply.com",
   });
 
   if (!result.messageId) {
@@ -42,5 +44,6 @@ export async function sendPasswordResetEmail(
     to,
     subject: `${gymName} - Restablecer Contraseña`,
     html: resetPasswordTemplate(resetLink, gymName, gymLogo),
+    fromName: gymName,
   });
 }

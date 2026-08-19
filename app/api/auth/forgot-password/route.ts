@@ -24,10 +24,14 @@ export async function POST(request: Request) {
 
     const supabase = getAdminClient();
 
-    await supabase
+    const { error: cleanupGlobalErr } = await supabase
       .from("password_reset_tokens")
       .delete()
       .lt("expires_at", new Date().toISOString());
+
+    if (cleanupGlobalErr) {
+      await supabase.from("password_reset_tokens").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+    }
 
     const { data: profile } = await supabase
       .from("profiles")
@@ -39,17 +43,25 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: messages.auth.resetPasswordSent });
     }
 
-    await supabase
+    const cutoff = new Date(Date.now() - RATE_LIMIT_WINDOW).toISOString();
+    const { error: cleanupUserErr } = await supabase
       .from("password_reset_tokens")
       .delete()
       .eq("user_id", profile.id)
-      .lt("created_at", new Date(Date.now() - RATE_LIMIT_WINDOW).toISOString());
+      .lt("created_at", cutoff);
+
+    if (cleanupUserErr) {
+      await supabase
+        .from("password_reset_tokens")
+        .delete()
+        .eq("user_id", profile.id);
+    }
 
     const { count } = await supabase
       .from("password_reset_tokens")
       .select("id", { count: "exact", head: true })
       .eq("user_id", profile.id)
-      .gte("created_at", new Date(Date.now() - RATE_LIMIT_WINDOW).toISOString());
+      .gte("created_at", cutoff);
 
     if (count && count >= MAX_REQUESTS_PER_WINDOW) {
       return NextResponse.json({ error: messages.auth.tooManyRequests }, { status: 429 });
@@ -71,7 +83,7 @@ export async function POST(request: Request) {
     }
 
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
-    const resetLink = `${siteUrl}/reset-password?token=${token}`;
+    const resetLink = `${siteUrl}/reset-password?token=${token}&email=${encodeURIComponent(email)}`;
 
     const { data: gymConfig } = await supabase
       .from("gym_config")

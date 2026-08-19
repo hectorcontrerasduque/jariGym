@@ -9,11 +9,13 @@ import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { Dumbbell, CheckCircle } from "lucide-react";
 import { configService } from "@/lib/services/config/config.service";
 import { messages } from "@/lib/messages";
+import { AuthFooter } from "@/components/auth-footer";
 import Link from "next/link";
 
 function ResetPasswordForm() {
   const searchParams = useSearchParams();
   const token = searchParams.get("token");
+  const resetEmail = searchParams.get("email") || "";
 
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -86,6 +88,7 @@ function ResetPasswordForm() {
         <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-gym-primary/5 via-transparent to-gym-secondary/5" />
         </div>
+        <AuthFooter />
       </>
     );
   }
@@ -117,6 +120,7 @@ function ResetPasswordForm() {
             </Link>
           </CardContent>
         </Card>
+        <AuthFooter />
       </div>
     );
   }
@@ -149,6 +153,7 @@ function ResetPasswordForm() {
             </Link>
           </CardContent>
         </Card>
+        <AuthFooter />
       </div>
     );
   }
@@ -170,6 +175,9 @@ function ResetPasswordForm() {
           </div>
           <CardTitle className="text-2xl font-display neon-text">{messages.auth.resetPasswordPageTitle}</CardTitle>
           <p className="text-gym-muted text-sm">{gymName}</p>
+          {resetEmail && (
+            <p className="text-gym-primary text-sm font-semibold bg-gym-primary/10 p-2 rounded-lg mt-2">{resetEmail}</p>
+          )}
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -213,6 +221,7 @@ function ResetPasswordForm() {
           </div>
         </CardContent>
       </Card>
+      <AuthFooter />
     </div>
   );
 }

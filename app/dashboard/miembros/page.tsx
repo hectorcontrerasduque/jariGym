@@ -187,15 +187,19 @@ export default function MiembrosPage() {
     const accion = isSuperAdmin ? "remover Super Admin de" : "asignar Super Admin a";
     if (!confirm(`¿${accion.charAt(0).toUpperCase() + accion.slice(1)} ${miembro.nombre_completo}?`)) return;
     try {
-      const supabase = createClient();
-      const { error } = await supabase
-        .from("profiles")
-        .update({
-          role: newRole,
-          notas_admin: newRole === "super_admin" ? notasAdmin || null : null,
-        })
-        .eq("id", miembro.id);
-      if (error) throw error;
+      const res = await fetch("/api/profile", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_id: miembro.id,
+          updates: {
+            role: newRole,
+            notas_admin: newRole === "super_admin" ? notasAdmin || null : null,
+          },
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Error al cambiar rol");
       setIsSuperAdmin(newRole === "super_admin");
       if (newRole === "miembro") setNotasAdmin("");
       showToast(newRole === "super_admin" ? "Ahora es Super Admin" : "Rol cambiado a Miembro", "success");
@@ -207,12 +211,18 @@ export default function MiembrosPage() {
 
   const handleSaveNotasAdmin = async (miembro: Profile) => {
     try {
-      const supabase = createClient();
-      const { error } = await supabase
-        .from("profiles")
-        .update({ notas_admin: notasAdmin || null })
-        .eq("id", miembro.id);
-      if (error) throw error;
+      const res = await fetch("/api/profile", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_id: miembro.id,
+          updates: {
+            notas_admin: notasAdmin || null,
+          },
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Error al guardar notas");
       showToast("Notas actualizadas", "success");
       await loadMiembros();
     } catch (error) {

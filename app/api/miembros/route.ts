@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { messages } from "@/lib/messages";
+import { randomBytes } from "crypto";
 
 export async function POST(request: Request) {
   try {
@@ -38,7 +39,7 @@ export async function POST(request: Request) {
     );
 
     const isGmail = email.toLowerCase().endsWith("@gmail.com");
-    const userPassword = password || Math.random().toString(36).slice(-12) + "A1!";
+    const userPassword = password || randomBytes(12).toString("base64url").slice(0, 16);
 
     const { data: authUser, error: authError } = await serviceSupabase.auth.admin.createUser({
       email: email,
@@ -51,13 +52,13 @@ export async function POST(request: Request) {
 
     if (authError) {
       if (authError.message?.includes("already") || authError.message?.includes("exists")) {
-        const { data: existingUsers } = await serviceSupabase.auth.admin.listUsers({
-          page: 1,
-          perPage: 1000,
-        });
-        const existing = existingUsers?.users?.find((u) => u.email === email);
-        if (existing) {
-          userId = existing.id;
+        const { data: existingProfile } = await serviceSupabase
+          .from("profiles")
+          .select("id")
+          .eq("email", email)
+          .maybeSingle();
+        if (existingProfile) {
+          userId = existingProfile.id;
         } else {
           return NextResponse.json({ error: messages.toast.miembroError }, { status: 400 });
         }

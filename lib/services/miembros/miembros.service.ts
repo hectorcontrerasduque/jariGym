@@ -104,6 +104,20 @@ export class MiembrosService {
   }
 
   async toggleMembresiaLibre(usuarioId: string, asignadoPor: string, asignadoPorNombre: string): Promise<void> {
+    const {
+      data: { user },
+    } = await this.supabase.auth.getUser();
+    if (!user) throw new Error(messages.toast.noAutenticado);
+
+    const { data: profile } = await this.supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+    if (profile?.role !== "super_admin" && profile?.role !== "admin") {
+      throw new Error(messages.toast.noAutorizado);
+    }
+
     const { error } = await this.supabase
       .rpc("toggle_membresia_libre", {
         p_usuario_id: usuarioId,
@@ -116,6 +130,16 @@ export class MiembrosService {
 
   async actualizarEstado(usuarioId: string, activo: boolean): Promise<void> {
     const { data: { user } } = await this.supabase.auth.getUser();
+    if (!user) throw new Error(messages.toast.noAutenticado);
+
+    const { data: profile } = await this.supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+    if (profile?.role !== "super_admin" && profile?.role !== "admin") {
+      throw new Error(messages.toast.noAutorizado);
+    }
 
     const { error } = await this.supabase
       .rpc("actualizar_estado_miembro", {

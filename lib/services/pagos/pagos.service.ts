@@ -59,6 +59,15 @@ export class PagosService {
     } = await this.supabase.auth.getUser();
     if (!user) throw new Error(messages.toast.noAutenticado);
 
+    const { data: profile } = await this.supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+    if (profile?.role !== "super_admin" && profile?.role !== "admin") {
+      throw new Error(messages.toast.noAutorizado);
+    }
+
     const { data, error } = await this.supabase
       .rpc("aprobar_pago_atomico", { p_pago_id: pagoId, p_user_id: user.id });
 

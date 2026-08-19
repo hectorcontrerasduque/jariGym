@@ -34,16 +34,22 @@ export async function PUT(request: Request) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
+    const { data: currentData } = await serviceSupabase
+      .from("profiles")
+      .select("nombre_completo, email, whatsapp, cedula, horario_entreno, notas_admin")
+      .eq("id", targetUserId)
+      .single();
+
     const profileUpdates: Record<string, unknown> = {
-      nombre_completo: updates.nombre_completo,
-      email: updates.email,
-      whatsapp: updates.whatsapp,
-      cedula: updates.cedula || null,
-      horario_entreno: updates.horario_entreno || null,
+      nombre_completo: updates.nombre_completo ?? currentData?.nombre_completo,
+      email: updates.email ?? currentData?.email,
+      whatsapp: updates.whatsapp ?? currentData?.whatsapp,
+      cedula: updates.cedula ?? currentData?.cedula,
+      horario_entreno: updates.horario_entreno ?? currentData?.horario_entreno,
     };
-    if (isAdmin) {
+    if (isAdmin && profileAdmin?.role === "super_admin") {
       profileUpdates.role = updates.role;
-      profileUpdates.notas_admin = updates.notas_admin || null;
+      profileUpdates.notas_admin = updates.notas_admin ?? currentData?.notas_admin;
     }
 
     const { data, error: profileError } = await serviceSupabase

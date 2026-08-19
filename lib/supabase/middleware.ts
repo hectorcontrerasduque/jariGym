@@ -40,7 +40,7 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  if (user && request.nextUrl.pathname === "/dashboard") {
+  if (user && request.nextUrl.pathname.startsWith("/dashboard")) {
     const { data: profile } = await supabase
       .from("profiles")
       .select("role")
@@ -48,7 +48,9 @@ export async function updateSession(request: NextRequest) {
       .single();
 
     const isAdmin = profile?.role === "super_admin" || profile?.role === "admin";
-    if (!isAdmin) {
+    const path = request.nextUrl.pathname;
+    const allowedForMiembro = ["/dashboard/mis-pagos", "/dashboard/reportar-pago", "/dashboard/perfil"];
+    if (!isAdmin && !allowedForMiembro.some((p) => path.startsWith(p))) {
       const url = request.nextUrl.clone();
       url.pathname = "/dashboard/mis-pagos";
       return NextResponse.redirect(url);

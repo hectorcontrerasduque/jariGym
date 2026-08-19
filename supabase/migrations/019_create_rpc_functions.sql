@@ -12,6 +12,10 @@ DECLARE
   v_notas TEXT;
   v_is_inscripcion BOOLEAN;
 BEGIN
+  IF get_user_role() NOT IN ('super_admin', 'admin') THEN
+    RAISE EXCEPTION 'No autorizado';
+  END IF;
+
   -- Update the payment status
   UPDATE pagos
   SET estado = 'aprobado',
@@ -54,6 +58,10 @@ AS $$
 DECLARE
   v_existing_id UUID;
 BEGIN
+  IF get_user_role() NOT IN ('super_admin', 'admin') THEN
+    RAISE EXCEPTION 'No autorizado';
+  END IF;
+
   -- Check for existing active membership
   SELECT id INTO v_existing_id
   FROM membresias
@@ -85,6 +93,10 @@ LANGUAGE plpgsql
 SECURITY DEFINER
 AS $$
 BEGIN
+  IF get_user_role() NOT IN ('super_admin', 'admin') THEN
+    RAISE EXCEPTION 'No autorizado';
+  END IF;
+
   -- Update profile status
   UPDATE profiles
   SET activo = p_activo
@@ -116,6 +128,10 @@ DECLARE
   v_current RECORD;
   v_new_record JSONB;
 BEGIN
+  IF get_user_role() NOT IN ('super_admin', 'admin') THEN
+    RAISE EXCEPTION 'No autorizado';
+  END IF;
+
   -- Get current record
   SELECT metodo_pago, monto_mensual, monto_inscripcion, habilitado
   INTO v_current
@@ -167,6 +183,10 @@ AS $$
 DECLARE
   v_profile JSONB;
 BEGIN
+  IF get_user_role() NOT IN ('super_admin', 'admin') THEN
+    RAISE EXCEPTION 'No autorizado';
+  END IF;
+
   -- Upsert profile
   INSERT INTO profiles (id, nombre_completo, role, email, inscripcion_pagada)
   VALUES (p_user_id, p_nombre, 'miembro', p_email, false)

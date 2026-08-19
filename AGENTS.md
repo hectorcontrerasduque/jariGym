@@ -5,6 +5,7 @@
 - **Next.js 14** (App Router) + TypeScript
 - **Supabase** (Auth, PostgreSQL, Storage, Edge Functions)
 - **Tailwind CSS** with custom `gym-*` color palette
+- **nodemailer** for transactional emails (Gmail SMTP)
 - Multi-tenant SaaS for gym management
 
 ## Commands
@@ -24,6 +25,7 @@ No CI pipelines.
 ```
 app/
   (auth)/login/     # Auth pages (route group, no /auth prefix)
+  (auth)/reset-password/  # Public password reset form
   auth/callback/    # OAuth callback route handler
   dashboard/        # All app pages under /dashboard/*
     configuracion/   # Gym config, logos, payment methods
@@ -34,6 +36,9 @@ app/
     perfil/          # Profile edit (supports ?user_id for super_admin)
   api/miembros/      # POST endpoint for creating members
   api/profile/       # PUT endpoint for profile updates (uses service role key)
+  api/auth/
+    forgot-password/ # POST: generates token + sends email via Gmail SMTP
+    reset-password/  # POST: validates token + sets new password
 lib/
   supabase/
     client.ts       # Browser client (createBrowserClient)
@@ -72,6 +77,8 @@ All in `.env.local`:
 - `SUPABASE_SERVICE_ROLE_KEY` — admin key (server-side only, never expose to client)
 - `NEXT_PUBLIC_SITE_URL` — callback redirect origin
 - `NEXT_PUBLIC_ADMIN_EMAIL` — initial admin email
+- `GMAIL_USER` — Gmail address for sending password reset emails
+- `GMAIL_APP_PASSWORD` — Gmail App Password (16 chars, NOT your real password)
 
 ## Database
 
@@ -79,7 +86,7 @@ Schema managed via numbered SQL files in `supabase/migrations/`. Run manually:
 1. Go to Supabase Dashboard → SQL Editor
 2. Paste migration content → Run
 
-Tables: `tenants`, `profiles`, `planes`, `membresias`, `pagos`, `gym_config`, `notificaciones_config`, `notificaciones_log`
+Tables: `tenants`, `profiles`, `planes`, `membresias`, `pagos`, `gym_config`, `notificaciones_config`, `notificaciones_log`, `password_reset_tokens`
 
 RLS uses helper functions (`get_user_role()`, `get_user_tenant_id()`) with `SECURITY DEFINER` to avoid infinite recursion. **Never create RLS policies that query the same table directly.**
 
@@ -89,6 +96,7 @@ RLS uses helper functions (`get_user_role()`, `get_user_tenant_id()`) with `SECU
 - Google OAuth: Supabase → Google → `/auth/callback?code=...` → `exchangeCodeForSession` → redirect to `/dashboard`
 - Email/password via `signInWithEmail`
 - Trigger `handle_new_user` auto-creates `profiles` row on signup
+- Password reset: custom flow via `/api/auth/forgot-password` → token in `password_reset_tokens` → email via Gmail SMTP → `/reset-password?token=xxx` → validates token + sets new password
 
 ## Style Conventions
 
@@ -146,7 +154,7 @@ inscripcion_fecha: string | null
 ## Known Issues / TODO
 
 - [ ] No CI/CD pipelines
-- [ ] No rate limiting on API routes
+- [ ] No rate limiting on API routes (except forgot-password: 3/hour)
 - [ ] Storage bucket `comprobantes` is private — need signed URLs for viewing
 - [ ] `gym_config_metodos_pago` monto_mensual fallback hardcoded to 5 when config missing
 - [ ] No confirmation modal for payment deletion (uses `confirm()`)

@@ -85,7 +85,7 @@ function ResetPasswordForm() {
     return (
       <>
         <LoadingOverlay show={true} message={messages.common.cargar} />
-        <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
+        <div className="min-h-screen flex items-center justify-center p-4 pb-16 relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-gym-primary/5 via-transparent to-gym-secondary/5" />
         </div>
         <AuthFooter />
@@ -95,7 +95,7 @@ function ResetPasswordForm() {
 
   if (!tokenValid) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
+      <div className="min-h-screen flex items-center justify-center p-4 pb-16 relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-gym-primary/5 via-transparent to-gym-secondary/5" />
         <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-gym-primary/10 rounded-full blur-3xl animate-pulse" />
         <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-gym-secondary/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: "1s" }} />
@@ -127,7 +127,7 @@ function ResetPasswordForm() {
 
   if (success) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
+      <div className="min-h-screen flex items-center justify-center p-4 pb-16 relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-gym-primary/5 via-transparent to-gym-secondary/5" />
         <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-gym-primary/10 rounded-full blur-3xl animate-pulse" />
         <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-gym-secondary/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: "1s" }} />
@@ -159,7 +159,7 @@ function ResetPasswordForm() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
+    <div className="min-h-screen flex items-center justify-center p-4 pb-16 relative overflow-hidden">
       <div className="absolute inset-0 bg-gradient-to-br from-gym-primary/5 via-transparent to-gym-secondary/5" />
       <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-gym-primary/10 rounded-full blur-3xl animate-pulse" />
       <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-gym-secondary/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: "1s" }} />

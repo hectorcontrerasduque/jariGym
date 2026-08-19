@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
+import { messages } from "@/lib/messages";
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
@@ -9,7 +10,6 @@ export async function GET(request: Request) {
   const errorDescription = searchParams.get("error_description");
 
   if (error) {
-    console.error("OAuth error:", error, errorDescription);
     return NextResponse.redirect(`${origin}/login?error=${encodeURIComponent(errorDescription || error)}`);
   }
 
@@ -56,7 +56,7 @@ export async function GET(request: Request) {
 
       if (!isAdmin && !isGymOwner && !isActiveMember) {
         await supabase.auth.signOut();
-        const msg = encodeURIComponent("Este usuario no está registrado o no está activo");
+        const msg = encodeURIComponent(messages.auth.userNotRegistered);
         return NextResponse.redirect(`${origin}/login?error=${msg}`);
       }
 
@@ -65,7 +65,6 @@ export async function GET(request: Request) {
       return NextResponse.redirect(`${origin}${redirectPath}`);
     }
 
-    console.error("Code exchange error:", exchangeError?.message);
   }
 
   return NextResponse.redirect(`${origin}/login?error=auth_failed`);

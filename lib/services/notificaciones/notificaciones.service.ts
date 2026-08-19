@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/client";
+import { messages } from "@/lib/messages";
 import type { NotificacionesConfig } from "@/lib/types";
 
 export class NotificacionesService {
@@ -25,7 +26,7 @@ export class NotificacionesService {
     const {
       data: { user },
     } = await this.supabase.auth.getUser();
-    if (!user) throw new Error("No autenticado");
+    if (!user) throw new Error(messages.toast.noAutenticado);
 
     const { data: existing } = await this.supabase
       .from("notificaciones_config")

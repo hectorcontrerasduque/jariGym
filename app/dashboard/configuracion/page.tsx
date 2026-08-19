@@ -29,6 +29,7 @@ export default function ConfiguracionPage() {
   const [localCountry, setLocalCountry] = useState("");
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const logoInputRef = useRef<HTMLInputElement>(null);
+  const originalMetodosRef = useRef<MetodoPagoConfig[]>([]);
 
   useEffect(() => {
     loadData();
@@ -58,6 +59,7 @@ export default function ConfiguracionPage() {
       ]);
       if (configData) setConfig(configData);
       setMetodos(metodosData);
+      originalMetodosRef.current = JSON.parse(JSON.stringify(metodosData));
     } catch (error) {
       showToast(messages.toast.errorCargaDatos, "error");
     } finally {
@@ -69,6 +71,20 @@ export default function ConfiguracionPage() {
     setSaving(true);
     try {
       await configService.updateConfig(config);
+
+      const original = originalMetodosRef.current;
+      for (const metodo of metodos) {
+        const orig = original.find((o) => o.id === metodo.id);
+        if (orig && (orig.monto_mensual !== metodo.monto_mensual || orig.monto_inscripcion !== metodo.monto_inscripcion || orig.habilitado !== metodo.habilitado)) {
+          await configService.updateMetodoPago(metodo.id, {
+            monto_mensual: metodo.monto_mensual,
+            monto_inscripcion: metodo.monto_inscripcion,
+            habilitado: metodo.habilitado,
+          });
+        }
+      }
+      originalMetodosRef.current = JSON.parse(JSON.stringify(metodos));
+
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
     } catch (error) {
@@ -78,26 +94,13 @@ export default function ConfiguracionPage() {
     }
   };
 
-  const handleToggleMetodo = async (metodo: MetodoPagoConfig) => {
+  const handleToggleMetodo = (metodo: MetodoPagoConfig) => {
     if (metodoLabels[metodo.metodo_pago]?.alwaysOn) return;
-    try {
-      const updated = await configService.updateMetodoPago(metodo.id, {
-        habilitado: !metodo.habilitado,
-      });
-      setMetodos((prev) => prev.map((m) => m.metodo_pago === updated.metodo_pago ? updated : m.id === updated.id ? m : m));
-      showToast(messages.toast.metodoPagoActualizado, "success");
-    } catch (error) {
-      showToast(messages.toast.metodoPagoError, "error");
-    }
+    setMetodos((prev) => prev.map((m) => m.id === metodo.id ? { ...m, habilitado: !m.habilitado } : m));
   };
 
-  const handleUpdateMonto = async (metodo: MetodoPagoConfig, field: "monto_mensual" | "monto_inscripcion", value: number) => {
-    try {
-      const updated = await configService.updateMetodoPago(metodo.id, { [field]: value });
-      setMetodos((prev) => prev.map((m) => m.metodo_pago === updated.metodo_pago ? updated : m.id === updated.id ? m : m));
-    } catch (error) {
-      showToast(messages.toast.metodoPagoError, "error");
-    }
+  const handleUpdateMonto = (metodo: MetodoPagoConfig, field: "monto_mensual" | "monto_inscripcion", value: number) => {
+    setMetodos((prev) => prev.map((m) => m.id === metodo.id ? { ...m, [field]: value } : m));
   };
 
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {

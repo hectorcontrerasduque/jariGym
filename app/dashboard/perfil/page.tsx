@@ -5,11 +5,13 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { createClient } from "@/lib/supabase/client";
 import { formatDate, formatCurrency } from "@/lib/utils";
 import { showToast } from "@/components/ui/toast";
+import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { messages } from "@/lib/messages";
 import {
   ArrowLeft,
@@ -41,8 +43,6 @@ function PerfilContent() {
   const targetUserId = searchParams.get("user_id");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [success, setSuccess] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [currentUserRole, setCurrentUserRole] = useState<string>("");
   const [formData, setFormData] = useState({
@@ -53,11 +53,12 @@ function PerfilContent() {
     horario_entreno: "",
     role: "" as Profile["role"],
     notas_admin: "",
+    password: "",
   });
 
   useEffect(() => {
     loadProfile();
-  }, []);
+  }, [targetUserId]);
 
   const loadProfile = async () => {
     try {
@@ -93,6 +94,7 @@ function PerfilContent() {
           horario_entreno: data.horario_entreno || "",
           role: data.role,
           notas_admin: data.notas_admin || "",
+          password: "",
         });
       }
     } catch (err) {
@@ -103,42 +105,38 @@ function PerfilContent() {
   };
 
   const handleSave = async () => {
-    setError(null);
     if (!formData.email.trim()) {
-      setError("El email es obligatorio");
-      return;
-    }
-    if (!formData.whatsapp.trim()) {
-      setError("El WhatsApp es obligatorio");
+      showToast(messages.miembros.correoRequerido, "error");
       return;
     }
     setSaving(true);
     try {
-      const supabase = createClient();
-      const isSuperAdmin = currentUserRole === "super_admin";
-      const updates: Record<string, unknown> = {
-        nombre_completo: formData.nombre_completo || profile!.nombre_completo || "Sin nombre",
-        email: formData.email,
-        whatsapp: formData.whatsapp,
-        cedula: formData.cedula || null,
-        horario_entreno: formData.horario_entreno || null,
-      };
-      if (isSuperAdmin) {
-        updates.role = formData.role;
-        updates.notas_admin = formData.notas_admin || null;
-      }
-      const { data, error } = await supabase
-        .from("profiles")
-        .update(updates)
-        .eq("id", profile!.id)
-        .select()
-        .single();
-      if (error) throw error;
-      setProfile(data);
-      setSuccess(true);
-      setTimeout(() => setSuccess(false), 3000);
+      const res = await fetch("/api/profile", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_id: targetUserId || undefined,
+          updates: {
+            nombre_completo: formData.nombre_completo || profile!.nombre_completo || "Sin nombre",
+            email: formData.email,
+            whatsapp: formData.whatsapp,
+            cedula: formData.cedula || null,
+            horario_entreno: formData.horario_entreno || null,
+            role: currentUserRole === "super_admin" ? formData.role : undefined,
+            notas_admin: currentUserRole === "super_admin" ? formData.notas_admin || null : undefined,
+          },
+          password: formData.password || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Error al guardar");
+      setProfile(data.profile);
+      setFormData((prev) => ({ ...prev, password: "" }));
+      showToast(messages.toast.perfilGuardado, "success");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al guardar");
+      const raw = err instanceof Error ? err.message : "";
+      const msg = raw.includes("contraseña") ? "Error al cambiar contraseña: " + raw.split(": ").pop() : messages.toast.perfilError;
+      showToast(msg, "error");
     } finally {
       setSaving(false);
     }
@@ -158,9 +156,10 @@ function PerfilContent() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-6 animate-fadeIn relative">
+      <LoadingOverlay show={saving} message={messages.common.guardando} />
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 relative z-10">
         <div className="flex items-center gap-3">
-          <Link href="/dashboard/mis-pagos" className="p-2 hover:bg-gym-bg/50 rounded-xl transition-colors">
+          <Link href={targetUserId ? "/dashboard/miembros" : "/dashboard/mis-pagos"} className="p-2 hover:bg-gym-bg/50 rounded-xl transition-colors">
             <ArrowLeft className="w-5 h-5 text-gym-muted" />
           </Link>
           <div>
@@ -216,13 +215,20 @@ function PerfilContent() {
               required
             />
           </div>
+          {targetUserId && (
+            <PasswordInput
+              label="Contraseña (opcional)"
+              placeholder="Dejar vacío para no cambiar"
+              value={formData.password}
+              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+            />
+          )}
           <div>
-            <label className="text-xs text-gym-muted mb-1 block">WhatsApp <span className="text-gym-danger">*</span></label>
+            <label className="text-xs text-gym-muted mb-1 block">WhatsApp</label>
             <Input
               value={formData.whatsapp}
               onChange={(e) => setFormData({ ...formData, whatsapp: e.target.value })}
               placeholder="+58 412 1234567"
-              required
             />
           </div>
           <div>
@@ -274,16 +280,6 @@ function PerfilContent() {
           </div>
         </CardContent>
       </Card>
-
-      {/* Messages */}
-      {error && (
-        <p className="text-sm text-gym-danger text-center bg-gym-danger/10 p-2 rounded-xl">{error}</p>
-      )}
-      {success && (
-        <p className="text-sm text-gym-success text-center bg-gym-success/10 p-2 rounded-xl">
-          Perfil actualizado correctamente
-        </p>
-      )}
 
       {/* Mobile floating save button */}
       <button

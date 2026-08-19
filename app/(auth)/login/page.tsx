@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { authService } from "@/lib/services/auth/auth.service";
 import { createClient } from "@/lib/supabase/client";
 import { Dumbbell, CheckCircle, Mail } from "lucide-react";
@@ -74,6 +75,16 @@ function LoginForm() {
     }
   };
 
+  const mapAuthError = (msg: string): string => {
+    const m = msg.toLowerCase();
+    if (m.includes("invalid login credentials") || m.includes("invalid") && m.includes("credentials")) return messages.auth.invalidCredentials;
+    if (m.includes("email not confirmed")) return messages.auth.emailNotConfirmed;
+    if (m.includes("user not found")) return messages.auth.userNotFound;
+    if (m.includes("too many requests")) return messages.auth.tooManyRequests;
+    if (m.includes("password")) return messages.auth.emailLoginError;
+    return messages.auth.emailLoginError;
+  };
+
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -96,7 +107,7 @@ function LoginForm() {
         router.push(isAdmin ? "/dashboard" : "/dashboard/mis-pagos");
       }
     } catch (err: any) {
-      setError(err.message || messages.auth.emailLoginError);
+      setError(mapAuthError(err.message || ""));
       setLoading(false);
     }
   };
@@ -155,7 +166,7 @@ function LoginForm() {
 
           <form onSubmit={handleEmailLogin} className="space-y-3">
             <Input type="email" placeholder="tu@email.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
-            <Input type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required />
+            <PasswordInput placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required />
             <div className="flex justify-end">
               <button
                 type="button"

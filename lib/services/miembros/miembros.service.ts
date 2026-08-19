@@ -118,12 +118,32 @@ export class MiembrosService {
   }
 
   async actualizarEstado(usuarioId: string, activo: boolean): Promise<void> {
-    const { error } = await this.supabase
+    const { data: { user } } = await this.supabase.auth.getUser();
+
+    await this.supabase
       .from("profiles")
       .update({ activo })
       .eq("id", usuarioId);
 
-    if (error) throw error;
+    await this.supabase.from("member_states").insert({
+      usuario_id: usuarioId,
+      estado: activo ? "activo" : "inactivo",
+      changed_by: user?.id || null,
+      notas: activo ? "Miembro activado" : "Miembro desactivado",
+    });
+  }
+
+  async obtenerEstadoActual(usuarioId: string): Promise<{ estado: string; changed_by: string | null; notas: string | null; fecha_evidencia: string } | null> {
+    const { data, error } = await this.supabase
+      .from("member_states")
+      .select("estado, changed_by, notas, fecha_evidencia")
+      .eq("usuario_id", usuarioId)
+      .order("fecha_evidencia", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error || !data) return null;
+    return data;
   }
 }
 

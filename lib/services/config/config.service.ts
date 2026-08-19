@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/client";
+import { messages } from "@/lib/messages";
 import type { GymConfig, MetodoPago, MetodoPagoConfig } from "@/lib/types";
 
 export class ConfigService {
@@ -19,7 +20,7 @@ export class ConfigService {
     const {
       data: { user },
     } = await this.supabase.auth.getUser();
-    if (!user) throw new Error("No autenticado");
+    if (!user) throw new Error(messages.toast.noAutenticado);
 
     const { data: existing } = await this.supabase
       .from("gym_config")
@@ -63,11 +64,19 @@ export class ConfigService {
   async updateMetodoPago(id: string, updates: Partial<MetodoPagoConfig>): Promise<MetodoPagoConfig> {
     const { data: current } = await this.supabase
       .from("gym_config_metodos_pago")
-      .select("metodo_pago, monto_mensual, monto_inscripcion")
+      .select("metodo_pago, monto_mensual, monto_inscripcion, habilitado")
       .eq("id", id)
       .single();
 
     if (!current) throw new Error("Método de pago no encontrado");
+
+    const montoMensual = updates.monto_mensual ?? current.monto_mensual;
+    const montoInscripcion = updates.monto_inscripcion ?? current.monto_inscripcion;
+    const habilitado = updates.habilitado !== undefined ? updates.habilitado : current.habilitado;
+
+    if (montoMensual === current.monto_mensual && montoInscripcion === current.monto_inscripcion && habilitado === current.habilitado) {
+      return { ...current, id, metodo_pago: current.metodo_pago, monto_mensual: montoMensual, monto_inscripcion: montoInscripcion, habilitado, created_at: "", updated_at: "" } as MetodoPagoConfig;
+    }
 
     await this.supabase
       .from("gym_config_metodos_pago")
@@ -76,9 +85,9 @@ export class ConfigService {
 
     const nuevoRegistro = {
       metodo_pago: current.metodo_pago,
-      monto_mensual: updates.monto_mensual ?? current.monto_mensual,
-      monto_inscripcion: updates.monto_inscripcion ?? current.monto_inscripcion,
-      habilitado: updates.habilitado !== undefined ? updates.habilitado : true,
+      monto_mensual: montoMensual,
+      monto_inscripcion: montoInscripcion,
+      habilitado,
     };
 
     const { data, error } = await this.supabase

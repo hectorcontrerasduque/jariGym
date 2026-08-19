@@ -13,9 +13,11 @@
 npm run dev        # dev server on localhost:3000
 npm run build      # production build
 npm run lint       # ESLint
+npm run test       # Vitest (single run)
+npm run test:watch # Vitest (watch mode)
 ```
 
-No test suite or typecheck command configured. No CI pipelines.
+No CI pipelines.
 
 ## Architecture
 
@@ -31,6 +33,7 @@ app/
     mis-pagos/       # Miembro's own payment history
     perfil/          # Profile edit (supports ?user_id for super_admin)
   api/miembros/      # POST endpoint for creating members
+  api/profile/       # PUT endpoint for profile updates (uses service role key)
 lib/
   supabase/
     client.ts       # Browser client (createBrowserClient)
@@ -44,6 +47,7 @@ components/
   ui/               # Reusable primitives (button, card, input, avatar, badge, modal)
   ui/toast.tsx      # showToast(message, type) + ToastContainer
   ui/loading-overlay.tsx  # LoadingOverlay component
+  ui/password-input.tsx   # PasswordInput with eye toggle
   sidebar.tsx       # Desktop sidebar + mobile bottom nav
   providers.tsx     # Client wrapper with ToastContainer
 supabase/
@@ -127,13 +131,20 @@ inscripcion_fecha: string | null
 
 ### Member Creation
 - POST `/api/miembros`: email required (no username), handles existing auth users, generates random password if empty
+- Non-Gmail emails require password (validated client-side)
 
 ### Profile Page
 - Accepts `?user_id=<uuid>` query param for super_admin to edit other users' profiles
+- Password change syncs email to auth.users if profiles.email differs
+- LoadingOverlay shows while saving
+
+### Messages (i18n)
+- All user-facing messages go through `lib/messages.ts`
+- No hardcoded strings or `console.log`/`console.error` in app or lib code
+- Server API routes import `messages` for error responses
 
 ## Known Issues / TODO
 
-- [ ] No test suite configured
 - [ ] No CI/CD pipelines
 - [ ] No rate limiting on API routes
 - [ ] Storage bucket `comprobantes` is private — need signed URLs for viewing

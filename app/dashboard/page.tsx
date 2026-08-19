@@ -31,6 +31,7 @@ interface MonthlyStat {
   sinPago: number;
   libres: number;
   montoAcumulado: number;
+  montoAdeudado: number;
 }
 
 export default function DashboardPage() {
@@ -131,7 +132,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Deudores - sin pago en mes actual */}
+        {/* Deudores - inscripciones y mensualidades pendientes */}
         <Card className="neon-card hover:border-gym-danger/50 transition-all hover:shadow-[0_0_20px_rgba(251,113,133,0.15)]">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
@@ -140,11 +141,17 @@ export default function DashboardPage() {
               </div>
               <div>
                 <p className="text-xs text-gym-muted">Deudores</p>
-                <p className="text-xl font-bold text-gym-danger neon-text-danger">{stats?.deudoresMensualidad || 0}</p>
+                <p className="text-xl font-bold text-gym-danger neon-text-danger">{stats?.deudoresTotal || 0}</p>
               </div>
             </div>
-            <div className="mt-3 text-xs text-gym-muted">
-              {formatCurrency(stats?.montoDeuda || 0)} en deuda
+            <div className="mt-3 space-y-1 text-xs">
+              {stats?.deudoresInscripcion > 0 && (
+                <p className="text-gym-warning">{stats.deudoresInscripcion} inscripciones sin pagar</p>
+              )}
+              {stats?.deudoresMensualidad > 0 && (
+                <p className="text-gym-danger">{stats.deudoresMensualidad} mensualidades sin pagar</p>
+              )}
+              <p className="text-gym-muted font-medium">{formatCurrency(stats?.montoDeuda || 0)} en deuda</p>
             </div>
           </CardContent>
         </Card>
@@ -242,7 +249,7 @@ export default function DashboardPage() {
                     <div className="flex items-center justify-between text-xs">
                       <span className="text-gym-success font-medium">{formatCurrency(m.montoAcumulado)} cobrado</span>
                       {m.sinPago > 0 && (
-                        <span className="text-gym-danger">{m.sinPago} sin pagar</span>
+                        <span className="text-gym-danger">{m.sinPago} sin pagar · {formatCurrency(m.montoAdeudado)} adeudado</span>
                       )}
                     </div>
                   </div>

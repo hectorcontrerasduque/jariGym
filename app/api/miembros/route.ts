@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
+import { messages } from "@/lib/messages";
 
 export async function POST(request: Request) {
   try {
@@ -8,7 +9,7 @@ export async function POST(request: Request) {
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
-      return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+      return NextResponse.json({ error: messages.toast.noAutenticado }, { status: 401 });
     }
 
     const { data: profileAdmin } = await supabase
@@ -18,17 +19,17 @@ export async function POST(request: Request) {
       .single();
 
     if (profileAdmin?.role !== "super_admin" && profileAdmin?.role !== "admin") {
-      return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+      return NextResponse.json({ error: messages.toast.noAutorizado }, { status: 403 });
     }
 
     const { email, nombre, password } = await request.json();
 
     if (!nombre) {
-      return NextResponse.json({ error: "Nombre requerido" }, { status: 400 });
+      return NextResponse.json({ error: messages.miembros.nombreRequerido }, { status: 400 });
     }
 
     if (!email) {
-      return NextResponse.json({ error: "Correo requerido" }, { status: 400 });
+      return NextResponse.json({ error: messages.miembros.correoRequerido }, { status: 400 });
     }
 
     const serviceSupabase = createServiceClient(
@@ -63,7 +64,7 @@ export async function POST(request: Request) {
     }
 
     if (!userId) {
-      return NextResponse.json({ error: "No se pudo obtener el ID del usuario" }, { status: 500 });
+      return NextResponse.json({ error: messages.miembros.errorObtenerUsuario }, { status: 500 });
     }
 
     const profileData: Record<string, unknown> = {
@@ -82,6 +83,13 @@ export async function POST(request: Request) {
     if (profileError) {
       return NextResponse.json({ error: profileError.message }, { status: 400 });
     }
+
+    await serviceSupabase.from("member_states").insert({
+      usuario_id: userId,
+      estado: "activo",
+      changed_by: user.id,
+      notas: "Miembro creado",
+    });
 
     let welcomeEmailSent = false;
     try {

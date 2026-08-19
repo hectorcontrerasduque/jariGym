@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Modal } from "@/components/ui/modal";
 import { Avatar } from "@/components/ui/avatar";
 import { miembrosService } from "@/lib/services/miembros/miembros.service";
@@ -31,6 +32,7 @@ export default function MiembrosPage() {
   const [nuevoNombre, setNuevoNombre] = useState("");
   const [nuevoPassword, setNuevoPassword] = useState("");
   const [emailError, setEmailError] = useState("");
+  const [passwordError, setPasswordError] = useState("");
   const [pagoInscripcion, setPagoInscripcion] = useState<Pago | null>(null);
   const [isMembresiaLibre, setIsMembresiaLibre] = useState(false);
   const [currentUser, setCurrentUser] = useState<Profile | null>(null);
@@ -72,6 +74,7 @@ export default function MiembrosPage() {
 
   const handleEmailChange = (value: string) => {
     setNuevoEmail(value);
+    setPasswordError("");
     if (value && !validateEmail(value)) {
       setEmailError("Formato de correo inválido");
     } else {
@@ -79,10 +82,21 @@ export default function MiembrosPage() {
     }
   };
 
+  const handlePasswordChange = (value: string) => {
+    setNuevoPassword(value);
+    if (value) setPasswordError("");
+  };
+
+  const isGmail = (email: string) => email.toLowerCase().endsWith("@gmail.com");
+
   const handleCrearMiembro = async () => {
     if (!nuevoNombre) return;
     if (nuevoEmail && !validateEmail(nuevoEmail)) return;
     if (!nuevoEmail) return;
+    if (!isGmail(nuevoEmail) && !nuevoPassword.trim()) {
+      setPasswordError(messages.miembros.contrasenaRequeridaNoGmail);
+      return;
+    }
     setSaving(true);
     try {
       const res = await fetch("/api/miembros", {
@@ -101,6 +115,7 @@ export default function MiembrosPage() {
       setNuevoNombre("");
       setNuevoPassword("");
       setEmailError("");
+      setPasswordError("");
       await loadMiembros();
     } catch (error) {
       showToast(messages.toast.miembroError, "error");
@@ -539,7 +554,7 @@ export default function MiembrosPage() {
       </Modal>
 
       {/* Modal Nuevo Miembro */}
-      <Modal isOpen={modalNuevo} onClose={() => setModalNuevo(false)} title="Nuevo Miembro">
+      <Modal isOpen={modalNuevo} onClose={() => { setModalNuevo(false); setNuevoEmail(""); setNuevoNombre(""); setNuevoPassword(""); setEmailError(""); setPasswordError(""); }} title="Nuevo Miembro">
         <div className="space-y-4">
           <p className="text-sm text-gym-muted">Agrega un miembro por su correo. Estará activo para poder presentar pagos.</p>
           <Input
@@ -559,20 +574,21 @@ export default function MiembrosPage() {
             />
             {emailError && <p className="text-xs text-gym-danger mt-1">{emailError}</p>}
           </div>
-          <Input
-            label="Contraseña (opcional, se genera si se deja vacía)"
-            type="password"
+          <PasswordInput
+            label={nuevoEmail && !isGmail(nuevoEmail) ? "Contraseña *" : "Contraseña (opcional, se genera si se deja vacía)"}
             placeholder="••••••••"
             value={nuevoPassword}
-            onChange={(e) => setNuevoPassword(e.target.value)}
+            onChange={(e) => handlePasswordChange(e.target.value)}
+            required={!!nuevoEmail && !isGmail(nuevoEmail)}
           />
+          {passwordError && <p className="text-xs text-gym-danger mt-1">{passwordError}</p>}
           <p className="text-xs text-gym-muted">
             El correo será el usuario de inicio de sesión. Si es Gmail, podrá iniciar con Google.
           </p>
           <Button
             className="w-full"
             onClick={handleCrearMiembro}
-            disabled={!nuevoNombre || !nuevoEmail}
+            disabled={!nuevoNombre || !nuevoEmail || (!!nuevoEmail && !isGmail(nuevoEmail) && !nuevoPassword.trim())}
           >
             <Plus className="w-4 h-4 mr-2" /> Agregar Miembro
           </Button>

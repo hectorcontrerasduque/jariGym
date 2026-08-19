@@ -17,6 +17,10 @@ export const messages = {
     userNotRegistered: "Este usuario no está registrado o no está activo",
     googleLoginError: "Error al iniciar sesión con Google",
     emailLoginError: "Error al iniciar sesión",
+    invalidCredentials: "Correo o contraseña incorrectos",
+    emailNotConfirmed: "El correo no ha sido confirmado",
+    userNotFound: "Usuario no encontrado",
+    tooManyRequests: "Demasiados intentos. Intenta de nuevo en unos minutos",
     or: "o",
   },
   dashboard: {
@@ -114,6 +118,10 @@ export const messages = {
     confirmDesactivar: "¿Desactivar a",
     confirmAsignarLibre: "¿Asignar membresía libre a",
     confirmRemoverLibre: "¿Remover membresía libre de",
+    nombreRequerido: "Nombre requerido",
+    correoRequerido: "Correo requerido",
+    contrasenaRequeridaNoGmail: "La contraseña es requerida para correos que no son de Gmail",
+    errorObtenerUsuario: "No se pudo obtener el ID del usuario",
   },
   configuracion: {
     title: "Configuración",
@@ -230,6 +238,13 @@ export const messages = {
     errorGenerico: "Ocurrió un error inesperado",
     datosCargados: "Datos cargados",
     errorCargaDatos: "Error al cargar datos",
+    nombreRequerido: "Nombre requerido",
+    correoRequerido: "Correo requerido",
+    errorCambiarContrasena: "Error al cambiar contraseña",
+    cuentaAuthNoExiste: "Este miembro no tiene cuenta de autenticación. Crea el miembro desde la sección de Miembros.",
+    errorAuthCallback: "Error en callback de autenticación",
+    errorIntercambioCodigo: "Error al intercambiar código",
+    perfilSaving: "Guardando perfil...",
   },
 } as const;
 

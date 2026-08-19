@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
+import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { authService } from "@/lib/services/auth/auth.service";
 import { createClient } from "@/lib/supabase/client";
 import { Dumbbell, CheckCircle, Mail } from "lucide-react";
@@ -187,6 +188,7 @@ function LoginForm() {
       {/* Forgot Password Modal - personalized with gym branding */}
       {showResetForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <LoadingOverlay show={resetLoading} message={messages.common.procesando} />
           <Card className="w-full max-w-md border-gym-primary/20">
             <CardHeader className="text-center">
               <div className="mx-auto w-12 h-12 bg-gym-primary/20 rounded-xl flex items-center justify-center mb-3 overflow-hidden">
@@ -222,7 +224,7 @@ function LoginForm() {
                   </div>
                   <div className="p-3 bg-gym-bg rounded-xl">
                     <p className="text-xs text-gym-muted">
-                      Si no recibes el correo, revisa tu carpeta de spam o contacta al administrador de <strong className="text-gym-text">{gymName}</strong>.
+                      {messages.auth.resetPasswordSpamWarning} <strong className="text-gym-text">{gymName}</strong>.
                     </p>
                   </div>
                   <Button

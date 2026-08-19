@@ -4,7 +4,7 @@ import { messages } from "@/lib/messages";
 import crypto from "crypto";
 import { createClient } from "@supabase/supabase-js";
 
-const RATE_LIMIT_WINDOW = 60 * 60 * 1000;
+const RATE_LIMIT_WINDOW = 20 * 60 * 1000;
 const MAX_REQUESTS_PER_WINDOW = 5;
 
 function getAdminClient() {
@@ -24,6 +24,11 @@ export async function POST(request: Request) {
 
     const supabase = getAdminClient();
 
+    await supabase
+      .from("password_reset_tokens")
+      .delete()
+      .or("used_at.not.is.null,expires_at.lt." + new Date().toISOString());
+
     const { data: profile } = await supabase
       .from("profiles")
       .select("id")
@@ -33,12 +38,6 @@ export async function POST(request: Request) {
     if (!profile) {
       return NextResponse.json({ message: messages.auth.resetPasswordSent });
     }
-
-    await supabase
-      .from("password_reset_tokens")
-      .delete()
-      .eq("user_id", profile.id)
-      .or("used_at.not.is.null,expires_at.lt." + new Date().toISOString());
 
     const { count } = await supabase
       .from("password_reset_tokens")
@@ -80,8 +79,7 @@ export async function POST(request: Request) {
     await sendPasswordResetEmail(email, resetLink, gymName, gymLogo);
 
     return NextResponse.json({ message: messages.auth.resetPasswordSent });
-  } catch (err) {
-    console.error("Forgot password error:", err);
+  } catch {
     return NextResponse.json(
       { error: messages.auth.resetPasswordError },
       { status: 500 }

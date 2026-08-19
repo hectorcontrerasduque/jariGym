@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PasswordInput } from "@/components/ui/password-input";
+import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { Dumbbell, CheckCircle } from "lucide-react";
 import { configService } from "@/lib/services/config/config.service";
 import { messages } from "@/lib/messages";
@@ -80,10 +81,12 @@ function ResetPasswordForm() {
 
   if (validating) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-gym-primary/5 via-transparent to-gym-secondary/5" />
-        <p className="text-gym-muted relative z-10">{messages.common.cargar}</p>
-      </div>
+      <>
+        <LoadingOverlay show={true} message={messages.common.cargar} />
+        <div className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-br from-gym-primary/5 via-transparent to-gym-secondary/5" />
+        </div>
+      </>
     );
   }
 
@@ -136,7 +139,7 @@ function ResetPasswordForm() {
             <p className="text-sm text-gym-muted">{messages.auth.resetPasswordSentInstructions}</p>
             <div className="p-3 bg-gym-bg rounded-xl">
               <p className="text-xs text-gym-muted">
-                Si no recibes el correo, revisa tu carpeta de spam o contacta al administrador de <strong className="text-gym-text">{gymName}</strong>.
+                {messages.auth.resetPasswordSpamWarning} <strong className="text-gym-text">{gymName}</strong>.
               </p>
             </div>
             <Link href="/login">

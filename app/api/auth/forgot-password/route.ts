@@ -27,7 +27,7 @@ export async function POST(request: Request) {
     await supabase
       .from("password_reset_tokens")
       .delete()
-      .or("used_at.not.is.null,expires_at.lt." + new Date().toISOString());
+      .lt("expires_at", new Date().toISOString());
 
     const { data: profile } = await supabase
       .from("profiles")
@@ -38,6 +38,12 @@ export async function POST(request: Request) {
     if (!profile) {
       return NextResponse.json({ message: messages.auth.resetPasswordSent });
     }
+
+    await supabase
+      .from("password_reset_tokens")
+      .delete()
+      .eq("user_id", profile.id)
+      .lt("created_at", new Date(Date.now() - RATE_LIMIT_WINDOW).toISOString());
 
     const { count } = await supabase
       .from("password_reset_tokens")

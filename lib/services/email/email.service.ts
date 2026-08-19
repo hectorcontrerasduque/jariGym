@@ -31,11 +31,12 @@ async function sendEmail({ to, subject, html }: SendEmailParams): Promise<void> 
 export async function sendPasswordResetEmail(
   to: string,
   resetLink: string,
-  gymName: string
+  gymName: string,
+  gymLogo?: string | null
 ): Promise<void> {
   await sendEmail({
     to,
     subject: `${gymName} - Restablecer Contraseña`,
-    html: resetPasswordTemplate(resetLink, gymName),
+    html: resetPasswordTemplate(resetLink, gymName, gymLogo),
   });
 }

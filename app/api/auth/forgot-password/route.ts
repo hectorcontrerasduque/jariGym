@@ -64,13 +64,14 @@ export async function POST(request: Request) {
 
     const { data: gymConfig } = await supabase
       .from("gym_config")
-      .select("nombre_gym")
+      .select("nombre_gym, logo_url")
       .limit(1)
       .single();
 
     const gymName = gymConfig?.nombre_gym || "GymApp";
+    const gymLogo = gymConfig?.logo_url || null;
 
-    await sendPasswordResetEmail(email, resetLink, gymName);
+    await sendPasswordResetEmail(email, resetLink, gymName, gymLogo);
 
     return NextResponse.json({ message: messages.auth.resetPasswordSent });
   } catch {

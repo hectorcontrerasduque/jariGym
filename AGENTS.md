@@ -4,7 +4,7 @@
 
 - **Next.js 14** (App Router) + TypeScript
 - **Supabase** (Auth, PostgreSQL, Storage, Edge Functions)
-- **Tailwind CSS** with custom `gym-*` color palette
+- **Tailwind CSS** with custom `gym-*` color palette + gold neon effects for super admin
 - **nodemailer** for transactional emails (Gmail SMTP)
 - Multi-tenant SaaS for gym management
 
@@ -18,7 +18,7 @@ npm run test       # Vitest (single run)
 npm run test:watch # Vitest (watch mode)
 ```
 
-No CI pipelines.
+No CI pipelines. No Node.js in WSL — run npm from Windows PowerShell.
 
 ## Architecture
 
@@ -26,12 +26,12 @@ No CI pipelines.
 app/
   (auth)/login/     # Auth pages (route group, no /auth prefix)
   (auth)/reset-password/  # Public password reset form
-  auth/callback/    # OAuth callback route handler
+  auth/callback/    # OAuth callback route handler + gym owner → super_admin promotion
   dashboard/        # All app pages under /dashboard/*
-    configuracion/   # Gym config, logos, payment methods
-    miembros/        # Member management (CRUD, toggle status, notas_admin)
+    configuracion/   # Gym config, logos, payment methods, dueno email
+    miembros/        # Member management (CRUD, toggle status, notas_admin, stats with max_miembros)
     pagos/           # Payment list (super_admin), inline filter by member
-    reportar-pago/   # Create payments (admin for others, miembro for self)
+    reportar-pago/   # Create payments (admin for others, miembro for self, super_admin can approve)
     mis-pagos/       # Miembro's own payment history
     perfil/          # Profile edit (supports ?user_id for super_admin)
   api/miembros/      # POST endpoint for creating members
@@ -44,7 +44,14 @@ lib/
     client.ts       # Browser client (createBrowserClient)
     server.ts       # Server client (async cookies())
     middleware.ts   # Auth guard middleware
-  services/         # Service layer per domain (auth, pagos, miembros, config, notificaciones)
+  services/
+    auth/           # signIn, resetPassword, getProfile
+    config/         # Config CRUD + dueno email promotion on change
+    email/          # nodemailer Gmail SMTP service
+    email/templates/ # HTML email templates (reset password)
+    miembros/       # Miembros CRUD + stats
+    pagos/          # Pagos CRUD + approval
+    notificaciones/ # Notification service
   types.ts          # All TypeScript interfaces
   utils.ts          # cn(), formatCurrency(), formatDate(), getMonthName()
   messages.ts       # Centralized i18n messages for all modules
@@ -53,7 +60,9 @@ components/
   ui/toast.tsx      # showToast(message, type) + ToastContainer
   ui/loading-overlay.tsx  # LoadingOverlay component
   ui/password-input.tsx   # PasswordInput with eye toggle
-  sidebar.tsx       # Desktop sidebar + mobile bottom nav
+  sidebar.tsx       # Desktop sidebar + mobile bottom nav (gold effects for super_admin)
+  auth-footer.tsx   # Fixed footer for auth pages
+  scroll-to-top.tsx # Scroll to top on route change
   providers.tsx     # Client wrapper with ToastContainer
 supabase/
   migrations/       # SQL migrations (run manually in Supabase SQL Editor)
@@ -97,14 +106,30 @@ RLS uses helper functions (`get_user_role()`, `get_user_tenant_id()`) with `SECU
 - Email/password via `signInWithEmail`
 - Trigger `handle_new_user` auto-creates `profiles` row on signup
 - Password reset: custom flow via `/api/auth/forgot-password` → token in `password_reset_tokens` → email via Gmail SMTP → `/reset-password?token=xxx` → validates token + sets new password
+- **Gym owner detection**: If logged-in user's email matches `gym_config.dueno_email`, their `profiles.role` is auto-promoted to `super_admin` (any email domain, not just Gmail)
+- **Email change**: When owner email is updated in Config, the new email's profile is auto-promoted to `super_admin`
 
-## Style Conventions
+## Super Admin (Dueño) — Gold Identity
 
-- Use `gym-*` custom Tailwind colors (not raw hex values)
-- Use `cn()` from `@/lib/utils` for conditional classes (wraps `clsx` + `tailwind-merge`)
-- All pages are responsive: mobile gets bottom nav (via `sidebar.tsx`), desktop gets sidebar
-- Component pattern: `"use client"` directive at top of client components
-- Service classes instantiated as singletons (`export const pagosService = new PagosService()`)
+The gym owner (`super_admin` role) has distinct gold neon visual effects:
+- **CSS**: `neon-gold` (gold text-shadow), `neon-admin-ring` (animated gold gradient ring around avatar), `admin-welcome-banner` (animated gold gradient background)
+- **Sidebar**: Avatar with gold glow ring, gym logo with gold background `bg-gradient-to-br from-yellow-500/30 to-amber-600/30`, name in gold text
+- **Dashboard**: Welcome banner "Bienvenido, Dueño" with crown emoji, floating gold particles
+- **Access**: Can report payments, approve them, manage all members and config
+
+Detection in code:
+```tsx
+const isSuperAdmin = profile?.role === "super_admin";
+// Sidebar, dashboard, etc. use this to apply gold effects
+```
+
+## Mobile Bottom Nav
+
+- 4 items for admin: Dashboard, Pagos, Miembros, Config
+- 2 items for miembro: Mis Pagos, Perfil
+- Each item uses `flex-1` for equal width distribution
+- `ScrollToTop` component resets scroll position on route change
+- `pb-24` in layout ensures content doesn't hide behind fixed nav
 
 ## Key Patterns
 
@@ -134,8 +159,16 @@ inscripcion_fecha: string | null
 - **Al día**: Active members with approved payment for current month
 - **Pagos recientes**: Approved payments only, with fallback when profile join fails
 
+### Miembros Stats
+- Total card shows `active/max` format (e.g. `11/80`) using `gym_config.max_miembros`
+
 ### Payment Approval
 - `aprobarPago()` now auto-updates `profiles.inscripcion_pagada = true` when approving inscription payments
+- Super admin can approve payments (not just regular admin)
+
+### Config Service
+- `updateConfig()` strips read-only fields (`id`, `created_at`, `updated_at`) before Supabase update
+- When `dueno_email` changes, auto-promotes new email's profile to `super_admin`
 
 ### Member Creation
 - POST `/api/miembros`: email required (no username), handles existing auth users, generates random password if empty
@@ -150,6 +183,11 @@ inscripcion_fecha: string | null
 - All user-facing messages go through `lib/messages.ts`
 - No hardcoded strings or `console.log`/`console.error` in app or lib code
 - Server API routes import `messages` for error responses
+
+### Logo Management
+- Upload: stores in Supabase Storage `logos` bucket, updates `gym_config.logo_url`
+- Delete: icon-only trash button (no text), removes from storage, sets `logo_url: ""`
+- Default fallback: `Dumbbell` icon when no logo
 
 ## Known Issues / TODO
 

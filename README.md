@@ -7,7 +7,7 @@ Multi-tenant SaaS para gestión de gimnasio con Next.js 14, Supabase y Tailwind 
 - Node.js 18+
 - npm
 - Cuenta de Supabase
-- Cuenta de Gmail (para envío de emails)
+- Cuenta de Gmail (para envío de emails de reset)
 
 ## Setup
 
@@ -50,6 +50,7 @@ En Supabase Dashboard → SQL Editor, ejecuta las migraciones en orden:
 1. `supabase/migrations/001_initial_schema.sql`
 2. ... (todas las migraciones numeradas)
 3. `supabase/migrations/023_password_reset_tokens.sql`
+4. `supabase/migrations/024_gym_config_public_read.sql`
 
 ### 5. Variables en Vercel
 
@@ -77,19 +78,48 @@ npm run test       # Ejecutar tests
 
 ```
 app/
-  (auth)/login/          # Login
-  (auth)/reset-password/ # Reset de contraseña
-  dashboard/             # Panel principal
-  api/auth/              # Endpoints de autenticación
-  api/miembros/          # CRUD de miembros
-  api/profile/           # Actualización de perfil
+  (auth)/login/              # Login con logo/gym name
+  (auth)/reset-password/     # Reset de contraseña (público)
+  auth/callback/             # OAuth callback + gym owner detection
+  dashboard/
+    configuracion/           # Gym config, logos, métodos de pago, dueno
+    miembros/                # CRUD miembros, stats con max_miembros
+    pagos/                   # Lista de pagos (super_admin)
+    reportar-pago/           # Crear pagos (admin/miembro)
+    mis-pagos/               # Historial del miembro
+    perfil/                  # Edición de perfil (?user_id para super_admin)
+  api/miembros/              # POST crear miembros
+  api/profile/               # PUT actualizar perfil
+  api/auth/
+    forgot-password/         # POST: genera token + envía email
+    reset-password/          # POST: valida token + cambia contraseña
 lib/
-  services/              # Lógica de negocio
-  supabase/              # Clientes Supabase
-  messages.ts            # Mensajes i18n
-components/ui/           # Componentes reutilizables
-supabase/migrations/     # Migraciones SQL
+  services/
+    email/                   # Servicio nodemailer (Gmail SMTP)
+    email/templates/         # Templates HTML de emails
+    auth/                    # signIn, resetPassword, etc.
+    config/                  # Config CRUD + dueno email promotion
+    pagos/                   # Pagos CRUD + aprobación
+    miembros/                # Miembros CRUD + stats
+  supabase/                  # Clientes Supabase (browser/server/middleware)
+  messages.ts                # i18n centralizado
+components/
+  ui/                        # Button, Card, Input, Avatar, Badge, Modal, Toast
+  sidebar.tsx                # Desktop sidebar + mobile bottom nav
+  auth-footer.tsx            # Footer para páginas de auth
+  scroll-to-top.tsx          # Scroll al top al cambiar de ruta
+  providers.tsx              # Client wrapper
+supabase/migrations/         # SQL migraciones (ejecutar manualmente)
 ```
+
+## Super Admin (Dueño del Gym)
+
+El dueño del gym se identifica automáticamente por email:
+- El email configurado en `gym_config.dueno_email` obtiene rol `super_admin`
+- Funciona con **cualquier dominio** de correo (no solo Gmail)
+- Al cambiar el email en Config, el nuevo correo se promueve a super_admin automáticamente
+- Identidad visual **gold/neon**: anillo dorado en avatar, banner de bienvenida con corona, nombre con efecto neon dorado
+- Acceso total: puede reportar pagos, aprobarlos, gestionar miembros y configuración
 
 ## Despliegue
 

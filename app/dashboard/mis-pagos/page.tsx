@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { pagosService } from "@/lib/services/pagos/pagos.service";
 import { createClient } from "@/lib/supabase/client";
 import { formatCurrency, getMonthName } from "@/lib/utils";
-import { CreditCard, CheckCircle, Clock, Gift, Calendar, Bell, Trash2, FileText, ArrowRight } from "lucide-react";
+import { CreditCard, CheckCircle, Clock, Gift, Calendar, Bell, Trash2, FileText, ArrowRight, Plus } from "lucide-react";
 import { showToast } from "@/components/ui/toast";
 import { messages } from "@/lib/messages";
 import Link from "next/link";
@@ -115,9 +115,9 @@ export default function MisPagosPage() {
           <p className="text-gym-muted text-sm">Historial de tus pagos</p>
         </div>
         <div className="flex items-center gap-2">
-          <Link href="/dashboard/reportar-pago">
+          <Link href="/dashboard/reportar-pago" className="hidden sm:flex">
             <Button>
-              <Bell className="w-4 h-4 mr-2" />
+              <Plus className="w-4 h-4 mr-2" />
               Reportar Pago
             </Button>
           </Link>
@@ -132,6 +132,14 @@ export default function MisPagosPage() {
           </select>
         </div>
       </div>
+
+      {/* Mobile floating button */}
+      <Link
+        href="/dashboard/reportar-pago"
+        className="sm:hidden fixed bottom-20 right-4 z-40 w-14 h-14 rounded-full bg-gym-primary text-gym-bg shadow-lg shadow-gym-primary/30 flex items-center justify-center active:scale-95 transition-all"
+      >
+        <Plus className="w-6 h-6" />
+      </Link>
 
       {/* Estado de inscripción y membresía */}
       <div className="grid grid-cols-2 gap-3">

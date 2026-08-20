@@ -36,7 +36,7 @@ export async function POST(request: Request) {
 
     if (!configCheck) {
       return NextResponse.json(
-        { error: "Falta configuración del gym. Vaya a Configuración y guarde los datos antes de migrar." },
+        { error: messages.migracion.configFaltante },
         { status: 400 }
       );
     }
@@ -102,11 +102,11 @@ export async function POST(request: Request) {
         if (authError.message?.includes("already") || authError.message?.includes("exists")) {
           return NextResponse.json({ error: messages.migracion.emailExistsError }, { status: 400 });
         }
-        return NextResponse.json({ error: messages.migracion.error }, { status: 500 });
+        return NextResponse.json({ error: `${messages.migracion.crearUsuarioError}: ${authError.message}` }, { status: 500 });
       }
 
       if (!authUser?.user?.id) {
-        return NextResponse.json({ error: messages.migracion.error }, { status: 500 });
+        return NextResponse.json({ error: messages.migracion.usuarioNoCreado }, { status: 500 });
       }
 
       userId = authUser.user.id;
@@ -127,7 +127,7 @@ export async function POST(request: Request) {
 
       if (profileError) {
         await supabase.auth.admin.deleteUser(userId);
-        return NextResponse.json({ error: messages.migracion.error }, { status: 500 });
+        return NextResponse.json({ error: `${messages.migracion.crearPerfilError}: ${profileError.message}` }, { status: 500 });
       }
 
       isNewUser = true;
@@ -254,7 +254,8 @@ export async function POST(request: Request) {
       pagosCreados,
       pagosActualizados,
     });
-  } catch {
-    return NextResponse.json({ error: messages.toast.errorGenerico }, { status: 500 });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return NextResponse.json({ error: `${messages.migracion.errorServidor}: ${msg}` }, { status: 500 });
   }
 }

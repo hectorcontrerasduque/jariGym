@@ -33,9 +33,23 @@ export class ConfigService {
 
     const { data: existing } = await this.supabase
       .from("gym_config")
-      .select("id")
+      .select("id, dueno_email")
       .limit(1)
       .single();
+
+    if (existing && updates.dueno_email && updates.dueno_email !== existing.dueno_email) {
+      const { data: newOwnerProfile } = await this.supabase
+        .from("profiles")
+        .select("id, role")
+        .eq("email", updates.dueno_email)
+        .single();
+      if (newOwnerProfile && newOwnerProfile.role !== "super_admin") {
+        await this.supabase
+          .from("profiles")
+          .update({ role: "super_admin" })
+          .eq("id", newOwnerProfile.id);
+      }
+    }
 
     const { id, created_at, updated_at, ...safeUpdates } = updates as GymConfig;
 

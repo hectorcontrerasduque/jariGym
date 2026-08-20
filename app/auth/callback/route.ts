@@ -51,14 +51,14 @@ export async function GET(request: Request) {
         .limit(1)
         .single();
 
-      const isGymOwner = gymConfig?.dueno_email && user.email === gymConfig.dueno_email && user.email?.endsWith("@gmail.com");
+      const isGymOwner = gymConfig?.dueno_email && user.email === gymConfig.dueno_email;
 
       if (isGymOwner && profile?.role !== "super_admin") {
         await supabase
           .from("profiles")
           .update({ role: "super_admin" })
           .eq("id", user.id);
-        profile.role = "super_admin";
+        if (profile) profile.role = "super_admin";
       }
 
       const isAdmin = isAdminByEmail || profile?.role === "super_admin" || profile?.role === "admin";

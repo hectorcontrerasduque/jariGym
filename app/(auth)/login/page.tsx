@@ -50,7 +50,7 @@ function LoginForm() {
   const isAuthorizedUser = async (userEmail: string, userId: string): Promise<boolean> => {
     const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL;
     if (adminEmail && userEmail === adminEmail) return true;
-    if (gymOwnerEmail && userEmail === gymOwnerEmail && userEmail.endsWith("@gmail.com")) {
+    if (gymOwnerEmail && userEmail === gymOwnerEmail) {
       const supabase = createClient();
       const { data: profile } = await supabase
         .from("profiles")
@@ -119,7 +119,7 @@ function LoginForm() {
         }
         const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL;
         const isAdmin = (adminEmail && result.user?.email === adminEmail) ||
-          (result.user?.email === gymOwnerEmail && result.user?.email?.endsWith("@gmail.com"));
+          (result.user?.email === gymOwnerEmail);
         router.push(isAdmin ? "/dashboard" : "/dashboard/mis-pagos");
       }
     } catch (err: any) {

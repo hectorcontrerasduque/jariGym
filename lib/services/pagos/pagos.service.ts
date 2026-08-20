@@ -290,7 +290,7 @@ export class PagosService {
     const mesesPendientes: { mes: number; anio: number }[] = [];
 
     for (let anio = anioActual; anio >= anioMinInscripcion; anio--) {
-      const mesMax = anio === anioActual ? mesActual : 12;
+      const mesMax = 12;
       const mesMin = anio === anioMinInscripcion ? mesMinInscripcion : 1;
 
       for (let mes = mesMax; mes >= mesMin; mes--) {

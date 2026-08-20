@@ -228,38 +228,33 @@ export default function MisPagosPage() {
         comprobanteUrl = urlData.publicUrl;
       }
 
+      const useAutoApprove = isSelf && isAdmin;
+
       if (formData.pagar_inscripcion && !inscripcionPagada && getMontoByMetodo(formData.metodo_pago, "inscripcion") > 0) {
-        if (isSelf) {
-          await pagosService.crearPagoAprobado({
-            usuario_id: targetId, monto: getMontoByMetodo(formData.metodo_pago, "inscripcion"),
-            mes_pagar: new Date().getMonth() + 1, anio_pagar: new Date().getFullYear(),
-            metodo_pago: formData.metodo_pago, tipo_pago: "inscripcion",
-            comprobante_url: comprobanteUrl || undefined, notas: "Inscripción", fecha_pago_real: formData.fecha_pago,
-          });
+        const pagoData = {
+          usuario_id: targetId, monto: getMontoByMetodo(formData.metodo_pago, "inscripcion"),
+          mes_pagar: new Date().getMonth() + 1, anio_pagar: new Date().getFullYear(),
+          metodo_pago: formData.metodo_pago, tipo_pago: "inscripcion",
+          comprobante_url: comprobanteUrl || undefined, notas: "Inscripción", fecha_pago_real: formData.fecha_pago,
+        };
+        if (useAutoApprove) {
+          await pagosService.crearPagoAprobado(pagoData);
         } else {
-          await pagosService.crearPago({
-            usuario_id: targetId, monto: getMontoByMetodo(formData.metodo_pago, "inscripcion"),
-            mes_pagar: new Date().getMonth() + 1, anio_pagar: new Date().getFullYear(),
-            metodo_pago: formData.metodo_pago, tipo_pago: "inscripcion",
-            comprobante_url: comprobanteUrl || undefined, notas: "Inscripción", fecha_pago_real: formData.fecha_pago,
-          });
+          await pagosService.crearPago(pagoData);
         }
       }
 
       if (formData.pagar_mensualidad && formData.meses.length > 0) {
         for (const { mes, anio } of formData.meses) {
-          if (isSelf) {
-            await pagosService.crearPagoAprobado({
-              usuario_id: targetId, monto: getMontoByMetodo(formData.metodo_pago, "mensual"),
-              mes_pagar: mes, anio_pagar: anio, metodo_pago: formData.metodo_pago, tipo_pago: "membresia",
-              comprobante_url: comprobanteUrl || undefined, notas: formData.notas || undefined, fecha_pago_real: formData.fecha_pago,
-            });
+          const pagoData = {
+            usuario_id: targetId, monto: getMontoByMetodo(formData.metodo_pago, "mensual"),
+            mes_pagar: mes, anio_pagar: anio, metodo_pago: formData.metodo_pago, tipo_pago: "membresia",
+            comprobante_url: comprobanteUrl || undefined, notas: formData.notas || undefined, fecha_pago_real: formData.fecha_pago,
+          };
+          if (useAutoApprove) {
+            await pagosService.crearPagoAprobado(pagoData);
           } else {
-            await pagosService.crearPago({
-              usuario_id: targetId, monto: getMontoByMetodo(formData.metodo_pago, "mensual"),
-              mes_pagar: mes, anio_pagar: anio, metodo_pago: formData.metodo_pago, tipo_pago: "membresia",
-              comprobante_url: comprobanteUrl || undefined, notas: formData.notas || undefined, fecha_pago_real: formData.fecha_pago,
-            });
+            await pagosService.crearPago(pagoData);
           }
         }
       }
@@ -624,36 +619,45 @@ export default function MisPagosPage() {
               <p className="text-gym-muted">No hay pagos registrados</p>
             </div>
           ) : (
-            <div className="space-y-2">
+            <div className="max-h-32 overflow-y-auto space-y-2 pr-1">
               {pagos.map(pago => (
-                <div key={pago.id} className="p-3 bg-gym-bg rounded-xl hover:bg-gym-surface transition-colors">
-                  <div className="flex items-center gap-3">
+                <div key={pago.id} className="p-2.5 bg-gym-bg rounded-xl hover:bg-gym-surface transition-colors">
+                  <div className="flex items-center gap-2">
                     {getPagoIcon(pago)}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-medium text-gym-text truncate">{getPagoLabel(pago)}</span>
                         <Badge
                           variant={pago.estado === "aprobado" ? "success" : pago.estado === "rechazado" ? "danger" : "warning"}
-                          className="text-[10px] px-1.5 py-0"
+                          className="text-[10px] px-1.5 py-0 flex-shrink-0"
                         >
                           {pago.estado === "aprobado" ? "Aprobado" : pago.estado === "rechazado" ? "Rechazado" : pago.estado === "suspendido" ? "Suspendido" : "Pendiente"}
                         </Badge>
                       </div>
-                      <div className="flex items-center gap-2 text-xs text-gym-muted">
-                        <span>{pago.metodo_pago === "efectivo" ? "💵" : pago.metodo_pago === "bs" ? "🇻🇪" : "🟡"} {pago.monto > 0 ? formatCurrency(pago.monto) : "Gratis"}</span>
+                      <div className="flex items-center gap-2 text-[11px] text-gym-muted">
+                        <span>{pago.monto > 0 ? formatCurrency(pago.monto) : "Gratis"}</span>
                         {pago.fecha_pago_real && (
                           <>
                             <span>·</span>
                             <span>{new Date(pago.fecha_pago_real).toLocaleDateString("es-ES")}</span>
                           </>
                         )}
+                        {pago.codigo_billete && (
+                          <>
+                            <span>·</span>
+                            <span className="font-mono">{pago.codigo_billete}</span>
+                          </>
+                        )}
                       </div>
+                      {pago.notas && (
+                        <p className="text-[10px] text-gym-muted/70 truncate mt-0.5">{pago.notas}</p>
+                      )}
                     </div>
                     {pago.estado === "pendiente" && (
                       <button
                         onClick={() => handleDelete(pago.id)}
                         disabled={deleting === pago.id}
-                        className="p-1.5 text-gym-danger hover:bg-gym-danger/10 rounded-lg transition-colors disabled:opacity-50"
+                        className="p-1.5 text-gym-danger hover:bg-gym-danger/10 rounded-lg transition-colors disabled:opacity-50 flex-shrink-0"
                       >
                         {deleting === pago.id ? (
                           <div className="w-4 h-4 border-2 border-gym-danger border-t-transparent rounded-full animate-spin" />

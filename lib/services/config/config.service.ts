@@ -37,7 +37,7 @@ export class ConfigService {
       .limit(1)
       .single();
 
-    const { id, created_at, updated_at, tenant_id, ...safeUpdates } = updates as GymConfig;
+    const { id, created_at, updated_at, ...safeUpdates } = updates as GymConfig;
 
     if (existing) {
       const { data, error } = await this.supabase

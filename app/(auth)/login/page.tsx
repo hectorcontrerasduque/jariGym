@@ -63,14 +63,30 @@ function LoginForm() {
 
   const isAuthorizedUser = async (userEmail: string, userId: string): Promise<boolean> => {
     const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL;
-    if (adminEmail && userEmail === adminEmail) return true;
+    const isAdminEmail = adminEmail && userEmail === adminEmail;
 
     const supabase = createClient();
-    const { data: profile } = await supabase
+    let { data: profile } = await supabase
       .from("profiles")
       .select("role, activo")
       .eq("id", userId)
       .single();
+
+    if (!profile && (isAdminEmail || (gymOwnerEmail && userEmail === gymOwnerEmail))) {
+      try {
+        await fetch("/api/auth/ensure-super-admin", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: userEmail }),
+        });
+        const { data: retry } = await supabase
+          .from("profiles")
+          .select("role, activo")
+          .eq("id", userId)
+          .single();
+        if (retry) profile = retry;
+      } catch {}
+    }
 
     if (!profile) return false;
     if (profile.role === "super_admin" || profile.role === "admin") {

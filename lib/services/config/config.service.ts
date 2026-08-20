@@ -38,17 +38,27 @@ export class ConfigService {
       .single();
 
     if (existing && updates.dueno_email && updates.dueno_email !== existing.dueno_email) {
-      const { data: newOwnerProfile } = await this.supabase
-        .from("profiles")
-        .select("id, role")
-        .eq("email", updates.dueno_email)
-        .single();
-      if (newOwnerProfile && newOwnerProfile.role !== "super_admin") {
-        await this.supabase
+      if (existing.dueno_email) {
+        const { data: oldOwnerProfile } = await this.supabase
           .from("profiles")
-          .update({ role: "super_admin" })
-          .eq("id", newOwnerProfile.id);
+          .select("id")
+          .eq("email", existing.dueno_email)
+          .maybeSingle();
+        if (oldOwnerProfile) {
+          await this.supabase
+            .from("profiles")
+            .update({ activo: false })
+            .eq("id", oldOwnerProfile.id);
+        }
       }
+
+      try {
+        await fetch("/api/auth/ensure-super-admin", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: updates.dueno_email }),
+        });
+      } catch {}
     }
 
     const { id, created_at, updated_at, ...safeUpdates } = updates as GymConfig;

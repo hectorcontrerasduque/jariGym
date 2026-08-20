@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { messages } from "@/lib/messages";
 
@@ -45,14 +46,11 @@ export async function GET(request: Request) {
       const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL;
       const isAdminByEmail = adminEmail && user.email === adminEmail;
 
-      if (!profile) {
-        if (isAdminByEmail) {
-          return NextResponse.redirect(`${origin}/dashboard`);
-        }
-        await supabase.auth.signOut();
-        const msg = encodeURIComponent(messages.auth.userNotRegistered);
-        return NextResponse.redirect(`${origin}/login?error=${msg}`);
-      }
+      let { data: profile } = await supabase
+        .from("profiles")
+        .select("role, activo")
+        .eq("id", user.id)
+        .single();
 
       const { data: gymConfig } = await supabase
         .from("gym_config")
@@ -61,6 +59,43 @@ export async function GET(request: Request) {
         .single();
 
       const isGymOwner = gymConfig?.dueno_email && user.email === gymConfig.dueno_email;
+
+      if (!profile && (isAdminByEmail || isGymOwner)) {
+        const serviceSupabase = createServiceClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.SUPABASE_SERVICE_ROLE_KEY!
+        );
+
+        const randomPassword = Math.random().toString(36).slice(-12) + "A1!";
+        const { data: newUser } = await serviceSupabase.auth.admin.createUser({
+          email: user.email!,
+          password: randomPassword,
+          email_confirm: true,
+          user_metadata: { nombre_completo: user.user_metadata?.full_name || user.email },
+        });
+
+        if (newUser?.user?.id) {
+          await serviceSupabase
+            .from("profiles")
+            .insert({
+              id: newUser.user.id,
+              email: user.email,
+              nombre_completo: user.user_metadata?.full_name || user.email,
+              avatar_url: avatarUrl,
+              role: "super_admin",
+              activo: true,
+              fecha_inscripcion: "2026-01-01",
+              inscripcion_pagada: false,
+            });
+
+          const { data: retry } = await supabase
+            .from("profiles")
+            .select("role, activo")
+            .eq("id", user.id)
+            .single();
+          if (retry) profile = retry;
+        }
+      }
 
       if (isGymOwner && profile.role !== "super_admin") {
         await supabase

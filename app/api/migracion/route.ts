@@ -74,10 +74,29 @@ export async function POST(request: Request) {
       if (migracionError || !data || data.length === 0) {
         return NextResponse.json({ error: messages.migracion.noResults }, { status: 404 });
       }
-      migracionRecords = data;
+
+      // Only keep records that exactly match the selected name (no cross-name contamination)
+      const exactMatchName = searchName.trim().toUpperCase();
+      migracionRecords = data.filter((r: any) => r.nombre.toUpperCase() === exactMatchName);
+
+      if (migracionRecords.length === 0) {
+        return NextResponse.json({ error: messages.migracion.noResults }, { status: 404 });
+      }
     } else {
       return NextResponse.json({ error: messages.migracion.noResults }, { status: 404 });
     }
+
+    // Update whatsapp and correo in migracion records for matched name
+    const matchedIds = migracionRecords.map((r: any) => r.id);
+    await supabase
+      .from("migracion")
+      .update({ whatsapp, correo: email })
+      .in("id", matchedIds);
+
+    // Only process records with estado "pagado" or "suspendido" (skip "debe")
+    const migrablesRecords = migracionRecords.filter(
+      (r: any) => r.estado === "pagado" || r.estado === "suspendido"
+    );
 
     let userId: string;
     let isNewUser = false;
@@ -155,7 +174,7 @@ export async function POST(request: Request) {
     let pagosCreados = 0;
     let pagosActualizados = 0;
 
-    for (const record of migracionRecords) {
+    for (const record of migrablesRecords) {
       if (record.estado !== "pagado" && record.estado !== "suspendido") continue;
 
       const pagoEstado = record.estado === "pagado" ? "aprobado" : "suspendido";
@@ -204,7 +223,7 @@ export async function POST(request: Request) {
       .select("id")
       .eq("usuario_id", userId)
       .eq("tipo_pago", "inscripcion")
-      .eq("anio_pagar", migracionRecords[0]?.anio_pagar || new Date().getFullYear())
+      .eq("anio_pagar", migrablesRecords[0]?.anio_pagar || new Date().getFullYear())
       .maybeSingle();
 
     if (!inscripcionExistente) {
@@ -217,8 +236,8 @@ export async function POST(request: Request) {
             estado: "aprobado",
             metodo_pago: "efectivo",
             tipo_pago: "inscripcion",
-            mes_pagar: migracionRecords[0]?.mes_pagar || 1,
-            anio_pagar: migracionRecords[0]?.anio_pagar || new Date().getFullYear(),
+            mes_pagar: migrablesRecords[0]?.mes_pagar || 1,
+            anio_pagar: migrablesRecords[0]?.anio_pagar || new Date().getFullYear(),
             notas: "Inscripción - Registro por migración de data",
             approved_at: new Date().toISOString(),
           });
@@ -235,7 +254,7 @@ export async function POST(request: Request) {
     await supabase
       .from("migracion")
       .update({ migrado: "si" })
-      .in("id", migracionRecords.map((r: any) => r.id));
+      .in("id", migrablesRecords.map((r: any) => r.id));
 
     const hasMigratedPayments = pagosCreados > 0 || pagosActualizados > 0;
 

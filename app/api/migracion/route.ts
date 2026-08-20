@@ -1,5 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
-import { createClient as createServiceClient } from "@supabase/supabase-js";
+import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { messages } from "@/lib/messages";
 import { sendWelcomeEmail } from "@/lib/services/email/email.service";
@@ -7,8 +6,6 @@ import { configService } from "@/lib/services/config/config.service";
 
 export async function POST(request: Request) {
   try {
-    const supabase = await createClient();
-
     const { nombreCompleto, whatsapp, correo, password, selectedNombre } = await request.json();
 
     if (!nombreCompleto || !whatsapp || !correo || !password) {
@@ -27,69 +24,83 @@ export async function POST(request: Request) {
     const nombre = nombreCompleto.trim().toUpperCase();
     const email = correo.toLowerCase().trim();
 
-    const serviceSupabase = createServiceClient(
+    const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
-    const { data: existingProfile } = await serviceSupabase
+    const searchName = selectedNombre || nombre;
+    const words = searchName.split(/\s+/).filter((w: string) => w.length >= 2);
+    let migracionRecords;
+
+    if (words.length > 0) {
+      const orFilter = words.map((w: string) => `nombre.ilike.%${w}%`).join(",");
+      const { data, error: migracionError } = await supabase
+        .from("migracion")
+        .select("*")
+        .or(orFilter)
+        .eq("migrado", "no")
+        .order("mes_pagar", { ascending: true });
+
+      if (migracionError || !data || data.length === 0) {
+        return NextResponse.json({ error: messages.migracion.noResults }, { status: 404 });
+      }
+      migracionRecords = data;
+    } else {
+      return NextResponse.json({ error: messages.migracion.noResults }, { status: 404 });
+    }
+
+    let userId: string;
+    let isNewUser = false;
+
+    const { data: existingProfile } = await supabase
       .from("profiles")
       .select("id")
       .eq("email", email)
       .maybeSingle();
 
     if (existingProfile) {
-      return NextResponse.json({ error: messages.migracion.emailExistsError }, { status: 400 });
-    }
-
-    const searchName = selectedNombre || nombre;
-    const { data: migracionRecords, error: migracionError } = await serviceSupabase
-      .from("migracion")
-      .select("*")
-      .ilike("nombre", `%${searchName}%`)
-      .eq("migrado", "no")
-      .order("mes_pagar", { ascending: true });
-
-    if (migracionError || !migracionRecords || migracionRecords.length === 0) {
-      return NextResponse.json({ error: messages.migracion.noResults }, { status: 404 });
-    }
-
-    const { data: authUser, error: authError } = await serviceSupabase.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: false,
-      user_metadata: { nombre_completo: nombre },
-    });
-
-    if (authError) {
-      if (authError.message?.includes("already") || authError.message?.includes("exists")) {
-        return NextResponse.json({ error: messages.migracion.emailExistsError }, { status: 400 });
-      }
-      return NextResponse.json({ error: messages.migracion.error }, { status: 500 });
-    }
-
-    if (!authUser?.user?.id) {
-      return NextResponse.json({ error: messages.migracion.error }, { status: 500 });
-    }
-
-    const userId = authUser.user.id;
-
-    const { error: profileError } = await serviceSupabase
-      .from("profiles")
-      .insert({
-        id: userId,
+      userId = existingProfile.id;
+    } else {
+      const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
         email,
-        nombre_completo: nombre,
-        whatsapp,
-        role: "miembro",
-        activo: true,
-        fecha_inscripcion: "2026-01-01",
-        inscripcion_pagada: false,
+        password,
+        email_confirm: false,
+        user_metadata: { nombre_completo: nombre },
       });
 
-    if (profileError) {
-      await serviceSupabase.auth.admin.deleteUser(userId);
-      return NextResponse.json({ error: messages.migracion.error }, { status: 500 });
+      if (authError) {
+        if (authError.message?.includes("already") || authError.message?.includes("exists")) {
+          return NextResponse.json({ error: messages.migracion.emailExistsError }, { status: 400 });
+        }
+        return NextResponse.json({ error: messages.migracion.error }, { status: 500 });
+      }
+
+      if (!authUser?.user?.id) {
+        return NextResponse.json({ error: messages.migracion.error }, { status: 500 });
+      }
+
+      userId = authUser.user.id;
+
+      const { error: profileError } = await supabase
+        .from("profiles")
+        .insert({
+          id: userId,
+          email,
+          nombre_completo: nombre,
+          whatsapp,
+          role: "miembro",
+          activo: true,
+          fecha_inscripcion: "2026-01-01",
+          inscripcion_pagada: false,
+        });
+
+      if (profileError) {
+        await supabase.auth.admin.deleteUser(userId);
+        return NextResponse.json({ error: messages.migracion.error }, { status: 500 });
+      }
+
+      isNewUser = true;
     }
 
     let pagosCreados = 0;
@@ -97,7 +108,7 @@ export async function POST(request: Request) {
 
     for (const record of migracionRecords) {
       if (record.estado === "pagado") {
-        const { error } = await serviceSupabase
+        const { error } = await supabase
           .from("pagos")
           .insert({
             usuario_id: userId,
@@ -111,7 +122,7 @@ export async function POST(request: Request) {
           });
         if (!error) pagosCreados++;
       } else if (record.estado === "suspendido") {
-        const { error } = await serviceSupabase
+        const { error } = await supabase
           .from("pagos")
           .insert({
             usuario_id: userId,
@@ -126,38 +137,41 @@ export async function POST(request: Request) {
       }
     }
 
-    await serviceSupabase
+    await supabase
       .from("migracion")
       .update({ migrado: "si" })
-      .in("id", migracionRecords.map((r) => r.id));
+      .in("id", migracionRecords.map((r: any) => r.id));
 
-    let gymName = "GymApp";
-    let gymLogo: string | null = null;
-    try {
-      const config = await configService.getConfig();
-      if (config?.nombre_gym) gymName = config.nombre_gym;
-      if (config?.logo_url) gymLogo = config.logo_url;
-    } catch {}
+    if (isNewUser) {
+      let gymName = "GymApp";
+      let gymLogo: string | null = null;
+      try {
+        const config = await configService.getConfig();
+        if (config?.nombre_gym) gymName = config.nombre_gym;
+        if (config?.logo_url) gymLogo = config.logo_url;
+      } catch {}
 
-    let confirmLink: string | undefined;
-    try {
-      const { data: linkData } = await serviceSupabase.auth.admin.generateLink({
-        type: "magiclink",
-        email,
-      });
-      if (linkData?.properties?.action_link) {
-        const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "";
-        confirmLink = `${siteUrl}/auth/callback?next=/login`;
-      }
-    } catch {}
+      let confirmLink: string | undefined;
+      try {
+        const { data: linkData } = await supabase.auth.admin.generateLink({
+          type: "magiclink",
+          email,
+        });
+        if (linkData?.properties?.action_link) {
+          const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "";
+          confirmLink = `${siteUrl}/auth/callback?next=/login`;
+        }
+      } catch {}
 
-    try {
-      await sendWelcomeEmail(email, email, password, gymName, gymLogo, confirmLink);
-    } catch {}
+      try {
+        await sendWelcomeEmail(email, email, password, gymName, gymLogo, confirmLink);
+      } catch {}
+    }
 
     return NextResponse.json({
       success: true,
       email,
+      existingUser: !isNewUser,
       pagosCreados,
       pagosSuspendidos,
     });

@@ -49,6 +49,7 @@ function LoginForm() {
   const [migPassword, setMigPassword] = useState("");
   const [migPasswordConfirm, setMigPasswordConfirm] = useState("");
   const [migEmailExists, setMigEmailExists] = useState(false);
+  const [migIsExistingUser, setMigIsExistingUser] = useState(false);
 
   useEffect(() => {
     const err = searchParams.get("error");
@@ -216,13 +217,14 @@ function LoginForm() {
   const executeMigracion = async (selectedNombre: string) => {
     setMigrateStep("loading");
     try {
-      await migracionService.migrate({
+      const result = await migracionService.migrate({
         nombreCompleto: migNombre,
         whatsapp: migWhatsapp,
         correo: migCorreo,
         password: migPassword,
         selectedNombre,
       });
+      setMigIsExistingUser(!!result.existingUser);
       setMigrateStep("success");
     } catch (err: any) {
       setMigrateError(err.message || messages.migracion.error);
@@ -242,6 +244,7 @@ function LoginForm() {
     setMigPassword("");
     setMigPasswordConfirm("");
     setMigEmailExists(false);
+    setMigIsExistingUser(false);
   };
 
   return (
@@ -538,17 +541,19 @@ function LoginForm() {
                   </div>
                   <div className="space-y-2">
                     <p className="text-sm text-gym-text font-medium">
-                      {messages.migracion.successMessage}
+                      {migIsExistingUser ? messages.migracion.existingUserMessage : messages.migracion.successMessage}
                     </p>
                     <p className="text-sm text-gym-primary font-semibold bg-gym-primary/10 p-2 rounded-lg">
                       {migCorreo}
                     </p>
                     <p className="text-xs text-gym-muted">
-                      {messages.migracion.successCredentials}
+                      {migIsExistingUser ? messages.migracion.existingUserNote : messages.migracion.successCredentials}
                     </p>
-                    <p className="text-xs text-gym-muted">
-                      {messages.migracion.successNote}
-                    </p>
+                    {!migIsExistingUser && (
+                      <p className="text-xs text-gym-muted">
+                        {messages.migracion.successNote}
+                      </p>
+                    )}
                   </div>
                   <Button
                     variant="secondary"

@@ -26,7 +26,7 @@ export class MigracionService {
     correo: string;
     password: string;
     selectedNombre?: string;
-  }): Promise<{ success: boolean; email: string }> {
+  }): Promise<{ success: boolean; email: string; existingUser?: boolean }> {
     const res = await fetch("/api/migracion", {
       method: "POST",
       headers: { "Content-Type": "application/json" },

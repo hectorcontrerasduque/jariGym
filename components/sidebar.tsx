@@ -35,6 +35,7 @@ export function Sidebar() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [gymName, setGymName] = useState("GymApp");
   const [gymLogo, setGymLogo] = useState("");
+  const [hasConfig, setHasConfig] = useState<boolean | null>(null);
 
   useEffect(() => {
     const supabase = createClient();
@@ -51,16 +52,29 @@ export function Sidebar() {
         setProfile(data);
       }
     };
-    const getGymName = async () => {
+    const getGymConfig = async () => {
       try {
         const config = await configService.getConfig();
-        if (config?.nombre_gym) setGymName(config.nombre_gym);
-        if (config?.logo_url) setGymLogo(config.logo_url);
-      } catch {}
+        if (config) {
+          setHasConfig(true);
+          if (config.nombre_gym) setGymName(config.nombre_gym);
+          if (config.logo_url) setGymLogo(config.logo_url);
+        } else {
+          setHasConfig(false);
+        }
+      } catch {
+        setHasConfig(false);
+      }
     };
     getProfile();
-    getGymName();
+    getGymConfig();
   }, []);
+
+  useEffect(() => {
+    if (hasConfig === false && isSuperAdmin && pathname !== "/dashboard/configuracion") {
+      window.location.href = "/dashboard/configuracion";
+    }
+  }, [hasConfig, isSuperAdmin, pathname]);
 
   const handleSignOut = async () => {
     await createClient().auth.signOut();
@@ -69,11 +83,28 @@ export function Sidebar() {
 
   const isAdmin = profile?.role === "super_admin" || profile?.role === "admin";
   const isSuperAdmin = profile?.role === "super_admin";
-  const navItems = isAdmin ? adminNavItems : miembroNavItems;
+
+  const navItems = hasConfig === false
+    ? (isSuperAdmin ? [{ href: "/dashboard/configuracion", label: "Config", icon: Settings }] : [])
+    : (isAdmin ? adminNavItems : miembroNavItems);
 
   return (
     <>
-      {/* Mobile top bar */}
+      {/* Miembro sin configuración: mensaje centrado */}
+      {!isAdmin && hasConfig === false && (
+        <div className="fixed inset-0 bg-gym-bg flex items-center justify-center z-[60] p-6">
+          <div className="text-center max-w-md">
+            <div className="w-16 h-16 rounded-2xl bg-gym-primary/10 flex items-center justify-center mx-auto mb-4">
+              <Settings className="w-8 h-8 text-gym-primary" />
+            </div>
+            <h2 className="text-xl font-display font-bold text-gym-text mb-2">Sin configuración</h2>
+            <p className="text-gym-muted">No hay configuración de pagos disponible. Comuníquese con el Administrador.</p>
+          </div>
+        </div>
+      )}
+
+      {/* Mobile top bar - oculto para miembro sin config */}
+      {(!(!isAdmin && hasConfig === false)) && (
       <div className="md:hidden fixed top-0 left-0 right-0 bg-gym-surface/90 backdrop-blur-xl border-b border-gym-border/50 z-50 px-4 py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3 min-w-0">
@@ -99,6 +130,7 @@ export function Sidebar() {
           </button>
         </div>
       </div>
+      )}
 
       {/* Desktop sidebar */}
       <aside className="hidden md:flex fixed left-0 top-0 h-full w-64 bg-gym-surface/80 backdrop-blur-xl border-r border-gym-border/50 flex-col z-40">
@@ -174,7 +206,8 @@ export function Sidebar() {
         </div>
       </aside>
 
-      {/* Mobile bottom nav */}
+      {/* Mobile bottom nav - oculto para miembro sin config */}
+      {!(!isAdmin && hasConfig === false) && (
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-gym-surface/90 backdrop-blur-xl border-t border-gym-border/50 z-50 safe-area-bottom">
         <div className="flex items-center justify-around py-2">
           {navItems.map((item) => {
@@ -212,6 +245,7 @@ export function Sidebar() {
           )}
         </div>
       </nav>
+      )}
     </>
   );
 }

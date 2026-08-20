@@ -230,7 +230,7 @@ export default function MisPagosPage() {
               <div className="flex-1">
                 <div className="flex gap-2">
                   <Button
-                    variant={miembroSeleccionado === null ? "default" : "outline"}
+                    variant={miembroSeleccionado === null ? "primary" : "ghost"}
                     size="sm"
                     onClick={handleSelfPay}
                     className="flex-1"
@@ -239,7 +239,7 @@ export default function MisPagosPage() {
                     Yo
                   </Button>
                   <Button
-                    variant={miembroSeleccionado !== null ? "default" : "outline"}
+                    variant={miembroSeleccionado !== null ? "primary" : "ghost"}
                     size="sm"
                     onClick={() => setShowSearch(!showSearch)}
                     className="flex-1"

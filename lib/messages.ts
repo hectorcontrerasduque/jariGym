@@ -261,7 +261,7 @@ export const messages = {
     linkText: "Ya soy miembro",
     title: "Migrar mis datos",
     subtitle: "Si ya eres miembro del gym, migra tus datos para comenzar a usar la app",
-    nombreCompleto: "Nombre completo",
+    nombreCompleto: "Nombre y apellido",
     whatsapp: "WhatsApp",
     correo: "Correo electrónico",
     password: "Contraseña para login",

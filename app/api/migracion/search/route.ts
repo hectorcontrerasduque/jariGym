@@ -5,10 +5,6 @@ import { messages } from "@/lib/messages";
 export async function POST(request: Request) {
   try {
     const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      return NextResponse.json({ error: messages.toast.noAutenticado }, { status: 401 });
-    }
 
     const { nombreCompleto } = await request.json();
     if (!nombreCompleto || typeof nombreCompleto !== "string") {

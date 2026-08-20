@@ -285,7 +285,14 @@ function LoginForm() {
           <form onSubmit={handleEmailLogin} className="space-y-3">
             <Input type="email" placeholder="tu@email.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
             <PasswordInput placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required />
-            <div className="flex justify-end">
+            <div className="flex justify-between items-center">
+              <button
+                type="button"
+                onClick={() => { resetMigrateForm(); setShowMigrateForm(true); }}
+                className="text-xs text-gym-primary hover:text-gym-primary/80 transition-colors"
+              >
+                {messages.migracion.linkText}
+              </button>
               <button
                 type="button"
                 onClick={() => { setShowResetForm(true); setResetEmail(email); }}
@@ -299,16 +306,6 @@ function LoginForm() {
               {messages.auth.loginButton}
             </Button>
           </form>
-
-          <div className="text-center">
-            <button
-              type="button"
-              onClick={() => { resetMigrateForm(); setShowMigrateForm(true); }}
-              className="text-xs text-gym-secondary hover:text-gym-secondary/80 transition-colors font-medium"
-            >
-              {messages.migracion.linkText}
-            </button>
-          </div>
         </CardContent>
       </Card>
 
@@ -425,9 +422,9 @@ function LoginForm() {
                   </p>
                   <Input
                     label={messages.migracion.nombreCompleto}
-                    placeholder="NOMBRE COMPLETO"
+                    placeholder="NOMBRE Y APELLIDO"
                     value={migNombre}
-                    onChange={(e) => setMigNombre(e.target.value.toUpperCase().trim())}
+                    onChange={(e) => setMigNombre(e.target.value.toUpperCase())}
                     onBlur={(e) => setMigNombre(e.target.value.toUpperCase().trim())}
                     required
                   />

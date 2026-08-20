@@ -273,7 +273,7 @@ export const messages = {
     emailExistsInfo: "Este correo ya está registrado. Los pagos de migración se asociarán a tu cuenta existente.",
     emailExistsError: "Este correo ya está registrado",
     emailInvalidError: "Correo electrónico inválido",
-    noResults: "No se encontraron datos. Comuníquese con su administrador.",
+    noResults: "No se encontraron registros con ese nombre. Verifique el nombre e intente de nuevo.",
     selectTitle: "Selecciona tu registro",
     selectSubtitle: "Se encontraron múltiples coincidencias",
     selectButton: "Aceptar",
@@ -286,6 +286,7 @@ export const messages = {
     existingUserNote: "Inicia sesión con tu contraseña actual",
     goToLogin: "Ir al Login",
     error: "Error al migrar datos",
+    errorConfig: "Falta configuración del gym. Vaya a Configuración y guarde los datos antes de migrar.",
     loading: "Migrando datos...",
   },
 } as const;

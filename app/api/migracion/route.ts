@@ -28,6 +28,19 @@ export async function POST(request: Request) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
+    const { data: configCheck } = await supabase
+      .from("gym_config")
+      .select("id")
+      .limit(1)
+      .maybeSingle();
+
+    if (!configCheck) {
+      return NextResponse.json(
+        { error: "Falta configuración del gym. Vaya a Configuración y guarde los datos antes de migrar." },
+        { status: 400 }
+      );
+    }
+
     const { data: metodoEfectivo } = await supabase
       .from("gym_config_metodos_pago")
       .select("monto_mensual, monto_inscripcion")

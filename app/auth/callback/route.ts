@@ -77,8 +77,9 @@ export async function GET(request: Request) {
                 role: "super_admin",
                 activo: true,
                 registered: true,
-                fecha_inscripcion: "2026-01-01",
-                inscripcion_pagada: false,
+                fecha_inscripcion: new Date().toISOString().split("T")[0],
+                inscripcion_pagada: true,
+                inscripcion_fecha: new Date().toISOString().split("T")[0],
               });
 
             const { data: retry } = await supabase

@@ -25,7 +25,7 @@ export async function POST(request: Request) {
       if (existingProfile.role !== "super_admin") {
         await supabase
           .from("profiles")
-          .update({ role: "super_admin", activo: true })
+          .update({ role: "super_admin", activo: true, registered: true })
           .eq("id", existingProfile.id);
       }
       return NextResponse.json({ created: false, promoted: true });
@@ -61,6 +61,7 @@ export async function POST(request: Request) {
         nombre_completo: emailLower.split("@")[0],
         role: "super_admin",
         activo: true,
+        registered: true,
         fecha_inscripcion: "2026-01-01",
         inscripcion_pagada: false,
       });
@@ -69,7 +70,7 @@ export async function POST(request: Request) {
       if (profileError.code === "23505") {
         await supabase
           .from("profiles")
-          .update({ role: "super_admin", activo: true })
+          .update({ role: "super_admin", activo: true, registered: true })
           .eq("email", emailLower);
         return NextResponse.json({ created: false, promoted: true });
       }

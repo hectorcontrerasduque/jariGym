@@ -100,6 +100,7 @@ export async function POST(request: Request) {
           whatsapp,
           role: "miembro",
           activo: true,
+          registered: true,
           fecha_inscripcion: "2026-01-01",
           inscripcion_pagada: false,
         });

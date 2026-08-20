@@ -68,7 +68,7 @@ function LoginForm() {
     const supabase = createClient();
     let { data: profile } = await supabase
       .from("profiles")
-      .select("role, activo")
+      .select("role, activo, registered")
       .eq("id", userId)
       .single();
 
@@ -81,7 +81,7 @@ function LoginForm() {
         });
         const { data: retry } = await supabase
           .from("profiles")
-          .select("role, activo")
+          .select("role, activo, registered")
           .eq("id", userId)
           .single();
         if (retry) profile = retry;
@@ -93,12 +93,12 @@ function LoginForm() {
       if (gymOwnerEmail && userEmail === gymOwnerEmail && profile.role !== "super_admin") {
         await supabase
           .from("profiles")
-          .update({ role: "super_admin" })
+          .update({ role: "super_admin", registered: true })
           .eq("id", userId);
       }
       return true;
     }
-    if (profile.activo !== false) return true;
+    if (profile.activo !== false && profile.registered === true) return true;
 
     return false;
   };

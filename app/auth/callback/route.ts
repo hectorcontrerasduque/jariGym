@@ -25,26 +25,8 @@ export async function GET(request: Request) {
       const email = user.email || null;
       const nombre = user.user_metadata?.nombre_completo || user.user_metadata?.full_name || null;
 
-      const updates: Record<string, unknown> = {};
-      if (avatarUrl) updates.avatar_url = avatarUrl;
-      if (email) updates.email = email;
-      if (nombre) updates.nombre_completo = nombre;
-
-      if (Object.keys(updates).length > 0) {
-        await supabase
-          .from("profiles")
-          .update(updates)
-          .eq("id", user.id);
-      }
-
       const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL;
       const isAdminByEmail = adminEmail && user.email === adminEmail;
-
-      let { data: profile } = await supabase
-        .from("profiles")
-        .select("role, activo")
-        .eq("id", user.id)
-        .single();
 
       const { data: gymConfig } = await supabase
         .from("gym_config")
@@ -53,6 +35,12 @@ export async function GET(request: Request) {
         .single();
 
       const isGymOwner = gymConfig?.dueno_email && user.email === gymConfig.dueno_email;
+
+      let { data: profile } = await supabase
+        .from("profiles")
+        .select("role, activo, registered")
+        .eq("id", user.id)
+        .single();
 
       if (!profile && (isAdminByEmail || isGymOwner)) {
         const serviceSupabase = createServiceClient(
@@ -78,25 +66,18 @@ export async function GET(request: Request) {
               avatar_url: avatarUrl,
               role: "super_admin",
               activo: true,
+              registered: true,
               fecha_inscripcion: "2026-01-01",
               inscripcion_pagada: false,
             });
 
           const { data: retry } = await supabase
             .from("profiles")
-            .select("role, activo")
+            .select("role, activo, registered")
             .eq("id", user.id)
             .single();
           if (retry) profile = retry;
         }
-      }
-
-      if (profile && isGymOwner && profile.role !== "super_admin") {
-        await supabase
-          .from("profiles")
-          .update({ role: "super_admin" })
-          .eq("id", user.id);
-        profile.role = "super_admin";
       }
 
       if (!profile) {
@@ -105,13 +86,33 @@ export async function GET(request: Request) {
         return NextResponse.redirect(`${origin}/login?error=${msg}`);
       }
 
+      if (isGymOwner && profile.role !== "super_admin") {
+        await supabase
+          .from("profiles")
+          .update({ role: "super_admin", registered: true })
+          .eq("id", user.id);
+        profile.role = "super_admin";
+      }
+
       const isAdmin = isAdminByEmail || profile.role === "super_admin" || profile.role === "admin";
-      const isActiveMember = profile.activo !== false && profile.role === "miembro";
+      const isActiveMember = profile.activo !== false && profile.registered === true && profile.role === "miembro";
 
       if (!isAdmin && !isActiveMember) {
         await supabase.auth.signOut();
         const msg = encodeURIComponent(messages.auth.userNotRegistered);
         return NextResponse.redirect(`${origin}/login?error=${msg}`);
+      }
+
+      const updates: Record<string, unknown> = {};
+      if (avatarUrl) updates.avatar_url = avatarUrl;
+      if (email) updates.email = email;
+      if (nombre) updates.nombre_completo = nombre;
+
+      if (Object.keys(updates).length > 0) {
+        await supabase
+          .from("profiles")
+          .update(updates)
+          .eq("id", user.id);
       }
 
       const redirectPath = isAdmin ? next : (next === "/dashboard" ? "/dashboard/mis-pagos" : next);

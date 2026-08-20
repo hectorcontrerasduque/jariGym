@@ -101,13 +101,14 @@ RLS uses helper functions (`get_user_role()`, `get_user_tenant_id()`) with `SECU
 
 ## Auth Flow
 
+- **LOGIN RULE**: toda persona que haga login DEBE estar registrado en `profiles` con `registered: true` y `activo: true` (o `activo: null`). Excepciones: `NEXT_PUBLIC_ADMIN_EMAIL` y `gym_config.dueno_email` se auto-crean como `super_admin` si no existen.
+- Trigger `handle_new_user` auto-creates `profiles` row on signup, pero con `registered: false` por defecto → no puede logearse
 - Middleware redirects unauthenticated users to `/login`
-- Google OAuth: Supabase → Google → `/auth/callback?code=...` → `exchangeCodeForSession` → redirect to `/dashboard`
-- Email/password via `signInWithEmail`
-- Trigger `handle_new_user` auto-creates `profiles` row on signup
+- Google OAuth: Supabase → Google → `/auth/callback?code=...` → `exchangeCodeForSession` → verifica profile `registered: true` → redirect a `/dashboard`
+- Email/password via `signInWithEmail` → `isAuthorizedUser` verifica profile `registered: true`
 - Password reset: custom flow via `/api/auth/forgot-password` → token in `password_reset_tokens` → email via Gmail SMTP → `/reset-password?token=xxx` → validates token + sets new password
-- **Gym owner detection**: If logged-in user's email matches `gym_config.dueno_email`, their `profiles.role` is auto-promoted to `super_admin` (any email domain, not just Gmail)
-- **Email change**: When owner email is updated in Config, the new email's profile is auto-promoted to `super_admin`
+- **Gym owner detection**: Si el email coincide con `gym_config.dueno_email`, se auto-crea profile `super_admin` con `registered: true`
+- **Email change**: Cuando se cambia `dueno_email` en Config, se desactiva profile anterior (`activo: false`) y se crea nuevo `super_admin` para el nuevo email
 
 ## Super Admin (Dueño) — Gold Identity
 
@@ -148,6 +149,7 @@ showToast(messages.toast.success, "success"); // or "error", "warning", "info"
 ```ts
 role: "super_admin" | "admin" | "miembro"
 activo: boolean | null  // null = active
+registered: boolean  // must be true to login (except admin/owner emails)
 notas_admin: string | null
 inscripcion_pagada: boolean
 inscripcion_fecha: string | null

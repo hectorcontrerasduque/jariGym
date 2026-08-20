@@ -23,7 +23,6 @@ export default function ConfiguracionPage() {
   const [metodos, setMetodos] = useState<MetodoPagoConfig[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [success, setSuccess] = useState(false);
   const [localTime, setLocalTime] = useState("");
   const [localCountry, setLocalCountry] = useState("");
   const [uploadingLogo, setUploadingLogo] = useState(false);
@@ -75,17 +74,18 @@ export default function ConfiguracionPage() {
       for (const metodo of metodos) {
         const orig = original.find((o) => o.id === metodo.id);
         if (orig && (orig.monto_mensual !== metodo.monto_mensual || orig.monto_inscripcion !== metodo.monto_inscripcion || orig.habilitado !== metodo.habilitado)) {
-          await configService.updateMetodoPago(metodo.id, {
-            monto_mensual: metodo.monto_mensual,
-            monto_inscripcion: metodo.monto_inscripcion,
-            habilitado: metodo.habilitado,
-          });
+          try {
+            await configService.updateMetodoPago(metodo.id, {
+              monto_mensual: metodo.monto_mensual,
+              monto_inscripcion: metodo.monto_inscripcion,
+              habilitado: metodo.habilitado,
+            });
+          } catch {}
         }
       }
       originalMetodosRef.current = JSON.parse(JSON.stringify(metodos));
 
-      setSuccess(true);
-      setTimeout(() => setSuccess(false), 3000);
+      showToast(messages.toast.configuracionGuardada, "success");
     } catch (error) {
       showToast(messages.toast.configuracionError, "error");
     } finally {
@@ -182,12 +182,6 @@ export default function ConfiguracionPage() {
           <Save className="w-6 h-6" />
         )}
       </button>
-
-      {success && (
-        <div className="p-4 bg-gym-success/20 border border-gym-success/50 rounded-xl text-gym-success text-center">
-          Configuración guardada correctamente
-        </div>
-      )}
 
       {/* Datos del Gym */}
       <Card className="neon-card relative z-10">

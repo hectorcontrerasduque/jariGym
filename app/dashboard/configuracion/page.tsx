@@ -89,11 +89,14 @@ export default function ConfiguracionPage() {
     }
 
     setSaving(true);
+    const isFirstSave = !config.id;
     try {
       await configService.updateConfig(config);
       await configService.saveMetodosPago(metodos);
       showToast(messages.toast.configuracionGuardada, "success");
-      setTimeout(() => window.location.reload(), 500);
+      if (isFirstSave) {
+        setTimeout(() => window.location.reload(), 500);
+      }
     } catch (error) {
       showToast(messages.toast.configuracionError, "error");
     } finally {

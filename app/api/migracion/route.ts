@@ -111,23 +111,42 @@ export async function POST(request: Request) {
 
       userId = authUser.user.id;
 
-      const { error: profileError } = await supabase
+      // The handle_new_user trigger may have auto-created the profile row.
+      // Check if it exists before inserting to avoid duplicate key error.
+      const { data: triggeredProfile } = await supabase
         .from("profiles")
-        .insert({
-          id: userId,
-          email,
-          nombre_completo: nombre,
-          whatsapp,
-          role: "miembro",
-          activo: true,
-          registered: true,
-          fecha_inscripcion: "2026-01-01",
-          inscripcion_pagada: false,
-        });
+        .select("id")
+        .eq("id", userId)
+        .maybeSingle();
 
-      if (profileError) {
-        await supabase.auth.admin.deleteUser(userId);
-        return NextResponse.json({ error: `${messages.migracion.crearPerfilError}: ${profileError.message}` }, { status: 500 });
+      const profileFields = {
+        email,
+        nombre_completo: nombre,
+        whatsapp,
+        role: "miembro" as const,
+        activo: true,
+        registered: true,
+        fecha_inscripcion: "2026-01-01",
+        inscripcion_pagada: false,
+      };
+
+      if (triggeredProfile) {
+        const { error: profileError } = await supabase
+          .from("profiles")
+          .update(profileFields)
+          .eq("id", userId);
+        if (profileError) {
+          await supabase.auth.admin.deleteUser(userId);
+          return NextResponse.json({ error: `${messages.migracion.crearPerfilError}: ${profileError.message}` }, { status: 500 });
+        }
+      } else {
+        const { error: profileError } = await supabase
+          .from("profiles")
+          .insert({ id: userId, ...profileFields });
+        if (profileError) {
+          await supabase.auth.admin.deleteUser(userId);
+          return NextResponse.json({ error: `${messages.migracion.crearPerfilError}: ${profileError.message}` }, { status: 500 });
+        }
       }
 
       isNewUser = true;

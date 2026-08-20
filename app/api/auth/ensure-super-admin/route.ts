@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 
 export async function POST(request: Request) {
   try {
-    const { email, nombre } = await request.json();
+    const { email, nombre, inscripcion_pagada } = await request.json();
     if (!email || typeof email !== "string") {
       return NextResponse.json({ created: false });
     }
@@ -15,13 +15,7 @@ export async function POST(request: Request) {
 
     const emailLower = email.toLowerCase().trim();
     const nombreCompleto = (nombre && typeof nombre === "string" && nombre.trim()) || emailLower.split("@")[0];
-
-    const { data: gymConfig } = await supabase
-      .from("gym_config")
-      .select("dueno_email")
-      .limit(1)
-      .maybeSingle();
-    const isGymOwner = gymConfig?.dueno_email?.toLowerCase() === emailLower;
+    const isOwner = inscripcion_pagada === true;
 
     const { data: existingProfile } = await supabase
       .from("profiles")
@@ -71,8 +65,8 @@ export async function POST(request: Request) {
         activo: true,
         registered: true,
         fecha_inscripcion: new Date().toISOString().split("T")[0],
-        inscripcion_pagada: isGymOwner,
-        inscripcion_fecha: isGymOwner ? new Date().toISOString().split("T")[0] : null,
+        inscripcion_pagada: isOwner,
+        inscripcion_fecha: isOwner ? new Date().toISOString().split("T")[0] : null,
       });
 
     if (profileError) {

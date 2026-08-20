@@ -41,7 +41,7 @@ export async function GET(request: Request) {
         .limit(1)
         .single();
 
-      const isGymOwner = gymConfig?.dueno_email && user.email === gymConfig.dueno_email;
+      const isGymOwner = gymConfig?.dueno_email && user.email?.toLowerCase() === gymConfig.dueno_email.toLowerCase();
 
       const serviceSupabase = createServiceClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,

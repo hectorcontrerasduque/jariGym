@@ -75,7 +75,7 @@ export class ConfigService {
             await fetch("/api/auth/ensure-super-admin", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ email: updates.dueno_email, nombre: updates.dueno_nombre }),
+              body: JSON.stringify({ email: updates.dueno_email, nombre: updates.dueno_nombre, inscripcion_pagada: true }),
             });
           } catch {}
         }
@@ -100,7 +100,7 @@ export class ConfigService {
             await fetch("/api/auth/ensure-super-admin", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ email: updates.dueno_email, nombre: updates.dueno_nombre }),
+              body: JSON.stringify({ email: updates.dueno_email, nombre: updates.dueno_nombre, inscripcion_pagada: true }),
             });
           } catch {}
         }

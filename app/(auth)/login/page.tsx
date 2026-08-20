@@ -57,6 +57,17 @@ function LoginForm() {
     if (err) setError(decodeURIComponent(err));
     const msg = searchParams.get("message");
     if (msg) setSuccess(decodeURIComponent(msg));
+
+    // Handle hash fragment errors from Supabase auth (e.g. expired magic links)
+    if (typeof window !== "undefined" && window.location.hash) {
+      const hash = new URLSearchParams(window.location.hash.substring(1));
+      const hashError = hash.get("error_description") || hash.get("error");
+      if (hashError) {
+        setError(decodeURIComponent(hashError));
+        window.history.replaceState(null, "", window.location.pathname);
+      }
+    }
+
     configService.getConfig().then((config) => {
       if (config?.nombre_gym) setGymName(config.nombre_gym);
       if (config?.dueno_email) setGymOwnerEmail(config.dueno_email);
@@ -80,7 +91,7 @@ function LoginForm() {
         await fetch("/api/auth/ensure-super-admin", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email: userEmail }),
+          body: JSON.stringify({ email: userEmail, inscripcion_pagada: true }),
         });
         const { data: retry } = await supabase
           .from("profiles")

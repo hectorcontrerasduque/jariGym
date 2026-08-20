@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { messages } from "@/lib/messages";
 import { sendWelcomeEmail } from "@/lib/services/email/email.service";
+import { randomBytes } from "crypto";
 
 export async function POST(request: Request) {
   try {
@@ -271,16 +272,20 @@ export async function POST(request: Request) {
       } catch {}
 
       if (isNewUser) {
-        // New user: generate confirmation link + send welcome email with credentials
+        // New user: generate confirmation token + send welcome email with credentials
         let confirmLink: string | null = null;
         try {
-          const { data: linkData } = await supabase.auth.admin.generateLink({
-            type: "magiclink",
-            email,
+          const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "";
+          const token = randomBytes(32).toString("hex");
+          const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+
+          await supabase.from("password_reset_tokens").insert({
+            user_id: userId,
+            token,
+            expires_at: expiresAt,
           });
-          if (linkData?.properties?.action_link) {
-            confirmLink = linkData.properties.action_link;
-          }
+
+          confirmLink = `${siteUrl}/confirm-email?token=${token}`;
         } catch {}
 
         try {

@@ -104,10 +104,30 @@ export async function POST(request: Request) {
     }
 
     let pagosCreados = 0;
-    let pagosSuspendidos = 0;
+    let pagosActualizados = 0;
 
     for (const record of migracionRecords) {
-      if (record.estado === "pagado") {
+      const { data: existingPago } = await supabase
+        .from("pagos")
+        .select("id, estado")
+        .eq("usuario_id", userId)
+        .eq("mes_pagar", record.mes_pagar)
+        .eq("anio_pagar", record.anio_pagar)
+        .maybeSingle();
+
+      if (existingPago) {
+        if (existingPago.estado === "pendiente" || existingPago.estado === "suspendido") {
+          const { error } = await supabase
+            .from("pagos")
+            .update({
+              estado: "aprobado",
+              notas: "Actualizado por migración de data",
+              approved_at: new Date().toISOString(),
+            })
+            .eq("id", existingPago.id);
+          if (!error) pagosActualizados++;
+        }
+      } else {
         const { error } = await supabase
           .from("pagos")
           .insert({
@@ -121,19 +141,6 @@ export async function POST(request: Request) {
             approved_at: new Date().toISOString(),
           });
         if (!error) pagosCreados++;
-      } else if (record.estado === "suspendido") {
-        const { error } = await supabase
-          .from("pagos")
-          .insert({
-            usuario_id: userId,
-            monto: 0,
-            estado: "suspendido",
-            metodo_pago: "efectivo",
-            mes_pagar: record.mes_pagar,
-            anio_pagar: record.anio_pagar,
-            notas: "Registro por migración de data - suspendido",
-          });
-        if (!error) pagosSuspendidos++;
       }
     }
 
@@ -173,7 +180,7 @@ export async function POST(request: Request) {
       email,
       existingUser: !isNewUser,
       pagosCreados,
-      pagosSuspendidos,
+      pagosActualizados,
     });
   } catch {
     return NextResponse.json({ error: messages.toast.errorGenerico }, { status: 500 });

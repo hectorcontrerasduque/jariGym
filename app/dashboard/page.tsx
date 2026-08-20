@@ -121,7 +121,7 @@ export default function DashboardPage() {
                 <p className="text-xl font-bold text-gym-text neon-text">{stats?.miembrosActivos || 0}</p>
               </div>
             </div>
-            <div className="mt-3 flex gap-2 text-xs">
+            <div className="mt-3 space-y-1 text-xs">
               <span className="text-gym-success flex items-center gap-1">
                 <CheckCircle className="w-3 h-3" /> {stats?.inscritosPagados || 0} inscritos
               </span>
@@ -146,10 +146,10 @@ export default function DashboardPage() {
             </div>
             <div className="mt-3 space-y-1 text-xs">
               {stats?.deudoresInscripcion > 0 && (
-                <p className="text-gym-warning">{stats.deudoresInscripcion} inscripciones sin pagar</p>
+                <p className="text-gym-warning">{stats.deudoresInscripcion} inscripciones</p>
               )}
               {stats?.deudoresMensualidad > 0 && (
-                <p className="text-gym-danger">{stats.deudoresMensualidad} mensualidades sin pagar</p>
+                <p className="text-gym-danger">{stats.deudoresMensualidad} mensualidades</p>
               )}
               <p className="text-gym-muted font-medium">{formatCurrency(stats?.montoDeuda || 0)} en deuda</p>
             </div>
@@ -249,7 +249,7 @@ export default function DashboardPage() {
                     <div className="flex items-center justify-between text-xs">
                       <span className="text-gym-success font-medium">{formatCurrency(m.montoAcumulado)} cobrado</span>
                       {m.sinPago > 0 && (
-                        <span className="text-gym-danger">{m.sinPago} sin pagar · {formatCurrency(m.montoAdeudado)} adeudado</span>
+                        <span className="text-gym-danger">{formatCurrency(m.montoAdeudado)} adeudado</span>
                       )}
                     </div>
                   </div>

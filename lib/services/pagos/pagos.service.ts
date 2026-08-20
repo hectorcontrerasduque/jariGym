@@ -144,6 +144,72 @@ export class PagosService {
     return data || [];
   }
 
+  async listarPagosUsuario(usuarioId: string, anio?: number): Promise<Pago[]> {
+    const {
+      data: { user },
+    } = await this.supabase.auth.getUser();
+    if (!user) throw new Error(messages.toast.noAutenticado);
+
+    const { data: profile } = await this.supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+    if (profile?.role !== "super_admin" && profile?.role !== "admin") {
+      throw new Error(messages.toast.noAutorizado);
+    }
+
+    let query = this.supabase
+      .from("pagos")
+      .select("*")
+      .eq("usuario_id", usuarioId)
+      .order("created_at", { ascending: false });
+
+    if (anio) {
+      query = query.eq("anio_pagar", anio);
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+    return data || [];
+  }
+
+  async crearPagoAprobado(input: CreatePagoInput): Promise<Pago> {
+    const {
+      data: { user },
+    } = await this.supabase.auth.getUser();
+    if (!user) throw new Error(messages.toast.noAutenticado);
+
+    const { data: profile } = await this.supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+    if (profile?.role !== "super_admin" && profile?.role !== "admin") {
+      throw new Error(messages.toast.noAutorizado);
+    }
+
+    const pagoData: Record<string, unknown> = {
+      ...input,
+      estado: "aprobado",
+      aprobado_por: user.id,
+      fecha_pago_real: input.fecha_pago_real || new Date().toISOString(),
+    };
+
+    if (input.metodo_pago === "efectivo") {
+      pagoData.comprobante_url = null;
+    }
+
+    const { data, error } = await this.supabase
+      .from("pagos")
+      .insert(pagoData)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return data;
+  }
+
   async listarPagos(estado?: string, anio?: number): Promise<Pago[]> {
     const {
       data: { user },

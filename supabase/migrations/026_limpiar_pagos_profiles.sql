@@ -1,5 +1,5 @@
--- 026: Inicio - Limpiar todo y recrear estado inicial
--- ADVERTENCIA: Reset completo del sistema
+-- 026: Inicio - Limpiar todo el sistema
+-- ADVERTENCIA: Reset completo
 
 -- 1. Limpiar tablas de datos
 TRUNCATE TABLE pagos RESTART IDENTITY;
@@ -17,15 +17,11 @@ END $$;
 DELETE FROM auth.users;
 DELETE FROM profiles;
 
--- 3. Limpiar gym_config y metodos de pago
+-- 3. Limpiar config y metodos de pago
 DELETE FROM gym_config_metodos_pago;
 DELETE FROM gym_config;
 
--- 4. Insertar config por defecto
-INSERT INTO gym_config (nombre_gym, dueno_email, logo_url, moneda)
-VALUES ('GymApp', '', NULL, '$');
-
--- 5. Resetear migracion para re-migrar
+-- 4. Resetear migracion para re-migrar
 UPDATE migracion SET migrado = 'no';
 
 -- Verificar

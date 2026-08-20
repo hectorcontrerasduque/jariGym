@@ -25,21 +25,11 @@ DELETE FROM gym_config;
 INSERT INTO gym_config (nombre_gym, dueno_email, logo_url, moneda)
 VALUES ('GymApp', '', NULL, '$');
 
--- 5. Insertar metodos de pago por defecto
-INSERT INTO gym_config_metodos_pago (metodo_pago, monto_mensual, monto_inscripcion, habilitado)
-VALUES
-  ('efectivo', 0, 0, true),
-  ('bs', 0, 0, false),
-  ('binance', 0, 0, false),
-  ('transferencia', 0, 0, false),
-  ('membresia_libre', 0, 0, false);
-
--- 6. Resetear migracion para re-migrar
+-- 5. Resetear migracion para re-migrar
 UPDATE migracion SET migrado = 'no';
 
 -- Verificar
 SELECT 'gym_config' as tabla, COUNT(*) as registros FROM gym_config
-UNION ALL SELECT 'metodos_pago', COUNT(*) FROM gym_config_metodos_pago
 UNION ALL SELECT 'pagos', COUNT(*) FROM pagos
 UNION ALL SELECT 'profiles', COUNT(*) FROM profiles
 UNION ALL SELECT 'auth.users', COUNT(*) FROM auth.users

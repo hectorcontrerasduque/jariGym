@@ -195,7 +195,7 @@ function ReportarPagoForm() {
   }, [formData.metodo_pago, formData.pagar_inscripcion, formData.pagar_mensualidad, formData.meses, inscripcionPagada, getMontoByMetodo]);
 
   const needsComprobante = (metodo: MetodoPago): boolean => {
-    return metodo !== "efectivo" && metodo !== "membresia_libre";
+    return metodo !== "efectivo";
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -572,19 +572,6 @@ function ReportarPagoForm() {
                     }`}
                   >
                     🟡 Binance
-                  </button>
-                )}
-                {metodosPago.find(m => m.metodo_pago === "transferencia")?.habilitado && (
-                  <button
-                    type="button"
-                    onClick={() => setFormData({ ...formData, metodo_pago: "transferencia" })}
-                    className={`p-3 rounded-xl text-sm font-medium transition-all ${
-                      formData.metodo_pago === "transferencia"
-                        ? "bg-gym-secondary text-white glow-secondary"
-                        : "bg-gym-bg text-gym-muted border border-gym-border hover:border-gym-secondary"
-                    }`}
-                  >
-                    🏦 Transferencia
                   </button>
                 )}
               </div>

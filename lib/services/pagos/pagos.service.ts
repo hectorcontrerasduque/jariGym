@@ -29,12 +29,6 @@ export class PagosService {
       estado: "pendiente",
     };
 
-    if (input.metodo_pago === "membresia_libre") {
-      pagoData.monto = 0;
-      pagoData.comprobante_url = null;
-      pagoData.codigo_billete = null;
-    }
-
     if (input.metodo_pago === "efectivo") {
       pagoData.comprobante_url = null;
     }

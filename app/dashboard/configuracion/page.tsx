@@ -16,7 +16,6 @@ const metodoLabels: Record<string, { label: string; icon: string; alwaysOn?: boo
   efectivo: { label: "Efectivo", icon: "💵", alwaysOn: true },
   bs: { label: "Bolívares", icon: "🇻🇪" },
   binance: { label: "Binance USDT", icon: "🟡" },
-  transferencia: { label: "Transferencia", icon: "🏦" },
 };
 
 export default function ConfiguracionPage() {

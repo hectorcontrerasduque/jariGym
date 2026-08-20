@@ -18,8 +18,6 @@ const metodoLabels: Record<MetodoPago, string> = {
   efectivo: "💵 Efectivo",
   bs: "🇻🇪 Bs",
   binance: "🟡 Binance",
-  transferencia: "🏦 Transferencia",
-  membresia_libre: "🎁 Libre",
 };
 
 function isInscripcion(pago: Pago): boolean {

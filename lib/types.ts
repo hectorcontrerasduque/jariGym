@@ -28,7 +28,7 @@ export interface Membresia {
   created_at: string;
 }
 
-export type MetodoPago = "efectivo" | "bs" | "binance" | "transferencia" | "membresia_libre";
+export type MetodoPago = "efectivo" | "bs" | "binance";
 
 export interface Pago {
   id: string;

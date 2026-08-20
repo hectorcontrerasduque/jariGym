@@ -225,7 +225,7 @@ export default function MisPagosPage() {
                         </Badge>
                       </div>
                       <div className="flex items-center gap-2 text-xs text-gym-muted">
-                        <span>{pago.metodo_pago === "efectivo" ? "💵" : pago.metodo_pago === "bs" ? "🇻🇪" : pago.metodo_pago === "binance" ? "🟡" : "🏦"} {pago.monto > 0 ? formatCurrency(pago.monto) : "Gratis"}</span>
+                        <span>{pago.metodo_pago === "efectivo" ? "💵" : pago.metodo_pago === "bs" ? "🇻🇪" : "🟡"} {pago.monto > 0 ? formatCurrency(pago.monto) : "Gratis"}</span>
                         {pago.fecha_pago_real && (
                           <>
                             <span>·</span>

@@ -2,6 +2,12 @@ import { createClient } from "@/lib/supabase/client";
 import { messages } from "@/lib/messages";
 import type { GymConfig, MetodoPago, MetodoPagoConfig } from "@/lib/types";
 
+const METODOS_DEFAULT: { metodo_pago: MetodoPago; habilitado: boolean }[] = [
+  { metodo_pago: "efectivo", habilitado: true },
+  { metodo_pago: "bs", habilitado: false },
+  { metodo_pago: "binance", habilitado: false },
+];
+
 export class ConfigService {
   private supabase = createClient();
 
@@ -103,14 +109,30 @@ export class ConfigService {
   }
 
   async getMetodosPago(): Promise<MetodoPagoConfig[]> {
-    const { data, error } = await this.supabase
+    const { data: existing } = await this.supabase
       .from("gym_config_metodos_pago")
       .select("*")
-      .eq("habilitado", true)
       .order("metodo_pago");
 
-    if (error) throw error;
-    return data || [];
+    const existingMap = new Map((existing || []).map((m) => [m.metodo_pago, m]));
+
+    for (const def of METODOS_DEFAULT) {
+      if (!existingMap.has(def.metodo_pago)) {
+        const { data: inserted } = await this.supabase
+          .from("gym_config_metodos_pago")
+          .insert({
+            metodo_pago: def.metodo_pago,
+            monto_mensual: 0,
+            monto_inscripcion: 0,
+            habilitado: def.habilitado,
+          })
+          .select()
+          .single();
+        if (inserted) existingMap.set(def.metodo_pago, inserted);
+      }
+    }
+
+    return Array.from(existingMap.values()).sort((a, b) => a.metodo_pago.localeCompare(b.metodo_pago));
   }
 
   async updateMetodoPago(id: string, updates: Partial<MetodoPagoConfig>): Promise<MetodoPagoConfig> {

@@ -180,29 +180,31 @@ export function Sidebar() {
                 key={item.href}
                 href={item.href}
                 className={cn(
-                  "flex flex-col items-center gap-1 px-3 py-1 rounded-lg transition-all",
+                  "flex-1 flex flex-col items-center gap-1 py-1 rounded-lg transition-all",
                   isActive
                     ? "text-gym-primary shadow-[0_0_10px_rgba(56,189,248,0.3)]"
                     : "text-gym-muted"
                 )}
               >
                 <item.icon className="w-5 h-5" />
-                <span className="text-[10px] font-medium">{item.label}</span>
+                <span className="text-[10px] font-medium truncate">{item.label}</span>
               </Link>
             );
           })}
-          <Link
-            href="/dashboard/perfil"
-            className={cn(
-              "flex flex-col items-center gap-1 px-3 py-1 rounded-lg transition-all",
-              pathname === "/dashboard/perfil"
-                ? "text-gym-primary shadow-[0_0_10px_rgba(56,189,248,0.3)]"
-                : "text-gym-muted"
-            )}
-          >
-            <User className="w-5 h-5" />
-            <span className="text-[10px] font-medium">Perfil</span>
-          </Link>
+          {!isAdmin && (
+            <Link
+              href="/dashboard/perfil"
+              className={cn(
+                "flex-1 flex flex-col items-center gap-1 py-1 rounded-lg transition-all",
+                pathname === "/dashboard/perfil"
+                  ? "text-gym-primary shadow-[0_0_10px_rgba(56,189,248,0.3)]"
+                  : "text-gym-muted"
+              )}
+            >
+              <User className="w-5 h-5" />
+              <span className="text-[10px] font-medium">Perfil</span>
+            </Link>
+          )}
         </div>
       </nav>
     </>

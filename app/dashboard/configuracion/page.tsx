@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { configService } from "@/lib/services/config/config.service";
 import { createClient } from "@/lib/supabase/client";
-import { Save, Building2, User, CreditCard, Clock, Globe, Upload, Dumbbell } from "lucide-react";
+import { Save, Building2, User, CreditCard, Clock, Globe, Upload, Dumbbell, Trash2 } from "lucide-react";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { showToast } from "@/components/ui/toast";
 import { messages } from "@/lib/messages";
@@ -132,6 +132,22 @@ export default function ConfiguracionPage() {
     }
   };
 
+  const handleLogoDelete = async () => {
+    setUploadingLogo(true);
+    try {
+      const supabase = createClient();
+      await supabase.storage.from("logos").remove(["logo.png", "logo.jpg", "logo.jpeg", "logo.webp"]);
+      setConfig((prev) => ({ ...prev, logo_url: "" }));
+      await configService.updateConfig({ logo_url: "" });
+      showToast("Logo eliminado", "success");
+    } catch (error) {
+      showToast("Error al eliminar logo", "error");
+    } finally {
+      setUploadingLogo(false);
+      if (logoInputRef.current) logoInputRef.current.value = "";
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -218,6 +234,18 @@ export default function ConfiguracionPage() {
                 )}
                 {config.logo_url ? "Cambiar" : "Subir logo"}
               </Button>
+              {config.logo_url && (
+                <Button
+                  type="button"
+                  variant="danger"
+                  size="sm"
+                  onClick={handleLogoDelete}
+                  disabled={uploadingLogo}
+                  className="ml-2"
+                >
+                  <Trash2 className="w-4 h-4 mr-1" /> Eliminar
+                </Button>
+              )}
             </div>
           </div>
 

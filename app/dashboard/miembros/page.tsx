@@ -23,7 +23,7 @@ export default function MiembrosPage() {
   const [busqueda, setBusqueda] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [stats, setStats] = useState({ totalMiembros: 0, membresiaLibre: 0 });
+  const [stats, setStats] = useState({ totalMiembros: 0, membresiaLibre: 0, maxMiembros: 50 });
 
   const [selectedMiembro, setSelectedMiembro] = useState<Profile | null>(null);
   const [modalDetalle, setModalDetalle] = useState(false);
@@ -54,12 +54,13 @@ export default function MiembrosPage() {
         setCurrentUser(profile);
       }
 
-      const [data, statsData] = await Promise.all([
+      const [data, statsData, configData] = await Promise.all([
         miembrosService.listarMiembros(),
         miembrosService.stats(),
+        supabase.from("gym_config").select("max_miembros").maybeSingle(),
       ]);
       setMiembros(data);
-      setStats(statsData);
+      setStats({ ...statsData, maxMiembros: configData?.data?.max_miembros || 50 });
     } catch (error) {
       showToast(messages.toast.errorCargaDatos, "error");
     } finally {
@@ -261,7 +262,7 @@ export default function MiembrosPage() {
       {/* Mobile floating button */}
       <button
         onClick={() => setModalNuevo(true)}
-        className="sm:hidden fixed bottom-20 right-4 z-40 w-14 h-14 rounded-full bg-gym-primary text-gym-bg shadow-lg shadow-gym-primary/30 flex items-center justify-center active:scale-95 transition-all"
+        className="sm:hidden fixed bottom-20 right-4 z-40 w-14 h-14 rounded-full bg-gym-success/80 text-white shadow-lg shadow-gym-success/20 flex items-center justify-center active:scale-95 transition-all"
       >
         <Plus className="w-6 h-6" />
       </button>
@@ -271,7 +272,7 @@ export default function MiembrosPage() {
         <Card className="neon-card">
           <CardContent className="p-3 text-center">
             <Users className="w-5 h-5 text-gym-primary mx-auto mb-1" />
-            <p className="text-xl font-bold text-gym-text neon-text">{stats.totalMiembros}</p>
+            <p className="text-xl font-bold text-gym-text neon-text">{stats.totalMiembros}/{stats.maxMiembros}</p>
             <p className="text-xs text-gym-muted">Total</p>
           </CardContent>
         </Card>

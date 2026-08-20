@@ -37,12 +37,6 @@ export async function GET(request: Request) {
           .eq("id", user.id);
       }
 
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("role, activo")
-        .eq("id", user.id)
-        .single();
-
       const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL;
       const isAdminByEmail = adminEmail && user.email === adminEmail;
 
@@ -97,12 +91,18 @@ export async function GET(request: Request) {
         }
       }
 
-      if (isGymOwner && profile.role !== "super_admin") {
+      if (profile && isGymOwner && profile.role !== "super_admin") {
         await supabase
           .from("profiles")
           .update({ role: "super_admin" })
           .eq("id", user.id);
         profile.role = "super_admin";
+      }
+
+      if (!profile) {
+        await supabase.auth.signOut();
+        const msg = encodeURIComponent(messages.auth.userNotRegistered);
+        return NextResponse.redirect(`${origin}/login?error=${msg}`);
       }
 
       const isAdmin = isAdminByEmail || profile.role === "super_admin" || profile.role === "admin";

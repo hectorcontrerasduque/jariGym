@@ -1,6 +1,9 @@
 -- 026: Limpiar tablas para re-migración
 -- ADVERTENCIA: Ejecutar solo si se necesita reiniciar los datos de miembros
 
+-- 2. Limpiar tokens
+TRUNCATE TABLE password_reset_tokens RESTART IDENTITY;
+
 -- 1. Limpiar pagos (preserva estructura)
 TRUNCATE TABLE pagos RESTART IDENTITY;
 

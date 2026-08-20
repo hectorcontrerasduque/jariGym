@@ -23,6 +23,7 @@ const adminNavItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/dashboard/pagos", label: "Pagos", icon: CreditCard },
   { href: "/dashboard/miembros", label: "Miembros", icon: Users },
+  { href: "/dashboard/mis-pagos", label: "Mis Pagos", icon: CreditCard },
   { href: "/dashboard/configuracion", label: "Config", icon: Settings },
 ];
 

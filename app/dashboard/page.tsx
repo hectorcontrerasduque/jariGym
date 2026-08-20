@@ -106,18 +106,18 @@ export default function DashboardPage() {
 
       {isSuperAdmin && (
         <div className="admin-welcome-banner rounded-2xl p-4 sm:p-5 relative z-10 overflow-hidden">
-          <div className="absolute top-2 right-4 w-2 h-2 bg-gym-primary rounded-full animate-float" style={{ animationDelay: "0s" }} />
-          <div className="absolute top-4 right-10 w-1.5 h-1.5 bg-gym-secondary rounded-full animate-float" style={{ animationDelay: "0.5s" }} />
-          <div className="absolute bottom-3 right-6 w-1 h-1 bg-gym-success rounded-full animate-float" style={{ animationDelay: "1s" }} />
+          <div className="absolute top-2 right-4 w-2 h-2 bg-yellow-400 rounded-full animate-float" style={{ animationDelay: "0s" }} />
+          <div className="absolute top-4 right-10 w-1.5 h-1.5 bg-amber-300 rounded-full animate-float" style={{ animationDelay: "0.5s" }} />
+          <div className="absolute bottom-3 right-6 w-1 h-1 bg-yellow-500 rounded-full animate-float" style={{ animationDelay: "1s" }} />
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-gym-primary to-gym-secondary flex items-center justify-center shadow-lg shadow-gym-primary/30">
-              <span className="text-lg">⚡</span>
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-yellow-400 to-amber-500 flex items-center justify-center shadow-lg shadow-yellow-500/30">
+              <span className="text-lg">👑</span>
             </div>
             <div>
-              <p className="text-sm font-display font-bold text-gym-text">
-                <span className="neon-text">Bienvenido, Admin</span>
+              <p className="text-sm font-display font-bold">
+                <span className="neon-gold">Bienvenido, Dueño</span>
               </p>
-              <p className="text-xs text-gym-muted">Tienes acceso total al sistema</p>
+              <p className="text-xs text-gym-muted">Acceso total al sistema</p>
             </div>
           </div>
         </div>

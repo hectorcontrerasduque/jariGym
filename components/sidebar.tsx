@@ -83,7 +83,7 @@ export function Sidebar() {
               </div>
             </Link>
             <div className="min-w-0">
-              <p className={cn("text-sm font-medium text-gym-text truncate", isSuperAdmin && "neon-text")}>
+              <p className={cn("text-sm font-medium text-gym-text truncate", isSuperAdmin && "neon-gold")}>
                 {profile?.nombre_completo || "Usuario"}
               </p>
               <p className="text-[10px] text-gym-muted truncate">
@@ -104,15 +104,15 @@ export function Sidebar() {
       <aside className="hidden md:flex fixed left-0 top-0 h-full w-64 bg-gym-surface/80 backdrop-blur-xl border-r border-gym-border/50 flex-col z-40">
         <div className="p-6 border-b border-gym-border/50">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gym-primary/20 rounded-xl flex items-center justify-center animate-pulse-glow overflow-hidden">
+            <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center overflow-hidden", isSuperAdmin ? "bg-gradient-to-br from-yellow-500/30 to-amber-600/30 shadow-[0_0_15px_rgba(251,191,36,0.3)]" : "bg-gym-primary/20 animate-pulse-glow")}>
               {gymLogo ? (
                 <img src={gymLogo} alt={gymName} className="w-full h-full object-cover" />
               ) : (
-                <Dumbbell className="w-6 h-6 text-gym-primary" />
+                <Dumbbell className={cn("w-6 h-6", isSuperAdmin ? "text-yellow-400" : "text-gym-primary")} />
               )}
             </div>
             <div>
-              <h1 className="font-display font-bold text-gym-text neon-text">{gymName}</h1>
+              <h1 className={cn("font-display font-bold text-gym-text", isSuperAdmin ? "neon-gold" : "neon-text")}>{gymName}</h1>
               <p className="text-xs text-gym-muted">Gestión inteligente</p>
             </div>
           </div>
@@ -156,7 +156,7 @@ export function Sidebar() {
               />
             </div>
             <div className="flex-1 min-w-0">
-              <p className={cn("text-sm font-medium text-gym-text truncate", isSuperAdmin && "neon-text")}>
+              <p className={cn("text-sm font-medium text-gym-text truncate", isSuperAdmin && "neon-gold")}>
                 {profile?.nombre_completo || "Usuario"}
               </p>
               <p className="text-xs text-gym-muted truncate">

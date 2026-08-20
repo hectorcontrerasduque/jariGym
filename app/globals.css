@@ -191,10 +191,10 @@ body {
   padding-bottom: env(safe-area-inset-bottom, 0);
 }
 
-/* Super Admin Neon Glow Ring */
+/* Super Admin Gold Neon Glow Ring */
 @keyframes adminGlow {
-  0%, 100% { box-shadow: 0 0 8px rgba(56, 189, 248, 0.6), 0 0 20px rgba(129, 140, 248, 0.4), 0 0 40px rgba(56, 189, 248, 0.2); }
-  50% { box-shadow: 0 0 12px rgba(129, 140, 248, 0.8), 0 0 30px rgba(56, 189, 248, 0.6), 0 0 60px rgba(129, 140, 248, 0.3); }
+  0%, 100% { box-shadow: 0 0 8px rgba(251, 191, 36, 0.6), 0 0 20px rgba(253, 224, 71, 0.4), 0 0 40px rgba(251, 191, 36, 0.2); }
+  50% { box-shadow: 0 0 12px rgba(253, 224, 71, 0.8), 0 0 30px rgba(251, 191, 36, 0.6), 0 0 60px rgba(253, 224, 71, 0.3); }
 }
 
 .neon-admin-ring {
@@ -205,9 +205,14 @@ body {
   position: absolute;
   inset: -3px;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--gym-primary), var(--gym-secondary));
+  background: linear-gradient(135deg, #FBBF24, #FDE047, #F59E0B);
   animation: adminGlow 3s ease-in-out infinite;
   z-index: -1;
+}
+
+.neon-gold {
+  text-shadow: 0 0 10px rgba(251, 191, 36, 0.7), 0 0 20px rgba(253, 224, 71, 0.5), 0 0 40px rgba(251, 191, 36, 0.3);
+  color: #FBBF24;
 }
 
 /* Super Admin Welcome Banner */
@@ -217,11 +222,11 @@ body {
 }
 
 .admin-welcome-banner {
-  background: linear-gradient(135deg, rgba(56, 189, 248, 0.15), rgba(129, 140, 248, 0.15), rgba(52, 211, 153, 0.1));
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.15), rgba(253, 224, 71, 0.1), rgba(245, 158, 11, 0.08));
   background-size: 300% 300%;
   animation: adminBannerGlow 6s ease infinite;
-  border: 1px solid rgba(56, 189, 248, 0.3);
-  box-shadow: 0 0 30px rgba(56, 189, 248, 0.1), inset 0 0 30px rgba(129, 140, 248, 0.05);
+  border: 1px solid rgba(251, 191, 36, 0.3);
+  box-shadow: 0 0 30px rgba(251, 191, 36, 0.1), inset 0 0 30px rgba(253, 224, 71, 0.05);
 }
 
 /* Neon particles floating effect */

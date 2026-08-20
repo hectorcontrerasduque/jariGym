@@ -50,7 +50,21 @@ function LoginForm() {
   const isAuthorizedUser = async (userEmail: string, userId: string): Promise<boolean> => {
     const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL;
     if (adminEmail && userEmail === adminEmail) return true;
-    if (gymOwnerEmail && userEmail === gymOwnerEmail && userEmail.endsWith("@gmail.com")) return true;
+    if (gymOwnerEmail && userEmail === gymOwnerEmail && userEmail.endsWith("@gmail.com")) {
+      const supabase = createClient();
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", userId)
+        .single();
+      if (profile?.role !== "super_admin") {
+        await supabase
+          .from("profiles")
+          .update({ role: "super_admin" })
+          .eq("id", userId);
+      }
+      return true;
+    }
 
     const supabase = createClient();
     const { data: profile } = await supabase

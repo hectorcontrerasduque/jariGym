@@ -35,10 +35,12 @@ app/
     mis-pagos/       # Miembro's own payment history
     perfil/          # Profile edit (supports ?user_id for super_admin)
   api/miembros/      # POST endpoint for creating members
+  api/migracion/     # POST: migrate member data from Excel, search, ping
   api/profile/       # PUT endpoint for profile updates (uses service role key)
   api/auth/
     forgot-password/ # POST: generates token + sends email via Gmail SMTP
     reset-password/  # POST: validates token + sets new password
+    ensure-super-admin/ # POST: creates or promotes super_admin profile
 lib/
   supabase/
     client.ts       # Browser client (createBrowserClient)
@@ -48,7 +50,7 @@ lib/
     auth/           # signIn, resetPassword, getProfile
     config/         # Config CRUD + dueno email promotion on change
     email/          # nodemailer Gmail SMTP service
-    email/templates/ # HTML email templates (reset password)
+    email/templates/ # HTML email templates (reset password, welcome)
     miembros/       # Miembros CRUD + stats
     pagos/          # Pagos CRUD + approval
     notificaciones/ # Notification service
@@ -67,6 +69,8 @@ components/
 supabase/
   migrations/       # SQL migrations (run manually in Supabase SQL Editor)
   functions/        # Deno Edge Functions (deploy via Supabase CLI)
+__tests__/
+  migracion.test.ts # Unit tests for migration flow
 ```
 
 ## Critical: Supabase Client Pattern
@@ -95,7 +99,7 @@ Schema managed via numbered SQL files in `supabase/migrations/`. Run manually:
 1. Go to Supabase Dashboard → SQL Editor
 2. Paste migration content → Run
 
-Tables: `tenants`, `profiles`, `planes`, `membresias`, `pagos`, `gym_config`, `notificaciones_config`, `notificaciones_log`, `password_reset_tokens`
+Tables: `tenants`, `profiles`, `planes`, `membresias`, `pagos`, `gym_config`, `gym_config_metodos_pago`, `migracion`, `notificaciones_config`, `notificaciones_log`, `password_reset_tokens`
 
 RLS uses helper functions (`get_user_role()`, `get_user_tenant_id()`) with `SECURITY DEFINER` to avoid infinite recursion. **Never create RLS policies that query the same table directly.**
 
@@ -115,7 +119,7 @@ RLS uses helper functions (`get_user_role()`, `get_user_tenant_id()`) with `SECU
 The gym owner (`super_admin` role) has distinct gold neon visual effects:
 - **CSS**: `neon-gold` (gold text-shadow), `neon-admin-ring` (animated gold gradient ring around avatar), `admin-welcome-banner` (animated gold gradient background)
 - **Sidebar**: Avatar with gold glow ring, gym logo with gold background `bg-gradient-to-br from-yellow-500/30 to-amber-600/30`, name in gold text
-- **Dashboard**: Welcome banner "Bienvenido, Dueño" with crown emoji, floating gold particles
+- **Dashboard**: Welcome banner "Bienvenido, Administrador" with crown emoji, floating gold particles (auto-fades at 5s)
 - **Access**: Can report payments, approve them, manage all members and config
 
 Detection in code:
@@ -171,6 +175,8 @@ inscripcion_fecha: string | null
 ### Config Service
 - `updateConfig()` strips read-only fields (`id`, `created_at`, `updated_at`) before Supabase update
 - When `dueno_email` changes, auto-promotes new email's profile to `super_admin`
+- `saveMetodosPago()` handles create/update/delete of payment methods. Returns void, errors are NOT thrown (silent).
+- When gym_config is empty (first save), reloads page after save to sync sidebar state
 
 ### Member Creation
 - POST `/api/miembros`: email required (no username), handles existing auth users, generates random password if empty
@@ -191,13 +197,62 @@ inscripcion_fecha: string | null
 - Delete: icon-only trash button (no text), removes from storage, sets `logo_url: ""`
 - Default fallback: `Dumbbell` icon when no logo
 
+### Member Self-Migration
+- Login page has "Ya soy miembro" link → opens migration modal
+- Flow: search by name → select match (if multiple) → create auth user + profile + pagos + inscription
+- Prerequisites: gym_config must exist + at least one enabled payment method with monto > 0
+- Only processes `pagado` (→ aprobado) and `suspendido` (→ suspendido) records from `migracion` table
+- Fuzzy name search: each word generates prefix match (word without last char) for partial matches
+- Welcome email sent to new users after migration
+
 ## Known Issues / TODO
 
+### Critical
+- [ ] **`aprobar_pago_atomico` RPC dropped** — migration 020 dropped this RPC but `aprobarPago` service still calls it. Payment approval may fail.
+- [ ] **`Profile.activo` type mismatch** — TypeScript says `boolean` but code handles `null` (null = active). Update type to `boolean | null`.
+- [ ] **`confirmLink` in migration route is broken** — generates magic link but throws it away, uses static callback URL. New users' emails never confirmed.
+
+### Code Quality
+- [ ] **Hardcoded messages in API routes** — `app/api/miembros/route.ts` (3 strings), `app/api/profile/route.ts` (2 strings), `lib/services/config/config.service.ts` (2 strings) should use `messages.ts`
+- [ ] **`ensure-super-admin` uses `listUsers()` to find one user** — fetches ALL auth users. Performance disaster. Should use filtered query.
+- [ ] **`saveMetodosPago` swallows all errors silently** — no error handling on RPC/insert/delete operations
+- [ ] **14+ empty `catch {}` blocks** across codebase silently swallow errors (see audit in chat history)
+- [ ] **`migrateStep: "error"` state is dead code** in login page — never set, never reached
+- [ ] **`errorConfig` and `existingUserTitle` messages defined but unused** in messages.ts
+
+### Features
 - [ ] No CI/CD pipelines
 - [ ] No rate limiting on API routes (except forgot-password: 3/hour)
 - [ ] Storage bucket `comprobantes` is private — need signed URLs for viewing
-- [ ] `gym_config_metodos_pago` monto_mensual fallback hardcoded to 5 when config missing
 - [ ] No confirmation modal for payment deletion (uses `confirm()`)
 - [ ] No pagination on pagos/miembros lists
 - [ ] No dark mode support
 - [ ] No PWA / offline support
+- [ ] Migration 026 is nuclear reset (TRUNCATE + DELETE) with no safety guard
+
+## Recent Git History (newest first)
+
+```
+b7fd848 fix: mensajes de error migración centralizados en messages.ts + sin console
+54f1b66 fix: inscripcion_pagada owner + prerequisito migración + mensajes error específicos
+786ca81 fix: inscripcion_pagada en migración + dueño + búsqueda fuzzy por nombre
+0e3725a fix: botón 'Generar pagos' con estilo primary como el resto
+96245ab fix: reload en config save solo en primer registro (sin config.id)
+8d9d73d feat: campo tipo_pago en pagos + fix migración estados + reload config save
+318dda1 fix: config save refactor - validación montos + ensure-super-admin usa nombre
+30c1097 fix: config save crea super_admin en primera vez + save resiliente
+bec76e1 fix: mover useEffect de redirect después de declarar isSuperAdmin
+171852d fix: sin config → super_admin solo ve Config, miembro ve mensaje
+```
+
+## Migrations Applied
+
+001–028 applied in Supabase SQL Editor. Key ones:
+- **019**: RPC functions (aprobar_pago_atomico, etc.) — **NOTE: 020 dropped these, breaking approval**
+- **020**: Dropped RPC functions
+- **025**: RLS for pagos suspendido + migracion (service_role only)
+- **026**: Nuclear reset — TRUNCATE pagos/membresias, DELETE all users/profiles/config
+- **027**: Added `registered` boolean to profiles
+- **028**: Added `tipo_pago` column to pagos (membresia/inscripcion)
+
+**Pending**: Push commits to origin (user must do from Windows: `git push`)

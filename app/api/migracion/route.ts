@@ -2,7 +2,6 @@ import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { messages } from "@/lib/messages";
 import { sendWelcomeEmail } from "@/lib/services/email/email.service";
-import { configService } from "@/lib/services/config/config.service";
 
 export async function POST(request: Request) {
   try {
@@ -28,6 +27,16 @@ export async function POST(request: Request) {
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
+
+    const { data: metodoEfectivo } = await supabase
+      .from("gym_config_metodos_pago")
+      .select("monto_mensual, monto_inscripcion")
+      .eq("metodo_pago", "efectivo")
+      .eq("habilitado", true)
+      .maybeSingle();
+
+    const montoMensual = metodoEfectivo?.monto_mensual || 0;
+    const montoInscripcion = metodoEfectivo?.monto_inscripcion || 0;
 
     const searchName = selectedNombre || nombre;
     const words = searchName.split(/\s+/).filter((w: string) => w.length >= 2);
@@ -120,6 +129,7 @@ export async function POST(request: Request) {
           const { error } = await supabase
             .from("pagos")
             .update({
+              monto: montoMensual,
               estado: "aprobado",
               notas: "Actualizado por migración de data",
               approved_at: new Date().toISOString(),
@@ -132,7 +142,7 @@ export async function POST(request: Request) {
           .from("pagos")
           .insert({
             usuario_id: userId,
-            monto: 0,
+            monto: montoMensual,
             estado: "aprobado",
             metodo_pago: "efectivo",
             mes_pagar: record.mes_pagar,
@@ -145,6 +155,34 @@ export async function POST(request: Request) {
     }
 
     await supabase
+      .from("profiles")
+      .update({ inscripcion_pagada: true })
+      .eq("id", userId);
+
+    const { data: inscripcionExistente } = await supabase
+      .from("pagos")
+      .select("id")
+      .eq("usuario_id", userId)
+      .ilike("notas", "%inscripción%")
+      .eq("anio_pagar", migracionRecords[0]?.anio_pagar || new Date().getFullYear())
+      .maybeSingle();
+
+    if (!inscripcionExistente) {
+      await supabase
+        .from("pagos")
+        .insert({
+          usuario_id: userId,
+          monto: montoInscripcion,
+          estado: "aprobado",
+          metodo_pago: "efectivo",
+          mes_pagar: migracionRecords[0]?.mes_pagar || 1,
+          anio_pagar: migracionRecords[0]?.anio_pagar || new Date().getFullYear(),
+          notas: "Inscripción - Registro por migración de data",
+          approved_at: new Date().toISOString(),
+        });
+    }
+
+    await supabase
       .from("migracion")
       .update({ migrado: "si" })
       .in("id", migracionRecords.map((r: any) => r.id));
@@ -153,7 +191,10 @@ export async function POST(request: Request) {
       let gymName = "GymApp";
       let gymLogo: string | null = null;
       try {
-        const config = await configService.getConfig();
+        const { data: config } = await supabase
+          .from("gym_config")
+          .select("nombre_gym, logo_url")
+          .maybeSingle();
         if (config?.nombre_gym) gymName = config.nombre_gym;
         if (config?.logo_url) gymLogo = config.logo_url;
       } catch {}

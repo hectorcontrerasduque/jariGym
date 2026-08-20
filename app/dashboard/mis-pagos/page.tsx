@@ -1,32 +1,29 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import { pagosService } from "@/lib/services/pagos/pagos.service";
 import { configService } from "@/lib/services/config/config.service";
 import { createClient } from "@/lib/supabase/client";
 import { formatCurrency, getMonthName } from "@/lib/utils";
-import { CreditCard, CheckCircle, Clock, Calendar, Trash2, FileText, Plus, Search, User } from "lucide-react";
+import { CreditCard, CheckCircle, Clock, Calendar, Trash2, FileText, Plus, Search, User, DollarSign, Upload, Send, Gift, AlertTriangle } from "lucide-react";
 import { showToast } from "@/components/ui/toast";
 import { messages } from "@/lib/messages";
-import type { Pago, Profile, MetodoPago } from "@/lib/types";
+import type { Pago, Profile, MetodoPago, MetodoPagoConfig, GymConfig } from "@/lib/types";
+
+const MESES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 
 function getPagoLabel(pago: Pago): string {
-  const isInscripcion = pago.notas?.toLowerCase().includes("inscripción") || pago.notas?.toLowerCase().includes("inscripcion");
-  if (isInscripcion) return "Inscripción";
+  if (pago.tipo_pago === "inscripcion") return "Inscripción";
   return `${getMonthName(pago.mes_pagar)} ${pago.anio_pagar}`;
 }
 
 function getPagoIcon(pago: Pago) {
-  const isInscripcion = pago.notas?.toLowerCase().includes("inscripción") || pago.notas?.toLowerCase().includes("inscripcion");
-  if (isInscripcion) return <FileText className="w-5 h-5 text-gym-primary" />;
+  if (pago.tipo_pago === "inscripcion") return <FileText className="w-5 h-5 text-gym-primary" />;
   return <Calendar className="w-5 h-5 text-gym-secondary" />;
 }
-
-const MESES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 
 export default function MisPagosPage() {
   const [pagos, setPagos] = useState<Pago[]>([]);
@@ -35,22 +32,36 @@ export default function MisPagosPage() {
   const [deleting, setDeleting] = useState<string | null>(null);
   const [anios, setAnios] = useState<number[]>([]);
   const [anioSeleccionado, setAnioSeleccionado] = useState(new Date().getFullYear());
+  const [gymConfig, setGymConfig] = useState<GymConfig | null>(null);
 
   const isSuperAdmin = profile?.role === "super_admin";
+  const isAdmin = profile?.role === "super_admin" || profile?.role === "admin";
 
+  // Super admin: member selector
   const [miembros, setMiembros] = useState<Profile[]>([]);
   const [miembroSearch, setMiembroSearch] = useState("");
   const [miembroSeleccionado, setMiembroSeleccionado] = useState<Profile | null>(null);
   const [showSearch, setShowSearch] = useState(false);
 
-  const [pagoForm, setPagoForm] = useState({
-    mes: new Date().getMonth() + 1,
-    anio: new Date().getFullYear(),
-    metodo_pago: "efectivo" as MetodoPago,
-    notas: "",
-  });
-  const [metodosPago, setMetodosPago] = useState<{ metodo_pago: MetodoPago; habilitado: boolean; monto_mensual: number }[]>([]);
+  // Payment form
+  const [showForm, setShowForm] = useState(false);
+  const [metodosPago, setMetodosPago] = useState<MetodoPagoConfig[]>([]);
+  const [mesesPendientes, setMesesPendientes] = useState<{ mes: number; anio: number }[]>([]);
+  const [inscripcionPagada, setInscripcionPagada] = useState(false);
+  const [inscripcionPendiente, setInscripcionPendiente] = useState(false);
+  const [membresiaLibre, setMembresiaLibre] = useState(false);
   const [savingPago, setSavingPago] = useState(false);
+
+  const [formData, setFormData] = useState({
+    meses: [] as { mes: number; anio: number }[],
+    metodo_pago: "efectivo" as MetodoPago,
+    codigo_billete: "",
+    notas: "",
+    pagar_inscripcion: false,
+    pagar_mensualidad: false,
+    fecha_pago: new Date().toISOString().split("T")[0],
+  });
+  const [comprobante, setComprobante] = useState<File | null>(null);
 
   const loadData = useCallback(async () => {
     try {
@@ -65,22 +76,27 @@ export default function MisPagosPage() {
         .single();
       setProfile(profileData);
 
-      const isAdmin = profileData?.role === "super_admin" || profileData?.role === "admin";
       const targetId = miembroSeleccionado?.id || user.id;
 
-      const [pagosData, aniosData] = await Promise.all([
-        isAdmin ? pagosService.listarPagosUsuario(targetId, anioSeleccionado) : pagosService.listarMisPagos(anioSeleccionado),
+      const [pagosData, aniosData, config] = await Promise.all([
+        pagosService.listarPagosUsuario(targetId, anioSeleccionado),
         pagosService.aniosConPagos(targetId),
+        configService.getConfig(),
       ]);
       setPagos(pagosData);
       setAnios(aniosData);
+      setGymConfig(config);
+
+      const metodos = await configService.getMetodosPago();
+      setMetodosPago(metodos);
 
       if (isAdmin) {
-        const [metodosData, { data: miembrosData }] = await Promise.all([
-          configService.getMetodosPago(),
-          supabase.from("profiles").select("*").eq("activo", true).eq("registered", true).order("nombre_completo"),
-        ]);
-        setMetodosPago(metodosData);
+        const { data: miembrosData } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("activo", true)
+          .eq("registered", true)
+          .order("nombre_completo");
         if (miembrosData) setMiembros(miembrosData);
       }
     } catch (error) {
@@ -88,39 +104,104 @@ export default function MisPagosPage() {
     } finally {
       setLoading(false);
     }
-  }, [anioSeleccionado, miembroSeleccionado]);
+  }, [anioSeleccionado, miembroSeleccionado, isAdmin]);
 
   useEffect(() => { loadData(); }, [loadData]);
+
+  // Load pending months when member changes
+  const loadMiembroPendientes = useCallback(async (miembroId: string) => {
+    try {
+      const [meses, profile, libre, tienePendiente] = await Promise.all([
+        pagosService.mesesPendientesAdmin(miembroId),
+        createClient().from("profiles").select("inscripcion_pagada").eq("id", miembroId).single(),
+        createClient().from("membresias").select("id").eq("usuario_id", miembroId).is("fecha_fin", null).maybeSingle(),
+        pagosService.tieneInscripcionPendiente(miembroId),
+      ]);
+      setMesesPendientes(meses);
+      if (profile.data) setInscripcionPagada(profile.data.inscripcion_pagada);
+      setInscripcionPendiente(tienePendiente);
+      setMembresiaLibre(!!libre.data);
+      setFormData(prev => ({ ...prev, meses: [], pagar_inscripcion: false, pagar_mensualidad: false }));
+    } catch {
+      showToast(messages.toast.errorCargaDatos, "error");
+    }
+  }, []);
+
+  const loadSelfPendientes = useCallback(async (userId: string) => {
+    try {
+      const [meses, profile, libre, tienePendiente] = await Promise.all([
+        pagosService.mesesPendientes(userId),
+        createClient().from("profiles").select("inscripcion_pagada").eq("id", userId).single(),
+        createClient().from("membresias").select("id").eq("usuario_id", userId).is("fecha_fin", null).maybeSingle(),
+        pagosService.tieneInscripcionPendiente(userId),
+      ]);
+      setMesesPendientes(meses);
+      if (profile.data) setInscripcionPagada(profile.data.inscripcion_pagada);
+      setInscripcionPendiente(tienePendiente);
+      setMembresiaLibre(!!libre.data);
+      setFormData(prev => ({ ...prev, meses: [], pagar_inscripcion: false, pagar_mensualidad: false }));
+    } catch {
+      showToast(messages.toast.errorCargaDatos, "error");
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!showForm) return;
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return;
+      const targetId = miembroSeleccionado?.id || user.id;
+      if (miembroSeleccionado) {
+        loadMiembroPendientes(targetId);
+      } else {
+        loadSelfPendientes(targetId);
+      }
+    });
+  }, [showForm, miembroSeleccionado, loadMiembroPendientes, loadSelfPendientes]);
 
   const handleSelectMiembro = (m: Profile | null) => {
     setMiembroSeleccionado(m);
     setShowSearch(false);
     setMiembroSearch("");
-    setPagoForm({ mes: new Date().getMonth() + 1, anio: new Date().getFullYear(), metodo_pago: "efectivo", notas: "" });
+    setFormData({ meses: [], metodo_pago: "efectivo", codigo_billete: "", notas: "", pagar_inscripcion: false, pagar_mensualidad: false, fecha_pago: new Date().toISOString().split("T")[0] });
   };
 
-  const handleSelfPay = () => {
-    setMiembroSeleccionado(null);
-    setPagoForm({ mes: new Date().getMonth() + 1, anio: new Date().getFullYear(), metodo_pago: "efectivo", notas: "" });
+  const toggleMonth = (mes: number, anio: number) => {
+    setFormData(prev => {
+      const existe = prev.meses.some(m => m.mes === mes && m.anio === anio);
+      const meses = existe ? prev.meses.filter(m => !(m.mes === mes && m.anio === anio)) : [...prev.meses, { mes, anio }];
+      return { ...prev, meses, pagar_mensualidad: meses.length > 0 ? true : prev.pagar_mensualidad };
+    });
   };
 
-  const mesesDisponibles = MESES.filter((m) => {
-    const alreadyPaid = pagos.some(
-      (p) => p.mes_pagar === m && p.anio_pagar === pagoForm.anio && (p.estado === "aprobado" || p.estado === "pendiente")
-    );
-    return !alreadyPaid;
-  });
-
-  const getMontoByMetodo = (metodo: MetodoPago): number => {
-    const config = metodosPago.find((m) => m.metodo_pago === metodo);
-    return config?.monto_mensual || 0;
+  const selectAllMonths = () => {
+    setFormData(prev => ({ ...prev, meses: [...mesesPendientes], pagar_mensualidad: true }));
   };
 
-  const handleQuickPay = async () => {
-    if (mesesDisponibles.length === 0 && mesesDisponibles.indexOf(pagoForm.mes) === -1) {
-      showToast("Selecciona un mes válido", "error");
-      return;
+  const getMontoByMetodo = useCallback((metodo: MetodoPago, tipo: "mensual" | "inscripcion"): number => {
+    const config = metodosPago.find(m => m.metodo_pago === metodo);
+    if (!config || !config.habilitado) {
+      const def = metodosPago.find(m => m.metodo_pago === "efectivo");
+      return tipo === "mensual" ? (def?.monto_mensual || 0) : (def?.monto_inscripcion || 0);
     }
+    return tipo === "mensual" ? config.monto_mensual : config.monto_inscripcion;
+  }, [metodosPago]);
+
+  const montoTotal = useMemo(() => {
+    let total = 0;
+    if (formData.pagar_inscripcion && !inscripcionPagada && getMontoByMetodo(formData.metodo_pago, "inscripcion") > 0) {
+      total += getMontoByMetodo(formData.metodo_pago, "inscripcion");
+    }
+    if (formData.pagar_mensualidad && formData.meses.length > 0) {
+      total += formData.meses.length * getMontoByMetodo(formData.metodo_pago, "mensual");
+    }
+    return total;
+  }, [formData, inscripcionPagada, getMontoByMetodo]);
+
+  const needsComprobante = (metodo: MetodoPago) => metodo !== "efectivo";
+
+  const handleSubmitPago = async (e: React.FormEvent) => {
+    e.preventDefault();
     setSavingPago(true);
     try {
       const supabase = createClient();
@@ -130,31 +211,62 @@ export default function MisPagosPage() {
       const targetId = miembroSeleccionado?.id || user.id;
       const isSelf = !miembroSeleccionado || miembroSeleccionado.id === user.id;
 
-      if (isSelf) {
-        await pagosService.crearPagoAprobado({
-          usuario_id: targetId,
-          monto: getMontoByMetodo(pagoForm.metodo_pago),
-          mes_pagar: pagoForm.mes,
-          anio_pagar: pagoForm.anio,
-          metodo_pago: pagoForm.metodo_pago,
-          tipo_pago: "membresia",
-          notas: pagoForm.notas || undefined,
-        });
-        showToast("Pago registrado y aprobado", "success");
-      } else {
-        await pagosService.crearPago({
-          usuario_id: targetId,
-          monto: getMontoByMetodo(pagoForm.metodo_pago),
-          mes_pagar: pagoForm.mes,
-          anio_pagar: pagoForm.anio,
-          metodo_pago: pagoForm.metodo_pago,
-          tipo_pago: "membresia",
-          notas: pagoForm.notas || undefined,
-        });
-        showToast("Pago registrado (pendiente de aprobación)", "success");
+      if (!formData.pagar_inscripcion && !formData.pagar_mensualidad) {
+        throw new Error("Selecciona al menos inscripción o mensualidad");
+      }
+      if (formData.pagar_mensualidad && formData.meses.length === 0) {
+        throw new Error("Selecciona al menos un mes");
       }
 
-      setPagoForm({ mes: new Date().getMonth() + 1, anio: new Date().getFullYear(), metodo_pago: "efectivo", notas: "" });
+      let comprobanteUrl = "";
+      if (needsComprobante(formData.metodo_pago) && comprobante) {
+        const fileName = `${targetId}/${Date.now()}_${comprobante.name}`;
+        const { error: uploadError } = await supabase.storage.from("comprobantes").upload(fileName, comprobante);
+        if (uploadError) throw uploadError;
+        const { data: urlData } = supabase.storage.from("comprobantes").getPublicUrl(fileName);
+        comprobanteUrl = urlData.publicUrl;
+      }
+
+      if (formData.pagar_inscripcion && !inscripcionPagada && getMontoByMetodo(formData.metodo_pago, "inscripcion") > 0) {
+        if (isSelf) {
+          await pagosService.crearPagoAprobado({
+            usuario_id: targetId, monto: getMontoByMetodo(formData.metodo_pago, "inscripcion"),
+            mes_pagar: new Date().getMonth() + 1, anio_pagar: new Date().getFullYear(),
+            metodo_pago: formData.metodo_pago, tipo_pago: "inscripcion",
+            comprobante_url: comprobanteUrl || undefined, notas: "Inscripción", fecha_pago_real: formData.fecha_pago,
+          });
+        } else {
+          await pagosService.crearPago({
+            usuario_id: targetId, monto: getMontoByMetodo(formData.metodo_pago, "inscripcion"),
+            mes_pagar: new Date().getMonth() + 1, anio_pagar: new Date().getFullYear(),
+            metodo_pago: formData.metodo_pago, tipo_pago: "inscripcion",
+            comprobante_url: comprobanteUrl || undefined, notas: "Inscripción", fecha_pago_real: formData.fecha_pago,
+          });
+        }
+      }
+
+      if (formData.pagar_mensualidad && formData.meses.length > 0) {
+        for (const { mes, anio } of formData.meses) {
+          if (isSelf) {
+            await pagosService.crearPagoAprobado({
+              usuario_id: targetId, monto: getMontoByMetodo(formData.metodo_pago, "mensual"),
+              mes_pagar: mes, anio_pagar: anio, metodo_pago: formData.metodo_pago, tipo_pago: "membresia",
+              comprobante_url: comprobanteUrl || undefined, notas: formData.notas || undefined, fecha_pago_real: formData.fecha_pago,
+            });
+          } else {
+            await pagosService.crearPago({
+              usuario_id: targetId, monto: getMontoByMetodo(formData.metodo_pago, "mensual"),
+              mes_pagar: mes, anio_pagar: anio, metodo_pago: formData.metodo_pago, tipo_pago: "membresia",
+              comprobante_url: comprobanteUrl || undefined, notas: formData.notas || undefined, fecha_pago_real: formData.fecha_pago,
+            });
+          }
+        }
+      }
+
+      showToast(isSelf ? "Pago registrado y aprobado" : "Pago registrado (pendiente de aprobación)", "success");
+      setShowForm(false);
+      setFormData({ meses: [], metodo_pago: "efectivo", codigo_billete: "", notas: "", pagar_inscripcion: false, pagar_mensualidad: false, fecha_pago: new Date().toISOString().split("T")[0] });
+      setComprobante(null);
       await loadData();
     } catch (err: any) {
       showToast(err.message || "Error al registrar pago", "error");
@@ -177,18 +289,17 @@ export default function MisPagosPage() {
     }
   };
 
-  const aprobados = pagos.filter((p) => p.estado === "aprobado");
-  const pendientes = pagos.filter((p) => p.estado === "pendiente");
+  const aprobados = pagos.filter(p => p.estado === "aprobado");
+  const pendientes = pagos.filter(p => p.estado === "pendiente");
   const montoAprobado = aprobados.reduce((sum, p) => sum + (p.monto || 0), 0);
   const montoPendiente = pendientes.reduce((sum, p) => sum + (p.monto || 0), 0);
 
-  const filteredMiembros = miembros.filter((m) => {
-    const search = miembroSearch.toLowerCase();
-    return (
-      m.nombre_completo?.toLowerCase().includes(search) ||
-      m.email?.toLowerCase().includes(search)
-    );
+  const filteredMiembros = miembros.filter(m => {
+    const s = miembroSearch.toLowerCase();
+    return m.nombre_completo?.toLowerCase().includes(s) || m.email?.toLowerCase().includes(s);
   });
+
+  const showInscriptionCheckbox = !inscripcionPagada && !inscripcionPendiente && gymConfig && getMontoByMetodo(formData.metodo_pago, "inscripcion") > 0;
 
   if (loading) {
     return (
@@ -200,15 +311,12 @@ export default function MisPagosPage() {
 
   return (
     <div className="space-y-4 animate-fadeIn">
+      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-2xl font-display font-bold text-gym-text neon-text">Mis Pagos</h1>
           <p className="text-gym-muted text-sm">
-            {isSuperAdmin
-              ? miembroSeleccionado
-                ? `Pagos de ${miembroSeleccionado.nombre_completo || miembroSeleccionado.email}`
-                : "Tus pagos (auto-aprobados)"
-              : "Historial de tus pagos"}
+            {miembroSeleccionado ? `Pagos de ${miembroSeleccionado.nombre_completo || miembroSeleccionado.email}` : "Historial y registro de pagos"}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -217,14 +325,15 @@ export default function MisPagosPage() {
             onChange={(e) => setAnioSeleccionado(Number(e.target.value))}
             className="px-4 py-2 bg-gym-surface border border-gym-border rounded-xl text-gym-text focus:outline-none focus:ring-2 focus:ring-gym-primary"
           >
-            {anios.map((a) => (
-              <option key={a} value={a}>{a}</option>
-            ))}
+            {anios.map(a => <option key={a} value={a}>{a}</option>)}
           </select>
+          <Button onClick={() => setShowForm(!showForm)} size="sm">
+            <Plus className="w-4 h-4 mr-1" /> Pagar
+          </Button>
         </div>
       </div>
 
-      {/* Super Admin: selector de miembro */}
+      {/* Super Admin: member selector */}
       {isSuperAdmin && (
         <Card className="neon-card relative z-10">
           <CardContent className="p-3">
@@ -234,11 +343,10 @@ export default function MisPagosPage() {
                   <Button
                     variant={miembroSeleccionado === null ? "primary" : "ghost"}
                     size="sm"
-                    onClick={handleSelfPay}
+                    onClick={() => handleSelectMiembro(null)}
                     className="flex-1"
                   >
-                    <User className="w-4 h-4 mr-1" />
-                    Yo
+                    <User className="w-4 h-4 mr-1" /> Yo
                   </Button>
                   <Button
                     variant={miembroSeleccionado !== null ? "primary" : "ghost"}
@@ -247,9 +355,7 @@ export default function MisPagosPage() {
                     className="flex-1"
                   >
                     <Search className="w-4 h-4 mr-1" />
-                    {miembroSeleccionado
-                      ? miembroSeleccionado.nombre_completo || miembroSeleccionado.email
-                      : "Otro miembro"}
+                    {miembroSeleccionado ? miembroSeleccionado.nombre_completo || miembroSeleccionado.email : "Otro miembro"}
                   </Button>
                 </div>
                 {showSearch && (
@@ -267,7 +373,7 @@ export default function MisPagosPage() {
                         {filteredMiembros.length === 0 ? (
                           <p className="p-3 text-sm text-gym-muted">Sin resultados</p>
                         ) : (
-                          filteredMiembros.map((m) => (
+                          filteredMiembros.map(m => (
                             <button
                               key={m.id}
                               onClick={() => handleSelectMiembro(m)}
@@ -288,90 +394,218 @@ export default function MisPagosPage() {
         </Card>
       )}
 
-      {/* Super Admin: formulario rápido de pago */}
-      {isSuperAdmin && (
+      {/* Payment form */}
+      {showForm && (
         <Card className="neon-card relative z-10">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-base">
               <Plus className="w-5 h-5 text-gym-primary" />
-              {miembroSeleccionado ? "Registrar pago para miembro" : "Auto-pago"}
-              {miembroSeleccionado === null && (
-                <Badge variant="success" className="text-[10px] ml-1">Auto-aprobado</Badge>
-              )}
+              {miembroSeleccionado ? `Pagar para ${miembroSeleccionado.nombre_completo}` : "Registrar pago"}
+              {!miembroSeleccionado && <Badge variant="success" className="text-[10px] ml-1">Auto-aprobado</Badge>}
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-gym-muted mb-1">Mes</label>
-                <select
-                  value={pagoForm.mes}
-                  onChange={(e) => setPagoForm({ ...pagoForm, mes: Number(e.target.value) })}
-                  className="w-full px-3 py-2 bg-gym-bg border border-gym-border rounded-xl text-gym-text text-sm focus:outline-none focus:ring-2 focus:ring-gym-primary"
-                >
-                  {MESES.map((m) => (
-                    <option key={m} value={m} disabled={!mesesDisponibles.includes(m) && pagoForm.mes !== m}>
-                      {getMonthName(m)}
-                    </option>
-                  ))}
-                </select>
+          <CardContent>
+            {membresiaLibre ? (
+              <div className="text-center py-6">
+                <Gift className="w-12 h-12 text-gym-secondary mx-auto mb-3" />
+                <p className="font-medium text-gym-text">Membresía Libre</p>
+                <p className="text-sm text-gym-muted">No tienes cargo mensual</p>
               </div>
-              <div>
-                <label className="block text-xs font-medium text-gym-muted mb-1">Año</label>
-                <select
-                  value={pagoForm.anio}
-                  onChange={(e) => setPagoForm({ ...pagoForm, anio: Number(e.target.value) })}
-                  className="w-full px-3 py-2 bg-gym-bg border border-gym-border rounded-xl text-gym-text text-sm focus:outline-none focus:ring-2 focus:ring-gym-primary"
-                >
-                  {[new Date().getFullYear(), new Date().getFullYear() - 1].map((a) => (
-                    <option key={a} value={a}>{a}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
+            ) : (
+              <form onSubmit={handleSubmitPago} className="space-y-4">
+                {/* Concepto de pago */}
+                <div>
+                  <label className="text-sm font-medium text-gym-muted mb-2 block">Concepto de pago</label>
+                  <div className="space-y-2">
+                    {showInscriptionCheckbox && (
+                      <label className="flex items-center gap-3 p-3 bg-gym-bg rounded-xl cursor-pointer hover:bg-gym-surface transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={formData.pagar_inscripcion}
+                          onChange={(e) => setFormData({ ...formData, pagar_inscripcion: e.target.checked })}
+                          className="w-5 h-5 rounded border-gym-border text-gym-primary focus:ring-gym-primary"
+                        />
+                        <div className="flex-1">
+                          <p className="font-medium text-gym-text">Inscripción</p>
+                          <p className="text-xs text-gym-muted">{formatCurrency(getMontoByMetodo(formData.metodo_pago, "inscripcion"))}</p>
+                        </div>
+                        <Badge variant="warning">Pendiente</Badge>
+                      </label>
+                    )}
+                    <label className="flex items-center gap-3 p-3 bg-gym-bg rounded-xl cursor-pointer hover:bg-gym-surface transition-colors">
+                      <input
+                        type="checkbox"
+                        checked={formData.pagar_mensualidad}
+                        onChange={(e) => setFormData({ ...formData, pagar_mensualidad: e.target.checked })}
+                        className="w-5 h-5 rounded border-gym-border text-gym-primary focus:ring-gym-primary"
+                      />
+                      <div className="flex-1">
+                        <p className="font-medium text-gym-text">Mensualidad</p>
+                        <p className="text-xs text-gym-muted">{formatCurrency(getMontoByMetodo(formData.metodo_pago, "mensual"))} × {formData.meses.length} mes(es)</p>
+                      </div>
+                      <Badge variant="primary">{formData.meses.length} meses</Badge>
+                    </label>
+                  </div>
+                  {!formData.pagar_inscripcion && !formData.pagar_mensualidad && (
+                    <div className="flex items-center gap-2 mt-3 p-3 bg-gym-warning/10 border border-gym-warning/30 rounded-xl">
+                      <AlertTriangle className="w-4 h-4 text-gym-warning flex-shrink-0" />
+                      <p className="text-sm text-gym-warning">Debe seleccionar un concepto de pago</p>
+                    </div>
+                  )}
+                </div>
 
-            <div>
-              <label className="block text-xs font-medium text-gym-muted mb-1">Método de pago</label>
-              <div className="flex gap-2">
-                {metodosPago.filter((m) => m.habilitado || m.metodo_pago === "efectivo").map((m) => (
-                  <button
-                    key={m.metodo_pago}
-                    type="button"
-                    onClick={() => setPagoForm({ ...pagoForm, metodo_pago: m.metodo_pago })}
-                    className={`flex-1 p-2 rounded-xl text-sm font-medium transition-all ${
-                      pagoForm.metodo_pago === m.metodo_pago
-                        ? "bg-gym-primary text-white"
-                        : "bg-gym-bg text-gym-muted border border-gym-border hover:border-gym-primary"
-                    }`}
-                  >
-                    {m.metodo_pago === "efectivo" ? "💵 Efectivo" : m.metodo_pago === "bs" ? "🇻🇪 Bs" : "🟡 Binance"}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between pt-1">
-              <span className="text-sm text-gym-muted">
-                Monto: <span className="font-semibold text-gym-text">{formatCurrency(getMontoByMetodo(pagoForm.metodo_pago))}</span>
-              </span>
-              <Button
-                onClick={handleQuickPay}
-                disabled={savingPago}
-                size="sm"
-              >
-                {savingPago ? (
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-                ) : (
-                  <CheckCircle className="w-4 h-4 mr-1" />
+                {/* Months selector */}
+                {formData.pagar_mensualidad && (
+                  <div>
+                    <div className="flex items-center justify-between mb-3">
+                      <label className="text-sm font-medium text-gym-muted">Meses a pagar</label>
+                      <Button type="button" variant="ghost" size="sm" onClick={selectAllMonths}>Seleccionar todos</Button>
+                    </div>
+                    {mesesPendientes.length === 0 ? (
+                      <div className="text-center py-8 bg-gym-bg rounded-xl">
+                        <CheckCircle className="w-12 h-12 text-gym-success mx-auto mb-2 animate-pulse-glow" />
+                        <p className="text-gym-muted font-medium">Sin deuda mensual</p>
+                        <p className="text-xs text-gym-muted mt-1">Todos los meses están al día</p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                        {mesesPendientes.map(({ mes, anio }) => {
+                          const seleccionado = formData.meses.some(m => m.mes === mes && m.anio === anio);
+                          return (
+                            <button
+                              key={`${anio}-${mes}`}
+                              type="button"
+                              onClick={() => toggleMonth(mes, anio)}
+                              className={`p-2 rounded-xl text-sm font-medium transition-all ${
+                                seleccionado
+                                  ? "bg-gym-primary text-gym-bg glow-primary"
+                                  : "bg-gym-bg text-gym-muted border border-gym-border hover:border-gym-primary hover:shadow-[0_0_10px_rgba(56,189,248,0.2)]"
+                              }`}
+                            >
+                              <div className="text-center">
+                                <div className="font-semibold">{getMonthName(mes).slice(0, 3)}</div>
+                                <div className="text-xs opacity-75">{anio}</div>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                    <p className="text-xs text-gym-muted mt-2">{formData.meses.length} mes(es) seleccionados</p>
+                    {formData.meses.length === 0 && mesesPendientes.length > 0 && (
+                      <div className="flex items-center gap-2 mt-3 p-3 bg-gym-warning/10 border border-gym-warning/30 rounded-xl">
+                        <AlertTriangle className="w-4 h-4 text-gym-warning flex-shrink-0" />
+                        <p className="text-sm text-gym-warning">Debe seleccionar mes(es) a pagar</p>
+                      </div>
+                    )}
+                  </div>
                 )}
-                {miembroSeleccionado ? "Registrar" : "Pagar"}
-              </Button>
-            </div>
+
+                {/* Payment method */}
+                <div>
+                  <label className="block text-sm font-medium text-gym-muted mb-2">Método de pago</label>
+                  <div className="flex gap-2">
+                    {metodosPago.filter(m => m.habilitado || m.metodo_pago === "efectivo").map(m => (
+                      <button
+                        key={m.metodo_pago}
+                        type="button"
+                        onClick={() => setFormData({ ...formData, metodo_pago: m.metodo_pago })}
+                        className={`flex-1 p-2 rounded-xl text-sm font-medium transition-all ${
+                          formData.metodo_pago === m.metodo_pago
+                            ? "bg-gym-primary text-white"
+                            : "bg-gym-bg text-gym-muted border border-gym-border hover:border-gym-primary"
+                        }`}
+                      >
+                        {m.metodo_pago === "efectivo" ? "💵 Efectivo" : m.metodo_pago === "bs" ? "🇻🇪 Bs" : "🟡 Binance"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Bill code for cash */}
+                {formData.metodo_pago === "efectivo" && (
+                  <div>
+                    <label className="block text-sm font-medium text-gym-muted mb-2">
+                      <FileText className="w-4 h-4 inline mr-1" /> Código(s) del billete
+                    </label>
+                    <input
+                      placeholder="Ej: A1B2C, D3E4F"
+                      value={formData.codigo_billete}
+                      onChange={(e) => setFormData({ ...formData, codigo_billete: e.target.value.toUpperCase() })}
+                      className="w-full px-4 py-2.5 bg-gym-bg border border-gym-border rounded-xl text-gym-text text-sm focus:outline-none focus:ring-2 focus:ring-gym-primary"
+                    />
+                  </div>
+                )}
+
+                {/* Comprobante for non-cash */}
+                {needsComprobante(formData.metodo_pago) && (
+                  <div>
+                    <label className="block text-sm font-medium text-gym-muted mb-2">Comprobante de pago</label>
+                    <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-gym-border rounded-xl cursor-pointer hover:border-gym-primary transition-colors">
+                      <Upload className="w-6 h-6 text-gym-muted mb-1" />
+                      <span className="text-xs text-gym-muted">{comprobante ? comprobante.name : "Adjuntar imagen o PDF"}</span>
+                      <input type="file" className="hidden" accept="image/*,.pdf" onChange={(e) => setComprobante(e.target.files?.[0] || null)} />
+                    </label>
+                  </div>
+                )}
+
+                {/* Notes */}
+                <div>
+                  <label className="block text-sm font-medium text-gym-muted mb-2">Notas (opcional)</label>
+                  <textarea
+                    placeholder="Algún comentario..."
+                    value={formData.notas}
+                    onChange={(e) => setFormData({ ...formData, notas: e.target.value })}
+                    className="w-full px-4 py-2.5 bg-gym-bg border border-gym-border rounded-xl text-gym-text text-sm focus:outline-none focus:ring-2 focus:ring-gym-primary resize-none h-16"
+                  />
+                </div>
+
+                {/* Date */}
+                <div>
+                  <label className="block text-sm font-medium text-gym-muted mb-2">
+                    <Calendar className="w-4 h-4 inline mr-1" /> Fecha de pago
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.fecha_pago}
+                    onChange={(e) => setFormData({ ...formData, fecha_pago: e.target.value })}
+                    className="w-full px-4 py-2.5 bg-gym-bg border border-gym-border rounded-xl text-gym-text text-sm focus:outline-none focus:ring-2 focus:ring-gym-primary"
+                  />
+                </div>
+
+                {/* Total */}
+                <div className="p-4 bg-gym-bg rounded-xl neon-border">
+                  <div className="flex items-center justify-between">
+                    <span className="text-gym-muted">Total a pagar:</span>
+                    <span className="text-2xl font-bold text-gym-text neon-text">{formatCurrency(montoTotal)}</span>
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  <Button type="button" variant="secondary" className="flex-1" onClick={() => setShowForm(false)}>
+                    Cancelar
+                  </Button>
+                  <Button
+                    type="submit"
+                    className="flex-1"
+                    loading={savingPago}
+                    disabled={
+                      (!formData.pagar_inscripcion && !formData.pagar_mensualidad) ||
+                      (formData.pagar_mensualidad && formData.meses.length === 0) ||
+                      montoTotal === 0
+                    }
+                  >
+                    <Send className="w-4 h-4 mr-1" />
+                    {!miembroSeleccionado ? "Pagar" : "Enviar Pago"}
+                  </Button>
+                </div>
+              </form>
+            )}
           </CardContent>
         </Card>
       )}
 
-      {/* Lista de pagos */}
+      {/* Payment list */}
       <Card className="neon-card">
         <CardHeader className="pb-2">
           <CardTitle className="flex items-center justify-between">
@@ -390,33 +624,18 @@ export default function MisPagosPage() {
             </div>
           ) : (
             <div className="space-y-2">
-              {pagos.map((pago) => (
-                <div
-                  key={pago.id}
-                  className="p-3 bg-gym-bg rounded-xl hover:bg-gym-surface transition-colors"
-                >
+              {pagos.map(pago => (
+                <div key={pago.id} className="p-3 bg-gym-bg rounded-xl hover:bg-gym-surface transition-colors">
                   <div className="flex items-center gap-3">
                     {getPagoIcon(pago)}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-gym-text truncate">
-                          {getPagoLabel(pago)}
-                        </span>
+                        <span className="text-sm font-medium text-gym-text truncate">{getPagoLabel(pago)}</span>
                         <Badge
-                          variant={
-                            pago.estado === "aprobado"
-                              ? "success"
-                              : pago.estado === "rechazado"
-                              ? "danger"
-                              : "warning"
-                          }
+                          variant={pago.estado === "aprobado" ? "success" : pago.estado === "rechazado" ? "danger" : "warning"}
                           className="text-[10px] px-1.5 py-0"
                         >
-                          {pago.estado === "aprobado"
-                            ? "Aprobado"
-                            : pago.estado === "rechazado"
-                            ? "Rechazado"
-                            : "Pendiente"}
+                          {pago.estado === "aprobado" ? "Aprobado" : pago.estado === "rechazado" ? "Rechazado" : pago.estado === "suspendido" ? "Suspendido" : "Pendiente"}
                         </Badge>
                       </div>
                       <div className="flex items-center gap-2 text-xs text-gym-muted">
@@ -450,22 +669,20 @@ export default function MisPagosPage() {
         </CardContent>
       </Card>
 
-      {/* Totales */}
+      {/* Totals */}
       {pagos.length > 0 && (
         <Card className="neon-card">
           <CardContent className="p-4 space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-sm text-gym-muted flex items-center gap-2">
-                <CheckCircle className="w-4 h-4 text-gym-success" />
-                Aprobado
+                <CheckCircle className="w-4 h-4 text-gym-success" /> Aprobado
               </span>
               <span className="text-sm font-semibold text-gym-success">{formatCurrency(montoAprobado)}</span>
             </div>
             {montoPendiente > 0 && (
               <div className="flex items-center justify-between">
                 <span className="text-sm text-gym-muted flex items-center gap-2">
-                  <Clock className="w-4 h-4 text-gym-warning" />
-                  Pendiente
+                  <Clock className="w-4 h-4 text-gym-warning" /> Pendiente
                 </span>
                 <span className="text-sm font-semibold text-gym-warning">{formatCurrency(montoPendiente)}</span>
               </div>

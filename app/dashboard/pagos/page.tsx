@@ -148,6 +148,12 @@ export default function PagosPage() {
           <p className="text-gym-muted text-sm">Gestiona los pagos de tus miembros</p>
         </div>
         <div className="flex items-center gap-2">
+          <Link href="/dashboard/mis-pagos">
+            <Button variant="secondary">
+              <CreditCard className="w-4 h-4 mr-2" />
+              Generar pagos
+            </Button>
+          </Link>
           {miembroSeleccionado && isActive && (
             <Link href={`/dashboard/reportar-pago?member=${miembroSeleccionado}`}>
               <Button>

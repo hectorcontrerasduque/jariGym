@@ -37,10 +37,12 @@ export class ConfigService {
       .limit(1)
       .single();
 
+    const { id, created_at, updated_at, tenant_id, ...safeUpdates } = updates as GymConfig;
+
     if (existing) {
       const { data, error } = await this.supabase
         .from("gym_config")
-        .update(updates)
+        .update(safeUpdates)
         .eq("id", existing.id)
         .select()
         .single();
@@ -50,7 +52,7 @@ export class ConfigService {
     } else {
       const { data, error } = await this.supabase
         .from("gym_config")
-        .insert(updates)
+        .insert(safeUpdates)
         .select()
         .single();
 

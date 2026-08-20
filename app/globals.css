@@ -191,6 +191,56 @@ body {
   padding-bottom: env(safe-area-inset-bottom, 0);
 }
 
+/* Super Admin Neon Glow Ring */
+@keyframes adminGlow {
+  0%, 100% { box-shadow: 0 0 8px rgba(56, 189, 248, 0.6), 0 0 20px rgba(129, 140, 248, 0.4), 0 0 40px rgba(56, 189, 248, 0.2); }
+  50% { box-shadow: 0 0 12px rgba(129, 140, 248, 0.8), 0 0 30px rgba(56, 189, 248, 0.6), 0 0 60px rgba(129, 140, 248, 0.3); }
+}
+
+.neon-admin-ring {
+  position: relative;
+}
+.neon-admin-ring::before {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--gym-primary), var(--gym-secondary));
+  animation: adminGlow 3s ease-in-out infinite;
+  z-index: -1;
+}
+
+/* Super Admin Welcome Banner */
+@keyframes adminBannerGlow {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+.admin-welcome-banner {
+  background: linear-gradient(135deg, rgba(56, 189, 248, 0.15), rgba(129, 140, 248, 0.15), rgba(52, 211, 153, 0.1));
+  background-size: 300% 300%;
+  animation: adminBannerGlow 6s ease infinite;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  box-shadow: 0 0 30px rgba(56, 189, 248, 0.1), inset 0 0 30px rgba(129, 140, 248, 0.05);
+}
+
+/* Neon particles floating effect */
+@keyframes floatParticle {
+  0%, 100% { transform: translateY(0) translateX(0); opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { transform: translateY(-60px) translateX(20px); opacity: 0; }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
 /* Touch-friendly tap targets */
 @media (pointer: coarse) {
   button, a, [role="button"] {

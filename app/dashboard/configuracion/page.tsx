@@ -235,16 +235,15 @@ export default function ConfiguracionPage() {
                 {config.logo_url ? "Cambiar" : "Subir logo"}
               </Button>
               {config.logo_url && (
-                <Button
+                <button
                   type="button"
-                  variant="danger"
-                  size="sm"
                   onClick={handleLogoDelete}
                   disabled={uploadingLogo}
-                  className="ml-2"
+                  title="Eliminar logo"
+                  className="ml-2 p-2 rounded-lg text-gym-muted hover:text-gym-danger hover:bg-gym-danger/10 transition-colors disabled:opacity-40"
                 >
-                  <Trash2 className="w-4 h-4 mr-1" /> Eliminar
-                </Button>
+                  <Trash2 className="w-4 h-4" />
+                </button>
               )}
             </div>
           </div>

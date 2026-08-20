@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { createClient } from "@/lib/supabase/client";
 import { pagosService } from "@/lib/services/pagos/pagos.service";
 import { miembrosService } from "@/lib/services/miembros/miembros.service";
 import { formatCurrency, getMonthName } from "@/lib/utils";
@@ -43,6 +44,7 @@ export default function DashboardPage() {
   const [monthlyStats, setMonthlyStats] = useState<{ totalMiembros: number; libres: number; meses: MonthlyStat[] } | null>(null);
   const [showAllMonths, setShowAllMonths] = useState(false);
   const [miembros, setMiembros] = useState<Profile[]>([]);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -51,6 +53,17 @@ export default function DashboardPage() {
   const loadData = async () => {
     setLoading(true);
     try {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", user.id)
+          .single();
+        if (profile?.role === "super_admin") setIsSuperAdmin(true);
+      }
+
       const [statsResult, pagosResult, aniosResult, monthlyResult, miembrosResult] = await Promise.allSettled([
         pagosService.stats(anioSeleccionado),
         pagosService.pagosRecientesAprobados(),
@@ -90,6 +103,25 @@ export default function DashboardPage() {
     <div className="space-y-6 animate-fadeIn relative">
       <div className="absolute top-0 right-0 w-72 h-72 bg-gym-primary/5 rounded-full blur-3xl animate-pulse" />
       <div className="absolute bottom-0 left-0 w-72 h-72 bg-gym-secondary/5 rounded-full blur-3xl animate-pulse" style={{ animationDelay: "1s" }} />
+
+      {isSuperAdmin && (
+        <div className="admin-welcome-banner rounded-2xl p-4 sm:p-5 relative z-10 overflow-hidden">
+          <div className="absolute top-2 right-4 w-2 h-2 bg-gym-primary rounded-full animate-float" style={{ animationDelay: "0s" }} />
+          <div className="absolute top-4 right-10 w-1.5 h-1.5 bg-gym-secondary rounded-full animate-float" style={{ animationDelay: "0.5s" }} />
+          <div className="absolute bottom-3 right-6 w-1 h-1 bg-gym-success rounded-full animate-float" style={{ animationDelay: "1s" }} />
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-gym-primary to-gym-secondary flex items-center justify-center shadow-lg shadow-gym-primary/30">
+              <span className="text-lg">⚡</span>
+            </div>
+            <div>
+              <p className="text-sm font-display font-bold text-gym-text">
+                <span className="neon-text">Bienvenido, Admin</span>
+              </p>
+              <p className="text-xs text-gym-muted">Tienes acceso total al sistema</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 relative z-10">
         <div>

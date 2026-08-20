@@ -36,47 +36,58 @@ export async function GET(request: Request) {
 
       const isGymOwner = gymConfig?.dueno_email && user.email === gymConfig.dueno_email;
 
+      const serviceSupabase = createServiceClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+      );
+
       let { data: profile } = await supabase
         .from("profiles")
         .select("role, activo, registered")
         .eq("id", user.id)
         .single();
 
-      if (!profile && (isAdminByEmail || isGymOwner)) {
-        const serviceSupabase = createServiceClient(
-          process.env.NEXT_PUBLIC_SUPABASE_URL!,
-          process.env.SUPABASE_SERVICE_ROLE_KEY!
-        );
-
-        const randomPassword = Math.random().toString(36).slice(-12) + "A1!";
-        const { data: newUser } = await serviceSupabase.auth.admin.createUser({
-          email: user.email!,
-          password: randomPassword,
-          email_confirm: true,
-          user_metadata: { nombre_completo: user.user_metadata?.full_name || user.email },
-        });
-
-        if (newUser?.user?.id) {
+      if (isAdminByEmail || isGymOwner) {
+        if (profile && profile.role !== "super_admin") {
           await serviceSupabase
             .from("profiles")
-            .insert({
-              id: newUser.user.id,
-              email: user.email,
-              nombre_completo: user.user_metadata?.full_name || user.email,
-              avatar_url: avatarUrl,
-              role: "super_admin",
-              activo: true,
-              registered: true,
-              fecha_inscripcion: "2026-01-01",
-              inscripcion_pagada: false,
-            });
+            .update({ role: "super_admin", registered: true, activo: true })
+            .eq("id", user.id);
+          profile.role = "super_admin";
+          profile.registered = true;
+        }
 
-          const { data: retry } = await supabase
-            .from("profiles")
-            .select("role, activo, registered")
-            .eq("id", user.id)
-            .single();
-          if (retry) profile = retry;
+        if (!profile) {
+          const randomPassword = Math.random().toString(36).slice(-12) + "A1!";
+          const { data: newUser } = await serviceSupabase.auth.admin.createUser({
+            email: user.email!,
+            password: randomPassword,
+            email_confirm: true,
+            user_metadata: { nombre_completo: user.user_metadata?.full_name || user.email },
+          });
+
+          if (newUser?.user?.id) {
+            await serviceSupabase
+              .from("profiles")
+              .insert({
+                id: newUser.user.id,
+                email: user.email,
+                nombre_completo: user.user_metadata?.full_name || user.email,
+                avatar_url: avatarUrl,
+                role: "super_admin",
+                activo: true,
+                registered: true,
+                fecha_inscripcion: "2026-01-01",
+                inscripcion_pagada: false,
+              });
+
+            const { data: retry } = await supabase
+              .from("profiles")
+              .select("role, activo, registered")
+              .eq("id", user.id)
+              .single();
+            if (retry) profile = retry;
+          }
         }
       }
 
@@ -86,18 +97,16 @@ export async function GET(request: Request) {
         return NextResponse.redirect(`${origin}/login?error=${msg}`);
       }
 
-      if (isGymOwner && profile.role !== "super_admin") {
-        await supabase
-          .from("profiles")
-          .update({ role: "super_admin", registered: true })
-          .eq("id", user.id);
-        profile.role = "super_admin";
-      }
-
       const isAdmin = isAdminByEmail || profile.role === "super_admin" || profile.role === "admin";
       const isActiveMember = profile.activo !== false && profile.registered === true && profile.role === "miembro";
 
       if (!isAdmin && !isActiveMember) {
+        if (profile.registered === false) {
+          await serviceSupabase
+            .from("profiles")
+            .delete()
+            .eq("id", user.id);
+        }
         await supabase.auth.signOut();
         const msg = encodeURIComponent(messages.auth.userNotRegistered);
         return NextResponse.redirect(`${origin}/login?error=${msg}`);

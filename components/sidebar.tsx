@@ -70,12 +70,6 @@ export function Sidebar() {
     getGymConfig();
   }, []);
 
-  useEffect(() => {
-    if (hasConfig === false && isSuperAdmin && pathname !== "/dashboard/configuracion") {
-      window.location.href = "/dashboard/configuracion";
-    }
-  }, [hasConfig, isSuperAdmin, pathname]);
-
   const handleSignOut = async () => {
     await createClient().auth.signOut();
     window.location.href = "/login";
@@ -83,6 +77,12 @@ export function Sidebar() {
 
   const isAdmin = profile?.role === "super_admin" || profile?.role === "admin";
   const isSuperAdmin = profile?.role === "super_admin";
+
+  useEffect(() => {
+    if (hasConfig === false && isSuperAdmin && pathname !== "/dashboard/configuracion") {
+      window.location.href = "/dashboard/configuracion";
+    }
+  }, [hasConfig, isSuperAdmin, pathname]);
 
   const navItems = hasConfig === false
     ? (isSuperAdmin ? [{ href: "/dashboard/configuracion", label: "Config", icon: Settings }] : [])

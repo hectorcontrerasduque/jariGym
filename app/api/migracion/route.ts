@@ -249,20 +249,18 @@ export async function POST(request: Request) {
         if (config?.logo_url) gymLogo = config.logo_url;
       } catch {}
 
-      let confirmLink: string | undefined;
+      // Send confirmation email via Supabase (proper link with code)
       try {
-        const { data: linkData } = await supabase.auth.admin.generateLink({
-          type: "magiclink",
-          email,
+        const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "";
+        await supabase.auth.admin.inviteUserByEmail(email, {
+          data: { nombre_completo: nombre },
+          redirectTo: `${siteUrl}/auth/callback?next=/login`,
         });
-        if (linkData?.properties?.action_link) {
-          const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "";
-          confirmLink = `${siteUrl}/auth/callback?next=/login`;
-        }
       } catch {}
 
+      // Send welcome email with credentials (no confirm button — Supabase handles that)
       try {
-        await sendWelcomeEmail(email, email, password, gymName, gymLogo, confirmLink);
+        await sendWelcomeEmail(email, email, password, gymName, gymLogo);
       } catch {}
     }
 

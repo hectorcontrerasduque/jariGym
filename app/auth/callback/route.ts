@@ -7,7 +7,7 @@ export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
   const nextRaw = searchParams.get("next") ?? "/dashboard";
-  const allowedPaths = ["/dashboard", "/dashboard/mis-pagos", "/dashboard/perfil", "/dashboard/reportar-pago", "/dashboard/pagos", "/dashboard/miembros", "/dashboard/configuracion", "/reset-password"];
+  const allowedPaths = ["/dashboard", "/dashboard/mis-pagos", "/dashboard/perfil", "/dashboard/reportar-pago", "/dashboard/pagos", "/dashboard/miembros", "/dashboard/configuracion", "/reset-password", "/login"];
   const next = allowedPaths.includes(nextRaw) ? nextRaw : "/dashboard";
   const error = searchParams.get("error");
   const errorDescription = searchParams.get("error_description");
@@ -21,6 +21,13 @@ export async function GET(request: Request) {
     const { data: { user }, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
 
     if (!exchangeError && user) {
+      // Email confirmation flow: next=/login means just confirm email, then redirect to login with success
+      if (next === "/login") {
+        await supabase.auth.signOut();
+        const msg = encodeURIComponent(messages.auth.emailConfirmed);
+        return NextResponse.redirect(`${origin}/login?message=${msg}`);
+      }
+
       const avatarUrl = user.user_metadata?.avatar_url || user.user_metadata?.picture || null;
       const email = user.email || null;
       const nombre = user.user_metadata?.nombre_completo || user.user_metadata?.full_name || null;

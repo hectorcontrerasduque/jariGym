@@ -25,6 +25,7 @@ export const messages = {
     resetPasswordWeakPassword: "La contraseña debe tener al menos 6 caracteres",
     resetPasswordEnterNew: "Ingresa tu nueva contraseña",
     resetPasswordSpamWarning: "Si no recibes el correo, revisa tu carpeta de spam o contacta al administrador de",
+    emailConfirmed: "Correo confirmado. Ya puedes iniciar sesión",
     userNotRegistered: "Este usuario no está registrado o no está activo",
     googleLoginError: "Error al iniciar sesión con Google",
     emailLoginError: "Error al iniciar sesión",

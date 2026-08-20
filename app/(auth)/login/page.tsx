@@ -30,6 +30,7 @@ function LoginForm() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [resetSent, setResetSent] = useState(false);
   const [showResetForm, setShowResetForm] = useState(false);
   const [resetEmail, setResetEmail] = useState("");
@@ -54,6 +55,8 @@ function LoginForm() {
   useEffect(() => {
     const err = searchParams.get("error");
     if (err) setError(decodeURIComponent(err));
+    const msg = searchParams.get("message");
+    if (msg) setSuccess(decodeURIComponent(msg));
     configService.getConfig().then((config) => {
       if (config?.nombre_gym) setGymName(config.nombre_gym);
       if (config?.dueno_email) setGymOwnerEmail(config.dueno_email);
@@ -310,6 +313,7 @@ function LoginForm() {
               </button>
             </div>
             {error && <p className="text-sm text-gym-danger text-center bg-gym-danger/10 p-2 rounded-xl">{error}</p>}
+            {success && <p className="text-sm text-gym-success text-center bg-gym-success/10 p-2 rounded-xl">{success}</p>}
             <Button type="submit" className="w-full" loading={loading}>
               {messages.auth.loginButton}
             </Button>

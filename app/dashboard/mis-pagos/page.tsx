@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -40,9 +40,7 @@ export default function MisPagosPage() {
   const [anioSeleccionado, setAnioSeleccionado] = useState(new Date().getFullYear());
   const [membresiaLibre, setMembresiaLibre] = useState<MembresiaLibre | null>(null);
 
-  useEffect(() => { loadData(); }, [anioSeleccionado]);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
@@ -78,7 +76,9 @@ export default function MisPagosPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [anioSeleccionado]);
+
+  useEffect(() => { loadData(); }, [loadData]);
 
   const handleDelete = async (pagoId: string) => {
     if (!confirm(messages.pagos.eliminarPagoConfirm)) return;

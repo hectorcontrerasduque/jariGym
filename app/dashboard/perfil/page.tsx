@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -57,11 +57,7 @@ function PerfilContent() {
     currentPassword: "",
   });
 
-  useEffect(() => {
-    loadProfile();
-  }, [targetUserId]);
-
-  const loadProfile = async () => {
+  const loadProfile = useCallback(async () => {
     try {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
@@ -104,7 +100,11 @@ function PerfilContent() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [targetUserId, router]);
+
+  useEffect(() => {
+    loadProfile();
+  }, [loadProfile]);
 
   const handleSave = async () => {
     if (!formData.email.trim()) {

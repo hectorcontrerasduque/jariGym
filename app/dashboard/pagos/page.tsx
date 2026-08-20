@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -43,9 +43,7 @@ export default function PagosPage() {
   const [busquedaMiembro, setBusquedaMiembro] = useState("");
   const [deleting, setDeleting] = useState<string | null>(null);
 
-  useEffect(() => { loadData(); }, [anioSeleccionado]);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const [pagosResult, aniosResult, miembrosResult] = await Promise.allSettled([
@@ -61,7 +59,9 @@ export default function PagosPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [anioSeleccionado]);
+
+  useEffect(() => { loadData(); }, [loadData]);
 
   const handleAprobar = async (pagoId: string) => {
     try {
@@ -199,7 +199,7 @@ export default function PagosPage() {
 
       {/* Filters */}
       <div className="flex gap-2 overflow-x-auto pb-2 relative z-10">
-        {["todos", "pendiente", "aprobado", "rechazado"].map((f) => (
+        {["todos", "pendiente", "aprobado", "rechazado", "suspendido"].map((f) => (
           <Button
             key={f}
             variant={filtro === f ? "primary" : "secondary"}
@@ -282,6 +282,8 @@ export default function PagosPage() {
                               ? "success"
                               : pago.estado === "rechazado"
                               ? "danger"
+                              : pago.estado === "suspendido"
+                              ? "warning"
                               : "warning"
                           }
                           className="text-[10px] px-1.5 py-0"
@@ -290,6 +292,8 @@ export default function PagosPage() {
                             ? "Aprobado"
                             : pago.estado === "rechazado"
                             ? "Rechazado"
+                            : pago.estado === "suspendido"
+                            ? "Suspendido"
                             : "Pendiente"}
                         </Badge>
                       </div>

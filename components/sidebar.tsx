@@ -35,9 +35,9 @@ export function Sidebar() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [gymName, setGymName] = useState("GymApp");
   const [gymLogo, setGymLogo] = useState("");
-  const supabase = createClient();
 
   useEffect(() => {
+    const supabase = createClient();
     const getProfile = async () => {
       const {
         data: { user },
@@ -63,7 +63,7 @@ export function Sidebar() {
   }, []);
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut();
+    await createClient().auth.signOut();
     window.location.href = "/login";
   };
 

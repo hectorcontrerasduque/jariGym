@@ -8,7 +8,9 @@
     "start": "next start",
     "test": "vitest run",
     "test:watch": "vitest",
-    "check": "powershell -ExecutionPolicy Bypass -File check.ps1"
+    "check": "powershell -ExecutionPolicy Bypass -File check.ps1",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@supabase/ssr": "^0.5.0",
@@ -30,6 +32,8 @@
     "postcss": "^8.4.38",
     "tailwindcss": "^3.4.4",
     "typescript": "^5.5.0",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.10",
+    "eslint": "^8.57.0",
+    "eslint-config-next": "14.2.5"
   }
 }

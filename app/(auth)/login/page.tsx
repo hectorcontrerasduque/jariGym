@@ -8,8 +8,9 @@ import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { authService } from "@/lib/services/auth/auth.service";
+import { migracionService } from "@/lib/services/migracion/migracion.service";
 import { createClient } from "@/lib/supabase/client";
-import { Dumbbell, CheckCircle, Mail } from "lucide-react";
+import { Dumbbell, CheckCircle, Mail, ArrowLeft, UserCheck } from "lucide-react";
 import { configService } from "@/lib/services/config/config.service";
 import { messages } from "@/lib/messages";
 import { AuthFooter } from "@/components/auth-footer";
@@ -36,6 +37,18 @@ function LoginForm() {
   const [gymName, setGymName] = useState("GymApp");
   const [gymOwnerEmail, setGymOwnerEmail] = useState("");
   const [gymLogo, setGymLogo] = useState("");
+
+  const [showMigrateForm, setShowMigrateForm] = useState(false);
+  const [migrateStep, setMigrateStep] = useState<"form" | "select" | "success" | "error" | "loading">("form");
+  const [migrateMatches, setMigrateMatches] = useState<string[]>([]);
+  const [migrateSelected, setMigrateSelected] = useState("");
+  const [migrateError, setMigrateError] = useState("");
+  const [migNombre, setMigNombre] = useState("");
+  const [migWhatsapp, setMigWhatsapp] = useState("");
+  const [migCorreo, setMigCorreo] = useState("");
+  const [migPassword, setMigPassword] = useState("");
+  const [migPasswordConfirm, setMigPasswordConfirm] = useState("");
+  const [migEmailExists, setMigEmailExists] = useState(false);
 
   useEffect(() => {
     const err = searchParams.get("error");
@@ -142,6 +155,95 @@ function LoginForm() {
     }
   };
 
+  const handleEmailBlur = async () => {
+    if (!migCorreo || migCorreo.length < 5) return;
+    try {
+      const result = await migracionService.pingEmail(migCorreo);
+      setMigEmailExists(result.exists);
+    } catch {
+      setMigEmailExists(false);
+    }
+  };
+
+  const handleMigrateSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setMigrateError("");
+
+    if (migPassword.length < 6) {
+      setMigrateError(messages.migracion.passwordMinError);
+      return;
+    }
+    if (migPassword !== migPasswordConfirm) {
+      setMigrateError(messages.migracion.passwordMismatchError);
+      return;
+    }
+    if (migEmailExists) {
+      setMigrateError(messages.migracion.emailExistsError);
+      return;
+    }
+
+    setMigrateStep("loading");
+    try {
+      const matches = await migracionService.searchByName(migNombre);
+      if (matches.length === 0) {
+        setMigrateError(messages.migracion.noResults);
+        setMigrateStep("form");
+        return;
+      }
+      if (matches.length === 1) {
+        await executeMigracion(matches[0]);
+        return;
+      }
+      setMigrateMatches(matches);
+      setMigrateStep("select");
+    } catch (err: any) {
+      setMigrateError(err.message || messages.migracion.error);
+      setMigrateStep("form");
+    }
+  };
+
+  const handleSelectMatch = async () => {
+    if (!migrateSelected) return;
+    setMigrateStep("loading");
+    try {
+      await executeMigracion(migrateSelected);
+    } catch (err: any) {
+      setMigrateError(err.message || messages.migracion.error);
+      setMigrateStep("select");
+    }
+  };
+
+  const executeMigracion = async (selectedNombre: string) => {
+    setMigrateStep("loading");
+    try {
+      await migracionService.migrate({
+        nombreCompleto: migNombre,
+        whatsapp: migWhatsapp,
+        correo: migCorreo,
+        password: migPassword,
+        selectedNombre,
+      });
+      setMigrateStep("success");
+    } catch (err: any) {
+      setMigrateError(err.message || messages.migracion.error);
+      setMigrateStep("form");
+    }
+  };
+
+  const resetMigrateForm = () => {
+    setShowMigrateForm(false);
+    setMigrateStep("form");
+    setMigrateMatches([]);
+    setMigrateSelected("");
+    setMigrateError("");
+    setMigNombre("");
+    setMigWhatsapp("");
+    setMigCorreo("");
+    setMigPassword("");
+    setMigPasswordConfirm("");
+    setMigEmailExists(false);
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center p-4 pb-16 relative overflow-hidden">
       <div className="absolute inset-0 bg-gradient-to-br from-gym-primary/5 via-transparent to-gym-secondary/5" />
@@ -197,10 +299,20 @@ function LoginForm() {
               {messages.auth.loginButton}
             </Button>
           </form>
+
+          <div className="text-center">
+            <button
+              type="button"
+              onClick={() => { resetMigrateForm(); setShowMigrateForm(true); }}
+              className="text-xs text-gym-secondary hover:text-gym-secondary/80 transition-colors font-medium"
+            >
+              {messages.migracion.linkText}
+            </button>
+          </div>
         </CardContent>
       </Card>
 
-      {/* Forgot Password Modal - personalized with gym branding */}
+      {/* Forgot Password Modal */}
       {showResetForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
           <LoadingOverlay show={resetLoading} message={messages.common.procesando} />
@@ -277,6 +389,178 @@ function LoginForm() {
                     </Button>
                   </div>
                 </form>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Migrate Modal */}
+      {showMigrateForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <LoadingOverlay show={migrateStep === "loading"} message={messages.migracion.loading} />
+          <Card className="w-full max-w-md border-gym-secondary/20">
+            <CardHeader className="text-center">
+              <div className="mx-auto w-12 h-12 bg-gym-secondary/20 rounded-xl flex items-center justify-center mb-3 overflow-hidden">
+                {gymLogo ? (
+                  <img src={gymLogo} alt={gymName} className="w-full h-full object-cover" />
+                ) : (
+                  <Dumbbell className="w-6 h-6 text-gym-secondary" />
+                )}
+              </div>
+              <CardTitle className="text-lg font-display text-gym-text">
+                {migrateStep === "form" && messages.migracion.title}
+                {migrateStep === "select" && messages.migracion.selectTitle}
+                {migrateStep === "success" && messages.migracion.successTitle}
+                {migrateStep === "error" && messages.migracion.error}
+              </CardTitle>
+              <p className="text-xs text-gym-muted mt-1">{gymName}</p>
+            </CardHeader>
+            <CardContent>
+              {/* Step: Form */}
+              {migrateStep === "form" && (
+                <form onSubmit={handleMigrateSubmit} className="space-y-3">
+                  <p className="text-sm text-gym-muted text-center mb-2">
+                    {messages.migracion.subtitle}
+                  </p>
+                  <Input
+                    label={messages.migracion.nombreCompleto}
+                    placeholder="NOMBRE COMPLETO"
+                    value={migNombre}
+                    onChange={(e) => setMigNombre(e.target.value.toUpperCase().trim())}
+                    onBlur={(e) => setMigNombre(e.target.value.toUpperCase().trim())}
+                    required
+                  />
+                  <Input
+                    label={messages.migracion.whatsapp}
+                    placeholder="+52 55 1234 5678"
+                    value={migWhatsapp}
+                    onChange={(e) => setMigWhatsapp(e.target.value)}
+                    required
+                  />
+                  <div>
+                    <Input
+                      label={messages.migracion.correo}
+                      type="email"
+                      placeholder="tu@email.com"
+                      value={migCorreo}
+                      onChange={(e) => { setMigCorreo(e.target.value); setMigEmailExists(false); }}
+                      onBlur={handleEmailBlur}
+                      required
+                    />
+                    {migEmailExists && (
+                      <p className="text-xs text-gym-danger mt-1">{messages.migracion.emailExistsError}</p>
+                    )}
+                  </div>
+                  <PasswordInput
+                    label={messages.migracion.password}
+                    placeholder="••••••••"
+                    value={migPassword}
+                    onChange={(e) => setMigPassword(e.target.value)}
+                    required
+                  />
+                  <PasswordInput
+                    label={messages.migracion.passwordConfirm}
+                    placeholder="••••••••"
+                    value={migPasswordConfirm}
+                    onChange={(e) => setMigPasswordConfirm(e.target.value)}
+                    error={migPasswordConfirm && migPassword !== migPasswordConfirm ? messages.migracion.passwordMismatchError : undefined}
+                    required
+                  />
+                  {migrateError && <p className="text-sm text-gym-danger text-center bg-gym-danger/10 p-2 rounded-xl">{migrateError}</p>}
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      className="flex-1"
+                      onClick={resetMigrateForm}
+                    >
+                      {messages.migracion.cancelButton}
+                    </Button>
+                    <Button type="submit" className="flex-1">
+                      {messages.migracion.button}
+                    </Button>
+                  </div>
+                </form>
+              )}
+
+              {/* Step: Select match */}
+              {migrateStep === "select" && (
+                <div className="space-y-4">
+                  <p className="text-sm text-gym-muted text-center">
+                    {messages.migracion.selectSubtitle}
+                  </p>
+                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                    {migrateMatches.map((name) => (
+                      <label
+                        key={name}
+                        className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${
+                          migrateSelected === name
+                            ? "border-gym-secondary bg-gym-secondary/10"
+                            : "border-gym-border hover:border-gym-secondary/50"
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="migrateMatch"
+                          value={name}
+                          checked={migrateSelected === name}
+                          onChange={() => setMigrateSelected(name)}
+                          className="w-4 h-4 text-gym-secondary"
+                        />
+                        <span className="text-sm font-medium text-gym-text">{name}</span>
+                      </label>
+                    ))}
+                  </div>
+                  {migrateError && <p className="text-sm text-gym-danger text-center bg-gym-danger/10 p-2 rounded-xl">{migrateError}</p>}
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      className="flex-1"
+                      onClick={() => { setMigrateStep("form"); setMigrateError(""); }}
+                    >
+                      <ArrowLeft className="w-4 h-4 mr-1" /> {messages.migracion.cancelButton}
+                    </Button>
+                    <Button
+                      className="flex-1"
+                      onClick={handleSelectMatch}
+                      disabled={!migrateSelected}
+                    >
+                      {messages.migracion.selectButton}
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Step: Success */}
+              {migrateStep === "success" && (
+                <div className="text-center space-y-4">
+                  <div className="w-16 h-16 bg-gym-success/20 rounded-full flex items-center justify-center mx-auto">
+                    <CheckCircle className="w-8 h-8 text-gym-success" />
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-sm text-gym-text font-medium">
+                      {messages.migracion.successMessage}
+                    </p>
+                    <p className="text-sm text-gym-primary font-semibold bg-gym-primary/10 p-2 rounded-lg">
+                      {migCorreo}
+                    </p>
+                    <p className="text-xs text-gym-muted">
+                      {messages.migracion.successCredentials}
+                    </p>
+                    <p className="text-xs text-gym-muted">
+                      {messages.migracion.successNote}
+                    </p>
+                  </div>
+                  <Button
+                    variant="secondary"
+                    className="w-full"
+                    onClick={resetMigrateForm}
+                  >
+                    {messages.migracion.goToLogin}
+                  </Button>
+                </div>
               )}
             </CardContent>
           </Card>

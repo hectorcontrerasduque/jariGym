@@ -1,5 +1,6 @@
 import nodemailer from "nodemailer";
 import { resetPasswordTemplate } from "./templates/reset-password";
+import { welcomeTemplate } from "./templates/welcome";
 
 const transporter = nodemailer.createTransport({
   service: "gmail",
@@ -44,6 +45,22 @@ export async function sendPasswordResetEmail(
     to,
     subject: `${gymName} - Restablecer Contraseña`,
     html: resetPasswordTemplate(resetLink, gymName, gymLogo),
+    fromName: gymName,
+  });
+}
+
+export async function sendWelcomeEmail(
+  to: string,
+  email: string,
+  password: string,
+  gymName: string,
+  gymLogo?: string | null,
+  confirmLink?: string
+): Promise<void> {
+  await sendEmail({
+    to,
+    subject: `${gymName} - Bienvenido`,
+    html: welcomeTemplate(email, password, gymName, gymLogo, confirmLink),
     fromName: gymName,
   });
 }

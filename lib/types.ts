@@ -35,7 +35,7 @@ export interface Pago {
   usuario_id: string;
   monto: number;
   comprobante_url: string | null;
-  estado: "pendiente" | "aprobado" | "rechazado";
+  estado: "pendiente" | "aprobado" | "rechazado" | "suspendido";
   metodo_pago: MetodoPago;
   codigo_billete: string | null;
   notas: string | null;
@@ -63,7 +63,7 @@ export interface Movimiento {
   notas: string | null;
   mes_pagar: number | null;
   anio_pagar: number | null;
-  estado: "pendiente" | "aprobado" | "rechazado";
+  estado: "pendiente" | "aprobado" | "rechazado" | "suspendido";
   activo: boolean;
   approved_by: string | null;
   approved_at: string | null;
@@ -134,4 +134,18 @@ export interface DashboardStats {
   pagosConfirmados: number;
   pagosPendientes: number;
   ingresosMes: number;
+}
+
+export type EstadoPagoMigracion = "pagado" | "suspendido" | "debe";
+
+export interface MigracionRecord {
+  id: number;
+  nombre: string;
+  whatsapp: string | null;
+  correo: string | null;
+  mes_pagar: number;
+  anio_pagar: number;
+  estado: EstadoPagoMigracion;
+  migrado: "si" | "no";
+  created_at: string;
 }

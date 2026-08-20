@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, Suspense } from "react";
+import { useState, useEffect, useMemo, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -65,8 +65,6 @@ function ReportarPagoForm() {
 
   const isAdmin = userRole === "super_admin" || userRole === "admin";
 
-  useEffect(() => { loadData(); }, []);
-
   useEffect(() => {
     if (isAdmin && memberParam && miembros.length > 0) {
       setMiembroSeleccionado(memberParam);
@@ -77,9 +75,9 @@ function ReportarPagoForm() {
     if (isAdmin && miembroSeleccionado) {
       loadMiembroPendientes(miembroSeleccionado);
     }
-  }, [miembroSeleccionado]);
+  }, [miembroSeleccionado, isAdmin, loadMiembroPendientes]);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
@@ -133,9 +131,11 @@ function ReportarPagoForm() {
     } finally {
       setConfigLoading(false);
     }
-  };
+  }, []);
 
-  const loadMiembroPendientes = async (miembroId: string) => {
+  useEffect(() => { loadData(); }, [loadData]);
+
+  const loadMiembroPendientes = useCallback(async (miembroId: string) => {
     try {
       const [meses, profile, libreData, tienePendiente] = await Promise.all([
         pagosService.mesesPendientesAdmin(miembroId),
@@ -158,7 +158,7 @@ function ReportarPagoForm() {
     } catch (err) {
       showToast(messages.toast.errorCargaDatos, "error");
     }
-  };
+  }, []);
 
   const toggleMonth = (mes: number, anio: number) => {
     setFormData((prev) => {
@@ -174,14 +174,14 @@ function ReportarPagoForm() {
     setFormData((prev) => ({ ...prev, meses: [...mesesPendientes], pagar_mensualidad: true }));
   };
 
-  const getMontoByMetodo = (metodo: MetodoPago, tipo: "mensual" | "inscripcion"): number => {
+  const getMontoByMetodo = useCallback((metodo: MetodoPago, tipo: "mensual" | "inscripcion"): number => {
     const config = metodosPago.find((m) => m.metodo_pago === metodo);
     if (!config || !config.habilitado) {
       const defaultConfig = metodosPago.find((m) => m.metodo_pago === "efectivo");
       return tipo === "mensual" ? (defaultConfig?.monto_mensual || 0) : (defaultConfig?.monto_inscripcion || 0);
     }
     return tipo === "mensual" ? config.monto_mensual : config.monto_inscripcion;
-  };
+  }, [metodosPago]);
 
   const montoTotal = useMemo(() => {
     let total = 0;
@@ -192,7 +192,7 @@ function ReportarPagoForm() {
       total += formData.meses.length * getMontoByMetodo(formData.metodo_pago, "mensual");
     }
     return total;
-  }, [formData.metodo_pago, formData.pagar_inscripcion, formData.pagar_mensualidad, formData.meses, inscripcionPagada]);
+  }, [formData.metodo_pago, formData.pagar_inscripcion, formData.pagar_mensualidad, formData.meses, inscripcionPagada, getMontoByMetodo]);
 
   const needsComprobante = (metodo: MetodoPago): boolean => {
     return metodo !== "efectivo" && metodo !== "membresia_libre";

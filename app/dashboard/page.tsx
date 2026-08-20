@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { createClient } from "@/lib/supabase/client";
@@ -46,11 +46,7 @@ export default function DashboardPage() {
   const [miembros, setMiembros] = useState<Profile[]>([]);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
-  useEffect(() => {
-    loadData();
-  }, [anioSeleccionado]);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     setLoading(true);
     try {
       const supabase = createClient();
@@ -81,7 +77,11 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [anioSeleccionado]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
   const getNombreMiembro = (pago: Pago): string => {
     if (pago.profile?.nombre_completo) return pago.profile.nombre_completo;

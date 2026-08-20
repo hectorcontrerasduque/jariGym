@@ -71,12 +71,6 @@ function ReportarPagoForm() {
     }
   }, [memberParam, miembros, isAdmin]);
 
-  useEffect(() => {
-    if (isAdmin && miembroSeleccionado) {
-      loadMiembroPendientes(miembroSeleccionado);
-    }
-  }, [miembroSeleccionado, isAdmin, loadMiembroPendientes]);
-
   const loadData = useCallback(async () => {
     try {
       const supabase = createClient();
@@ -159,6 +153,12 @@ function ReportarPagoForm() {
       showToast(messages.toast.errorCargaDatos, "error");
     }
   }, []);
+
+  useEffect(() => {
+    if (isAdmin && miembroSeleccionado) {
+      loadMiembroPendientes(miembroSeleccionado);
+    }
+  }, [miembroSeleccionado, isAdmin, loadMiembroPendientes]);
 
   const toggleMonth = (mes: number, anio: number) => {
     setFormData((prev) => {

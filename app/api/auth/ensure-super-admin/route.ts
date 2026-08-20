@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 
 export async function POST(request: Request) {
   try {
-    const { email } = await request.json();
+    const { email, nombre } = await request.json();
     if (!email || typeof email !== "string") {
       return NextResponse.json({ created: false });
     }
@@ -14,6 +14,7 @@ export async function POST(request: Request) {
     );
 
     const emailLower = email.toLowerCase().trim();
+    const nombreCompleto = (nombre && typeof nombre === "string" && nombre.trim()) || emailLower.split("@")[0];
 
     const { data: existingProfile } = await supabase
       .from("profiles")
@@ -25,7 +26,7 @@ export async function POST(request: Request) {
       if (existingProfile.role !== "super_admin") {
         await supabase
           .from("profiles")
-          .update({ role: "super_admin", activo: true, registered: true })
+          .update({ role: "super_admin", activo: true, registered: true, nombre_completo: nombreCompleto })
           .eq("id", existingProfile.id);
       }
       return NextResponse.json({ created: false, promoted: true });
@@ -44,7 +45,7 @@ export async function POST(request: Request) {
         email: emailLower,
         password: randomPassword,
         email_confirm: true,
-        user_metadata: { nombre_completo: emailLower.split("@")[0] },
+        user_metadata: { nombre_completo: nombreCompleto },
       });
 
       if (authError || !newUser?.user?.id) {
@@ -58,7 +59,7 @@ export async function POST(request: Request) {
       .insert({
         id: userId,
         email: emailLower,
-        nombre_completo: emailLower.split("@")[0],
+        nombre_completo: nombreCompleto,
         role: "super_admin",
         activo: true,
         registered: true,
@@ -70,7 +71,7 @@ export async function POST(request: Request) {
       if (profileError.code === "23505") {
         await supabase
           .from("profiles")
-          .update({ role: "super_admin", activo: true, registered: true })
+          .update({ role: "super_admin", activo: true, registered: true, nombre_completo: nombreCompleto })
           .eq("email", emailLower);
         return NextResponse.json({ created: false, promoted: true });
       }

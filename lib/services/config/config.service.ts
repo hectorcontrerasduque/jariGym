@@ -2,11 +2,7 @@ import { createClient } from "@/lib/supabase/client";
 import { messages } from "@/lib/messages";
 import type { GymConfig, MetodoPago, MetodoPagoConfig } from "@/lib/types";
 
-const METODOS_DEFAULT: { metodo_pago: MetodoPago; habilitado: boolean }[] = [
-  { metodo_pago: "efectivo", habilitado: true },
-  { metodo_pago: "bs", habilitado: false },
-  { metodo_pago: "binance", habilitado: false },
-];
+export const METODOS_PAGO_DEFAULT: MetodoPago[] = ["efectivo", "bs", "binance"];
 
 export class ConfigService {
   private supabase = createClient();
@@ -79,7 +75,7 @@ export class ConfigService {
             await fetch("/api/auth/ensure-super-admin", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ email: updates.dueno_email }),
+              body: JSON.stringify({ email: updates.dueno_email, nombre: updates.dueno_nombre }),
             });
           } catch {}
         }
@@ -104,7 +100,7 @@ export class ConfigService {
             await fetch("/api/auth/ensure-super-admin", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ email: updates.dueno_email }),
+              body: JSON.stringify({ email: updates.dueno_email, nombre: updates.dueno_nombre }),
             });
           } catch {}
         }
@@ -136,69 +132,53 @@ export class ConfigService {
   }
 
   async getMetodosPago(): Promise<MetodoPagoConfig[]> {
-    const { data: existing } = await this.supabase
+    const { data } = await this.supabase
       .from("gym_config_metodos_pago")
       .select("*")
+      .eq("habilitado", true)
       .order("metodo_pago");
 
-    const existingMap = new Map((existing || []).map((m) => [m.metodo_pago, m]));
-
-    for (const def of METODOS_DEFAULT) {
-      if (!existingMap.has(def.metodo_pago)) {
-        const { data: inserted } = await this.supabase
-          .from("gym_config_metodos_pago")
-          .insert({
-            metodo_pago: def.metodo_pago,
-            monto_mensual: 0,
-            monto_inscripcion: 0,
-            habilitado: def.habilitado,
-          })
-          .select()
-          .single();
-        if (inserted) existingMap.set(def.metodo_pago, inserted);
-      }
-    }
-
-    return Array.from(existingMap.values()).sort((a, b) => a.metodo_pago.localeCompare(b.metodo_pago));
+    return data || [];
   }
 
-  async updateMetodoPago(id: string, updates: Partial<MetodoPagoConfig>): Promise<MetodoPagoConfig> {
-    const {
-      data: { user },
-    } = await this.supabase.auth.getUser();
-    if (!user) throw new Error(messages.toast.noAutenticado);
-
-    const { data: profile } = await this.supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .single();
-    if (profile?.role !== "super_admin" && profile?.role !== "admin") {
-      throw new Error(messages.toast.noAutorizado);
-    }
-
-    const { data: current } = await this.supabase
+  async saveMetodosPago(metodos: MetodoPagoConfig[]): Promise<void> {
+    const { data: existingRecords } = await this.supabase
       .from("gym_config_metodos_pago")
-      .select("metodo_pago, monto_mensual, monto_inscripcion, habilitado")
-      .eq("id", id)
-      .single();
+      .select("*")
+      .eq("habilitado", true);
 
-    if (!current) throw new Error("Método de pago no encontrado");
+    const existingMap = new Map((existingRecords || []).map((r) => [r.metodo_pago, r]));
 
-    const montoMensual = updates.monto_mensual ?? current.monto_mensual;
-    const montoInscripcion = updates.monto_inscripcion ?? current.monto_inscripcion;
-    const habilitado = updates.habilitado !== undefined ? updates.habilitado : current.habilitado;
+    for (const metodo of metodos) {
+      const existing = existingMap.get(metodo.metodo_pago);
 
-    const { data, error } = await this.supabase
-      .rpc("actualizar_metodo_pago_atomico", {
-        p_id: id,
-        p_monto_mensual: montoMensual,
-        p_monto_inscripcion: montoInscripcion,
-        p_habilitado: habilitado,
-      });
-
-    if (error) throw error;
-    return data as MetodoPagoConfig;
+      if (metodo.habilitado) {
+        if (existing) {
+          if (existing.monto_mensual !== metodo.monto_mensual || existing.monto_inscripcion !== metodo.monto_inscripcion) {
+            await this.supabase.rpc("actualizar_metodo_pago_atomico", {
+              p_id: existing.id,
+              p_monto_mensual: metodo.monto_mensual,
+              p_monto_inscripcion: metodo.monto_inscripcion,
+              p_habilitado: true,
+            });
+          }
+        } else {
+          await this.supabase.from("gym_config_metodos_pago").insert({
+            metodo_pago: metodo.metodo_pago,
+            monto_mensual: metodo.monto_mensual,
+            monto_inscripcion: metodo.monto_inscripcion,
+            habilitado: true,
+          });
+        }
+      } else {
+        if (existing) {
+          await this.supabase
+            .from("gym_config_metodos_pago")
+            .delete()
+            .eq("id", existing.id);
+        }
+      }
+    }
   }
 
   async getMetodoPago(metodo: MetodoPago): Promise<MetodoPagoConfig | null> {

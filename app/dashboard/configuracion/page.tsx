@@ -4,19 +4,34 @@ import { useEffect, useState, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { configService } from "@/lib/services/config/config.service";
+import { configService, METODOS_PAGO_DEFAULT } from "@/lib/services/config/config.service";
 import { createClient } from "@/lib/supabase/client";
 import { Save, Building2, User, CreditCard, Clock, Globe, Upload, Dumbbell, Trash2 } from "lucide-react";
-import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { showToast } from "@/components/ui/toast";
 import { messages } from "@/lib/messages";
-import type { GymConfig, MetodoPagoConfig } from "@/lib/types";
+import type { GymConfig, MetodoPago, MetodoPagoConfig } from "@/lib/types";
 
-const metodoLabels: Record<string, { label: string; icon: string; alwaysOn?: boolean }> = {
+const metodoLabels: Record<MetodoPago, { label: string; icon: string; alwaysOn?: boolean }> = {
   efectivo: { label: "Efectivo", icon: "💵", alwaysOn: true },
   bs: { label: "Bolívares", icon: "🇻🇪" },
   binance: { label: "Binance USDT", icon: "🟡" },
 };
+
+function buildMetodosState(dbRecords: MetodoPagoConfig[]): MetodoPagoConfig[] {
+  const dbMap = new Map(dbRecords.map((r) => [r.metodo_pago, r]));
+  return METODOS_PAGO_DEFAULT.map((mp) => {
+    const existing = dbMap.get(mp);
+    return existing || {
+      id: "",
+      metodo_pago: mp,
+      monto_mensual: 0,
+      monto_inscripcion: 0,
+      habilitado: mp === "efectivo",
+      created_at: "",
+      updated_at: "",
+    };
+  });
+}
 
 export default function ConfiguracionPage() {
   const [config, setConfig] = useState<Partial<GymConfig>>({});
@@ -27,7 +42,6 @@ export default function ConfiguracionPage() {
   const [localCountry, setLocalCountry] = useState("");
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const logoInputRef = useRef<HTMLInputElement>(null);
-  const originalMetodosRef = useRef<MetodoPagoConfig[]>([]);
 
   useEffect(() => {
     loadData();
@@ -56,8 +70,7 @@ export default function ConfiguracionPage() {
         configService.getMetodosPago(),
       ]);
       if (configData) setConfig(configData);
-      setMetodos(metodosData);
-      originalMetodosRef.current = JSON.parse(JSON.stringify(metodosData));
+      setMetodos(buildMetodosState(metodosData));
     } catch (error) {
       showToast(messages.toast.errorCargaDatos, "error");
     } finally {
@@ -66,25 +79,19 @@ export default function ConfiguracionPage() {
   };
 
   const handleSaveConfig = async () => {
+    const enabledMetodos = metodos.filter((m) => m.habilitado);
+    const hasPositiveAmount = enabledMetodos.some(
+      (m) => (m.monto_mensual > 0 || m.monto_inscripcion > 0)
+    );
+    if (!hasPositiveAmount) {
+      showToast("Al menos un método habilitado debe tener un monto mayor a cero", "error");
+      return;
+    }
+
     setSaving(true);
     try {
       await configService.updateConfig(config);
-
-      const original = originalMetodosRef.current;
-      for (const metodo of metodos) {
-        const orig = original.find((o) => o.id === metodo.id);
-        if (orig && (orig.monto_mensual !== metodo.monto_mensual || orig.monto_inscripcion !== metodo.monto_inscripcion || orig.habilitado !== metodo.habilitado)) {
-          try {
-            await configService.updateMetodoPago(metodo.id, {
-              monto_mensual: metodo.monto_mensual,
-              monto_inscripcion: metodo.monto_inscripcion,
-              habilitado: metodo.habilitado,
-            });
-          } catch {}
-        }
-      }
-      originalMetodosRef.current = JSON.parse(JSON.stringify(metodos));
-
+      await configService.saveMetodosPago(metodos);
       showToast(messages.toast.configuracionGuardada, "success");
     } catch (error) {
       showToast(messages.toast.configuracionError, "error");
@@ -93,13 +100,21 @@ export default function ConfiguracionPage() {
     }
   };
 
-  const handleToggleMetodo = (metodo: MetodoPagoConfig) => {
-    if (metodoLabels[metodo.metodo_pago]?.alwaysOn) return;
-    setMetodos((prev) => prev.map((m) => m.id === metodo.id ? { ...m, habilitado: !m.habilitado } : m));
+  const handleToggleMetodo = (metodoPago: MetodoPago) => {
+    if (metodoLabels[metodoPago]?.alwaysOn) return;
+    setMetodos((prev) =>
+      prev.map((m) =>
+        m.metodo_pago === metodoPago ? { ...m, habilitado: !m.habilitado } : m
+      )
+    );
   };
 
-  const handleUpdateMonto = (metodo: MetodoPagoConfig, field: "monto_mensual" | "monto_inscripcion", value: number) => {
-    setMetodos((prev) => prev.map((m) => m.id === metodo.id ? { ...m, [field]: value } : m));
+  const handleUpdateMonto = (metodoPago: MetodoPago, field: "monto_mensual" | "monto_inscripcion", value: number) => {
+    setMetodos((prev) =>
+      prev.map((m) =>
+        m.metodo_pago === metodoPago ? { ...m, [field]: value } : m
+      )
+    );
   };
 
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -117,33 +132,31 @@ export default function ConfiguracionPage() {
       const { error: uploadError } = await supabase.storage
         .from("logos")
         .upload(fileName, file, { upsert: true });
+
       if (uploadError) throw uploadError;
+
       const { data: urlData } = supabase.storage.from("logos").getPublicUrl(fileName);
       const logoUrl = `${urlData.publicUrl}?t=${Date.now()}`;
-      setConfig((prev) => ({ ...prev, logo_url: logoUrl }));
+      setConfig({ ...config, logo_url: logoUrl });
       await configService.updateConfig({ logo_url: logoUrl });
       showToast("Logo actualizado", "success");
     } catch (error) {
       showToast("Error al subir logo", "error");
     } finally {
       setUploadingLogo(false);
-      if (logoInputRef.current) logoInputRef.current.value = "";
     }
   };
 
-  const handleLogoDelete = async () => {
-    setUploadingLogo(true);
+  const handleDeleteLogo = async () => {
     try {
       const supabase = createClient();
-      await supabase.storage.from("logos").remove(["logo.png", "logo.jpg", "logo.jpeg", "logo.webp"]);
-      setConfig((prev) => ({ ...prev, logo_url: "" }));
+      await supabase.storage.from("logos").remove(["logo.png"]).catch(() => {});
+      await supabase.storage.from("logos").remove(["logo.jpg"]).catch(() => {});
+      setConfig({ ...config, logo_url: "" });
       await configService.updateConfig({ logo_url: "" });
       showToast("Logo eliminado", "success");
     } catch (error) {
       showToast("Error al eliminar logo", "error");
-    } finally {
-      setUploadingLogo(false);
-      if (logoInputRef.current) logoInputRef.current.value = "";
     }
   };
 
@@ -156,32 +169,27 @@ export default function ConfiguracionPage() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6 animate-fadeIn relative">
-      <LoadingOverlay show={saving} message="Guardando configuración..." />
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-96 h-96 bg-gym-primary/5 rounded-full blur-3xl animate-pulse" />
+    <div className="space-y-4 animate-fadeIn relative">
+      <div className="absolute top-0 right-0 w-72 h-72 bg-gym-primary/5 rounded-full blur-3xl animate-pulse" />
 
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 relative z-10">
         <div>
           <h1 className="text-2xl font-display font-bold text-gym-text neon-text">Configuración</h1>
-          <p className="text-gym-muted text-sm">Personaliza tu gimnasio</p>
+          <p className="text-gym-muted text-sm">Ajustes generales del gym</p>
         </div>
-        <Button onClick={handleSaveConfig} loading={saving} className="hidden sm:flex">
-          <Save className="w-4 h-4 mr-2" /> Guardar
-        </Button>
+        <button
+          onClick={handleSaveConfig}
+          disabled={saving}
+          className="flex items-center gap-2 px-5 py-2.5 bg-gym-primary text-gym-bg rounded-xl font-medium hover:bg-gym-primary/90 transition-all disabled:opacity-50"
+        >
+          {saving ? (
+            <div className="w-4 h-4 border-2 border-gym-bg border-t-transparent rounded-full animate-spin" />
+          ) : (
+            <Save className="w-4 h-4" />
+          )}
+          Guardar
+        </button>
       </div>
-
-      {/* Mobile floating save button */}
-      <button
-        onClick={handleSaveConfig}
-        disabled={saving}
-        className="sm:hidden fixed bottom-20 right-4 z-40 w-14 h-14 rounded-full bg-gym-success/80 text-white shadow-lg shadow-gym-success/20 flex items-center justify-center disabled:opacity-40 active:scale-95 transition-all"
-      >
-        {saving ? (
-          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-        ) : (
-          <Save className="w-6 h-6" />
-        )}
-      </button>
 
       {/* Datos del Gym */}
       <Card className="neon-card relative z-10">
@@ -191,21 +199,26 @@ export default function ConfiguracionPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Logo upload */}
-          <div className="flex items-center gap-4">
-            <div
-              className="w-20 h-20 rounded-2xl border-2 border-dashed border-gym-border flex items-center justify-center overflow-hidden bg-gym-bg cursor-pointer hover:border-gym-primary/50 transition-colors"
-              onClick={() => logoInputRef.current?.click()}
-            >
-              {config.logo_url ? (
-                <img src={config.logo_url} alt="Logo" className="w-full h-full object-cover" />
-              ) : (
-                <Dumbbell className="w-8 h-8 text-gym-muted" />
+          <div className="flex items-center gap-4 mb-4">
+            <div className="relative">
+              <div className="w-20 h-20 rounded-xl bg-gym-surface border-2 border-dashed border-gym-border flex items-center justify-center overflow-hidden">
+                {config.logo_url ? (
+                  <img src={config.logo_url} alt="Logo" className="w-full h-full object-cover" />
+                ) : (
+                  <Dumbbell className="w-8 h-8 text-gym-muted" />
+                )}
+              </div>
+              {config.logo_url && (
+                <button
+                  onClick={handleDeleteLogo}
+                  className="absolute -top-2 -right-2 w-6 h-6 bg-gym-danger text-white rounded-full flex items-center justify-center hover:bg-gym-danger/80 transition-colors"
+                >
+                  <Trash2 className="w-3 h-3" />
+                </button>
               )}
             </div>
-            <div>
-              <p className="text-sm font-medium text-gym-text">Logo del Gym</p>
-              <p className="text-xs text-gym-muted mb-2">PNG, JPG. Se muestra en login y sidebar.</p>
+            <div className="flex-1">
+              <label className="block text-sm font-medium text-gym-muted mb-2">Logo del Gym</label>
               <input
                 ref={logoInputRef}
                 type="file"
@@ -213,50 +226,34 @@ export default function ConfiguracionPage() {
                 onChange={handleLogoUpload}
                 className="hidden"
               />
-              <Button
-                type="button"
-                variant="secondary"
-                size="sm"
+              <button
                 onClick={() => logoInputRef.current?.click()}
                 disabled={uploadingLogo}
+                className="flex items-center gap-2 px-4 py-2 bg-gym-surface border border-gym-border rounded-xl text-sm text-gym-text hover:bg-gym-border/50 transition-colors disabled:opacity-50"
               >
                 {uploadingLogo ? (
-                  <div className="w-4 h-4 border-2 border-gym-primary border-t-transparent rounded-full animate-spin mr-2" />
+                  <div className="w-4 h-4 border-2 border-gym-primary border-t-transparent rounded-full animate-spin" />
                 ) : (
-                  <Upload className="w-4 h-4 mr-2" />
+                  <Upload className="w-4 h-4" />
                 )}
                 {config.logo_url ? "Cambiar" : "Subir logo"}
-              </Button>
-              {config.logo_url && (
-                <button
-                  type="button"
-                  onClick={handleLogoDelete}
-                  disabled={uploadingLogo}
-                  title="Eliminar logo"
-                  className="ml-2 p-2 rounded-lg text-gym-muted hover:text-gym-danger hover:bg-gym-danger/10 transition-colors disabled:opacity-40"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              )}
+              </button>
             </div>
           </div>
 
-          <Input label="Nombre del Gym *" placeholder="Mi Gimnasio" value={config.nombre_gym || ""} onChange={(e) => setConfig({ ...config, nombre_gym: e.target.value })} required />
-          <Input label="Dirección" placeholder="Av. Principal #123" value={config.direccion || ""} onChange={(e) => setConfig({ ...config, direccion: e.target.value })} />
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Input label="Teléfono" placeholder="+52 55 1234 5678" value={config.telefono || ""} onChange={(e) => setConfig({ ...config, telefono: e.target.value })} />
-            <Input label="Email de contacto" placeholder="contacto@miGym.com" type="email" value={config.email_contacto || ""} onChange={(e) => setConfig({ ...config, email_contacto: e.target.value })} />
-          </div>
+          <Input label="Nombre del gym *" placeholder="Mi Gym" value={config.nombre_gym || ""} onChange={(e) => setConfig({ ...config, nombre_gym: e.target.value })} required />
+          <Input label="Dirección" placeholder="Calle Principal #123" value={config.direccion || ""} onChange={(e) => setConfig({ ...config, direccion: e.target.value })} />
+          <Input label="Teléfono" placeholder="+52 55 1234 5678" value={config.telefono || ""} onChange={(e) => setConfig({ ...config, telefono: e.target.value })} />
           <Input label="Horario" placeholder="Lun-Vie 6am-10pm" value={config.horario || ""} onChange={(e) => setConfig({ ...config, horario: e.target.value })} />
           <Input label="Máximo de miembros" type="number" placeholder="50" value={config.max_miembros || ""} onChange={(e) => setConfig({ ...config, max_miembros: parseInt(e.target.value) || 0 })} min="1" />
         </CardContent>
       </Card>
 
-      {/* Propietario */}
+      {/* Datos del Dueño */}
       <Card className="neon-card relative z-10">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <User className="w-5 h-5 text-gym-primary" /> Propietario
+            <User className="w-5 h-5 text-gym-secondary" /> Datos del Propietario
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -277,25 +274,25 @@ export default function ConfiguracionPage() {
           <p className="text-sm text-gym-muted">Configura los métodos de pago aceptados y sus montos.</p>
 
           {metodos.map((metodo) => {
-            const info = metodoLabels[metodo.metodo_pago] || { label: metodo.metodo_pago, icon: "💳" };
-            const isAlwaysOn = info.alwaysOn;
+            const info = metodoLabels[metodo.metodo_pago];
+            const isAlwaysOn = info?.alwaysOn;
             return (
               <div
-                key={metodo.id}
+                key={metodo.metodo_pago}
                 className={`p-4 rounded-xl border transition-all ${metodo.habilitado ? "bg-gym-bg border-gym-border/50" : "bg-gym-bg/30 border-gym-border/20 opacity-60"}`}
               >
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-3">
-                    <span className="text-xl">{info.icon}</span>
+                    <span className="text-xl">{info?.icon}</span>
                     <div>
-                      <p className="font-medium text-gym-text">{info.label}</p>
+                      <p className="font-medium text-gym-text">{info?.label}</p>
                       {isAlwaysOn && <p className="text-xs text-gym-muted">Siempre habilitado</p>}
                     </div>
                   </div>
                   <button
                     type="button"
                     disabled={isAlwaysOn}
-                    onClick={() => handleToggleMetodo(metodo)}
+                    onClick={() => handleToggleMetodo(metodo.metodo_pago)}
                     className={`w-11 h-6 rounded-full flex items-center px-1 transition-all ${
                       metodo.habilitado ? "bg-gym-primary justify-end" : "bg-gym-surface justify-start"
                     } ${isAlwaysOn ? "cursor-not-allowed opacity-70" : "cursor-pointer"}`}
@@ -306,20 +303,20 @@ export default function ConfiguracionPage() {
                 {metodo.habilitado && (
                   <div className="grid grid-cols-2 gap-3">
                     <Input
-                      label={`Mensualidad`}
+                      label="Mensualidad"
                       type="number"
                       placeholder="0"
                       value={metodo.monto_mensual || ""}
-                      onChange={(e) => handleUpdateMonto(metodo, "monto_mensual", parseFloat(e.target.value) || 0)}
+                      onChange={(e) => handleUpdateMonto(metodo.metodo_pago, "monto_mensual", parseFloat(e.target.value) || 0)}
                       min="0"
                       step="0.01"
                     />
                     <Input
-                      label={`Inscripción`}
+                      label="Inscripción"
                       type="number"
                       placeholder="0"
                       value={metodo.monto_inscripcion || ""}
-                      onChange={(e) => handleUpdateMonto(metodo, "monto_inscripcion", parseFloat(e.target.value) || 0)}
+                      onChange={(e) => handleUpdateMonto(metodo.metodo_pago, "monto_inscripcion", parseFloat(e.target.value) || 0)}
                       min="0"
                       step="0.01"
                     />

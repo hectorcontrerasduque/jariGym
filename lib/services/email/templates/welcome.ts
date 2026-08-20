@@ -51,6 +51,7 @@ export function welcomeTemplate(
           </tr>
           <tr>
             <td style="padding:30px;">
+              ${password ? `
               <h2 style="color:#1e293b;margin:0 0 15px;font-size:20px;">¡Bienvenido!</h2>
               <p style="color:#64748b;font-size:15px;line-height:1.6;margin:0 0 10px;">Hola,</p>
               <p style="color:#64748b;font-size:15px;line-height:1.6;margin:0 0 20px;">
@@ -69,6 +70,16 @@ export function welcomeTemplate(
                   </td>
                 </tr>
               </table>
+              ` : `
+              <h2 style="color:#1e293b;margin:0 0 15px;font-size:20px;">Datos Migrados</h2>
+              <p style="color:#64748b;font-size:15px;line-height:1.6;margin:0 0 10px;">Hola,</p>
+              <p style="color:#64748b;font-size:15px;line-height:1.6;margin:0 0 20px;">
+                Tus pagos han sido migrados exitosamente en <strong style="color:#1e293b;">${gymName}</strong>.
+              </p>
+              <p style="color:#64748b;font-size:15px;line-height:1.6;margin:0 0 20px;">
+                Ya puedes iniciar sesión con tu correo y contraseña existentes para ver tus pagos.
+              </p>
+              `}
               ${confirmButtonHtml}
               <p style="color:#94a3b8;font-size:13px;line-height:1.5;margin:25px 0 0;">
                 Si no solicitaste esta cuenta, puedes ignorar este correo de forma segura.

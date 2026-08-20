@@ -85,8 +85,8 @@ export async function GET(request: Request) {
                 activo: true,
                 registered: true,
                 fecha_inscripcion: new Date().toISOString().split("T")[0],
-                inscripcion_pagada: true,
-                inscripcion_fecha: new Date().toISOString().split("T")[0],
+                inscripcion_pagada: isGymOwner,
+                inscripcion_fecha: isGymOwner ? new Date().toISOString().split("T")[0] : null,
               });
 
             const { data: retry } = await supabase

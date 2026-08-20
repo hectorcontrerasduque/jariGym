@@ -8,6 +8,7 @@ import { configService, METODOS_PAGO_DEFAULT } from "@/lib/services/config/confi
 import { createClient } from "@/lib/supabase/client";
 import { Save, Building2, User, CreditCard, Clock, Globe, Upload, Dumbbell, Trash2 } from "lucide-react";
 import { showToast } from "@/components/ui/toast";
+import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { messages } from "@/lib/messages";
 import type { GymConfig, MetodoPago, MetodoPagoConfig } from "@/lib/types";
 
@@ -174,6 +175,7 @@ export default function ConfiguracionPage() {
 
   return (
     <div className="space-y-4 animate-fadeIn relative">
+      <LoadingOverlay show={saving} message={messages.common.guardando} />
       <div className="absolute top-0 right-0 w-72 h-72 bg-gym-primary/5 rounded-full blur-3xl animate-pulse" />
 
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 relative z-10">

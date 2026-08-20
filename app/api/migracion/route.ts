@@ -237,7 +237,9 @@ export async function POST(request: Request) {
       .update({ migrado: "si" })
       .in("id", migracionRecords.map((r: any) => r.id));
 
-    if (isNewUser) {
+    const hasMigratedPayments = pagosCreados > 0 || pagosActualizados > 0;
+
+    if (isNewUser || hasMigratedPayments) {
       let gymName = "GymApp";
       let gymLogo: string | null = null;
       try {
@@ -249,22 +251,28 @@ export async function POST(request: Request) {
         if (config?.logo_url) gymLogo = config.logo_url;
       } catch {}
 
-      // Generate confirmation link via Supabase admin API — email sent via custom nodemailer
-      let confirmLink: string | null = null;
-      try {
-        const { data: linkData } = await supabase.auth.admin.generateLink({
-          type: "magiclink",
-          email,
-        });
-        if (linkData?.properties?.action_link) {
-          confirmLink = linkData.properties.action_link;
-        }
-      } catch {}
+      if (isNewUser) {
+        // New user: generate confirmation link + send welcome email with credentials
+        let confirmLink: string | null = null;
+        try {
+          const { data: linkData } = await supabase.auth.admin.generateLink({
+            type: "magiclink",
+            email,
+          });
+          if (linkData?.properties?.action_link) {
+            confirmLink = linkData.properties.action_link;
+          }
+        } catch {}
 
-      // Send welcome email with credentials + confirmation link (custom nodemailer)
-      try {
-        await sendWelcomeEmail(email, email, password, gymName, gymLogo, confirmLink || undefined);
-      } catch {}
+        try {
+          await sendWelcomeEmail(email, email, password, gymName, gymLogo, confirmLink || undefined);
+        } catch {}
+      } else {
+        // Existing user: send notification that payments were migrated
+        try {
+          await sendWelcomeEmail(email, email, "", gymName, gymLogo);
+        } catch {}
+      }
     }
 
     return NextResponse.json({

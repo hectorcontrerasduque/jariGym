@@ -149,7 +149,7 @@ export default function PagosPage() {
         </div>
         <div className="flex items-center gap-2">
           <Link href="/dashboard/mis-pagos">
-            <Button variant="secondary">
+            <Button>
               <CreditCard className="w-4 h-4 mr-2" />
               Generar pagos
             </Button>

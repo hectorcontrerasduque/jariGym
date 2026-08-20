@@ -38,6 +38,16 @@ export class ConfigService {
       .single();
 
     if (existing && updates.dueno_email && updates.dueno_email !== existing.dueno_email) {
+      const { data: newOwnerProfile } = await this.supabase
+        .from("profiles")
+        .select("id, activo, role")
+        .eq("email", updates.dueno_email)
+        .maybeSingle();
+
+      if (newOwnerProfile && newOwnerProfile.activo !== false && newOwnerProfile.role !== "super_admin") {
+        throw new Error("Este correo ya está registrado como miembro activo. Use otro correo.");
+      }
+
       if (existing.dueno_email) {
         const { data: oldOwnerProfile } = await this.supabase
           .from("profiles")
@@ -52,13 +62,20 @@ export class ConfigService {
         }
       }
 
-      try {
-        await fetch("/api/auth/ensure-super-admin", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email: updates.dueno_email }),
-        });
-      } catch {}
+      if (newOwnerProfile && newOwnerProfile.activo === false) {
+        await this.supabase
+          .from("profiles")
+          .update({ activo: true, role: "super_admin", registered: true })
+          .eq("id", newOwnerProfile.id);
+      } else if (!newOwnerProfile) {
+        try {
+          await fetch("/api/auth/ensure-super-admin", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email: updates.dueno_email }),
+          });
+        } catch {}
+      }
     }
 
     const { id, created_at, updated_at, ...safeUpdates } = updates as GymConfig;

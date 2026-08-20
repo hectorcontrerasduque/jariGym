@@ -45,6 +45,14 @@ export default function DashboardPage() {
   const [showAllMonths, setShowAllMonths] = useState(false);
   const [miembros, setMiembros] = useState<Profile[]>([]);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [showBanner, setShowBanner] = useState(true);
+
+  useEffect(() => {
+    if (isSuperAdmin) {
+      const timer = setTimeout(() => setShowBanner(false), 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [isSuperAdmin]);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -104,8 +112,8 @@ export default function DashboardPage() {
       <div className="absolute top-0 right-0 w-72 h-72 bg-gym-primary/5 rounded-full blur-3xl animate-pulse" />
       <div className="absolute bottom-0 left-0 w-72 h-72 bg-gym-secondary/5 rounded-full blur-3xl animate-pulse" style={{ animationDelay: "1s" }} />
 
-      {isSuperAdmin && (
-        <div className="admin-welcome-banner rounded-2xl p-4 sm:p-5 relative z-10 overflow-hidden">
+      {isSuperAdmin && showBanner && (
+        <div className="admin-welcome-banner rounded-2xl p-4 sm:p-5 relative z-10 overflow-hidden transition-opacity duration-1000" style={{ opacity: showBanner ? 1 : 0 }}>
           <div className="absolute top-2 right-4 w-2 h-2 bg-yellow-400 rounded-full animate-float" style={{ animationDelay: "0s" }} />
           <div className="absolute top-4 right-10 w-1.5 h-1.5 bg-amber-300 rounded-full animate-float" style={{ animationDelay: "0.5s" }} />
           <div className="absolute bottom-3 right-6 w-1 h-1 bg-yellow-500 rounded-full animate-float" style={{ animationDelay: "1s" }} />
@@ -115,7 +123,7 @@ export default function DashboardPage() {
             </div>
             <div>
               <p className="text-sm font-display font-bold">
-                <span className="neon-gold">Bienvenido, Dueño</span>
+                <span className="neon-gold">Bienvenido, Administrador</span>
               </p>
               <p className="text-xs text-gym-muted">Acceso total al sistema</p>
             </div>

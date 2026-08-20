@@ -252,11 +252,9 @@ export async function POST(request: Request) {
       // Generate confirmation link via Supabase admin API — email sent via custom nodemailer
       let confirmLink: string | null = null;
       try {
-        const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "";
         const { data: linkData } = await supabase.auth.admin.generateLink({
           type: "magiclink",
           email,
-          redirectTo: `${siteUrl}/auth/callback?next=/login`,
         });
         if (linkData?.properties?.action_link) {
           confirmLink = linkData.properties.action_link;

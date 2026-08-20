@@ -270,6 +270,7 @@ export const messages = {
     cancelButton: "Cancelar",
     passwordMinError: "La contraseña debe tener al menos 6 caracteres",
     passwordMismatchError: "Las contraseñas no coinciden",
+    emailExistsInfo: "Este correo ya está registrado. Los pagos de migración se asociarán a tu cuenta existente.",
     emailExistsError: "Este correo ya está registrado",
     emailInvalidError: "Correo electrónico inválido",
     noResults: "No se encontraron datos. Comuníquese con su administrador.",

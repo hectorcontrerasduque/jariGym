@@ -178,10 +178,6 @@ function LoginForm() {
       setMigrateError(messages.migracion.passwordMismatchError);
       return;
     }
-    if (migEmailExists) {
-      setMigrateError(messages.migracion.emailExistsError);
-      return;
-    }
 
     setMigrateStep("loading");
     try {
@@ -449,7 +445,7 @@ function LoginForm() {
                       required
                     />
                     {migEmailExists && (
-                      <p className="text-xs text-gym-danger mt-1">{messages.migracion.emailExistsError}</p>
+                      <p className="text-xs text-gym-warning mt-1">{messages.migracion.emailExistsInfo}</p>
                     )}
                   </div>
                   <PasswordInput

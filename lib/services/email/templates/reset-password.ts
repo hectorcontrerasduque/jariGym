@@ -50,6 +50,9 @@ export function resetPasswordTemplate(resetLink: string, gymName: string, gymLog
               <p style="color:#94a3b8;font-size:13px;line-height:1.5;margin:25px 0 0;">
                 Este enlace expira en 24 horas. Si no solicitaste este cambio, puedes ignorar este correo de forma segura.
               </p>
+              <p style="color:#f59e0b;font-size:12px;line-height:1.5;margin:20px 0 0;background:#fffbeb;border:1px solid #fde68a;border-radius:6px;padding:10px 14px;">
+                Si no recibes el correo, revisa tu carpeta de <strong>SPAM</strong> o <strong>No deseado</strong>.
+              </p>
               <p style="color:#cbd5e1;font-size:11px;line-height:1.5;margin:15px 0 0;">
                 Este es un correo automático, por favor no respondas a este mensaje.
               </p>

@@ -668,7 +668,7 @@ function ReportarPagoForm() {
             <Button
               id="form-submit-btn"
               type="submit"
-              className="w-full hidden sm:flex"
+              className="hidden sm:flex"
               loading={loading}
               disabled={
                 (isAdmin && !miembroSeleccionado) ||

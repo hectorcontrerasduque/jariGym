@@ -16,10 +16,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ matches: [] });
     }
 
+    const words = nombre.split(/\s+/).filter((w) => w.length >= 2);
+    if (words.length === 0) {
+      return NextResponse.json({ matches: [] });
+    }
+
+    const orFilter = words.map((w) => `nombre.ilike.%${w}%`).join(",");
+
     const { data, error } = await supabase
       .from("migracion")
       .select("nombre")
-      .ilike("nombre", `%${nombre}%`)
+      .or(orFilter)
       .eq("migrado", "no");
 
     if (error) {

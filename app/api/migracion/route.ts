@@ -43,7 +43,14 @@ export async function POST(request: Request) {
     let migracionRecords;
 
     if (words.length > 0) {
-      const orFilter = words.map((w: string) => `nombre.ilike.%${w}%`).join(",");
+      const conditions: string[] = [];
+      for (const w of words) {
+        conditions.push(`nombre.ilike.%${w}%`);
+        if (w.length > 3) {
+          conditions.push(`nombre.ilike.%${w.slice(0, -1)}%`);
+        }
+      }
+      const orFilter = conditions.join(",");
       const { data, error: migracionError } = await supabase
         .from("migracion")
         .select("*")
@@ -160,33 +167,37 @@ export async function POST(request: Request) {
       }
     }
 
-    await supabase
-      .from("profiles")
-      .update({ inscripcion_pagada: true })
-      .eq("id", userId);
-
     const { data: inscripcionExistente } = await supabase
       .from("pagos")
       .select("id")
       .eq("usuario_id", userId)
-      .ilike("notas", "%inscripción%")
+      .eq("tipo_pago", "inscripcion")
       .eq("anio_pagar", migracionRecords[0]?.anio_pagar || new Date().getFullYear())
       .maybeSingle();
 
     if (!inscripcionExistente) {
+      if (montoInscripcion > 0) {
+        await supabase
+          .from("pagos")
+          .insert({
+            usuario_id: userId,
+            monto: montoInscripcion,
+            estado: "aprobado",
+            metodo_pago: "efectivo",
+            tipo_pago: "inscripcion",
+            mes_pagar: migracionRecords[0]?.mes_pagar || 1,
+            anio_pagar: migracionRecords[0]?.anio_pagar || new Date().getFullYear(),
+            notas: "Inscripción - Registro por migración de data",
+            approved_at: new Date().toISOString(),
+          });
+      }
       await supabase
-        .from("pagos")
-        .insert({
-          usuario_id: userId,
-          monto: montoInscripcion,
-          estado: "aprobado",
-          metodo_pago: "efectivo",
-          tipo_pago: "inscripcion",
-          mes_pagar: migracionRecords[0]?.mes_pagar || 1,
-          anio_pagar: migracionRecords[0]?.anio_pagar || new Date().getFullYear(),
-          notas: "Inscripción - Registro por migración de data",
-          approved_at: new Date().toISOString(),
-        });
+        .from("profiles")
+        .update({
+          inscripcion_pagada: true,
+          inscripcion_fecha: new Date().toISOString().split("T")[0],
+        })
+        .eq("id", userId);
     }
 
     await supabase

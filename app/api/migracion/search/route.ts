@@ -24,7 +24,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ matches: [] });
     }
 
-    const orFilter = words.map((w) => `nombre.ilike.%${w}%`).join(",");
+    const conditions: string[] = [];
+    for (const w of words) {
+      conditions.push(`nombre.ilike.%${w}%`);
+      if (w.length > 3) {
+        conditions.push(`nombre.ilike.%${w.slice(0, -1)}%`);
+      }
+    }
+    const orFilter = conditions.join(",");
 
     const { data, error } = await supabase
       .from("migracion")

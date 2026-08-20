@@ -77,9 +77,10 @@ export default function MisPagosPage() {
       setProfile(profileData);
 
       const targetId = miembroSeleccionado?.id || user.id;
+      const currentIsAdmin = profileData?.role === "super_admin" || profileData?.role === "admin";
 
       const [pagosData, aniosData, config] = await Promise.all([
-        pagosService.listarPagosUsuario(targetId, anioSeleccionado),
+        currentIsAdmin ? pagosService.listarPagosUsuario(targetId, anioSeleccionado) : pagosService.listarMisPagos(anioSeleccionado),
         pagosService.aniosConPagos(targetId),
         configService.getConfig(),
       ]);

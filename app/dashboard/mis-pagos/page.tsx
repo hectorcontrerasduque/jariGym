@@ -137,6 +137,7 @@ export default function MisPagosPage() {
           mes_pagar: pagoForm.mes,
           anio_pagar: pagoForm.anio,
           metodo_pago: pagoForm.metodo_pago,
+          tipo_pago: "membresia",
           notas: pagoForm.notas || undefined,
         });
         showToast("Pago registrado y aprobado", "success");
@@ -147,6 +148,7 @@ export default function MisPagosPage() {
           mes_pagar: pagoForm.mes,
           anio_pagar: pagoForm.anio,
           metodo_pago: pagoForm.metodo_pago,
+          tipo_pago: "membresia",
           notas: pagoForm.notas || undefined,
         });
         showToast("Pago registrado (pendiente de aprobación)", "success");

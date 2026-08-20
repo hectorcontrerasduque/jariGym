@@ -30,6 +30,8 @@ export interface Membresia {
 
 export type MetodoPago = "efectivo" | "bs" | "binance";
 
+export type TipoPago = "membresia" | "inscripcion";
+
 export interface Pago {
   id: string;
   usuario_id: string;
@@ -37,6 +39,7 @@ export interface Pago {
   comprobante_url: string | null;
   estado: "pendiente" | "aprobado" | "rechazado" | "suspendido";
   metodo_pago: MetodoPago;
+  tipo_pago: TipoPago;
   codigo_billete: string | null;
   notas: string | null;
   approved_by: string | null;

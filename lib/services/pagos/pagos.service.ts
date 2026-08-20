@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/client";
 import { getMonthName } from "@/lib/utils";
 import { messages } from "@/lib/messages";
-import type { Pago, MetodoPago } from "@/lib/types";
+import type { Pago, MetodoPago, TipoPago } from "@/lib/types";
 
 export interface CreatePagoInput {
   usuario_id: string;
@@ -9,6 +9,7 @@ export interface CreatePagoInput {
   mes_pagar: number;
   anio_pagar: number;
   metodo_pago: MetodoPago;
+  tipo_pago: TipoPago;
   comprobante_url?: string;
   codigo_billete?: string;
   notas?: string;

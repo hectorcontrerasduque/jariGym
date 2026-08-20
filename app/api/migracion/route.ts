@@ -117,6 +117,10 @@ export async function POST(request: Request) {
     let pagosActualizados = 0;
 
     for (const record of migracionRecords) {
+      if (record.estado !== "pagado" && record.estado !== "suspendido") continue;
+
+      const pagoEstado = record.estado === "pagado" ? "aprobado" : "suspendido";
+
       const { data: existingPago } = await supabase
         .from("pagos")
         .select("id, estado")
@@ -131,9 +135,9 @@ export async function POST(request: Request) {
             .from("pagos")
             .update({
               monto: montoMensual,
-              estado: "aprobado",
+              estado: pagoEstado,
               notas: "Actualizado por migración de data",
-              approved_at: new Date().toISOString(),
+              approved_at: pagoEstado === "aprobado" ? new Date().toISOString() : null,
             })
             .eq("id", existingPago.id);
           if (!error) pagosActualizados++;
@@ -144,12 +148,13 @@ export async function POST(request: Request) {
           .insert({
             usuario_id: userId,
             monto: montoMensual,
-            estado: "aprobado",
+            estado: pagoEstado,
             metodo_pago: "efectivo",
+            tipo_pago: "membresia",
             mes_pagar: record.mes_pagar,
             anio_pagar: record.anio_pagar,
             notas: "Registro por migración de data",
-            approved_at: new Date().toISOString(),
+            approved_at: pagoEstado === "aprobado" ? new Date().toISOString() : null,
           });
         if (!error) pagosCreados++;
       }
@@ -176,6 +181,7 @@ export async function POST(request: Request) {
           monto: montoInscripcion,
           estado: "aprobado",
           metodo_pago: "efectivo",
+          tipo_pago: "inscripcion",
           mes_pagar: migracionRecords[0]?.mes_pagar || 1,
           anio_pagar: migracionRecords[0]?.anio_pagar || new Date().getFullYear(),
           notas: "Inscripción - Registro por migración de data",

@@ -198,7 +198,6 @@ export async function POST(request: Request) {
         }
       }
       isNewUser = true;
-      }
     }
 
     let pagosCreados = 0;

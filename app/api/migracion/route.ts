@@ -303,10 +303,7 @@ export async function POST(request: Request) {
           await sendWelcomeEmail(email, email, password, gymName, gymLogo, confirmLink || undefined);
         } catch {}
       } else {
-        // Existing user: send notification that payments were migrated
-        try {
-          await sendWelcomeEmail(email, email, "", gymName, gymLogo);
-        } catch {}
+        // Existing user: no email needed, they already have an account
       }
     }
 

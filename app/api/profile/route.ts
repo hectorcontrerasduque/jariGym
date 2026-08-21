@@ -64,7 +64,7 @@ export async function PUT(request: Request) {
     }
 
     if (password && password.trim()) {
-      if (targetUserId === user.id) {
+      if (targetUserId === user.id && !isAdmin) {
         if (!currentPassword) {
           return NextResponse.json({ error: "Contraseña actual requerida" }, { status: 400 });
         }

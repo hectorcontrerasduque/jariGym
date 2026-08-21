@@ -143,7 +143,7 @@ function PerfilContent() {
       showToast(messages.toast.perfilGuardado, "success");
     } catch (err) {
       const raw = err instanceof Error ? err.message : "";
-      const msg = raw.includes("contraseña") ? "Error al cambiar contraseña: " + raw.split(": ").pop() : messages.toast.perfilError;
+      const msg = raw.toLowerCase().includes("contraseña") ? raw : messages.toast.perfilError;
       showToast(msg, "error");
     } finally {
       setSaving(false);

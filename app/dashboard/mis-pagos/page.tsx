@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -28,6 +29,7 @@ function getPagoIcon(pago: Pago) {
 }
 
 export default function MisPagosPage() {
+  const router = useRouter();
   const [pagos, setPagos] = useState<Pago[]>([]);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -295,11 +297,15 @@ export default function MisPagosPage() {
       }
 
       showToast(isSelf ? "Pago registrado y aprobado" : "Pago registrado (pendiente de aprobación)", "success");
-      setShowForm(false);
-      setSubmitted(false);
-      setFormData({ meses: [], metodo_pago: "efectivo", codigo_billete: "", notas: "", pagar_inscripcion: false, pagar_mensualidad: false, fecha_pago: new Date().toISOString().split("T")[0] });
-      setComprobante(null);
-      await loadData();
+      if (isSuperAdmin) {
+        router.push("/dashboard/pagos");
+      } else {
+        setShowForm(false);
+        setSubmitted(false);
+        setFormData({ meses: [], metodo_pago: "efectivo", codigo_billete: "", notas: "", pagar_inscripcion: false, pagar_mensualidad: false, fecha_pago: new Date().toISOString().split("T")[0] });
+        setComprobante(null);
+        await loadData();
+      }
     } catch (err: any) {
       showToast(err.message || "Error al registrar pago", "error");
     } finally {

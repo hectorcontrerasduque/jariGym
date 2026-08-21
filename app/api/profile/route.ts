@@ -60,7 +60,7 @@ export async function PUT(request: Request) {
       .single();
 
     if (profileError) {
-      return NextResponse.json({ error: messages.toast.perfilError }, { status: 400 });
+      return NextResponse.json({ error: `${messages.toast.perfilError}: ${profileError.message}` }, { status: 400 });
     }
 
     if (password && password.trim()) {
@@ -105,7 +105,8 @@ export async function PUT(request: Request) {
     }
 
     return NextResponse.json({ profile: data });
-  } catch {
-    return NextResponse.json({ error: messages.toast.errorGenerico }, { status: 500 });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : messages.toast.errorGenerico;
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

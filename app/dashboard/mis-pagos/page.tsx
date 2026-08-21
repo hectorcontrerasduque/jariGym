@@ -51,6 +51,7 @@ export default function MisPagosPage() {
   const [inscripcionPendiente, setInscripcionPendiente] = useState(false);
   const [membresiaLibre, setMembresiaLibre] = useState(false);
   const [savingPago, setSavingPago] = useState(false);
+  const [loadingPendientes, setLoadingPendientes] = useState(false);
 
   const [formData, setFormData] = useState({
     meses: [] as { mes: number; anio: number }[],
@@ -111,6 +112,7 @@ export default function MisPagosPage() {
 
   // Load pending months when member changes
   const loadMiembroPendientes = useCallback(async (miembroId: string) => {
+    setLoadingPendientes(true);
     try {
       const [meses, profile, libre, tienePendiente] = await Promise.all([
         pagosService.mesesPendientesAdmin(miembroId),
@@ -125,10 +127,13 @@ export default function MisPagosPage() {
       setFormData(prev => ({ ...prev, meses: [], pagar_inscripcion: false, pagar_mensualidad: false }));
     } catch {
       showToast(messages.toast.errorCargaDatos, "error");
+    } finally {
+      setLoadingPendientes(false);
     }
   }, []);
 
   const loadSelfPendientes = useCallback(async (userId: string) => {
+    setLoadingPendientes(true);
     try {
       const [meses, profile, libre, tienePendiente] = await Promise.all([
         pagosService.mesesPendientes(userId),
@@ -143,6 +148,8 @@ export default function MisPagosPage() {
       setFormData(prev => ({ ...prev, meses: [], pagar_inscripcion: false, pagar_mensualidad: false }));
     } catch {
       showToast(messages.toast.errorCargaDatos, "error");
+    } finally {
+      setLoadingPendientes(false);
     }
   }, []);
 
@@ -170,8 +177,18 @@ export default function MisPagosPage() {
   const toggleMonth = (mes: number, anio: number) => {
     setFormData(prev => {
       const existe = prev.meses.some(m => m.mes === mes && m.anio === anio);
-      const meses = existe ? prev.meses.filter(m => !(m.mes === mes && m.anio === anio)) : [...prev.meses, { mes, anio }];
-      return { ...prev, meses, pagar_mensualidad: meses.length > 0 ? true : prev.pagar_mensualidad };
+      if (existe) {
+        const idx = mesesPendientes.findIndex(m => m.mes === mes && m.anio === anio);
+        const nuevosMeses = prev.meses.filter(m => {
+          const mIdx = mesesPendientes.findIndex(sp => sp.mes === m.mes && sp.anio === m.anio);
+          return mIdx < idx;
+        });
+        return { ...prev, meses: nuevosMeses, pagar_mensualidad: nuevosMeses.length > 0 };
+      } else {
+        const idx = mesesPendientes.findIndex(m => m.mes === mes && m.anio === anio);
+        const nuevosMeses = mesesPendientes.slice(0, idx + 1);
+        return { ...prev, meses: nuevosMeses, pagar_mensualidad: true };
+      }
     });
   };
 
@@ -455,9 +472,16 @@ export default function MisPagosPage() {
                   <div>
                     <div className="flex items-center justify-between mb-3">
                       <label className="text-sm font-medium text-gym-muted">Meses a pagar</label>
-                      <Button type="button" variant="ghost" size="sm" onClick={selectAllMonths}>Seleccionar todos</Button>
+                      {!loadingPendientes && mesesPendientes.length > 0 && (
+                        <Button type="button" variant="ghost" size="sm" onClick={selectAllMonths}>Seleccionar todos</Button>
+                      )}
                     </div>
-                    {mesesPendientes.length === 0 ? (
+                    {loadingPendientes ? (
+                      <div className="flex items-center justify-center py-8 bg-gym-bg rounded-xl">
+                        <div className="animate-spin w-6 h-6 border-2 border-gym-primary border-t-transparent rounded-full" />
+                        <span className="ml-2 text-sm text-gym-muted">Cargando meses pendientes...</span>
+                      </div>
+                    ) : mesesPendientes.length === 0 ? (
                       <div className="text-center py-8 bg-gym-bg rounded-xl">
                         <CheckCircle className="w-12 h-12 text-gym-success mx-auto mb-2 animate-pulse-glow" />
                         <p className="text-gym-muted font-medium">Sin deuda mensual</p>
@@ -619,7 +643,7 @@ export default function MisPagosPage() {
               <p className="text-gym-muted">No hay pagos registrados</p>
             </div>
           ) : (
-            <div className="max-h-32 overflow-y-auto space-y-2 pr-1">
+            <div className="max-h-40 overflow-y-auto space-y-2 pr-1">
               {pagos.map(pago => (
                 <div key={pago.id} className="p-2.5 bg-gym-bg rounded-xl hover:bg-gym-surface transition-colors">
                   <div className="flex items-center gap-2">

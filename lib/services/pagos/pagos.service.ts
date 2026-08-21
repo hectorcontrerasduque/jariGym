@@ -303,7 +303,7 @@ export class PagosService {
       }
     }
 
-    return mesesPendientes;
+    return mesesPendientes.reverse();
   }
 
   async mesesPendientesAdmin(usuarioId: string): Promise<{ mes: number; anio: number }[]> {

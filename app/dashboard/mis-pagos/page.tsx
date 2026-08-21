@@ -111,11 +111,11 @@ export default function MisPagosPage() {
   useEffect(() => { loadData(); }, [loadData]);
 
   // Load pending months when member changes
-  const loadMiembroPendientes = useCallback(async (miembroId: string) => {
+  const loadMiembroPendientes = useCallback(async (miembroId: string, anio?: number) => {
     setLoadingPendientes(true);
     try {
       const [meses, profile, libre, tienePendiente] = await Promise.all([
-        pagosService.mesesPendientesAdmin(miembroId),
+        pagosService.mesesPendientesAdmin(miembroId, anio),
         createClient().from("profiles").select("inscripcion_pagada").eq("id", miembroId).single(),
         createClient().from("membresias").select("id").eq("usuario_id", miembroId).is("fecha_fin", null).maybeSingle(),
         pagosService.tieneInscripcionPendiente(miembroId),
@@ -130,13 +130,13 @@ export default function MisPagosPage() {
     } finally {
       setLoadingPendientes(false);
     }
-  }, []);
+  }, [anioSeleccionado]);
 
-  const loadSelfPendientes = useCallback(async (userId: string) => {
+  const loadSelfPendientes = useCallback(async (userId: string, anio?: number) => {
     setLoadingPendientes(true);
     try {
       const [meses, profile, libre, tienePendiente] = await Promise.all([
-        pagosService.mesesPendientes(userId),
+        pagosService.mesesPendientes(userId, anio),
         createClient().from("profiles").select("inscripcion_pagada").eq("id", userId).single(),
         createClient().from("membresias").select("id").eq("usuario_id", userId).is("fecha_fin", null).maybeSingle(),
         pagosService.tieneInscripcionPendiente(userId),
@@ -151,7 +151,7 @@ export default function MisPagosPage() {
     } finally {
       setLoadingPendientes(false);
     }
-  }, []);
+  }, [anioSeleccionado]);
 
   useEffect(() => {
     if (!showForm) return;
@@ -160,12 +160,12 @@ export default function MisPagosPage() {
       if (!user) return;
       const targetId = miembroSeleccionado?.id || user.id;
       if (miembroSeleccionado) {
-        loadMiembroPendientes(targetId);
+        loadMiembroPendientes(targetId, anioSeleccionado);
       } else {
-        loadSelfPendientes(targetId);
+        loadSelfPendientes(targetId, anioSeleccionado);
       }
     });
-  }, [showForm, miembroSeleccionado, loadMiembroPendientes, loadSelfPendientes]);
+  }, [showForm, miembroSeleccionado, anioSeleccionado, loadMiembroPendientes, loadSelfPendientes]);
 
   const handleSelectMiembro = (m: Profile | null) => {
     setMiembroSeleccionado(m);

@@ -254,7 +254,7 @@ export class PagosService {
     return this.listarPagos("pendiente");
   }
 
-  async mesesPendientes(usuarioId: string): Promise<{ mes: number; anio: number }[]> {
+  async mesesPendientes(usuarioId: string, anio?: number): Promise<{ mes: number; anio: number }[]> {
     const { data, error } = await this.supabase
       .from("pagos")
       .select("mes_pagar, anio_pagar, estado")
@@ -270,25 +270,24 @@ export class PagosService {
       anio: p.anio_pagar,
     }));
 
-    const hoy = new Date();
-    const anioActual = hoy.getFullYear();
+    const anioFiltro = anio || new Date().getFullYear();
 
     const mesesPendientes: { mes: number; anio: number }[] = [];
 
     for (let mes = 12; mes >= 1; mes--) {
       const yaPago = pagosAprobados.some(
-        (p) => p.mes === mes && p.anio === anioActual
+        (p) => p.mes === mes && p.anio === anioFiltro
       );
       if (!yaPago) {
-        mesesPendientes.push({ mes, anio: anioActual });
+        mesesPendientes.push({ mes, anio: anioFiltro });
       }
     }
 
     return mesesPendientes.reverse();
   }
 
-  async mesesPendientesAdmin(usuarioId: string): Promise<{ mes: number; anio: number }[]> {
-    return this.mesesPendientes(usuarioId);
+  async mesesPendientesAdmin(usuarioId: string, anio?: number): Promise<{ mes: number; anio: number }[]> {
+    return this.mesesPendientes(usuarioId, anio);
   }
 
   async tieneInscripcionPendiente(usuarioId: string): Promise<boolean> {

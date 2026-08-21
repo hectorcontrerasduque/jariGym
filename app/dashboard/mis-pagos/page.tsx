@@ -648,7 +648,7 @@ export default function MisPagosPage() {
             type="submit"
             form="pago-form"
             disabled={savingPago || (!formData.pagar_inscripcion && !formData.pagar_mensualidad) || (formData.pagar_mensualidad && formData.meses.length === 0) || montoTotal === 0}
-            className="sm:hidden fixed bottom-20 right-4 z-40 w-14 h-14 rounded-full bg-gym-success text-white shadow-lg shadow-gym-success/30 flex items-center justify-center disabled:opacity-50 active:scale-95 transition-all"
+            className="sm:hidden fixed bottom-20 right-4 z-40 w-14 h-14 rounded-full bg-gym-success/80 text-white shadow-lg shadow-gym-success/20 flex items-center justify-center disabled:opacity-40 active:scale-95 transition-all"
           >
             {savingPago ? (
               <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />

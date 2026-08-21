@@ -114,7 +114,6 @@ export function Sidebar() {
           </button>
         </div>
       </div>
-      )}
 
       {/* Desktop sidebar */}
       <aside className="hidden md:flex fixed left-0 top-0 h-full w-64 bg-gym-surface/80 backdrop-blur-xl border-r border-gym-border/50 flex-col z-40">

@@ -255,16 +255,6 @@ export class PagosService {
   }
 
   async mesesPendientes(usuarioId: string): Promise<{ mes: number; anio: number }[]> {
-    const { data: profile } = await this.supabase
-      .from("profiles")
-      .select("fecha_inscripcion, inscripcion_pagada")
-      .eq("id", usuarioId)
-      .single();
-
-    const fechaInscripcion = profile?.fecha_inscripcion
-      ? new Date(profile.fecha_inscripcion)
-      : new Date();
-
     const { data, error } = await this.supabase
       .from("pagos")
       .select("mes_pagar, anio_pagar, estado")
@@ -281,25 +271,16 @@ export class PagosService {
     }));
 
     const hoy = new Date();
-    const mesActual = hoy.getMonth() + 1;
     const anioActual = hoy.getFullYear();
-
-    const mesMinInscripcion = fechaInscripcion.getMonth() + 1;
-    const anioMinInscripcion = fechaInscripcion.getFullYear();
 
     const mesesPendientes: { mes: number; anio: number }[] = [];
 
-    for (let anio = anioActual; anio >= anioMinInscripcion; anio--) {
-      const mesMax = 12;
-      const mesMin = anio === anioMinInscripcion ? mesMinInscripcion : 1;
-
-      for (let mes = mesMax; mes >= mesMin; mes--) {
-        const yaPago = pagosAprobados.some(
-          (p) => p.mes === mes && p.anio === anio
-        );
-        if (!yaPago) {
-          mesesPendientes.push({ mes, anio });
-        }
+    for (let mes = 12; mes >= 1; mes--) {
+      const yaPago = pagosAprobados.some(
+        (p) => p.mes === mes && p.anio === anioActual
+      );
+      if (!yaPago) {
+        mesesPendientes.push({ mes, anio: anioActual });
       }
     }
 

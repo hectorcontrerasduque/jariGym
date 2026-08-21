@@ -362,6 +362,19 @@ export default function ConfiguracionPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Mobile floating save button */}
+      <button
+        onClick={handleSaveConfig}
+        disabled={saving}
+        className="sm:hidden fixed bottom-20 right-4 z-40 w-14 h-14 rounded-full bg-gym-success/80 text-white shadow-lg shadow-gym-success/20 flex items-center justify-center disabled:opacity-40 active:scale-95 transition-all"
+      >
+        {saving ? (
+          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+        ) : (
+          <Save className="w-6 h-6" />
+        )}
+      </button>
     </div>
   );
 }

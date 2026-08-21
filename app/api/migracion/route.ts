@@ -152,82 +152,52 @@ export async function POST(request: Request) {
       });
 
       if (authError) {
-        if (authError.message?.includes("already") || authError.message?.includes("exists")) {
-          // User exists in auth but no profile — recover by looking up the auth user
-          const { data: existingAuth } = await supabase.auth.admin.listUsers();
-          const found = existingAuth?.users?.find((u) => u.email?.toLowerCase() === email.toLowerCase());
-          if (found) {
-            userId = found.id;
-            // Create profile for existing auth user
-            const { data: existingProf } = await supabase
-              .from("profiles")
-              .select("id")
-              .eq("id", userId)
-              .maybeSingle();
-            if (!existingProf) {
-              await supabase.from("profiles").insert({
-                id: userId,
-                email,
-                nombre_completo: nombre,
-                whatsapp,
-                role: "miembro",
-                activo: true,
-                registered: true,
-                fecha_inscripcion: "2026-01-01",
-                inscripcion_pagada: false,
-              });
-            }
-          } else {
-            return NextResponse.json({ error: messages.migracion.emailExistsError }, { status: 400 });
-          }
-        } else {
-          return NextResponse.json({ error: `${messages.migracion.crearUsuarioError}: ${authError.message}` }, { status: 500 });
+        return NextResponse.json({ error: `${messages.migracion.crearUsuarioError}: ${authError.message}` }, { status: 500 });
+      }
+
+      if (!authUser?.user?.id) {
+        return NextResponse.json({ error: messages.migracion.usuarioNoCreado }, { status: 500 });
+      }
+      userId = authUser.user.id;
+
+      // The handle_new_user trigger may have auto-created the profile row.
+      // Check if it exists before inserting to avoid duplicate key error.
+      const { data: triggeredProfile } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("id", userId)
+        .maybeSingle();
+
+      const profileFields = {
+        email,
+        nombre_completo: nombre,
+        whatsapp,
+        role: "miembro" as const,
+        activo: true,
+        registered: true,
+        fecha_inscripcion: "2026-01-01",
+        inscripcion_pagada: false,
+      };
+
+      if (triggeredProfile) {
+        const { error: profileError } = await supabase
+          .from("profiles")
+          .update(profileFields)
+          .eq("id", userId);
+        if (profileError) {
+          await supabase.auth.admin.deleteUser(userId);
+          return NextResponse.json({ error: `${messages.migracion.crearPerfilError}: ${profileError.message}` }, { status: 500 });
         }
       } else {
-        // New user created successfully
-        if (!authUser?.user?.id) {
-          return NextResponse.json({ error: messages.migracion.usuarioNoCreado }, { status: 500 });
-        }
-        userId = authUser.user.id;
-
-        // The handle_new_user trigger may have auto-created the profile row.
-        // Check if it exists before inserting to avoid duplicate key error.
-        const { data: triggeredProfile } = await supabase
+        const { error: profileError } = await supabase
           .from("profiles")
-          .select("id")
-          .eq("id", userId)
-          .maybeSingle();
-
-        const profileFields = {
-          email,
-          nombre_completo: nombre,
-          whatsapp,
-          role: "miembro" as const,
-          activo: true,
-          registered: true,
-          fecha_inscripcion: "2026-01-01",
-          inscripcion_pagada: false,
-        };
-
-        if (triggeredProfile) {
-          const { error: profileError } = await supabase
-            .from("profiles")
-            .update(profileFields)
-            .eq("id", userId);
-          if (profileError) {
-            await supabase.auth.admin.deleteUser(userId);
-            return NextResponse.json({ error: `${messages.migracion.crearPerfilError}: ${profileError.message}` }, { status: 500 });
-          }
-        } else {
-          const { error: profileError } = await supabase
-            .from("profiles")
-            .insert({ id: userId, ...profileFields });
-          if (profileError) {
-            await supabase.auth.admin.deleteUser(userId);
-            return NextResponse.json({ error: `${messages.migracion.crearPerfilError}: ${profileError.message}` }, { status: 500 });
-          }
+          .insert({ id: userId, ...profileFields });
+        if (profileError) {
+          await supabase.auth.admin.deleteUser(userId);
+          return NextResponse.json({ error: `${messages.migracion.crearPerfilError}: ${profileError.message}` }, { status: 500 });
         }
-        isNewUser = true;
+      }
+      isNewUser = true;
       }
     }
 

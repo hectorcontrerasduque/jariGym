@@ -8,7 +8,7 @@ import { pagosService } from "@/lib/services/pagos/pagos.service";
 import { configService } from "@/lib/services/config/config.service";
 import { createClient } from "@/lib/supabase/client";
 import { formatCurrency, getMonthName } from "@/lib/utils";
-import { CreditCard, CheckCircle, Clock, Calendar, Trash2, FileText, Plus, Search, User, DollarSign, Upload, Send, Gift, AlertTriangle, ChevronDown, X } from "lucide-react";
+import { CreditCard, CheckCircle, Clock, Calendar, Trash2, FileText, Plus, Search, User, DollarSign, Upload, Send, Gift, AlertTriangle, ChevronDown, X, Save } from "lucide-react";
 import { showToast } from "@/components/ui/toast";
 import { messages } from "@/lib/messages";
 import { Avatar } from "@/components/ui/avatar";
@@ -225,6 +225,11 @@ export default function MisPagosPage() {
   const handleSubmitPago = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitted(true);
+
+    if (!formData.pagar_inscripcion && !formData.pagar_mensualidad) return;
+    if (formData.pagar_mensualidad && formData.meses.length === 0) return;
+    if (montoTotal === 0) return;
+
     setSavingPago(true);
     try {
       const supabase = createClient();
@@ -625,13 +630,8 @@ export default function MisPagosPage() {
                     type="submit"
                     className="flex-1"
                     loading={savingPago}
-                    disabled={
-                      (!formData.pagar_inscripcion && !formData.pagar_mensualidad) ||
-                      (formData.pagar_mensualidad && formData.meses.length === 0) ||
-                      montoTotal === 0
-                    }
                   >
-                    <Send className="w-4 h-4 mr-1" />
+                    <Save className="w-4 h-4 mr-1" />
                     Guardar
                   </Button>
                 </div>
@@ -647,13 +647,12 @@ export default function MisPagosPage() {
           <button
             type="submit"
             form="pago-form"
-            disabled={savingPago || (!formData.pagar_inscripcion && !formData.pagar_mensualidad) || (formData.pagar_mensualidad && formData.meses.length === 0) || montoTotal === 0}
-            className="sm:hidden fixed bottom-20 right-4 z-40 w-14 h-14 rounded-full bg-gym-success/80 text-white shadow-lg shadow-gym-success/20 flex items-center justify-center disabled:opacity-40 active:scale-95 transition-all"
+            className="sm:hidden fixed bottom-20 right-4 z-40 w-14 h-14 rounded-full bg-gym-success/80 text-white shadow-lg shadow-gym-success/20 flex items-center justify-center active:scale-95 transition-all"
           >
             {savingPago ? (
               <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
             ) : (
-              <Send className="w-6 h-6" />
+              <Save className="w-6 h-6" />
             )}
           </button>
         </>

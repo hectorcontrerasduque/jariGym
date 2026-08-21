@@ -46,7 +46,7 @@ export default function MisPagosPage() {
   const [showSearch, setShowSearch] = useState(false);
 
   // Payment form
-  const [showForm, setShowForm] = useState(false);
+  const [showForm, setShowForm] = useState(true);
   const [metodosPago, setMetodosPago] = useState<MetodoPagoConfig[]>([]);
   const [mesesPendientes, setMesesPendientes] = useState<{ mes: number; anio: number }[]>([]);
   const [inscripcionPagada, setInscripcionPagada] = useState(false);
@@ -344,9 +344,6 @@ export default function MisPagosPage() {
           >
             {anios.map(a => <option key={a} value={a}>{a}</option>)}
           </select>
-          <Button onClick={() => setShowForm(!showForm)} size="sm" className="hidden sm:flex">
-            <Plus className="w-4 h-4 mr-1" /> Guardar
-          </Button>
         </div>
       </div>
 
@@ -369,26 +366,27 @@ export default function MisPagosPage() {
                     <X className="w-4 h-4" />
                   </button>
                 </div>
-              ) : (
+              ) : showSearch ? (
                 <div className="flex-1 relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gym-muted" />
                   <input
                     type="text"
                     placeholder="Buscar miembro..."
                     value={miembroSearch}
-                    onChange={(e) => { setMiembroSearch(e.target.value); setShowSearch(true); }}
+                    onChange={(e) => setMiembroSearch(e.target.value)}
                     onFocus={() => setShowSearch(true)}
+                    autoFocus
                     className="w-full pl-9 pr-3 py-2 bg-gym-bg border border-gym-border rounded-xl text-gym-text text-sm focus:outline-none focus:ring-2 focus:ring-gym-primary"
                   />
-                  {showSearch && miembroSearch && (
-                    <div className="absolute top-full left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-gym-bg border border-gym-border rounded-xl z-20 shadow-lg">
+                  {miembroSearch && (
+                    <div className="absolute top-full left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-gym-bg border border-gym-border rounded-xl z-50 shadow-lg">
                       {filteredMiembros.length === 0 ? (
                         <p className="p-3 text-sm text-gym-muted">Sin resultados</p>
                       ) : (
                         filteredMiembros.map(m => (
                           <button
                             key={m.id}
-                            onClick={() => handleSelectMiembro(m)}
+                            onClick={() => { handleSelectMiembro(m); setShowSearch(false); }}
                             className="w-full text-left p-3 hover:bg-gym-surface transition-colors border-b border-gym-border/30 last:border-0 flex items-center gap-3"
                           >
                             <Avatar src={m.avatar_url} alt={m.nombre_completo || ""} size="sm" />
@@ -401,6 +399,20 @@ export default function MisPagosPage() {
                       )}
                     </div>
                   )}
+                </div>
+              ) : (
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <Avatar src={profile?.avatar_url} alt={profile?.nombre_completo || ""} size="sm" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gym-text truncate">{profile?.nombre_completo || "Miembro"}</p>
+                    <p className="text-xs text-gym-muted">Registrando pago para este usuario</p>
+                  </div>
+                  <button
+                    onClick={() => setShowSearch(true)}
+                    className="text-xs text-gym-primary hover:underline flex-shrink-0"
+                  >
+                    Cambiar
+                  </button>
                 </div>
               )}
             </div>
@@ -633,7 +645,7 @@ export default function MisPagosPage() {
             type="submit"
             form="pago-form"
             disabled={savingPago || (!formData.pagar_inscripcion && !formData.pagar_mensualidad) || (formData.pagar_mensualidad && formData.meses.length === 0) || montoTotal === 0}
-            className="sm:hidden fixed bottom-20 right-4 z-40 w-14 h-14 rounded-full bg-gym-success/80 text-white shadow-lg shadow-gym-success/20 flex items-center justify-center disabled:opacity-40 active:scale-95 transition-all"
+            className="sm:hidden fixed bottom-20 right-4 z-40 w-14 h-14 rounded-full bg-gym-success text-white shadow-lg shadow-gym-success/30 flex items-center justify-center disabled:opacity-50 active:scale-95 transition-all"
           >
             {savingPago ? (
               <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -641,24 +653,7 @@ export default function MisPagosPage() {
               <Send className="w-6 h-6" />
             )}
           </button>
-          <button
-            type="button"
-            onClick={() => setShowForm(false)}
-            className="sm:hidden fixed bottom-20 left-4 z-40 w-14 h-14 rounded-full bg-gym-surface border border-gym-border text-gym-muted shadow-lg flex items-center justify-center active:scale-95 transition-all"
-          >
-            <X className="w-6 h-6" />
-          </button>
         </>
-      )}
-
-      {/* Mobile floating new payment button when form closed */}
-      {!showForm && (
-        <button
-          onClick={() => setShowForm(true)}
-          className="sm:hidden fixed bottom-20 right-4 z-40 w-14 h-14 rounded-full bg-gym-success/80 text-white shadow-lg shadow-gym-success/20 flex items-center justify-center active:scale-95 transition-all"
-        >
-          <Plus className="w-6 h-6" />
-        </button>
       )}
 
       {/* Payment list */}

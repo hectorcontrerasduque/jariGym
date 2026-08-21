@@ -8,7 +8,7 @@ import { Modal } from "@/components/ui/modal";
 import { pagosService } from "@/lib/services/pagos/pagos.service";
 import { miembrosService } from "@/lib/services/miembros/miembros.service";
 import { formatCurrency, getMonthName } from "@/lib/utils";
-import { Check, X, Eye, CreditCard, Clock, CheckCircle, AlertTriangle, Bell, Calendar, Trash2, FileText, Search } from "lucide-react";
+import { Check, X, Eye, CreditCard, Clock, CheckCircle, AlertTriangle, Bell, Calendar, Trash2, FileText, Search, Plus } from "lucide-react";
 import { showToast } from "@/components/ui/toast";
 import { messages } from "@/lib/messages";
 import type { Pago, MetodoPago, Profile } from "@/lib/types";
@@ -221,7 +221,7 @@ export default function PagosPage() {
             variant={filtro === f ? "primary" : "secondary"}
             size="sm"
             onClick={() => setFiltro(f)}
-            className="whitespace-nowrap px-4"
+            className="whitespace-nowrap px-5 py-2 text-sm"
           >
             {f === "todos" ? "Todos" : f.charAt(0).toUpperCase() + f.slice(1)}
             {f === "pendiente" && pendientes.length > 0 && ` (${pendientes.length})`}
@@ -400,8 +400,8 @@ export default function PagosPage() {
 
       {/* Mobile floating Generar pagos button */}
       <Link href="/dashboard/mis-pagos" className="sm:hidden fixed bottom-20 right-4 z-40">
-        <div className="w-14 h-14 rounded-full bg-gym-success/80 text-white shadow-lg shadow-gym-success/20 flex items-center justify-center active:scale-95 transition-all">
-          <CreditCard className="w-6 h-6" />
+        <div className="w-14 h-14 rounded-full bg-gym-success text-white shadow-lg shadow-gym-success/30 flex items-center justify-center active:scale-95 transition-all">
+          <Plus className="w-6 h-6" />
         </div>
       </Link>
     </div>

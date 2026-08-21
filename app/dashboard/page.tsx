@@ -336,7 +336,7 @@ export default function DashboardPage() {
           {pagosRecientes.length === 0 ? (
             <p className="text-center text-gym-muted py-8">{messages.dashboard.noPagosRegistrados}</p>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
               {pagosRecientes.map((pago: Pago) => {
                 const isInscripcion = pago.notas?.toLowerCase().includes("inscripción") || pago.notas?.toLowerCase().includes("inscripcion");
                 return (

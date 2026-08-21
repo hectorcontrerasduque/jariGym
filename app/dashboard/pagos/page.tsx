@@ -214,14 +214,14 @@ export default function PagosPage() {
       )}
 
       {/* Filters */}
-      <div className="flex gap-1.5 sm:gap-3 relative z-10">
+      <div className="flex gap-1 sm:gap-3 relative z-10">
         {["todos", "pendiente", "aprobado", "rechazado", "suspendido"].map((f) => (
           <Button
             key={f}
             variant={filtro === f ? "primary" : "secondary"}
             size="sm"
             onClick={() => setFiltro(f)}
-            className="px-2.5 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm whitespace-nowrap"
+            className="px-2 sm:px-4 py-1 sm:py-2 text-[10px] sm:text-sm whitespace-nowrap"
           >
             {f === "todos" ? "Todos" : f.charAt(0).toUpperCase() + f.slice(1)}
             {f === "pendiente" && pendientes.length > 0 && ` (${pendientes.length})`}

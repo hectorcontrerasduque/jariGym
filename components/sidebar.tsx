@@ -88,21 +88,7 @@ export function Sidebar() {
 
   return (
     <>
-      {/* Miembro sin configuración: mensaje centrado */}
-      {!isAdmin && hasConfig === false && (
-        <div className="fixed inset-0 bg-gym-bg flex items-center justify-center z-[60] p-6">
-          <div className="text-center max-w-md">
-            <div className="w-16 h-16 rounded-2xl bg-gym-primary/10 flex items-center justify-center mx-auto mb-4">
-              <Settings className="w-8 h-8 text-gym-primary" />
-            </div>
-            <h2 className="text-xl font-display font-bold text-gym-text mb-2">Sin configuración</h2>
-            <p className="text-gym-muted">No hay configuración de pagos disponible. Comuníquese con el Administrador.</p>
-          </div>
-        </div>
-      )}
-
-      {/* Mobile top bar - oculto para miembro sin config */}
-      {(!(!isAdmin && hasConfig === false)) && (
+      {/* Mobile top bar */}
       <div className="md:hidden fixed top-0 left-0 right-0 bg-gym-surface/90 backdrop-blur-xl border-b border-gym-border/50 z-50 px-4 py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3 min-w-0">
@@ -204,8 +190,7 @@ export function Sidebar() {
         </div>
       </aside>
 
-      {/* Mobile bottom nav - oculto para miembro sin config */}
-      {!(!isAdmin && hasConfig === false) && (
+      {/* Mobile bottom nav */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-gym-surface/90 backdrop-blur-xl border-t border-gym-border/50 z-50 safe-area-bottom">
         <div className="flex items-center justify-around py-2">
           {navItems.map((item) => {
@@ -243,7 +228,6 @@ export function Sidebar() {
           )}
         </div>
       </nav>
-      )}
     </>
   );
 }

@@ -54,6 +54,7 @@ export default function MisPagosPage() {
   const [membresiaLibre, setMembresiaLibre] = useState(false);
   const [savingPago, setSavingPago] = useState(false);
   const [loadingPendientes, setLoadingPendientes] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
 
   const [formData, setFormData] = useState({
     meses: [] as { mes: number; anio: number }[],
@@ -223,6 +224,7 @@ export default function MisPagosPage() {
 
   const handleSubmitPago = async (e: React.FormEvent) => {
     e.preventDefault();
+    setSubmitted(true);
     setSavingPago(true);
     try {
       const supabase = createClient();
@@ -281,6 +283,7 @@ export default function MisPagosPage() {
 
       showToast(isSelf ? "Pago registrado y aprobado" : "Pago registrado (pendiente de aprobación)", "success");
       setShowForm(false);
+      setSubmitted(false);
       setFormData({ meses: [], metodo_pago: "efectivo", codigo_billete: "", notas: "", pagar_inscripcion: false, pagar_mensualidad: false, fecha_pago: new Date().toISOString().split("T")[0] });
       setComprobante(null);
       await loadData();
@@ -472,7 +475,7 @@ export default function MisPagosPage() {
                       <Badge variant="primary">{formData.meses.length} meses</Badge>
                     </label>
                   </div>
-                  {!formData.pagar_inscripcion && !formData.pagar_mensualidad && (
+                  {submitted && !formData.pagar_inscripcion && !formData.pagar_mensualidad && (
                     <div className="flex items-center gap-2 mt-3 p-3 bg-gym-warning/10 border border-gym-warning/30 rounded-xl">
                       <AlertTriangle className="w-4 h-4 text-gym-warning flex-shrink-0" />
                       <p className="text-sm text-gym-warning">Debe seleccionar un concepto de pago</p>
@@ -525,7 +528,7 @@ export default function MisPagosPage() {
                       </div>
                     )}
                     <p className="text-xs text-gym-muted mt-2">{formData.meses.length} mes(es) seleccionados</p>
-                    {formData.meses.length === 0 && mesesPendientes.length > 0 && (
+                    {submitted && formData.meses.length === 0 && mesesPendientes.length > 0 && (
                       <div className="flex items-center gap-2 mt-3 p-3 bg-gym-warning/10 border border-gym-warning/30 rounded-xl">
                         <AlertTriangle className="w-4 h-4 text-gym-warning flex-shrink-0" />
                         <p className="text-sm text-gym-warning">Debe seleccionar mes(es) a pagar</p>

@@ -8,9 +8,11 @@ import { pagosService } from "@/lib/services/pagos/pagos.service";
 import { configService } from "@/lib/services/config/config.service";
 import { createClient } from "@/lib/supabase/client";
 import { formatCurrency, getMonthName } from "@/lib/utils";
-import { CreditCard, CheckCircle, Clock, Calendar, Trash2, FileText, Plus, Search, User, DollarSign, Upload, Send, Gift, AlertTriangle } from "lucide-react";
+import { CreditCard, CheckCircle, Clock, Calendar, Trash2, FileText, Plus, Search, User, DollarSign, Upload, Send, Gift, AlertTriangle, ChevronDown, X } from "lucide-react";
 import { showToast } from "@/components/ui/toast";
 import { messages } from "@/lib/messages";
+import { Avatar } from "@/components/ui/avatar";
+import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import type { Pago, Profile, MetodoPago, MetodoPagoConfig, GymConfig, TipoPago } from "@/lib/types";
 
 const MESES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
@@ -325,6 +327,7 @@ export default function MisPagosPage() {
 
   return (
     <div className="space-y-4 animate-fadeIn">
+      <LoadingOverlay show={savingPago} message={messages.common.guardando} />
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
@@ -341,8 +344,8 @@ export default function MisPagosPage() {
           >
             {anios.map(a => <option key={a} value={a}>{a}</option>)}
           </select>
-          <Button onClick={() => setShowForm(!showForm)} size="sm">
-            <Plus className="w-4 h-4 mr-1" /> Pagar
+          <Button onClick={() => setShowForm(!showForm)} size="sm" className="hidden sm:flex">
+            <Plus className="w-4 h-4 mr-1" /> Guardar
           </Button>
         </div>
       </div>
@@ -351,58 +354,55 @@ export default function MisPagosPage() {
       {isSuperAdmin && (
         <Card className="neon-card relative z-10">
           <CardContent className="p-3">
-            <div className="flex flex-col sm:flex-row gap-2">
-              <div className="flex-1">
-                <div className="flex gap-2">
-                  <Button
-                    variant={miembroSeleccionado === null ? "primary" : "ghost"}
-                    size="sm"
-                    onClick={() => handleSelectMiembro(null)}
-                    className="flex-1"
-                  >
-                    <User className="w-4 h-4 mr-1" /> Yo
-                  </Button>
-                  <Button
-                    variant={miembroSeleccionado !== null ? "primary" : "ghost"}
-                    size="sm"
-                    onClick={() => setShowSearch(!showSearch)}
-                    className="flex-1"
-                  >
-                    <Search className="w-4 h-4 mr-1" />
-                    {miembroSeleccionado ? miembroSeleccionado.nombre_completo || miembroSeleccionado.email : "Otro miembro"}
-                  </Button>
-                </div>
-                {showSearch && (
-                  <div className="mt-2 space-y-2">
-                    <input
-                      type="text"
-                      placeholder="Buscar por nombre o correo..."
-                      value={miembroSearch}
-                      onChange={(e) => setMiembroSearch(e.target.value)}
-                      className="w-full px-3 py-2 bg-gym-bg border border-gym-border rounded-xl text-gym-text text-sm focus:outline-none focus:ring-2 focus:ring-gym-primary"
-                      autoFocus
-                    />
-                    {miembroSearch && (
-                      <div className="max-h-40 overflow-y-auto bg-gym-bg border border-gym-border rounded-xl">
-                        {filteredMiembros.length === 0 ? (
-                          <p className="p-3 text-sm text-gym-muted">Sin resultados</p>
-                        ) : (
-                          filteredMiembros.map(m => (
-                            <button
-                              key={m.id}
-                              onClick={() => handleSelectMiembro(m)}
-                              className="w-full text-left p-3 hover:bg-gym-surface transition-colors border-b border-gym-border/30 last:border-0"
-                            >
-                              <p className="text-sm font-medium text-gym-text">{m.nombre_completo || "Sin nombre"}</p>
-                              <p className="text-xs text-gym-muted">{m.email}</p>
-                            </button>
-                          ))
-                        )}
-                      </div>
-                    )}
+            <div className="flex items-center gap-3">
+              {miembroSeleccionado ? (
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <Avatar src={miembroSeleccionado.avatar_url} alt={miembroSeleccionado.nombre_completo || ""} size="sm" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gym-text truncate">{miembroSeleccionado.nombre_completo || miembroSeleccionado.email}</p>
+                    <p className="text-xs text-gym-muted truncate">{miembroSeleccionado.email}</p>
                   </div>
-                )}
-              </div>
+                  <button
+                    onClick={() => handleSelectMiembro(null)}
+                    className="p-1.5 text-gym-muted hover:text-gym-danger hover:bg-gym-danger/10 rounded-lg transition-colors flex-shrink-0"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              ) : (
+                <div className="flex-1 relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gym-muted" />
+                  <input
+                    type="text"
+                    placeholder="Buscar miembro..."
+                    value={miembroSearch}
+                    onChange={(e) => { setMiembroSearch(e.target.value); setShowSearch(true); }}
+                    onFocus={() => setShowSearch(true)}
+                    className="w-full pl-9 pr-3 py-2 bg-gym-bg border border-gym-border rounded-xl text-gym-text text-sm focus:outline-none focus:ring-2 focus:ring-gym-primary"
+                  />
+                  {showSearch && miembroSearch && (
+                    <div className="absolute top-full left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-gym-bg border border-gym-border rounded-xl z-20 shadow-lg">
+                      {filteredMiembros.length === 0 ? (
+                        <p className="p-3 text-sm text-gym-muted">Sin resultados</p>
+                      ) : (
+                        filteredMiembros.map(m => (
+                          <button
+                            key={m.id}
+                            onClick={() => handleSelectMiembro(m)}
+                            className="w-full text-left p-3 hover:bg-gym-surface transition-colors border-b border-gym-border/30 last:border-0 flex items-center gap-3"
+                          >
+                            <Avatar src={m.avatar_url} alt={m.nombre_completo || ""} size="sm" />
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium text-gym-text truncate">{m.nombre_completo || "Sin nombre"}</p>
+                              <p className="text-xs text-gym-muted truncate">{m.email}</p>
+                            </div>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -414,7 +414,7 @@ export default function MisPagosPage() {
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-base">
               <Plus className="w-5 h-5 text-gym-primary" />
-              {miembroSeleccionado ? `Pagar para ${miembroSeleccionado.nombre_completo}` : "Registrar pago"}
+              {miembroSeleccionado ? `Pago para ${miembroSeleccionado.nombre_completo}` : "Guardar pago"}
               {!miembroSeleccionado && <Badge variant="success" className="text-[10px] ml-1">Auto-aprobado</Badge>}
             </CardTitle>
           </CardHeader>
@@ -426,7 +426,7 @@ export default function MisPagosPage() {
                 <p className="text-sm text-gym-muted">No tienes cargo mensual</p>
               </div>
             ) : (
-              <form onSubmit={handleSubmitPago} className="space-y-4">
+              <form id="pago-form" onSubmit={handleSubmitPago} className="space-y-4">
                 {/* Concepto de pago */}
                 <div>
                   <label className="text-sm font-medium text-gym-muted mb-2 block">Concepto de pago</label>
@@ -602,7 +602,7 @@ export default function MisPagosPage() {
                   </div>
                 </div>
 
-                <div className="flex gap-2">
+                <div className="hidden sm:flex gap-2">
                   <Button type="button" variant="secondary" className="flex-1" onClick={() => setShowForm(false)}>
                     Cancelar
                   </Button>
@@ -617,13 +617,48 @@ export default function MisPagosPage() {
                     }
                   >
                     <Send className="w-4 h-4 mr-1" />
-                    {!miembroSeleccionado ? "Pagar" : "Enviar Pago"}
+                    Guardar
                   </Button>
                 </div>
               </form>
             )}
           </CardContent>
         </Card>
+      )}
+
+      {/* Mobile floating buttons for payment form */}
+      {showForm && (
+        <>
+          <button
+            type="submit"
+            form="pago-form"
+            disabled={savingPago || (!formData.pagar_inscripcion && !formData.pagar_mensualidad) || (formData.pagar_mensualidad && formData.meses.length === 0) || montoTotal === 0}
+            className="sm:hidden fixed bottom-20 right-4 z-40 w-14 h-14 rounded-full bg-gym-success/80 text-white shadow-lg shadow-gym-success/20 flex items-center justify-center disabled:opacity-40 active:scale-95 transition-all"
+          >
+            {savingPago ? (
+              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <Send className="w-6 h-6" />
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowForm(false)}
+            className="sm:hidden fixed bottom-20 left-4 z-40 w-14 h-14 rounded-full bg-gym-surface border border-gym-border text-gym-muted shadow-lg flex items-center justify-center active:scale-95 transition-all"
+          >
+            <X className="w-6 h-6" />
+          </button>
+        </>
+      )}
+
+      {/* Mobile floating new payment button when form closed */}
+      {!showForm && (
+        <button
+          onClick={() => setShowForm(true)}
+          className="sm:hidden fixed bottom-20 right-4 z-40 w-14 h-14 rounded-full bg-gym-success/80 text-white shadow-lg shadow-gym-success/20 flex items-center justify-center active:scale-95 transition-all"
+        >
+          <Plus className="w-6 h-6" />
+        </button>
       )}
 
       {/* Payment list */}

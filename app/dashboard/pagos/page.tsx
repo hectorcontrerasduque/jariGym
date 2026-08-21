@@ -149,7 +149,7 @@ export default function PagosPage() {
           <p className="text-gym-muted text-sm">Gestiona los pagos de tus miembros</p>
         </div>
         <div className="flex items-center gap-2">
-          <Link href="/dashboard/mis-pagos">
+          <Link href="/dashboard/mis-pagos" className="hidden sm:block">
             <Button>
               <CreditCard className="w-4 h-4 mr-2" />
               Generar pagos
@@ -163,24 +163,26 @@ export default function PagosPage() {
               </Button>
             </Link>
           )}
-          <select
-            value={anioSeleccionado}
-            onChange={(e) => setAnioSeleccionado(Number(e.target.value))}
-            className="px-3 py-2 bg-gym-surface border border-gym-border rounded-xl text-gym-text text-sm focus:outline-none focus:ring-2 focus:ring-gym-primary w-auto"
-          >
-            {anios.map((a) => (
-              <option key={a} value={a}>{a}</option>
-            ))}
-          </select>
-          <select
-            value={mesSeleccionado}
-            onChange={(e) => setMesSeleccionado(Number(e.target.value))}
-            className="px-3 py-2 bg-gym-surface border border-gym-border rounded-xl text-gym-text text-sm focus:outline-none focus:ring-2 focus:ring-gym-primary w-auto"
-          >
-            {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
-              <option key={m} value={m}>{getMonthName(m)}</option>
-            ))}
-          </select>
+          <div className="flex gap-2">
+            <select
+              value={anioSeleccionado}
+              onChange={(e) => setAnioSeleccionado(Number(e.target.value))}
+              className="px-3 py-2 bg-gym-surface border border-gym-border rounded-xl text-gym-text text-sm focus:outline-none focus:ring-2 focus:ring-gym-primary"
+            >
+              {anios.map((a) => (
+                <option key={a} value={a}>{a}</option>
+              ))}
+            </select>
+            <select
+              value={mesSeleccionado}
+              onChange={(e) => setMesSeleccionado(Number(e.target.value))}
+              className="px-3 py-2 bg-gym-surface border border-gym-border rounded-xl text-gym-text text-sm focus:outline-none focus:ring-2 focus:ring-gym-primary"
+            >
+              {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+                <option key={m} value={m}>{getMonthName(m)}</option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 
@@ -212,14 +214,14 @@ export default function PagosPage() {
       )}
 
       {/* Filters */}
-      <div className="flex gap-2 overflow-x-auto pb-2 relative z-10">
+      <div className="flex gap-3 overflow-x-auto pb-2 relative z-10 px-1">
         {["todos", "pendiente", "aprobado", "rechazado", "suspendido"].map((f) => (
           <Button
             key={f}
             variant={filtro === f ? "primary" : "secondary"}
             size="sm"
             onClick={() => setFiltro(f)}
-            className="whitespace-nowrap"
+            className="whitespace-nowrap px-4"
           >
             {f === "todos" ? "Todos" : f.charAt(0).toUpperCase() + f.slice(1)}
             {f === "pendiente" && pendientes.length > 0 && ` (${pendientes.length})`}
@@ -395,6 +397,13 @@ export default function PagosPage() {
           </div>
         )}
       </Modal>
+
+      {/* Mobile floating Generar pagos button */}
+      <Link href="/dashboard/mis-pagos" className="sm:hidden fixed bottom-20 right-4 z-40">
+        <div className="w-14 h-14 rounded-full bg-gym-success/80 text-white shadow-lg shadow-gym-success/20 flex items-center justify-center active:scale-95 transition-all">
+          <CreditCard className="w-6 h-6" />
+        </div>
+      </Link>
     </div>
   );
 }

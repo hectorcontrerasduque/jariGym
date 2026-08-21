@@ -155,6 +155,7 @@ export default function MisPagosPage() {
 
   useEffect(() => {
     if (!showForm) return;
+    setLoadingPendientes(true);
     const supabase = createClient();
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) return;

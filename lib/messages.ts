@@ -276,6 +276,7 @@ export const messages = {
     emailInvalidError: "Correo electrónico inválido",
     noResults: "No se encontraron registros con ese nombre. Verifique el nombre e intente de nuevo.",
     yaMigrado: "Este miembro ya fue migrado anteriormente.",
+    correoYaMigrado: "Este correo ya fue migrado anteriormente. Inicia sesión con tu contraseña existente.",
     configFaltante: "Falta configuración del gym. Vaya a Configuración y guarde los datos antes de migrar.",
     crearUsuarioError: "Error al crear usuario",
     usuarioNoCreado: "No se pudo crear el usuario. Verifique los datos e intente de nuevo.",

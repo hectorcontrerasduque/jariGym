@@ -191,6 +191,9 @@ function LoginForm() {
     try {
       const result = await migracionService.pingEmail(migCorreo);
       setMigEmailExists(result.exists);
+      if (result.alreadyMigrated) {
+        setMigrateError(messages.migracion.correoYaMigrado);
+      }
     } catch {
       setMigEmailExists(false);
     }
@@ -207,6 +210,17 @@ function LoginForm() {
     if (migPassword !== migPasswordConfirm) {
       setMigrateError(messages.migracion.passwordMismatchError);
       return;
+    }
+
+    // Check if email already migrated before proceeding
+    try {
+      const pingResult = await migracionService.pingEmail(migCorreo);
+      if (pingResult.alreadyMigrated) {
+        setMigrateError(messages.migracion.correoYaMigrado);
+        return;
+      }
+    } catch {
+      // ignore ping errors, proceed with migration
     }
 
     setMigrateStep("loading");

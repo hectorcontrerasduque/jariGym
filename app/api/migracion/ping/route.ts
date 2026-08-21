@@ -20,13 +20,23 @@ export async function GET(request: Request) {
       return NextResponse.json({ exists: false, invalid: true });
     }
 
+    const normalizedEmail = email.toLowerCase().trim();
+
     const { data } = await supabase
       .from("profiles")
       .select("id")
-      .eq("email", email.toLowerCase().trim())
+      .eq("email", normalizedEmail)
       .maybeSingle();
 
-    return NextResponse.json({ exists: !!data });
+    const { data: migrated } = await supabase
+      .from("migracion")
+      .select("id")
+      .eq("correo", normalizedEmail)
+      .eq("migrado", "si")
+      .limit(1)
+      .maybeSingle();
+
+    return NextResponse.json({ exists: !!data, alreadyMigrated: !!migrated });
   } catch {
     return NextResponse.json({ exists: false });
   }

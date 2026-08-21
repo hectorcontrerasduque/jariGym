@@ -96,7 +96,7 @@ export default function ConfiguracionPage() {
       await configService.saveMetodosPago(metodos);
       showToast(messages.toast.configuracionGuardada, "success");
       if (isFirstSave) {
-        setTimeout(() => window.location.reload(), 500);
+        window.dispatchEvent(new Event("config:updated"));
       }
     } catch (error) {
       showToast(messages.toast.configuracionError, "error");

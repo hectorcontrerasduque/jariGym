@@ -128,7 +128,7 @@ export class PagosService {
     if (error) throw error;
   }
 
-  async listarMisPagos(anio?: number): Promise<Pago[]> {
+  async listarMisPagos(anio?: number, mes?: number): Promise<Pago[]> {
     const {
       data: { user },
     } = await this.supabase.auth.getUser();
@@ -142,6 +142,9 @@ export class PagosService {
 
     if (anio) {
       query = query.eq("anio_pagar", anio);
+    }
+    if (mes) {
+      query = query.eq("mes_pagar", mes);
     }
 
     const { data, error } = await query;
@@ -214,7 +217,7 @@ export class PagosService {
     return data;
   }
 
-  async listarPagos(estado?: string, anio?: number): Promise<Pago[]> {
+  async listarPagos(estado?: string, anio?: number, mes?: number): Promise<Pago[]> {
     const {
       data: { user },
     } = await this.supabase.auth.getUser();
@@ -239,6 +242,9 @@ export class PagosService {
     }
     if (anio) {
       query = query.eq("anio_pagar", anio);
+    }
+    if (mes) {
+      query = query.eq("mes_pagar", mes);
     }
 
     const { data, error } = await query;
@@ -582,7 +588,7 @@ export class PagosService {
       ).size;
 
       const montoAcumulado = pagosMes
-        .filter((p) => p.estado === "aprobado" && m.idsMes.has(p.usuario_id))
+        .filter((p) => p.estado === "aprobado")
         .reduce((sum, p) => sum + (p.monto || 0), 0);
 
       const libresMes = profiles.filter((p) => m.idsMes.has(p.id) && libresIds.has(p.id)).length;

@@ -68,6 +68,10 @@ export function Sidebar() {
     };
     getProfile();
     getGymConfig();
+
+    const handleConfigUpdated = () => getGymConfig();
+    window.addEventListener("config:updated", handleConfigUpdated);
+    return () => window.removeEventListener("config:updated", handleConfigUpdated);
   }, []);
 
   const handleSignOut = async () => {

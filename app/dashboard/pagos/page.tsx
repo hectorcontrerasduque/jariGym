@@ -36,6 +36,7 @@ export default function PagosPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [anios, setAnios] = useState<number[]>([]);
   const [anioSeleccionado, setAnioSeleccionado] = useState(new Date().getFullYear());
+  const [mesSeleccionado, setMesSeleccionado] = useState<number>(new Date().getMonth() + 1);
   const [miembros, setMiembros] = useState<Profile[]>([]);
   const [miembroSeleccionado, setMiembroSeleccionado] = useState<string>("");
   const [busquedaMiembro, setBusquedaMiembro] = useState("");
@@ -45,19 +46,19 @@ export default function PagosPage() {
     setLoading(true);
     try {
       const [pagosResult, aniosResult, miembrosResult] = await Promise.allSettled([
-        pagosService.listarPagos(undefined, anioSeleccionado),
+        pagosService.listarPagos(undefined, anioSeleccionado, mesSeleccionado),
         pagosService.aniosConPagos(),
         miembrosService.listarMiembros(),
       ]);
       if (pagosResult.status === "fulfilled") setPagos(pagosResult.value);
       if (aniosResult.status === "fulfilled") setAnios(aniosResult.value);
       if (miembrosResult.status === "fulfilled") setMiembros(miembrosResult.value);
-    } catch (error) {
+    } catch {
       showToast(messages.toast.errorCargaDatos, "error");
     } finally {
       setLoading(false);
     }
-  }, [anioSeleccionado]);
+  }, [anioSeleccionado, mesSeleccionado]);
 
   useEffect(() => { loadData(); }, [loadData]);
 
@@ -169,6 +170,15 @@ export default function PagosPage() {
           >
             {anios.map((a) => (
               <option key={a} value={a}>{a}</option>
+            ))}
+          </select>
+          <select
+            value={mesSeleccionado}
+            onChange={(e) => setMesSeleccionado(Number(e.target.value))}
+            className="px-3 py-2 bg-gym-surface border border-gym-border rounded-xl text-gym-text text-sm focus:outline-none focus:ring-2 focus:ring-gym-primary w-auto"
+          >
+            {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
+              <option key={m} value={m}>{getMonthName(m)}</option>
             ))}
           </select>
         </div>

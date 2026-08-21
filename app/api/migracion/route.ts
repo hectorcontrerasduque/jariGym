@@ -110,6 +110,17 @@ export async function POST(request: Request) {
 
     if (existingProfile) {
       userId = existingProfile.id;
+      // Update existing profile with latest data from migration form
+      await supabase
+        .from("profiles")
+        .update({
+          nombre_completo: nombre,
+          whatsapp,
+          email,
+          registered: true,
+          activo: true,
+        })
+        .eq("id", userId);
     } else {
       const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
         email,
@@ -285,7 +296,7 @@ export async function POST(request: Request) {
             expires_at: expiresAt,
           });
 
-          confirmLink = `${siteUrl}/confirm-email?token=${token}`;
+          confirmLink = `${siteUrl}/api/auth/confirm-email?token=${token}`;
         } catch {}
 
         try {

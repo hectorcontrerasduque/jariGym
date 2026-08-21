@@ -68,6 +68,13 @@ function LoginForm() {
       }
     }
 
+    // Handle confirmation token as query param — redirect to confirm-email route
+    const tokenParam = searchParams.get("token");
+    if (tokenParam) {
+      window.location.href = `/api/auth/confirm-email?token=${tokenParam}`;
+      return;
+    }
+
     configService.getConfig().then((config) => {
       if (config?.nombre_gym) setGymName(config.nombre_gym);
       if (config?.dueno_email) setGymOwnerEmail(config.dueno_email);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -55,6 +55,8 @@ export default function MisPagosPage() {
   const [savingPago, setSavingPago] = useState(false);
   const [loadingPendientes, setLoadingPendientes] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const msgConceptoRef = useRef<HTMLDivElement>(null);
+  const msgMesesRef = useRef<HTMLDivElement>(null);
 
   const [formData, setFormData] = useState({
     meses: [] as { mes: number; anio: number }[],
@@ -226,8 +228,14 @@ export default function MisPagosPage() {
     e.preventDefault();
     setSubmitted(true);
 
-    if (!formData.pagar_inscripcion && !formData.pagar_mensualidad) return;
-    if (formData.pagar_mensualidad && formData.meses.length === 0) return;
+    if (!formData.pagar_inscripcion && !formData.pagar_mensualidad) {
+      setTimeout(() => msgConceptoRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 100);
+      return;
+    }
+    if (formData.pagar_mensualidad && formData.meses.length === 0) {
+      setTimeout(() => msgMesesRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 100);
+      return;
+    }
     if (montoTotal === 0) return;
 
     setSavingPago(true);
@@ -481,7 +489,7 @@ export default function MisPagosPage() {
                     </label>
                   </div>
                   {submitted && !formData.pagar_inscripcion && !formData.pagar_mensualidad && (
-                    <div className="flex items-center gap-2 mt-3 p-3 bg-gym-warning/10 border border-gym-warning/30 rounded-xl">
+                    <div ref={msgConceptoRef} className="flex items-center gap-2 mt-3 p-3 bg-gym-warning/10 border border-gym-warning/30 rounded-xl">
                       <AlertTriangle className="w-4 h-4 text-gym-warning flex-shrink-0" />
                       <p className="text-sm text-gym-warning">Debe seleccionar un concepto de pago</p>
                     </div>
@@ -534,7 +542,7 @@ export default function MisPagosPage() {
                     )}
                     <p className="text-xs text-gym-muted mt-2">{formData.meses.length} mes(es) seleccionados</p>
                     {submitted && formData.meses.length === 0 && mesesPendientes.length > 0 && (
-                      <div className="flex items-center gap-2 mt-3 p-3 bg-gym-warning/10 border border-gym-warning/30 rounded-xl">
+                      <div ref={msgMesesRef} className="flex items-center gap-2 mt-3 p-3 bg-gym-warning/10 border border-gym-warning/30 rounded-xl">
                         <AlertTriangle className="w-4 h-4 text-gym-warning flex-shrink-0" />
                         <p className="text-sm text-gym-warning">Debe seleccionar mes(es) a pagar</p>
                       </div>

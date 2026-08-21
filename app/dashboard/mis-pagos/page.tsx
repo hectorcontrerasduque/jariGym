@@ -11,7 +11,7 @@ import { formatCurrency, getMonthName } from "@/lib/utils";
 import { CreditCard, CheckCircle, Clock, Calendar, Trash2, FileText, Plus, Search, User, DollarSign, Upload, Send, Gift, AlertTriangle } from "lucide-react";
 import { showToast } from "@/components/ui/toast";
 import { messages } from "@/lib/messages";
-import type { Pago, Profile, MetodoPago, MetodoPagoConfig, GymConfig } from "@/lib/types";
+import type { Pago, Profile, MetodoPago, MetodoPagoConfig, GymConfig, TipoPago } from "@/lib/types";
 
 const MESES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 
@@ -234,7 +234,7 @@ export default function MisPagosPage() {
         const pagoData = {
           usuario_id: targetId, monto: getMontoByMetodo(formData.metodo_pago, "inscripcion"),
           mes_pagar: new Date().getMonth() + 1, anio_pagar: new Date().getFullYear(),
-          metodo_pago: formData.metodo_pago, tipo_pago: "inscripcion",
+          metodo_pago: formData.metodo_pago, tipo_pago: "inscripcion" as TipoPago,
           comprobante_url: comprobanteUrl || undefined, notas: "Inscripción", fecha_pago_real: formData.fecha_pago,
         };
         if (useAutoApprove) {
@@ -248,7 +248,7 @@ export default function MisPagosPage() {
         for (const { mes, anio } of formData.meses) {
           const pagoData = {
             usuario_id: targetId, monto: getMontoByMetodo(formData.metodo_pago, "mensual"),
-            mes_pagar: mes, anio_pagar: anio, metodo_pago: formData.metodo_pago, tipo_pago: "membresia",
+            mes_pagar: mes, anio_pagar: anio,             metodo_pago: formData.metodo_pago, tipo_pago: "membresia" as TipoPago,
             comprobante_url: comprobanteUrl || undefined, notas: formData.notas || undefined, fecha_pago_real: formData.fecha_pago,
           };
           if (useAutoApprove) {

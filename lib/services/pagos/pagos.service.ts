@@ -64,7 +64,11 @@ export class PagosService {
     }
 
     const { data, error } = await this.supabase
-      .rpc("aprobar_pago_atomico", { p_pago_id: pagoId, p_user_id: user.id });
+      .from("pagos")
+      .update({ estado: "aprobado" })
+      .eq("id", pagoId)
+      .select()
+      .single();
 
     if (error) throw error;
     return data as Pago;
@@ -193,7 +197,6 @@ export class PagosService {
     const pagoData: Record<string, unknown> = {
       ...input,
       estado: "aprobado",
-      aprobado_por: user.id,
       fecha_pago_real: input.fecha_pago_real || new Date().toISOString(),
     };
 

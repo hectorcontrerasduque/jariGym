@@ -524,12 +524,21 @@ export class PagosService {
       });
     }
 
+    const { data: configData } = await this.supabase
+      .from("gym_config")
+      .select("dueno_email")
+      .limit(1)
+      .maybeSingle();
+    const ownerEmail = configData?.dueno_email?.toLowerCase() || "";
+
     const { data: allProfiles } = await this.supabase
       .from("profiles")
-      .select("id, fecha_inscripcion, role")
-      .eq("role", "miembro");
+      .select("id, fecha_inscripcion, role, email, activo")
+      .in("role", ["miembro", "admin", "super_admin"]);
 
-    const profiles = allProfiles || [];
+    const profiles = (allProfiles || []).filter(
+      (p) => p.activo !== false && p.email?.toLowerCase() !== ownerEmail
+    );
 
     const { data: libreData } = await this.supabase
       .from("membresias")

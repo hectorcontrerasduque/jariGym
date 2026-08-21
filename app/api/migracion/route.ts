@@ -144,60 +144,75 @@ export async function POST(request: Request) {
         })
         .eq("id", userId);
     } else {
-      const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
-        email,
-        password,
-        email_confirm: false,
-        user_metadata: { nombre_completo: nombre },
-      });
+      // Check if auth user already exists (profile may have been deleted)
+      const { data: authUsers } = await supabase.auth.admin.listUsers();
+      const existingAuth = authUsers?.users?.find(
+        (u) => u.email?.toLowerCase() === email.toLowerCase()
+      );
 
-      if (authError) {
-        return NextResponse.json({ error: `${messages.migracion.crearUsuarioError}: ${authError.message}` }, { status: 500 });
-      }
-
-      if (!authUser?.user?.id) {
-        return NextResponse.json({ error: messages.migracion.usuarioNoCreado }, { status: 500 });
-      }
-      userId = authUser.user.id;
-
-      // The handle_new_user trigger may have auto-created the profile row.
-      // Check if it exists before inserting to avoid duplicate key error.
-      const { data: triggeredProfile } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("id", userId)
-        .maybeSingle();
-
-      const profileFields = {
-        email,
-        nombre_completo: nombre,
-        whatsapp,
-        role: "miembro" as const,
-        activo: true,
-        registered: true,
-        fecha_inscripcion: "2026-01-01",
-        inscripcion_pagada: false,
-      };
-
-      if (triggeredProfile) {
-        const { error: profileError } = await supabase
-          .from("profiles")
-          .update(profileFields)
-          .eq("id", userId);
-        if (profileError) {
-          await supabase.auth.admin.deleteUser(userId);
-          return NextResponse.json({ error: `${messages.migracion.crearPerfilError}: ${profileError.message}` }, { status: 500 });
-        }
+      if (existingAuth) {
+        // Auth user exists but no profile — create profile
+        userId = existingAuth.id;
+        await supabase.from("profiles").insert({
+          id: userId,
+          email,
+          nombre_completo: nombre,
+          whatsapp,
+          role: "miembro",
+          activo: true,
+          registered: true,
+          fecha_inscripcion: "2026-01-01",
+          inscripcion_pagada: false,
+        });
+        isNewUser = true;
       } else {
-        const { error: profileError } = await supabase
-          .from("profiles")
-          .insert({ id: userId, ...profileFields });
-        if (profileError) {
-          await supabase.auth.admin.deleteUser(userId);
-          return NextResponse.json({ error: `${messages.migracion.crearPerfilError}: ${profileError.message}` }, { status: 500 });
+        // Create new auth user
+        const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
+          email,
+          password,
+          email_confirm: false,
+          user_metadata: { nombre_completo: nombre },
+        });
+
+        if (authError) {
+          return NextResponse.json({ error: `${messages.migracion.crearUsuarioError}: ${authError.message}` }, { status: 500 });
         }
+
+        if (!authUser?.user?.id) {
+          return NextResponse.json({ error: messages.migracion.usuarioNoCreado }, { status: 500 });
+        }
+        userId = authUser.user.id;
+
+        // The handle_new_user trigger may have auto-created the profile row.
+        const { data: triggeredProfile } = await supabase
+          .from("profiles")
+          .select("id")
+          .eq("id", userId)
+          .maybeSingle();
+
+        const profileFields = {
+          email,
+          nombre_completo: nombre,
+          whatsapp,
+          role: "miembro" as const,
+          activo: true,
+          registered: true,
+          fecha_inscripcion: "2026-01-01",
+          inscripcion_pagada: false,
+        };
+
+        if (triggeredProfile) {
+          await supabase
+            .from("profiles")
+            .update(profileFields)
+            .eq("id", userId);
+        } else {
+          await supabase
+            .from("profiles")
+            .insert({ id: userId, ...profileFields });
+        }
+        isNewUser = true;
       }
-      isNewUser = true;
     }
 
     let pagosCreados = 0;

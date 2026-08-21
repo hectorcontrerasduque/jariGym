@@ -192,7 +192,8 @@ function LoginForm() {
       const result = await migracionService.pingEmail(migCorreo);
       setMigEmailExists(result.exists);
       if (result.alreadyMigrated) {
-        setMigrateError(messages.migracion.correoYaMigrado);
+        const nombre = result.nombre || migCorreo;
+        setMigrateError(messages.migracion.correoYaMigrado(nombre));
       }
     } catch {
       setMigEmailExists(false);
@@ -216,7 +217,8 @@ function LoginForm() {
     try {
       const pingResult = await migracionService.pingEmail(migCorreo);
       if (pingResult.alreadyMigrated) {
-        setMigrateError(messages.migracion.correoYaMigrado);
+        const nombre = pingResult.nombre || migCorreo;
+        setMigrateError(messages.migracion.correoYaMigrado(nombre));
         return;
       }
     } catch {

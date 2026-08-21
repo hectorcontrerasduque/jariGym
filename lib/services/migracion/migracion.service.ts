@@ -13,7 +13,7 @@ export class MigracionService {
     return data.matches || [];
   }
 
-  async pingEmail(email: string): Promise<{ exists: boolean; alreadyMigrated: boolean }> {
+  async pingEmail(email: string): Promise<{ exists: boolean; alreadyMigrated: boolean; nombre: string | null }> {
     const res = await fetch(`/api/migracion/ping?email=${encodeURIComponent(email)}`);
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || messages.migracion.error);

@@ -24,7 +24,7 @@ export async function GET(request: Request) {
 
     const { data } = await supabase
       .from("profiles")
-      .select("id")
+      .select("id, nombre_completo")
       .eq("email", normalizedEmail)
       .maybeSingle();
 
@@ -36,7 +36,11 @@ export async function GET(request: Request) {
       .limit(1)
       .maybeSingle();
 
-    return NextResponse.json({ exists: !!data, alreadyMigrated: !!migrated });
+    return NextResponse.json({
+      exists: !!data,
+      alreadyMigrated: !!migrated,
+      nombre: data?.nombre_completo || null,
+    });
   } catch {
     return NextResponse.json({ exists: false });
   }

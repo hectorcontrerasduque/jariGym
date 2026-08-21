@@ -130,7 +130,7 @@ export default function MisPagosPage() {
     } finally {
       setLoadingPendientes(false);
     }
-  }, [anioSeleccionado]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const loadSelfPendientes = useCallback(async (userId: string, anio?: number) => {
     setLoadingPendientes(true);
@@ -151,7 +151,7 @@ export default function MisPagosPage() {
     } finally {
       setLoadingPendientes(false);
     }
-  }, [anioSeleccionado]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!showForm) return;

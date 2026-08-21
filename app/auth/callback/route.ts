@@ -120,16 +120,18 @@ export async function GET(request: Request) {
         return NextResponse.redirect(`${origin}/login?error=${msg}`);
       }
 
-      const updates: Record<string, unknown> = {};
-      if (avatarUrl) updates.avatar_url = avatarUrl;
-      if (email) updates.email = email;
-      if (nombre) updates.nombre_completo = nombre;
+      if (profile) {
+        // Only update avatar and email, never overwrite nombre_completo on existing profiles
+        const updates: Record<string, unknown> = {};
+        if (avatarUrl) updates.avatar_url = avatarUrl;
+        if (email) updates.email = email;
 
-      if (Object.keys(updates).length > 0) {
-        await supabase
-          .from("profiles")
-          .update(updates)
-          .eq("id", user.id);
+        if (Object.keys(updates).length > 0) {
+          await supabase
+            .from("profiles")
+            .update(updates)
+            .eq("id", user.id);
+        }
       }
 
       const redirectPath = isAdmin ? next : (next === "/dashboard" ? "/dashboard/mis-pagos" : next);

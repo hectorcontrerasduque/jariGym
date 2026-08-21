@@ -306,29 +306,25 @@ export class PagosService {
     return !!data;
   }
 
-  async pagosRecientesAprobados(): Promise<Pago[]> {
+  async pagosRecientesAprobados(anio?: number): Promise<Pago[]> {
     const {
       data: { user },
     } = await this.supabase.auth.getUser();
     if (!user) throw new Error(messages.toast.noAutenticado);
 
-    const { data, error } = await this.supabase
+    let query = this.supabase
       .from("pagos")
-      .select("*, profile:profiles(nombre_completo, avatar_url)")
+      .select("*")
       .eq("estado", "aprobado")
-      .order("created_at", { ascending: false })
-      .limit(10);
+      .order("created_at", { ascending: false });
 
-    if (error) {
-      const fallback = await this.supabase
-        .from("pagos")
-        .select("*")
-        .eq("estado", "aprobado")
-        .order("created_at", { ascending: false })
-        .limit(10);
-      if (fallback.error) throw fallback.error;
-      return fallback.data || [];
+    if (anio) {
+      query = query.eq("anio_pagar", anio);
     }
+
+    const { data, error } = await query.limit(10);
+
+    if (error) throw error;
     return data || [];
   }
 
@@ -358,7 +354,7 @@ export class PagosService {
     const anioConsulta = anio || hoy.getFullYear();
     const mesActual = hoy.getMonth() + 1;
 
-    const [pendientes, allMiembros, pagosAnio, libres] = await Promise.all([
+    const [pendientes, allProfiles, pagosAnio, libres, configResult, ownerResult] = await Promise.all([
       this.supabase
         .from("pagos")
         .select("id, monto, usuario_id, mes_pagar, anio_pagar", { count: "exact", head: true })
@@ -366,8 +362,8 @@ export class PagosService {
         .eq("anio_pagar", anioConsulta),
       this.supabase
         .from("profiles")
-        .select("id, inscripcion_pagada, fecha_inscripcion, activo")
-        .eq("role", "miembro"),
+        .select("id, inscripcion_pagada, fecha_inscripcion, activo, role, email")
+        .in("role", ["miembro", "admin", "super_admin"]),
       this.supabase
         .from("pagos")
         .select("monto, usuario_id, estado, anio_pagar, mes_pagar, notas")
@@ -376,26 +372,27 @@ export class PagosService {
         .from("membresias")
         .select("usuario_id")
         .is("fecha_fin", null),
-    ]);
-
-    let config = null;
-    try {
-      const { data } = await this.supabase
+      this.supabase
         .from("gym_config_metodos_pago")
         .select("monto_mensual, monto_inscripcion")
         .eq("habilitado", true)
         .limit(1)
-        .maybeSingle();
-      config = { data };
-    } catch {
-      config = { data: null };
-    }
+        .maybeSingle(),
+      this.supabase
+        .from("gym_config")
+        .select("dueno_email")
+        .limit(1)
+        .maybeSingle(),
+    ]);
 
-    const miembros = allMiembros.data || [];
+    const ownerEmail = ownerResult.data?.dueno_email?.toLowerCase() || "";
+    const config = configResult.data;
+
+    const allMiembros = allProfiles.data || [];
     const pagosAnioData = pagosAnio.data || [];
     const miembrosLibresIds = new Set((libres.data || []).map((l) => l.usuario_id));
-    const montoMensual = config?.data?.monto_mensual || 5;
-    const montoInscripcion = config?.data?.monto_inscripcion || 0;
+    const montoMensual = config?.monto_mensual || 5;
+    const montoInscripcion = config?.monto_inscripcion || 0;
 
     // Determine inscription status from pagos table (approved payments with "inscripción")
     const todosPagosAprobados = pagosAnioData.filter((p) => p.estado === "aprobado");
@@ -408,14 +405,14 @@ export class PagosService {
     }
 
     // Also include profiles where inscripcion_pagada is true (for backwards compatibility)
-    for (const m of miembros) {
+    for (const m of allMiembros) {
       if (m.inscripcion_pagada) {
         miembrosConInscripcionPagada.add(m.id);
       }
     }
 
-    // Inscritos: activos con inscripción pagada (por pagos o profile)
-    const miembrosActivos = miembros.filter((m) => m.activo !== false);
+    // Inscritos: activos con inscripción pagada (por pagos o profile), exclude gym owner
+    const miembrosActivos = allMiembros.filter((m) => m.activo !== false && m.email?.toLowerCase() !== ownerEmail);
     const inscritosPagados = miembrosActivos.filter((m) => miembrosConInscripcionPagada.has(m.id)).length;
     const inscritosPendientes = miembrosActivos.filter((m) => !miembrosConInscripcionPagada.has(m.id)).length;
 
@@ -480,7 +477,7 @@ export class PagosService {
       .reduce((sum, p) => sum + (p.monto || 0), 0);
 
     return {
-      totalMiembros: miembros.length,
+      totalMiembros: miembrosActivos.length,
       miembrosActivos: miembrosActivos.length,
       inscritosPagados,
       inscritosPendientes,

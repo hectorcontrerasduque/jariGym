@@ -43,6 +43,22 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: messages.migracion.error }, { status: 500 });
     }
 
+    if (!data || data.length === 0) {
+      // Check if records exist but are already migrated
+      const { data: migratedData } = await supabase
+        .from("migracion")
+        .select("nombre")
+        .or(orFilter)
+        .eq("migrado", "si")
+        .limit(1);
+
+      if (migratedData && migratedData.length > 0) {
+        return NextResponse.json({ error: messages.migracion.yaMigrado }, { status: 400 });
+      }
+
+      return NextResponse.json({ matches: [] });
+    }
+
     const uniqueNames = Array.from(new Set((data || []).map((r) => r.nombre.toUpperCase()))).sort();
 
     return NextResponse.json({ matches: uniqueNames });

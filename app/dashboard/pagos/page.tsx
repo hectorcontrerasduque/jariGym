@@ -320,10 +320,10 @@ export default function PagosPage() {
                       </span>
                       <button
                         onClick={() => { setSelectedPago(pago); setModalOpen(true); }}
-                        className="p-1.5 text-gym-muted hover:text-gym-text rounded-lg transition-colors"
+                        className="p-2 text-gym-muted hover:text-gym-text rounded-lg transition-colors ml-2"
                         title="Ver detalle"
                       >
-                        <Eye className="w-4 h-4" />
+                        <Eye className="w-5 h-5" />
                       </button>
                     </div>
                   </div>
@@ -378,12 +378,10 @@ export default function PagosPage() {
                 </a>
               </div>
             )}
-            {selectedPago.notas && (
-              <div>
-                <p className="text-sm text-gym-muted">Notas</p>
-                <p className="text-gym-text">{selectedPago.notas}</p>
-              </div>
-            )}
+            <div>
+              <p className="text-sm text-gym-muted">Notas</p>
+              <p className="text-gym-text">{selectedPago.notas || "—"}</p>
+            </div>
             {selectedPago.estado === "pendiente" && (
               <div className="flex gap-2 pt-4">
                 <Button className="flex-1 glow-success" onClick={() => handleAprobar(selectedPago.id)}>

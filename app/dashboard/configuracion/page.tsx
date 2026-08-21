@@ -183,7 +183,7 @@ export default function ConfiguracionPage() {
         <button
           onClick={handleSaveConfig}
           disabled={saving}
-          className="flex items-center gap-2 px-5 py-2.5 bg-gym-primary text-gym-bg rounded-xl font-medium hover:bg-gym-primary/90 transition-all disabled:opacity-50"
+          className="hidden sm:flex items-center gap-2 px-5 py-2.5 bg-gym-primary text-gym-bg rounded-xl font-medium hover:bg-gym-primary/90 transition-all disabled:opacity-50"
         >
           {saving ? (
             <div className="w-4 h-4 border-2 border-gym-bg border-t-transparent rounded-full animate-spin" />

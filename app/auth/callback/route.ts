@@ -136,6 +136,11 @@ export async function GET(request: Request) {
 
       const redirectPath = isAdmin ? next : (next === "/dashboard" ? "/dashboard/mis-pagos" : next);
 
+      // Super admin sin config: redirigir a configuracion
+      if (isAdmin && !gymConfig && redirectPath === "/dashboard") {
+        return NextResponse.redirect(`${origin}/dashboard/configuracion`);
+      }
+
       return NextResponse.redirect(`${origin}${redirectPath}`);
     }
 

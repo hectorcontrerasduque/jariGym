@@ -73,6 +73,17 @@ export async function POST(request: Request) {
         .order("mes_pagar", { ascending: true });
 
       if (migracionError || !data || data.length === 0) {
+        // Check if records exist but are already migrated
+        const { data: migratedData } = await supabase
+          .from("migracion")
+          .select("nombre")
+          .or(orFilter)
+          .eq("migrado", "si")
+          .limit(1);
+
+        if (migratedData && migratedData.length > 0) {
+          return NextResponse.json({ error: messages.migracion.yaMigrado }, { status: 400 });
+        }
         return NextResponse.json({ error: messages.migracion.noResults }, { status: 404 });
       }
 
@@ -81,6 +92,17 @@ export async function POST(request: Request) {
       migracionRecords = data.filter((r: any) => r.nombre.toUpperCase() === exactMatchName);
 
       if (migracionRecords.length === 0) {
+        // Check if exact name exists but already migrated
+        const { data: migratedExact } = await supabase
+          .from("migracion")
+          .select("nombre")
+          .or(orFilter)
+          .eq("migrado", "si")
+          .limit(1);
+
+        if (migratedExact && migratedExact.length > 0) {
+          return NextResponse.json({ error: messages.migracion.yaMigrado }, { status: 400 });
+        }
         return NextResponse.json({ error: messages.migracion.noResults }, { status: 404 });
       }
     } else {

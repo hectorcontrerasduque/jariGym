@@ -70,7 +70,7 @@ export default function DashboardPage() {
 
       const [statsResult, pagosResult, aniosResult, monthlyResult, miembrosResult] = await Promise.allSettled([
         pagosService.stats(anioSeleccionado),
-        pagosService.pagosRecientesAprobados(),
+        pagosService.pagosRecientesAprobados(anioSeleccionado),
         pagosService.aniosConPagos(),
         pagosService.monthlyStats(anioSeleccionado),
         miembrosService.listarMiembros(),

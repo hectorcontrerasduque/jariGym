@@ -41,7 +41,8 @@ export async function GET(request: Request) {
       alreadyMigrated: !!migrated,
       nombre: data?.nombre_completo || null,
     });
-  } catch {
+  } catch (error) {
+    console.error("[API migracion/ping]", error);
     return NextResponse.json({ exists: false });
   }
 }

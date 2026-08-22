@@ -60,6 +60,7 @@ export default function ConfiguracionPage() {
       const region = new Intl.DateTimeFormat(locale, { timeZone: tz }).resolvedOptions().timeZone.split("/")[1] || "";
       setLocalCountry(region.replace(/_/g, " "));
     } catch {
+      // Non-critical: Intl fallback to raw timezone
       setLocalCountry(tz.split("/")[1] || tz);
     }
   };

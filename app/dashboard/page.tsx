@@ -6,6 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { createClient } from "@/lib/supabase/client";
 import { pagosService } from "@/lib/services/pagos/pagos.service";
 import { miembrosService } from "@/lib/services/miembros/miembros.service";
+import { notificacionesService } from "@/lib/services/notificaciones/notificaciones.service";
+import { configService } from "@/lib/services/config/config.service";
 import { formatCurrency, getMonthName } from "@/lib/utils";
 import type { Pago, Profile } from "@/lib/types";
 import { showToast } from "@/components/ui/toast";
@@ -90,6 +92,21 @@ export default function DashboardPage() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  useEffect(() => {
+    if (!isSuperAdmin) return;
+    const triggerNotificaciones = async () => {
+      try {
+        const config = await configService.getConfig();
+        if (config?.notificaciones_enabled) {
+          notificacionesService.procesarTodasLasNotificaciones().catch(() => {});
+        }
+      } catch {
+        // Non-critical: silent - notifications trigger is fire-and-forget
+      }
+    };
+    triggerNotificaciones();
+  }, [isSuperAdmin]);
 
   const getNombreMiembro = (pago: Pago): string => {
     if (pago.profile?.nombre_completo) return pago.profile.nombre_completo;

@@ -62,7 +62,8 @@ export async function POST(request: Request) {
     const uniqueNames = Array.from(new Set((data || []).map((r) => r.nombre.toUpperCase()))).sort();
 
     return NextResponse.json({ matches: uniqueNames });
-  } catch {
+  } catch (error) {
+    console.error("[API migracion/search]", error);
     return NextResponse.json({ error: messages.toast.errorGenerico }, { status: 500 });
   }
 }

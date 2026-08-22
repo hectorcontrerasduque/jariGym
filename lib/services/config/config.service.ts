@@ -48,7 +48,7 @@ export class ConfigService {
           .maybeSingle();
 
         if (newOwnerProfile && newOwnerProfile.activo !== false && newOwnerProfile.role !== "super_admin") {
-          throw new Error("Este correo ya está registrado como miembro activo. Use otro correo.");
+          throw new Error(messages.notificaciones.emailYaRegistradoActivo);
         }
 
         if (existing.dueno_email) {
@@ -77,7 +77,9 @@ export class ConfigService {
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ email: updates.dueno_email, nombre: updates.dueno_nombre, inscripcion_pagada: true }),
             });
-          } catch {}
+          } catch (error) {
+            console.error("[ConfigService] Error calling ensure-super-admin (existing owner path)", error);
+          }
         }
       } else if (!existing) {
         const { data: existingProfile } = await this.supabase
@@ -87,7 +89,7 @@ export class ConfigService {
           .maybeSingle();
 
         if (existingProfile && existingProfile.activo !== false && existingProfile.role !== "super_admin") {
-          throw new Error("Este correo ya está registrado como miembro activo. Use otro correo.");
+          throw new Error(messages.notificaciones.emailYaRegistradoActivo);
         }
 
         if (existingProfile && existingProfile.activo === false) {
@@ -102,7 +104,9 @@ export class ConfigService {
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ email: updates.dueno_email, nombre: updates.dueno_nombre, inscripcion_pagada: true }),
             });
-          } catch {}
+          } catch (error) {
+            console.error("[ConfigService] Error calling ensure-super-admin (new owner path)", error);
+          }
         }
       }
     }

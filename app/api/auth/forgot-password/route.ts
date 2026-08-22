@@ -97,7 +97,8 @@ export async function POST(request: Request) {
     await sendPasswordResetEmail(email, resetLink, gymName, gymLogo);
 
     return NextResponse.json({ message: messages.auth.resetPasswordSent });
-  } catch {
+  } catch (error) {
+    console.error("[API auth/forgot-password]", error);
     return NextResponse.json(
       { error: messages.auth.resetPasswordError },
       { status: 500 }

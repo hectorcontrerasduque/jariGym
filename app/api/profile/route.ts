@@ -74,14 +74,14 @@ export async function PUT(request: Request) {
     if (password && password.trim()) {
       if (targetUserId === user.id && !isAdmin) {
         if (!currentPassword) {
-          return NextResponse.json({ error: "Contraseña actual requerida" }, { status: 400 });
+          return NextResponse.json({ error: messages.toast.contrasenaActualRequerida }, { status: 400 });
         }
         const { error: verifyError } = await supabase.auth.signInWithPassword({
           email: data.email,
           password: currentPassword,
         });
         if (verifyError) {
-          return NextResponse.json({ error: "Contraseña actual incorrecta" }, { status: 400 });
+          return NextResponse.json({ error: messages.toast.contrasenaActualIncorrecta }, { status: 400 });
         }
       }
 

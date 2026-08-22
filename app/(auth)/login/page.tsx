@@ -127,7 +127,9 @@ function LoginForm() {
           .eq("id", userId)
           .single();
         if (retry) profile = retry;
-      } catch {}
+      } catch {
+        // Non-critical: retry failed, continue with existing profile
+      }
     }
 
     if (!profile) return false;
@@ -217,6 +219,7 @@ function LoginForm() {
         setMigrateError(messages.migracion.correoYaMigrado(nombre));
       }
     } catch {
+      // Non-critical: ping failed, assume email doesn't exist
       setMigEmailExists(false);
     }
   };
@@ -260,7 +263,7 @@ function LoginForm() {
         return;
       }
     } catch {
-      // ignore ping errors, proceed with migration
+      // Non-critical: ping errors ignored, proceed with migration
     }
 
     setMigrateStep("loading");

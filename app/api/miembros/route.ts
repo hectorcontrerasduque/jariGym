@@ -35,13 +35,13 @@ export async function POST(request: Request) {
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      return NextResponse.json({ error: "Email inválido" }, { status: 400 });
+      return NextResponse.json({ error: messages.miembros.emailInvalido }, { status: 400 });
     }
     if (email.length > 254) {
-      return NextResponse.json({ error: "Email demasiado largo" }, { status: 400 });
+      return NextResponse.json({ error: messages.miembros.emailDemasiadoLargo }, { status: 400 });
     }
     if (nombre.length > 200) {
-      return NextResponse.json({ error: "Nombre demasiado largo" }, { status: 400 });
+      return NextResponse.json({ error: messages.miembros.nombreDemasiadoLargo }, { status: 400 });
     }
 
     const serviceSupabase = createServiceClient(
@@ -122,7 +122,8 @@ export async function POST(request: Request) {
       loginEmail: email,
       welcomeEmailSent,
     });
-  } catch {
+  } catch (error) {
+    console.error("[API miembros]", error);
     return NextResponse.json({ error: messages.toast.errorGenerico }, { status: 500 });
   }
 }

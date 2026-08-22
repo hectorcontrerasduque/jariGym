@@ -74,7 +74,8 @@ function ResetPasswordForm() {
       }
 
       setSuccess(true);
-    } catch {
+    } catch (error) {
+      console.error("[Reset password]", error);
       setError(messages.auth.resetPasswordError);
     } finally {
       setLoading(false);

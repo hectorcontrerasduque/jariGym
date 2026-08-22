@@ -1,107 +1,128 @@
 import { createClient } from "@/lib/supabase/client";
-import { messages } from "@/lib/messages";
-import type { NotificacionesConfig } from "@/lib/types";
+import type { GymConfig, NotificacionConfig, NotificacionLog } from "@/lib/types";
 
 export class NotificacionesService {
   private supabase = createClient();
 
-  async getConfig(): Promise<NotificacionesConfig | null> {
-    const {
-      data: { user },
-    } = await this.supabase.auth.getUser();
-    if (!user) return null;
+  // ─── CONFIG GLOBAL ─────────────────────────────
 
-    const { data } = await this.supabase
-      .from("notificaciones_config")
+  async getConfigGlobal(): Promise<GymConfig | null> {
+    const { data, error } = await this.supabase
+      .from("gym_config")
       .select("*")
-      .eq("usuario_id", user.id)
+      .limit(1)
       .single();
-
+    if (error || !data) return null;
     return data;
   }
 
-  async updateConfig(
-    updates: Partial<NotificacionesConfig>
-  ): Promise<NotificacionesConfig> {
-    const {
-      data: { user },
-    } = await this.supabase.auth.getUser();
-    if (!user) throw new Error(messages.toast.noAutenticado);
-
+  async updateConfigGlobal(updates: Partial<GymConfig>): Promise<void> {
     const { data: existing } = await this.supabase
-      .from("notificaciones_config")
+      .from("gym_config")
       .select("id")
-      .eq("usuario_id", user.id)
+      .limit(1)
       .single();
-
-    if (existing) {
-      const { data, error } = await this.supabase
-        .from("notificaciones_config")
-        .update(updates)
-        .eq("id", existing.id)
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data;
-    } else {
-      const { data, error } = await this.supabase
-        .from("notificaciones_config")
-        .insert({ ...updates, usuario_id: user.id })
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data;
-    }
+    if (!existing) return;
+    const { error } = await this.supabase
+      .from("gym_config")
+      .update({ notificaciones_enabled: updates.notificaciones_enabled })
+      .eq("id", existing.id);
+    if (error) throw error;
   }
 
-  async enviarNotificacionPago(usuarioId: string, tipo: string) {
-    const config = await this.getConfigForUser(usuarioId);
-    if (!config) return;
+  // ─── CONFIG POR TIPO ──────────────────────────
 
-    if (config.email_enabled) {
-      await this.enviarEmail(usuarioId, tipo);
-    }
-
-    if (config.whatsapp_enabled && config.whatsapp_number) {
-      await this.enviarWhatsApp(config.whatsapp_number, tipo);
-    }
-  }
-
-  private async getConfigForUser(
-    usuarioId: string
-  ): Promise<NotificacionesConfig | null> {
-    const { data } = await this.supabase
-      .from("notificaciones_config")
+  async getNotificacionesConfig(): Promise<NotificacionConfig[]> {
+    const { data, error } = await this.supabase
+      .from("notificacion_config")
       .select("*")
-      .eq("usuario_id", usuarioId)
-      .single();
+      .order("tipo_notificacion");
+    if (error) throw error;
+    return data || [];
+  }
 
+  async getNotificacionConfigByTipo(tipo: string): Promise<NotificacionConfig | null> {
+    const { data } = await this.supabase
+      .from("notificacion_config")
+      .select("*")
+      .eq("tipo_notificacion", tipo)
+      .single();
     return data;
   }
 
-  private async enviarEmail(usuarioId: string, tipo: string) {
-    const { data: profile } = await this.supabase
-      .from("profiles")
-      .select("nombre_completo")
-      .eq("id", usuarioId)
-      .single();
-
-    await this.supabase.from("notificaciones_log").insert({
-      usuario_id: usuarioId,
-      tipo,
-      canal: "email",
-      enviado: true,
-    });
+  async updateNotificacionConfig(id: string, updates: Partial<NotificacionConfig>): Promise<void> {
+    const { error } = await this.supabase
+      .from("notificacion_config")
+      .update(updates)
+      .eq("id", id);
+    if (error) throw error;
   }
 
-  private async enviarWhatsApp(numero: string, tipo: string) {
-    await this.supabase.from("notificaciones_log").insert({
-      tipo,
-      canal: "whatsapp",
-      enviado: true,
+  // ─── EJECUTAR NOTIFICACIONES (via API) ────────
+
+  async procesarTodasLasNotificaciones(): Promise<{
+    ejecutadas: number;
+    enviados: number;
+    errores: number;
+  }> {
+    const { data: { session } } = await this.supabase.auth.getSession();
+    const token = session?.access_token;
+
+    const res = await fetch("/api/notificaciones/procesar", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
     });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: "Error desconocido" }));
+      throw new Error(err.error || "Error al procesar notificaciones");
+    }
+
+    return res.json();
+  }
+
+  // ─── DIAGNÓSTICO (via API) ────────────────────
+
+  async ejecutarDiagnostico(): Promise<{
+    exitoso: boolean;
+    resultados: Array<{
+      paso: string;
+      estado: "ok" | "error" | "warning";
+      detalle: string;
+    }>;
+  }> {
+    const { data: { session } } = await this.supabase.auth.getSession();
+    const token = session?.access_token;
+
+    const res = await fetch("/api/notificaciones/diagnostico", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: "Error desconocido" }));
+      throw new Error(err.error || "Error al ejecutar diagnóstico");
+    }
+
+    return res.json();
+  }
+
+  // ─── HISTORIAL ────────────────────────────────
+
+  async getHistorial(limit = 50): Promise<NotificacionLog[]> {
+    const { data, error } = await this.supabase
+      .from("notificacion_log")
+      .select("*, notificacion_config(*)")
+      .order("fecha_hora_envio", { ascending: false })
+      .limit(limit);
+    if (error) throw error;
+    return data || [];
   }
 }
 

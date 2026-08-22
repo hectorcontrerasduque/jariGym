@@ -33,26 +33,29 @@ export async function POST(request: Request) {
       return NextResponse.json({ created: false, promoted: true });
     }
 
-    const { data: existingAuth } = await supabase.auth.admin.listUsers();
-    const authUser = existingAuth?.users?.find((u) => u.email === emailLower);
+    const randomPassword = Math.random().toString(36).slice(-12) + "A1!";
+    const { data: newUser, error: authError } = await supabase.auth.admin.createUser({
+      email: emailLower,
+      password: randomPassword,
+      email_confirm: true,
+      user_metadata: { nombre_completo: nombreCompleto },
+    });
 
     let userId: string;
 
-    if (authUser) {
-      userId = authUser.id;
-    } else {
-      const randomPassword = Math.random().toString(36).slice(-12) + "A1!";
-      const { data: newUser, error: authError } = await supabase.auth.admin.createUser({
-        email: emailLower,
-        password: randomPassword,
-        email_confirm: true,
-        user_metadata: { nombre_completo: nombreCompleto },
-      });
-
-      if (authError || !newUser?.user?.id) {
-        return NextResponse.json({ created: false, error: authError?.message });
+    if (authError) {
+      if (authError.message?.includes("already") || authError.message?.includes("exists")) {
+        const { data: existingAuth } = await supabase.auth.admin.listUsers();
+        const authUser = existingAuth?.users?.find((u) => u.email === emailLower);
+        if (!authUser) {
+          return NextResponse.json({ created: false, error: authError.message });
+        }
+        userId = authUser.id;
+      } else {
+        return NextResponse.json({ created: false, error: authError.message });
       }
-      userId = newUser.user.id;
+    } else {
+      userId = newUser!.user!.id;
     }
 
     const { error: profileError } = await supabase
@@ -81,7 +84,8 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({ created: true });
-  } catch {
+  } catch (error) {
+    console.error("[API auth/ensure-super-admin]", error);
     return NextResponse.json({ created: false });
   }
 }

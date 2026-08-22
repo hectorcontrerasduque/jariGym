@@ -52,3 +52,4 @@ yarn-error.log*
 # local scripts
 check.sh
 check.ps1
+.opencode/

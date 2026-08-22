@@ -90,6 +90,7 @@ export interface GymConfig {
   dueno_telefono: string | null;
   moneda: string;
   timezone: string;
+  notificaciones_enabled: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -104,25 +105,36 @@ export interface MetodoPagoConfig {
   updated_at: string;
 }
 
-export interface NotificacionesConfig {
+export type TipoNotificacion =
+  | "miembros_deudores"
+  | "recordatorio_pago"
+  | "resumen_dueno"
+  | "estatus_sistema";
+
+export interface NotificacionConfig {
   id: string;
-  usuario_id: string;
-  whatsapp_enabled: boolean;
-  email_enabled: boolean;
-  whatsapp_number: string | null;
-  recordatorio_dias_antes: number;
+  tipo_notificacion: TipoNotificacion;
+  habilitado: boolean;
+  frecuencia_semanal: boolean;
+  frecuencia_quincenal: boolean;
+  frecuencia_mensual: boolean;
+  dias_previo: number;
+  notificar_por_email: boolean;
+  notificar_por_whatsapp: boolean;
   created_at: string;
+  updated_at: string;
 }
 
 export interface NotificacionLog {
   id: string;
-  usuario_id: string | null;
-  tipo: "pago_pendiente" | "pago_atrasado" | "pago_confirmado" | "membresia_vence";
-  canal: "whatsapp" | "email";
-  enviado: boolean;
-  error: string | null;
-  metadata: Record<string, unknown> | null;
+  id_notificacion_config: string;
+  miembros_notificados: number;
+  fecha_hora_envio: string;
+  sin_problemas: boolean;
+  error_detalle: string | null;
   created_at: string;
+  updated_at: string;
+  notificacion_config?: NotificacionConfig;
 }
 
 export interface DashboardStats {

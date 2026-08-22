@@ -63,6 +63,14 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: `${messages.toast.perfilError}: ${profileError.message}` }, { status: 400 });
     }
 
+    // Sync email to auth.users if it changed
+    if (data.email && currentData?.email && data.email !== currentData.email) {
+      await serviceSupabase.auth.admin.updateUserById(
+        targetUserId,
+        { email: data.email, email_confirm: true }
+      );
+    }
+
     if (password && password.trim()) {
       if (targetUserId === user.id && !isAdmin) {
         if (!currentPassword) {
@@ -83,13 +91,6 @@ export async function PUT(request: Request) {
           error: messages.toast.cuentaAuthNoExiste,
           profile: data 
         }, { status: 400 });
-      }
-
-      if (authUser.user.email !== data.email) {
-        await serviceSupabase.auth.admin.updateUserById(
-          targetUserId,
-          { email: data.email, email_confirm: true }
-        );
       }
 
       const { error: pwError } = await serviceSupabase.auth.admin.updateUserById(

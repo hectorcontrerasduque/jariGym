@@ -149,7 +149,7 @@ export function Sidebar() {
         <nav className="flex-1 p-4 space-y-1">
           {navItems.map((item) => {
             const isActive = pathname === item.href ||
-              (item.href !== "/dashboard" && pathname.startsWith(item.href));
+              (item.href !== "/dashboard" && !item.href.endsWith("/configuracion") && pathname.startsWith(item.href));
             return (
               <Link
                 key={item.href}
@@ -207,7 +207,7 @@ export function Sidebar() {
         <div className="flex items-center justify-around py-2">
           {navItems.map((item) => {
             const isActive = pathname === item.href ||
-              (item.href !== "/dashboard" && pathname.startsWith(item.href));
+              (item.href !== "/dashboard" && !item.href.endsWith("/configuracion") && pathname.startsWith(item.href));
             return (
               <Link
                 key={item.href}

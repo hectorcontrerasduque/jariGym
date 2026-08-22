@@ -89,6 +89,20 @@ function LoginForm() {
       .catch(() => setHasPendingMigration(false));
   }, [searchParams]);
 
+  // Handle browser back button to close migration modal
+  useEffect(() => {
+    if (!showMigrateForm) return;
+    const handlePopState = () => {
+      setShowMigrateForm(false);
+      setMigrateStep("form");
+    };
+    window.history.pushState({ modal: "migrate" }, "");
+    window.addEventListener("popstate", handlePopState);
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+    };
+  }, [showMigrateForm]);
+
   const isAuthorizedUser = async (userEmail: string, userId: string): Promise<boolean> => {
     const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL;
     const isAdminEmail = adminEmail && userEmail === adminEmail;

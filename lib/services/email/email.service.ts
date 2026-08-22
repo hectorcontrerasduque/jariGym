@@ -15,6 +15,40 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+// ─── RATE LIMITING ────────────────────────────────────────────
+// Gmail: 500/day (free), 2000/day (Workspace)
+// Safe limit: 100/day with 3s delay between sends
+const EMAIL_DELAY_MS = 3000;
+let lastEmailSentAt = 0;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function rateLimit(): Promise<void> {
+  const now = Date.now();
+  const elapsed = now - lastEmailSentAt;
+  if (elapsed < EMAIL_DELAY_MS) {
+    await sleep(EMAIL_DELAY_MS - elapsed);
+  }
+  lastEmailSentAt = Date.now();
+}
+
+// ─── UNSUBSCRIBE FOOTER ──────────────────────────────────────
+function unsubscribeFooter(gymName: string, siteUrl: string): string {
+  return `
+    <div style="margin-top:30px;padding-top:15px;border-top:1px solid #e2e8f0;text-align:center;">
+      <p style="color:#94a3b8;font-size:11px;margin:0 0 5px;">
+        ${gymName} &mdash; Notificación automática
+      </p>
+      <p style="color:#94a3b8;font-size:11px;margin:0;">
+        Si no deseas recibir estos correos, contacta al administrador para desactivar las notificaciones.
+      </p>
+    </div>
+  `;
+}
+
+// ─── SEND EMAIL ──────────────────────────────────────────────
 interface SendEmailParams {
   to: string;
   subject: string;
@@ -32,12 +66,17 @@ export async function sendEmail({
     throw new Error("GMAIL_USER and GMAIL_APP_PASSWORD must be configured");
   }
 
+  await rateLimit();
+
   const result = await transporter.sendMail({
-    from: `"${fromName || "GymApp"} - No Reply" <${process.env.GMAIL_USER}>`,
+    from: `"${fromName || "GymApp"}" <${process.env.GMAIL_USER}>`,
     to,
     subject,
     html,
-    replyTo: "no-reply@noreply.com",
+    replyTo: process.env.GMAIL_USER,
+    headers: {
+      "List-Unsubscribe": `<mailto:${process.env.GMAIL_USER}?subject=unsubscribe>`,
+    },
   });
 
   if (!result.messageId) {
@@ -45,6 +84,7 @@ export async function sendEmail({
   }
 }
 
+// ─── PASSWORD RESET ──────────────────────────────────────────
 export async function sendPasswordResetEmail(
   to: string,
   resetLink: string,
@@ -59,6 +99,7 @@ export async function sendPasswordResetEmail(
   });
 }
 
+// ─── WELCOME ─────────────────────────────────────────────────
 export async function sendWelcomeEmail(
   to: string,
   email: string,
@@ -75,6 +116,7 @@ export async function sendWelcomeEmail(
   });
 }
 
+// ─── DEBT NOTIFICATION ───────────────────────────────────────
 export async function sendPaymentDebtEmail(
   to: string,
   memberName: string,
@@ -83,20 +125,17 @@ export async function sendPaymentDebtEmail(
   totalDeuda: number,
   gymLogo?: string | null
 ): Promise<void> {
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "";
+  const baseHtml = deudasPendientesTemplate(memberName, gymName, deudas, totalDeuda, gymLogo);
   await sendEmail({
     to,
     subject: `${gymName} - Tienes pagos pendientes`,
-    html: deudasPendientesTemplate(
-      memberName,
-      gymName,
-      deudas,
-      totalDeuda,
-      gymLogo
-    ),
+    html: baseHtml + unsubscribeFooter(gymName, siteUrl),
     fromName: gymName,
   });
 }
 
+// ─── PAYMENT REMINDER ────────────────────────────────────────
 export async function sendPaymentReminderEmail(
   to: string,
   memberName: string,
@@ -105,20 +144,17 @@ export async function sendPaymentReminderEmail(
   fechaVencimiento: string,
   gymLogo?: string | null
 ): Promise<void> {
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "";
+  const baseHtml = recordatorioMiembroTemplate(memberName, gymName, diasRestantes, fechaVencimiento, gymLogo);
   await sendEmail({
     to,
     subject: `${gymName} - Tu membresía vence en ${diasRestantes} días`,
-    html: recordatorioMiembroTemplate(
-      memberName,
-      gymName,
-      diasRestantes,
-      fechaVencimiento,
-      gymLogo
-    ),
+    html: baseHtml + unsubscribeFooter(gymName, siteUrl),
     fromName: gymName,
   });
 }
 
+// ─── ADMIN REMINDER ──────────────────────────────────────────
 export async function sendAdminReminderEmail(
   to: string,
   adminName: string,
@@ -130,19 +166,17 @@ export async function sendAdminReminderEmail(
   }>,
   gymLogo?: string | null
 ): Promise<void> {
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "";
+  const baseHtml = recordatorioAdminTemplate(adminName, gymName, miembrosProximoVencer, gymLogo);
   await sendEmail({
     to,
     subject: `${gymName} - Miembros con membresía por vencer`,
-    html: recordatorioAdminTemplate(
-      adminName,
-      gymName,
-      miembrosProximoVencer,
-      gymLogo
-    ),
+    html: baseHtml + unsubscribeFooter(gymName, siteUrl),
     fromName: gymName,
   });
 }
 
+// ─── ADMIN SUMMARY ───────────────────────────────────────────
 export async function sendAdminSummaryEmail(
   to: string,
   gymName: string,
@@ -157,14 +191,16 @@ export async function sendAdminSummaryEmail(
   appUrl: string,
   gymLogo?: string | null
 ): Promise<void> {
+  const baseHtml = resumenDuenoTemplate(gymName, resumen, appUrl, gymLogo);
   await sendEmail({
     to,
     subject: `${gymName} - Resumen de pagos`,
-    html: resumenDuenoTemplate(gymName, resumen, appUrl, gymLogo),
+    html: baseHtml + unsubscribeFooter(gymName, appUrl),
     fromName: gymName,
   });
 }
 
+// ─── SYSTEM STATUS ───────────────────────────────────────────
 export async function sendSystemStatusEmail(
   to: string,
   gymName: string,
@@ -182,10 +218,13 @@ export async function sendSystemStatusEmail(
   },
   gymLogo?: string | null
 ): Promise<void> {
+  const baseHtml = estatusSistemaTemplate(gymName, metricas, gymLogo);
   await sendEmail({
     to,
     subject: `${gymName} - Estado del Sistema`,
-    html: estatusSistemaTemplate(gymName, metricas, gymLogo),
+    html: baseHtml + unsubscribeFooter(gymName, process.env.NEXT_PUBLIC_SITE_URL || ""),
     fromName: gymName,
   });
 }
+
+export { sleep };

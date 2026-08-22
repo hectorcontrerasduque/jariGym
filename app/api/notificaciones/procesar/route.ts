@@ -6,6 +6,7 @@ import {
   sendAdminReminderEmail,
   sendAdminSummaryEmail,
   sendSystemStatusEmail,
+  sleep,
 } from "@/lib/services/email/email.service";
 
 const supabase = createClient(
@@ -204,6 +205,7 @@ async function procesarMiembrosDeudores(gymConfig: Record<string, unknown>): Pro
         logoUrl
       );
       count++;
+      await sleep(3000);
     } catch (error) {
       console.error("[API notificaciones/procesar] Error sending debt email", error);
     }
@@ -264,6 +266,7 @@ async function procesarRecordatorioPago(diasPrevio: number, gymConfig: Record<st
           logoUrl
         );
         count++;
+        await sleep(3000);
       } catch (error) {
         console.error("[API notificaciones/procesar] Error sending payment reminder", error);
       }

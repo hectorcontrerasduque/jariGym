@@ -17,6 +17,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { showToast } from "@/components/ui/toast";
+import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { messages } from "@/lib/messages";
 import type { GymConfig, NotificacionConfig, NotificacionLog } from "@/lib/types";
 
@@ -153,6 +154,7 @@ export default function NotificacionesPage() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-6 animate-fadeIn">
+      <LoadingOverlay show={saving} />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-display font-bold text-gym-text">

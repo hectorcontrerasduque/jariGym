@@ -161,6 +161,7 @@ async function ejecutarTipo(
 async function procesarMiembrosDeudores(gymConfig: Record<string, unknown>): Promise<number> {
   const nombreGym = (gymConfig.nombre_gym as string) || "GymApp";
   const logoUrl = gymConfig.logo_url as string | null;
+  const direccion = gymConfig.direccion as string | null;
 
   const { data: miembros } = await supabase
     .from("profiles")
@@ -202,12 +203,13 @@ async function procesarMiembrosDeudores(gymConfig: Record<string, unknown>): Pro
         nombreGym,
         pagosPendientes.map((p) => ({ mes: p.mes_pagar, anio: p.anio_pagar, monto: p.monto })),
         pagosPendientes.reduce((sum, p) => sum + p.monto, 0),
-        logoUrl
+        logoUrl,
+        direccion
       );
       count++;
       await sleep(3000);
     } catch (error) {
-      console.error("[API notificaciones/procesar] Error sending debt email", error);
+      // Non-critical: silent
     }
   }
 
@@ -218,6 +220,7 @@ async function procesarRecordatorioPago(diasPrevio: number, gymConfig: Record<st
   const nombreGym = (gymConfig.nombre_gym as string) || "GymApp";
   const logoUrl = gymConfig.logo_url as string | null;
   const duenoEmail = gymConfig.dueno_email as string | null;
+  const direccion = gymConfig.direccion as string | null;
 
   const { data: miembros } = await supabase
     .from("profiles")
@@ -263,22 +266,23 @@ async function procesarRecordatorioPago(diasPrevio: number, gymConfig: Record<st
           nombreGym,
           diasRestantes,
           fechaVencimiento.toLocaleDateString("es-ES"),
-          logoUrl
+          logoUrl,
+          direccion
         );
         count++;
         await sleep(3000);
       } catch (error) {
-        console.error("[API notificaciones/procesar] Error sending payment reminder", error);
+        // Non-critical: silent
       }
     }
   }
 
   if (duenoEmail) {
     try {
-      await sendAdminReminderEmail(duenoEmail, duenoEmail, nombreGym, [], logoUrl);
+      await sendAdminReminderEmail(duenoEmail, duenoEmail, nombreGym, [], logoUrl, direccion);
       count++;
     } catch (error) {
-      console.error("[API notificaciones/procesar] Error sending admin reminder", error);
+      // Non-critical: silent
     }
   }
 
@@ -289,6 +293,7 @@ async function procesarResumenDueno(gymConfig: Record<string, unknown>): Promise
   const nombreGym = (gymConfig.nombre_gym as string) || "GymApp";
   const logoUrl = gymConfig.logo_url as string | null;
   const duenoEmail = gymConfig.dueno_email as string | null;
+  const direccion = gymConfig.direccion as string | null;
   if (!duenoEmail) return 0;
 
   const mesActual = new Date().getMonth() + 1;
@@ -327,11 +332,11 @@ async function procesarResumenDueno(gymConfig: Record<string, unknown>): Promise
         miembrosDeudores: 0,
       },
       `${process.env.NEXT_PUBLIC_SITE_URL}/dashboard/pagos`,
-      logoUrl
+      logoUrl,
+      direccion
     );
     return 1;
   } catch (error) {
-    console.error("[API notificaciones/procesar] Error sending admin summary", error);
     return 0;
   }
 }
@@ -339,6 +344,7 @@ async function procesarResumenDueno(gymConfig: Record<string, unknown>): Promise
 async function procesarEstatusSistema(gymConfig: Record<string, unknown>): Promise<number> {
   const nombreGym = (gymConfig.nombre_gym as string) || "GymApp";
   const logoUrl = gymConfig.logo_url as string | null;
+  const direccion = gymConfig.direccion as string | null;
   const destino = process.env.NEXT_PUBLIC_ADMIN_EMAIL;
   if (!destino) return 0;
 
@@ -401,11 +407,11 @@ async function procesarEstatusSistema(gymConfig: Record<string, unknown>): Promi
           ? new Date(ultimoPago.created_at).toLocaleDateString("es-ES")
           : "N/A",
       },
-      logoUrl
+      logoUrl,
+      direccion
     );
     return 1;
   } catch (error) {
-    console.error("[API notificaciones/procesar] Error sending system status email", error);
     return 0;
   }
 }

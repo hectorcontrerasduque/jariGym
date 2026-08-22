@@ -67,10 +67,6 @@ serve(async (req) => {
       const profile = (pago as any).profile;
 
       if (notisConfig?.email_enabled) {
-        console.log(
-          `Enviando email a ${profile?.nombre_completo}: Pago pendiente de ${new Date(pago.created_at).toLocaleDateString("es-ES", { month: "long", year: "numeric" })}`
-        );
-
         await supabase.from("notificaciones_log").insert({
           usuario_id: pago.usuario_id,
           tipo: "pago_pendiente",
@@ -86,10 +82,6 @@ serve(async (req) => {
       }
 
       if (notisConfig?.whatsapp_enabled && notisConfig?.whatsapp_number) {
-        console.log(
-          `Enviando WhatsApp a ${notisConfig.whatsapp_number}: Pago pendiente`
-        );
-
         await supabase.from("notificaciones_log").insert({
           usuario_id: pago.usuario_id,
           tipo: "pago_pendiente",

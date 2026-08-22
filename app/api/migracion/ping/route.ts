@@ -42,7 +42,6 @@ export async function GET(request: Request) {
       nombre: data?.nombre_completo || null,
     });
   } catch (error) {
-    console.error("[API migracion/ping]", error);
     return NextResponse.json({ exists: false });
   }
 }

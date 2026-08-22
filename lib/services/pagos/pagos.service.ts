@@ -539,7 +539,6 @@ export class PagosService {
         .maybeSingle();
       config = data;
     } catch (error) {
-      console.error("[PagosService] Error fetching config monto_mensual", error);
       config = null;
     }
     const montoMensual = config?.monto_mensual || 5;

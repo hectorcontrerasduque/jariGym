@@ -63,7 +63,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ matches: uniqueNames });
   } catch (error) {
-    console.error("[API migracion/search]", error);
     return NextResponse.json({ error: messages.toast.errorGenerico }, { status: 500 });
   }
 }

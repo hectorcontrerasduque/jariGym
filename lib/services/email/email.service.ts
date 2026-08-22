@@ -16,8 +16,6 @@ const transporter = nodemailer.createTransport({
 });
 
 // ─── RATE LIMITING ────────────────────────────────────────────
-// Gmail: 500/day (free), 2000/day (Workspace)
-// Safe limit: 100/day with 3s delay between sends
 const EMAIL_DELAY_MS = 3000;
 let lastEmailSentAt = 0;
 
@@ -35,9 +33,13 @@ async function rateLimit(): Promise<void> {
 }
 
 // ─── UNSUBSCRIBE FOOTER ──────────────────────────────────────
-function unsubscribeFooter(gymName: string, siteUrl: string): string {
+function unsubscribeFooter(gymName: string, direccion?: string | null): string {
+  const addressHtml = direccion
+    ? `<p style="color:#94a3b8;font-size:11px;margin:0 0 5px;">${direccion}</p>`
+    : "";
   return `
     <div style="margin-top:30px;padding-top:15px;border-top:1px solid #e2e8f0;text-align:center;">
+      ${addressHtml}
       <p style="color:#94a3b8;font-size:11px;margin:0 0 5px;">
         ${gymName} &mdash; Notificación automática
       </p>
@@ -48,7 +50,7 @@ function unsubscribeFooter(gymName: string, siteUrl: string): string {
   `;
 }
 
-// ─── SEND EMAIL ──────────────────────────────────────────────
+// ─── SEND EMAIL (transactional) ──────────────────────────────
 interface SendEmailParams {
   to: string;
   subject: string;
@@ -56,7 +58,7 @@ interface SendEmailParams {
   fromName?: string;
 }
 
-export async function sendEmail({
+async function sendEmail({
   to,
   subject,
   html,
@@ -74,8 +76,38 @@ export async function sendEmail({
     subject,
     html,
     replyTo: process.env.GMAIL_USER,
+  });
+
+  if (!result.messageId) {
+    throw new Error("Email sent but no messageId returned");
+  }
+}
+
+// ─── SEND NOTIFICATION (batch/Marketing headers) ─────────────
+async function sendNotificationEmail({
+  to,
+  subject,
+  html,
+  fromName,
+  campaign,
+}: SendEmailParams & { campaign: string }): Promise<void> {
+  if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) {
+    throw new Error("GMAIL_USER and GMAIL_APP_PASSWORD must be configured");
+  }
+
+  await rateLimit();
+
+  const result = await transporter.sendMail({
+    from: `"${fromName || "GymApp"}" <${process.env.GMAIL_USER}>`,
+    to,
+    subject,
+    html,
+    replyTo: process.env.GMAIL_USER,
     headers: {
       "List-Unsubscribe": `<mailto:${process.env.GMAIL_USER}?subject=unsubscribe>`,
+      "Precedence": "bulk",
+      "X-Campaign": campaign,
+      "X-Mailer": "GymApp-Notifications",
     },
   });
 
@@ -123,15 +155,16 @@ export async function sendPaymentDebtEmail(
   gymName: string,
   deudas: Array<{ mes: number; anio: number; monto: number }>,
   totalDeuda: number,
-  gymLogo?: string | null
+  gymLogo?: string | null,
+  direccion?: string | null
 ): Promise<void> {
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "";
   const baseHtml = deudasPendientesTemplate(memberName, gymName, deudas, totalDeuda, gymLogo);
-  await sendEmail({
+  await sendNotificationEmail({
     to,
-    subject: `${gymName} - Tienes pagos pendientes`,
-    html: baseHtml + unsubscribeFooter(gymName, siteUrl),
+    subject: `${gymName} - Pago pendiente de ${memberName}`,
+    html: baseHtml + unsubscribeFooter(gymName, direccion),
     fromName: gymName,
+    campaign: "deudas-pendientes",
   });
 }
 
@@ -142,15 +175,16 @@ export async function sendPaymentReminderEmail(
   gymName: string,
   diasRestantes: number,
   fechaVencimiento: string,
-  gymLogo?: string | null
+  gymLogo?: string | null,
+  direccion?: string | null
 ): Promise<void> {
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "";
   const baseHtml = recordatorioMiembroTemplate(memberName, gymName, diasRestantes, fechaVencimiento, gymLogo);
-  await sendEmail({
+  await sendNotificationEmail({
     to,
-    subject: `${gymName} - Tu membresía vence en ${diasRestantes} días`,
-    html: baseHtml + unsubscribeFooter(gymName, siteUrl),
+    subject: `${gymName} - Tu membresía vence en ${diasRestantes} día${diasRestantes !== 1 ? "s" : ""}`,
+    html: baseHtml + unsubscribeFooter(gymName, direccion),
     fromName: gymName,
+    campaign: "recordatorio-pago",
   });
 }
 
@@ -164,15 +198,16 @@ export async function sendAdminReminderEmail(
     diasRestantes: number;
     fechaVencimiento: string;
   }>,
-  gymLogo?: string | null
+  gymLogo?: string | null,
+  direccion?: string | null
 ): Promise<void> {
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "";
   const baseHtml = recordatorioAdminTemplate(adminName, gymName, miembrosProximoVencer, gymLogo);
-  await sendEmail({
+  await sendNotificationEmail({
     to,
     subject: `${gymName} - Miembros con membresía por vencer`,
-    html: baseHtml + unsubscribeFooter(gymName, siteUrl),
+    html: baseHtml + unsubscribeFooter(gymName, direccion),
     fromName: gymName,
+    campaign: "recordatorio-admin",
   });
 }
 
@@ -189,14 +224,16 @@ export async function sendAdminSummaryEmail(
     miembrosDeudores: number;
   },
   appUrl: string,
-  gymLogo?: string | null
+  gymLogo?: string | null,
+  direccion?: string | null
 ): Promise<void> {
   const baseHtml = resumenDuenoTemplate(gymName, resumen, appUrl, gymLogo);
-  await sendEmail({
+  await sendNotificationEmail({
     to,
-    subject: `${gymName} - Resumen de pagos`,
-    html: baseHtml + unsubscribeFooter(gymName, appUrl),
+    subject: `${gymName} - Resumen semanal de pagos`,
+    html: baseHtml + unsubscribeFooter(gymName, direccion),
     fromName: gymName,
+    campaign: "resumen-dueno",
   });
 }
 
@@ -216,14 +253,16 @@ export async function sendSystemStatusEmail(
     ultimoMiembroRegistrado: string;
     ultimoPagoRegistrado: string;
   },
-  gymLogo?: string | null
+  gymLogo?: string | null,
+  direccion?: string | null
 ): Promise<void> {
   const baseHtml = estatusSistemaTemplate(gymName, metricas, gymLogo);
-  await sendEmail({
+  await sendNotificationEmail({
     to,
-    subject: `${gymName} - Estado del Sistema`,
-    html: baseHtml + unsubscribeFooter(gymName, process.env.NEXT_PUBLIC_SITE_URL || ""),
+    subject: `${gymName} - Estado del sistema`,
+    html: baseHtml + unsubscribeFooter(gymName, direccion),
     fromName: gymName,
+    campaign: "estatus-sistema",
   });
 }
 

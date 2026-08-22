@@ -85,7 +85,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ created: true });
   } catch (error) {
-    console.error("[API auth/ensure-super-admin]", error);
     return NextResponse.json({ created: false });
   }
 }

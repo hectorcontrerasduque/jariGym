@@ -54,7 +54,6 @@ export default function PagosPage() {
       if (aniosResult.status === "fulfilled") setAnios(aniosResult.value);
       if (miembrosResult.status === "fulfilled") setMiembros(miembrosResult.value);
     } catch (error) {
-      console.error("[Pagos page] Error loading data", error);
       showToast(messages.toast.errorCargaDatos, "error");
     } finally {
       setLoading(false);

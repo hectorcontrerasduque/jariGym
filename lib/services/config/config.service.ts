@@ -78,7 +78,7 @@ export class ConfigService {
               body: JSON.stringify({ email: updates.dueno_email, nombre: updates.dueno_nombre, inscripcion_pagada: true }),
             });
           } catch (error) {
-            console.error("[ConfigService] Error calling ensure-super-admin (existing owner path)", error);
+            // Non-critical: silent
           }
         }
       } else if (!existing) {
@@ -105,7 +105,7 @@ export class ConfigService {
               body: JSON.stringify({ email: updates.dueno_email, nombre: updates.dueno_nombre, inscripcion_pagada: true }),
             });
           } catch (error) {
-            console.error("[ConfigService] Error calling ensure-super-admin (new owner path)", error);
+            // Non-critical: silent
           }
         }
       }

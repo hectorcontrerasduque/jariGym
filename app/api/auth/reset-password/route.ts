@@ -53,7 +53,6 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ message: messages.auth.resetPasswordSuccess });
   } catch (error) {
-    console.error("[API auth/reset-password]", error);
     return NextResponse.json(
       { error: messages.auth.resetPasswordError },
       { status: 500 }

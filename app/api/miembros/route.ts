@@ -123,7 +123,6 @@ export async function POST(request: Request) {
       welcomeEmailSent,
     });
   } catch (error) {
-    console.error("[API miembros]", error);
     return NextResponse.json({ error: messages.toast.errorGenerico }, { status: 500 });
   }
 }

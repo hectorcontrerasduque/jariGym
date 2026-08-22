@@ -364,7 +364,7 @@ export async function POST(request: Request) {
 
           confirmLink = `${siteUrl}/api/auth/confirm-email?token=${token}`;
         } catch (error) {
-          console.error("[API migracion] Error creating confirm token", error);
+          // Non-critical: silent
         }
 
         try {

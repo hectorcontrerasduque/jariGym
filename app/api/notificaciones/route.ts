@@ -18,7 +18,7 @@ export async function POST(request: Request) {
   try {
     const { data: gymConfig } = await supabase
       .from("gym_config")
-      .select("notificaciones_enabled, nombre_gym, logo_url, dueno_email, max_miembros")
+      .select("notificaciones_enabled, nombre_gym, logo_url, dueno_email, max_miembros, direccion")
       .limit(1)
       .single();
 
@@ -122,6 +122,7 @@ async function ejecutarTipo(
     logo_url: string | null;
     dueno_email: string | null;
     max_miembros: number;
+    direccion: string | null;
   }
 ): Promise<{ miembrosNotificados: number; sinProblemas: boolean }> {
   try {
@@ -167,6 +168,7 @@ async function ejecutarTipo(
 async function procesarMiembrosDeudores(gymConfig: {
   nombre_gym: string | null;
   logo_url: string | null;
+  direccion: string | null;
 }): Promise<number> {
   const { data: miembros } = await supabase
     .from("profiles")
@@ -215,11 +217,12 @@ async function procesarMiembrosDeudores(gymConfig: {
           monto: p.monto,
         })),
         pagosPendientes.reduce((sum, p) => sum + p.monto, 0),
-        gymConfig.logo_url
+        gymConfig.logo_url,
+        gymConfig.direccion
       );
       count++;
     } catch (error) {
-      console.error("[API notificaciones] Error sending debt email", error);
+      // Non-critical: silent
     }
   }
 
@@ -289,7 +292,7 @@ async function procesarRecordatorioPago(
         );
         count++;
       } catch (error) {
-        console.error("[API notificaciones] Error sending payment reminder", error);
+        // Non-critical: silent
       }
     }
   }
@@ -308,7 +311,7 @@ async function procesarRecordatorioPago(
       );
       count++;
     } catch (error) {
-      console.error("[API notificaciones] Error sending admin reminder", error);
+      // Non-critical: silent
     }
   }
 
@@ -371,7 +374,6 @@ async function procesarResumenDueno(gymConfig: {
     );
     return 1;
   } catch (error) {
-    console.error("[API notificaciones] Error sending admin summary", error);
     return 0;
   }
 }
@@ -458,7 +460,6 @@ async function procesarEstatusSistema(gymConfig: {
     );
     return 1;
   } catch (error) {
-    console.error("[API notificaciones] Error sending system status email", error);
     return 0;
   }
 }

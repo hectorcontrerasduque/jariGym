@@ -133,7 +133,6 @@ export default function MisPagosPage() {
       setMembresiaLibre(!!libre.data);
       setFormData(prev => ({ ...prev, meses: [], pagar_inscripcion: false, pagar_mensualidad: false }));
     } catch (error) {
-      console.error("[Mis pagos] Error loading admin pendientes", error);
       showToast(messages.toast.errorCargaDatos, "error");
     } finally {
       setLoadingPendientes(false);
@@ -155,7 +154,6 @@ export default function MisPagosPage() {
       setMembresiaLibre(!!libre.data);
       setFormData(prev => ({ ...prev, meses: [], pagar_inscripcion: false, pagar_mensualidad: false }));
     } catch (error) {
-      console.error("[Mis pagos] Error loading self pendientes", error);
       showToast(messages.toast.errorCargaDatos, "error");
     } finally {
       setLoadingPendientes(false);

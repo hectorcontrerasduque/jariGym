@@ -273,6 +273,7 @@ export default function MisPagosPage() {
           mes_pagar: new Date().getMonth() + 1, anio_pagar: new Date().getFullYear(),
           metodo_pago: formData.metodo_pago, tipo_pago: "inscripcion" as TipoPago,
           comprobante_url: comprobanteUrl || undefined, notas: "Inscripción", fecha_pago_real: formData.fecha_pago,
+          codigo_billete: formData.codigo_billete || undefined,
         };
         if (useAutoApprove) {
           await pagosService.crearPagoAprobado(pagoData);
@@ -287,6 +288,7 @@ export default function MisPagosPage() {
             usuario_id: targetId, monto: getMontoByMetodo(formData.metodo_pago, "mensual"),
             mes_pagar: mes, anio_pagar: anio,             metodo_pago: formData.metodo_pago, tipo_pago: "membresia" as TipoPago,
             comprobante_url: comprobanteUrl || undefined, notas: formData.notas || undefined, fecha_pago_real: formData.fecha_pago,
+            codigo_billete: formData.codigo_billete || undefined,
           };
           if (useAutoApprove) {
             await pagosService.crearPagoAprobado(pagoData);

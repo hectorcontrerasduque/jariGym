@@ -71,6 +71,17 @@ export class PagosService {
       .single();
 
     if (error) throw error;
+
+    if (data.tipo_pago === "inscripcion") {
+      await this.supabase
+        .from("profiles")
+        .update({
+          inscripcion_pagada: true,
+          inscripcion_fecha: new Date().toISOString().split("T")[0],
+        })
+        .eq("id", data.usuario_id);
+    }
+
     return data as Pago;
   }
 
@@ -214,6 +225,17 @@ export class PagosService {
       .single();
 
     if (error) throw error;
+
+    if (data.tipo_pago === "inscripcion") {
+      await this.supabase
+        .from("profiles")
+        .update({
+          inscripcion_pagada: true,
+          inscripcion_fecha: new Date().toISOString().split("T")[0],
+        })
+        .eq("id", data.usuario_id);
+    }
+
     return data;
   }
 

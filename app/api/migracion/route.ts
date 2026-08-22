@@ -130,6 +130,16 @@ export async function POST(request: Request) {
       .eq("email", email)
       .maybeSingle();
 
+    // Calculate fecha_inscripcion from first pagado record
+    const sortedForInsc = [...migrablesRecords].sort((a: any, b: any) => {
+      if (a.anio_pagar !== b.anio_pagar) return a.anio_pagar - b.anio_pagar;
+      return a.mes_pagar - b.mes_pagar;
+    });
+    const firstPagadoInsc = sortedForInsc.find((r: any) => r.estado === "pagado");
+    const fechaInscripcionCalc = firstPagadoInsc
+      ? `${firstPagadoInsc.anio_pagar}-${String(firstPagadoInsc.mes_pagar).padStart(2, "0")}-01`
+      : `${new Date().getFullYear()}-01-01`;
+
     if (existingProfile) {
       userId = existingProfile.id;
       // Update existing profile with latest data from migration form
@@ -141,6 +151,7 @@ export async function POST(request: Request) {
           email,
           registered: true,
           activo: true,
+          fecha_inscripcion: fechaInscripcionCalc,
         })
         .eq("id", userId);
     } else {
@@ -161,7 +172,7 @@ export async function POST(request: Request) {
           role: "miembro",
           activo: true,
           registered: true,
-          fecha_inscripcion: "2026-01-01",
+          fecha_inscripcion: fechaInscripcionCalc,
           inscripcion_pagada: false,
         });
         isNewUser = true;
@@ -197,7 +208,7 @@ export async function POST(request: Request) {
           role: "miembro" as const,
           activo: true,
           registered: true,
-          fecha_inscripcion: "2026-01-01",
+          fecha_inscripcion: fechaInscripcionCalc,
           inscripcion_pagada: false,
         };
 
@@ -218,9 +229,29 @@ export async function POST(request: Request) {
     let pagosCreados = 0;
     let pagosActualizados = 0;
 
-    for (const record of migrablesRecords) {
-      if (record.estado !== "pagado" && record.estado !== "suspendido") continue;
+    // Sort records by year and month
+    const sortedRecords = [...migrablesRecords].sort((a: any, b: any) => {
+      if (a.anio_pagar !== b.anio_pagar) return a.anio_pagar - b.anio_pagar;
+      return a.mes_pagar - b.mes_pagar;
+    });
 
+    // Determine which records to process:
+    // - All "pagado" records → aprobado
+    // - "suspendido" records that come AFTER the first "pagado" → suspendido
+    // - "suspendido" records BEFORE the first "pagado" → skip (consecutive suspended at start)
+    let foundFirstPagado = false;
+    const recordsToProcess: any[] = [];
+    for (const record of sortedRecords) {
+      if (record.estado === "pagado") {
+        foundFirstPagado = true;
+        recordsToProcess.push(record);
+      } else if (record.estado === "suspendido" && foundFirstPagado) {
+        recordsToProcess.push(record);
+      }
+      // If suspendido and !foundFirstPagado → skip (consecutive suspended at start)
+    }
+
+    for (const record of recordsToProcess) {
       const pagoEstado = record.estado === "pagado" ? "aprobado" : "suspendido";
 
       const { data: existingPago } = await supabase

@@ -50,6 +50,7 @@ function LoginForm() {
   const [migPassword, setMigPassword] = useState("");
   const [migPasswordConfirm, setMigPasswordConfirm] = useState("");
   const [migEmailExists, setMigEmailExists] = useState(false);
+  const [hasPendingMigration, setHasPendingMigration] = useState(true);
   const [migIsExistingUser, setMigIsExistingUser] = useState(false);
 
   useEffect(() => {
@@ -80,6 +81,16 @@ function LoginForm() {
       if (config?.dueno_email) setGymOwnerEmail(config.dueno_email);
       if (config?.logo_url) setGymLogo(config.logo_url);
     }).catch(() => {});
+
+    // Check if there are pending migration records
+    createClient()
+      .from("migracion")
+      .select("id", { count: "exact", head: true })
+      .eq("migrado", "no")
+      .then(({ count }) => {
+        setHasPendingMigration((count || 0) > 0);
+      })
+      .catch(() => setHasPendingMigration(false));
   }, [searchParams]);
 
   const isAuthorizedUser = async (userEmail: string, userId: string): Promise<boolean> => {
@@ -332,13 +343,15 @@ function LoginForm() {
             <Input type="email" placeholder="tu@email.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
             <PasswordInput placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required />
             <div className="flex justify-between items-center">
-              <button
-                type="button"
-                onClick={() => { resetMigrateForm(); setShowMigrateForm(true); }}
-                className="text-xs text-gym-primary hover:text-gym-primary/80 transition-colors"
-              >
-                {messages.migracion.linkText}
-              </button>
+              {hasPendingMigration && (
+                <button
+                  type="button"
+                  onClick={() => { resetMigrateForm(); setShowMigrateForm(true); }}
+                  className="text-xs text-gym-primary hover:text-gym-primary/80 transition-colors"
+                >
+                  {messages.migracion.linkText}
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => { setShowResetForm(true); setResetEmail(email); }}

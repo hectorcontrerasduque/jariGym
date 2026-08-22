@@ -7,7 +7,6 @@ import { notificacionesService } from "@/lib/services/notificaciones/notificacio
 import { configService } from "@/lib/services/config/config.service";
 import {
   Save,
-  Bell,
   Users,
   Clock,
   BarChart3,
@@ -75,10 +74,6 @@ export default function NotificacionesPage() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleToggleGlobal = (enabled: boolean) => {
-    setGymConfig({ ...gymConfig, notificaciones_enabled: enabled });
   };
 
   const handleToggleConfig = (id: string, field: string, value: boolean) => {
@@ -170,31 +165,6 @@ export default function NotificacionesPage() {
           {messages.notificaciones.guardar}
         </Button>
       </div>
-
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-10 h-10 bg-gym-primary/20 rounded-xl flex items-center justify-center">
-                <Bell className="w-5 h-5 text-gym-primary" />
-              </div>
-              <div>
-                <p className="font-medium text-gym-text">{messages.notificaciones.switchGlobal}</p>
-                <p className="text-sm text-gym-muted">{messages.notificaciones.switchGlobalDesc}</p>
-              </div>
-            </div>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                className="sr-only peer"
-                checked={gymConfig.notificaciones_enabled || false}
-                onChange={(e) => handleToggleGlobal(e.target.checked)}
-              />
-              <div className="w-11 h-6 bg-gym-surface peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-gym-primary rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-gym-primary"></div>
-            </label>
-          </div>
-        </CardContent>
-      </Card>
 
       {configs.map((config) => {
         const info = tipoLabels[config.tipo_notificacion];

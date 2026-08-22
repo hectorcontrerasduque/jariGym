@@ -30,7 +30,7 @@ function getTipoLabel(pago: Pago): string {
 
 export default function PagosPage() {
   const [pagos, setPagos] = useState<Pago[]>([]);
-  const [filtro, setFiltro] = useState<string>("pendiente");
+  const [filtro, setFiltro] = useState<string>("todos");
   const [loading, setLoading] = useState(true);
   const [selectedPago, setSelectedPago] = useState<Pago | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
@@ -167,7 +167,7 @@ export default function PagosPage() {
             <select
               value={anioSeleccionado}
               onChange={(e) => setAnioSeleccionado(Number(e.target.value))}
-              className="px-3 py-2 bg-gym-surface border border-gym-border rounded-xl text-gym-text text-sm focus:outline-none focus:ring-2 focus:ring-gym-primary"
+              className="px-3 py-2 bg-gym-primary/10 border border-gym-primary/30 rounded-xl text-gym-text text-sm font-medium focus:outline-none focus:ring-2 focus:ring-gym-primary"
             >
               {anios.map((a) => (
                 <option key={a} value={a}>{a}</option>
@@ -176,7 +176,7 @@ export default function PagosPage() {
             <select
               value={mesSeleccionado}
               onChange={(e) => setMesSeleccionado(Number(e.target.value))}
-              className="px-3 py-2 bg-gym-surface border border-gym-border rounded-xl text-gym-text text-sm focus:outline-none focus:ring-2 focus:ring-gym-primary"
+              className="px-3 py-2 bg-gym-primary/10 border border-gym-primary/30 rounded-xl text-gym-text text-sm font-medium focus:outline-none focus:ring-2 focus:ring-gym-primary"
             >
               {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
                 <option key={m} value={m}>{getMonthName(m)}</option>

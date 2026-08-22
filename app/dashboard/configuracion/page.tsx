@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { configService, METODOS_PAGO_DEFAULT } from "@/lib/services/config/config.service";
 import { createClient } from "@/lib/supabase/client";
-import { Save, Building2, User, CreditCard, Clock, Globe, Upload, Dumbbell, Trash2 } from "lucide-react";
+import { Save, Building2, User, CreditCard, Clock, Globe, Upload, Dumbbell, Trash2, Bell } from "lucide-react";
 import { showToast } from "@/components/ui/toast";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { messages } from "@/lib/messages";
@@ -361,6 +361,35 @@ export default function ConfiguracionPage() {
               </select>
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Notificaciones */}
+      <Card className="neon-card relative z-10">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Bell className="w-5 h-5 text-gym-warning" /> Notificaciones
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-medium text-gym-text">Notificaciones Automáticas</p>
+              <p className="text-sm text-gym-muted">Enviar emails de deudas, recordatorios y resúmenes</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setConfig({ ...config, notificaciones_enabled: !config.notificaciones_enabled })}
+              className={`w-11 h-6 rounded-full flex items-center px-1 transition-all ${
+                config.notificaciones_enabled ? "bg-gym-primary justify-end" : "bg-gym-surface justify-start"
+              }`}
+            >
+              <div className={`w-5 h-5 rounded-full transition-all ${config.notificaciones_enabled ? "bg-white" : "bg-gym-border"}`} />
+            </button>
+          </div>
+          {config.notificaciones_enabled && (
+            <p className="text-xs text-gym-muted">Configura los detalles en <a href="/dashboard/configuracion/notificaciones" className="text-gym-primary hover:underline">Config Notificaciones</a></p>
+          )}
         </CardContent>
       </Card>
 

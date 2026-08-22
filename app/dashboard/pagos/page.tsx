@@ -358,7 +358,7 @@ export default function PagosPage() {
               <p className="text-sm text-gym-muted">Método</p>
               <p className="text-gym-text">{metodoLabels[selectedPago.metodo_pago]}</p>
             </div>
-            {selectedPago.codigo_billete && (
+            {selectedPago.codigo_billete && selectedPago.metodo_pago === "efectivo" && (
               <div>
                 <p className="text-sm text-gym-muted">Código billete</p>
                 <p className="text-gym-text font-mono">{selectedPago.codigo_billete}</p>

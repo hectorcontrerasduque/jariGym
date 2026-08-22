@@ -83,14 +83,10 @@ function LoginForm() {
     }).catch(() => {});
 
     // Check if there are pending migration records
-    createClient()
-      .from("migracion")
-      .select("id", { count: "exact", head: true })
-      .eq("migrado", "no")
-      .then(({ count, error }) => {
-        if (error) setHasPendingMigration(false);
-        else setHasPendingMigration((count || 0) > 0);
-      });
+    fetch("/api/migracion/pending")
+      .then((res) => res.json())
+      .then(({ pending }) => setHasPendingMigration(pending))
+      .catch(() => setHasPendingMigration(false));
   }, [searchParams]);
 
   const isAuthorizedUser = async (userEmail: string, userId: string): Promise<boolean> => {

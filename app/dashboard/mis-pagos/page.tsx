@@ -302,7 +302,7 @@ export default function MisPagosPage() {
       if (isSuperAdmin) {
         router.push("/dashboard/pagos");
       } else {
-        setShowForm(false);
+        setShowForm(true);
         setSubmitted(false);
         setFormData({ meses: [], metodo_pago: "efectivo", codigo_billete: "", notas: "", pagar_inscripcion: false, pagar_mensualidad: false, fecha_pago: new Date().toISOString().split("T")[0] });
         setComprobante(null);

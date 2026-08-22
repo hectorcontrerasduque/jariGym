@@ -23,6 +23,7 @@ export async function POST(request: Request) {
 
     const nombre = nombreCompleto.trim().toUpperCase();
     const email = correo.toLowerCase().trim();
+    const profileNombre = selectedNombre ? selectedNombre.trim().toUpperCase() : nombre;
 
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -146,7 +147,7 @@ export async function POST(request: Request) {
       await supabase
         .from("profiles")
         .update({
-          nombre_completo: nombre,
+          nombre_completo: profileNombre,
           whatsapp,
           email,
           registered: true,
@@ -167,7 +168,7 @@ export async function POST(request: Request) {
         await supabase.from("profiles").insert({
           id: userId,
           email,
-          nombre_completo: nombre,
+          nombre_completo: profileNombre,
           whatsapp,
           role: "miembro",
           activo: true,
@@ -182,7 +183,7 @@ export async function POST(request: Request) {
           email,
           password,
           email_confirm: false,
-          user_metadata: { nombre_completo: nombre },
+          user_metadata: { nombre_completo: profileNombre },
         });
 
         if (authError) {
@@ -203,7 +204,7 @@ export async function POST(request: Request) {
 
         const profileFields = {
           email,
-          nombre_completo: nombre,
+          nombre_completo: profileNombre,
           whatsapp,
           role: "miembro" as const,
           activo: true,

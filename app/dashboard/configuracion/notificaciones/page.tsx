@@ -33,7 +33,7 @@ const tipoLabels: Record<string, { label: string; icon: React.ReactNode; desc: s
     desc: "Avisa antes de que venza la membresia",
   },
   resumen_dueno: {
-    label: "Resumen al Dueno",
+    label: "Resumen al Propietario",
     icon: <BarChart3 className="w-5 h-5 text-blue-500" />,
     desc: "Resumen de pagos para el propietario",
   },
@@ -44,7 +44,7 @@ const tipoLabels: Record<string, { label: string; icon: React.ReactNode; desc: s
   },
 };
 
-const mesesNombres = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+const mesesNombres = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
 
 export default function NotificacionesPage() {
   const [gymConfig, setGymConfig] = useState<Partial<GymConfig>>({});

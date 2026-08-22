@@ -451,7 +451,7 @@ export default function MisPagosPage() {
             <CardTitle className="flex items-center gap-2 text-base">
               <Plus className="w-5 h-5 text-gym-primary" />
               {miembroSeleccionado ? `Pago para ${miembroSeleccionado.nombre_completo}` : "Guardar pago"}
-              {!miembroSeleccionado && <Badge variant="success" className="text-[10px] ml-1">Auto-aprobado</Badge>}
+              {!miembroSeleccionado && isAdmin && <Badge variant="success" className="text-[10px] ml-1">Auto-aprobado</Badge>}
             </CardTitle>
           </CardHeader>
           <CardContent>

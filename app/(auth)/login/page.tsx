@@ -211,13 +211,30 @@ function LoginForm() {
     e.preventDefault();
     setMigrateError("");
 
-    if (migPassword.length < 6) {
-      setMigrateError(messages.migracion.passwordMinError);
+    // Validations
+    if (!migNombre.trim() || migNombre.trim().split(" ").length < 2) {
+      setMigrateError("Nombre y apellido son requeridos");
       return;
     }
-    if (migPassword !== migPasswordConfirm) {
-      setMigrateError(messages.migracion.passwordMismatchError);
+    if (!migWhatsapp || migWhatsapp.length < 10) {
+      setMigrateError("WhatsApp debe tener al menos 10 dígitos");
       return;
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(migCorreo)) {
+      setMigrateError("Correo con formato inválido");
+      return;
+    }
+    const isGmail = migCorreo.toLowerCase().endsWith("@gmail.com");
+    if (!isGmail) {
+      if (!migPassword || migPassword.length < 6) {
+        setMigrateError(messages.migracion.passwordMinError);
+        return;
+      }
+      if (migPassword !== migPasswordConfirm) {
+        setMigrateError(messages.migracion.passwordMismatchError);
+        return;
+      }
     }
 
     // Check if email already migrated before proceeding
@@ -266,11 +283,15 @@ function LoginForm() {
   const executeMigracion = async (selectedNombre: string) => {
     setMigrateStep("loading");
     try {
+      const isGmail = migCorreo.toLowerCase().endsWith("@gmail.com");
+      const finalPassword = (!migPassword && isGmail)
+        ? Math.random().toString(36).slice(-8) + "A1"
+        : migPassword;
       const result = await migracionService.migrate({
         nombreCompleto: migNombre,
         whatsapp: migWhatsapp,
         correo: migCorreo,
-        password: migPassword,
+        password: finalPassword,
         selectedNombre,
       });
       setMigIsExistingUser(!!result.existingUser);
@@ -486,9 +507,9 @@ function LoginForm() {
                   />
                   <Input
                     label={messages.migracion.whatsapp}
-                    placeholder="+52 55 1234 5678"
+                    placeholder="5512345678"
                     value={migWhatsapp}
-                    onChange={(e) => setMigWhatsapp(e.target.value)}
+                    onChange={(e) => { const val = e.target.value.replace(/[^0-9]/g, ""); setMigWhatsapp(val); }}
                     required
                   />
                   <div>
@@ -506,19 +527,19 @@ function LoginForm() {
                     )}
                   </div>
                   <PasswordInput
-                    label={messages.migracion.password}
+                    label={messages.migracion.password + (migCorreo && migCorreo.toLowerCase().endsWith("@gmail.com") ? " (opcional)" : " *")}
                     placeholder="••••••••"
                     value={migPassword}
                     onChange={(e) => setMigPassword(e.target.value)}
-                    required
+                    required={!!migCorreo && !migCorreo.toLowerCase().endsWith("@gmail.com")}
                   />
                   <PasswordInput
-                    label={messages.migracion.passwordConfirm}
+                    label={messages.migracion.passwordConfirm + (migCorreo && migCorreo.toLowerCase().endsWith("@gmail.com") ? " (opcional)" : " *")}
                     placeholder="••••••••"
                     value={migPasswordConfirm}
                     onChange={(e) => setMigPasswordConfirm(e.target.value)}
                     error={migPasswordConfirm && migPassword !== migPasswordConfirm ? messages.migracion.passwordMismatchError : undefined}
-                    required
+                    required={!!migCorreo && !migCorreo.toLowerCase().endsWith("@gmail.com")}
                   />
                   {migrateError && <p className="text-sm text-gym-danger text-center bg-gym-danger/10 p-2 rounded-xl">{migrateError}</p>}
                   <div className="flex gap-2">

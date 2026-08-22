@@ -32,7 +32,29 @@ export class NotificacionesService {
 
   // ─── CONFIG POR TIPO ──────────────────────────
 
+  private defaultConfigs = [
+    { tipo_notificacion: "miembros_deudores", habilitado: true, frecuencia_semanal: true, frecuencia_quincenal: false, frecuencia_mensual: false, dias_previo: 7, notificar_por_email: true, notificar_por_whatsapp: false },
+    { tipo_notificacion: "recordatorio_pago", habilitado: true, frecuencia_semanal: false, frecuencia_quincenal: true, frecuencia_mensual: false, dias_previo: 7, notificar_por_email: true, notificar_por_whatsapp: false },
+    { tipo_notificacion: "resumen_dueno", habilitado: true, frecuencia_semanal: true, frecuencia_quincenal: false, frecuencia_mensual: false, dias_previo: 7, notificar_por_email: true, notificar_por_whatsapp: false },
+    { tipo_notificacion: "estatus_sistema", habilitado: true, frecuencia_semanal: false, frecuencia_quincenal: false, frecuencia_mensual: true, dias_previo: 7, notificar_por_email: true, notificar_por_whatsapp: false },
+  ];
+
+  async ensureDefaultConfigs(): Promise<void> {
+    const { data: existing } = await this.supabase
+      .from("notificacion_config")
+      .select("id")
+      .limit(1);
+
+    if (existing && existing.length > 0) return;
+
+    const { error } = await this.supabase
+      .from("notificacion_config")
+      .insert(this.defaultConfigs);
+    if (error) throw error;
+  }
+
   async getNotificacionesConfig(): Promise<NotificacionConfig[]> {
+    await this.ensureDefaultConfigs();
     const { data, error } = await this.supabase
       .from("notificacion_config")
       .select("*")

@@ -80,6 +80,18 @@ export default function ConfiguracionPage() {
     }
   };
 
+  const handleToggleNotificaciones = async () => {
+    const newValue = !config.notificaciones_enabled;
+    setConfig({ ...config, notificaciones_enabled: newValue });
+    try {
+      await configService.updateConfig({ notificaciones_enabled: newValue } as Partial<GymConfig>);
+      showToast(messages.toast.configuracionGuardada, "success");
+    } catch {
+      setConfig({ ...config, notificaciones_enabled: !newValue });
+      showToast(messages.toast.configuracionError, "error");
+    }
+  };
+
   const handleSaveConfig = async () => {
     const enabledMetodos = metodos.filter((m) => m.habilitado);
     const hasPositiveAmount = enabledMetodos.some(
@@ -379,7 +391,7 @@ export default function ConfiguracionPage() {
             </div>
             <button
               type="button"
-              onClick={() => setConfig({ ...config, notificaciones_enabled: !config.notificaciones_enabled })}
+              onClick={handleToggleNotificaciones}
               className={`w-11 h-6 rounded-full flex items-center px-1 transition-all ${
                 config.notificaciones_enabled ? "bg-gym-primary justify-end" : "bg-gym-surface justify-start"
               }`}

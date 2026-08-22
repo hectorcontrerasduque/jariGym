@@ -253,6 +253,16 @@ function PerfilContent() {
               placeholder="V-12345678"
             />
           </div>
+          {profile?.fecha_inscripcion && (
+            <div>
+              <label className="text-xs text-gym-muted mb-1 block">Fecha de inscripción</label>
+              <Input
+                value={formatDate(profile.fecha_inscripcion)}
+                readOnly
+                className="bg-gym-bg/50 cursor-not-allowed"
+              />
+            </div>
+          )}
           <div>
             <label className="text-xs text-gym-muted mb-1 block">Horario posible a entrenar (opcional)</label>
             <Input
@@ -292,16 +302,6 @@ function PerfilContent() {
               </>
             )}
           </div>
-          {profile.fecha_inscripcion && (
-            <div className="mt-3">
-              <label className="text-xs text-gym-muted mb-1 block">Fecha de inscripción</label>
-              <Input
-                value={formatDate(profile.fecha_inscripcion)}
-                readOnly
-                className="bg-gym-bg/50 cursor-not-allowed"
-              />
-            </div>
-          )}
         </CardContent>
       </Card>
 

@@ -87,10 +87,10 @@ function LoginForm() {
       .from("migracion")
       .select("id", { count: "exact", head: true })
       .eq("migrado", "no")
-      .then(({ count }) => {
-        setHasPendingMigration((count || 0) > 0);
-      })
-      .catch(() => setHasPendingMigration(false));
+      .then(({ count, error }) => {
+        if (error) setHasPendingMigration(false);
+        else setHasPendingMigration((count || 0) > 0);
+      });
   }, [searchParams]);
 
   const isAuthorizedUser = async (userEmail: string, userId: string): Promise<boolean> => {

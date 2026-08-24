@@ -415,13 +415,15 @@ export default function DashboardPage() {
       </Card>
 
       {/* Distribución por hora de entrenamiento */}
-      {hourEntries.length > 0 && (
-        <details open={!collapseDistHoras} onToggle={(e) => setCollapseDistHoras(!(e.target as HTMLDetailsElement).open)} className="neon-card relative z-10 rounded-2xl border border-gym-border bg-gym-surface">
-          <summary className="p-6 cursor-pointer select-none list-none flex items-center gap-2 font-semibold text-lg text-gym-text [&::-webkit-details-marker]:hidden">
-            {collapseDistHoras ? <ChevronRight className="w-5 h-5 text-gym-primary" /> : <ChevronDown className="w-5 h-5 text-gym-primary" />}
-            Distribución por hora
-          </summary>
-          <div className="px-6 pb-6">
+      <details open={!collapseDistHoras} onToggle={(e) => setCollapseDistHoras(!(e.target as HTMLDetailsElement).open)} className="neon-card relative z-10 rounded-2xl border border-gym-border bg-gym-surface">
+        <summary className="p-6 cursor-pointer select-none list-none flex items-center gap-2 font-semibold text-lg text-gym-text [&::-webkit-details-marker]:hidden">
+          {collapseDistHoras ? <ChevronRight className="w-5 h-5 text-gym-primary" /> : <ChevronDown className="w-5 h-5 text-gym-primary" />}
+          Distribución por hora
+        </summary>
+        <div className="px-6 pb-6">
+          {hourEntries.length === 0 ? (
+            <p className="text-center text-gym-muted py-6">Sin datos de horarios — configura hora de llegada y salida en los perfiles de los miembros</p>
+          ) : (
             <div className="space-y-2">
               {hourEntries.map(([hour, count]) => (
                 <div key={hour} className="flex items-center gap-3">
@@ -436,9 +438,9 @@ export default function DashboardPage() {
                 </div>
               ))}
             </div>
-          </div>
-        </details>
-      )}
+          )}
+        </div>
+      </details>
     </div>
   );
 }

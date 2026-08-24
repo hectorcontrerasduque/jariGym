@@ -119,6 +119,7 @@ export default function NotificacionesPage() {
   };
 
   const handleEjecutarAhora = async () => {
+    if (!confirm("¿Ejecutar notificaciones ahora? Se enviarán los correos pendientes según la frecuencia configurada.")) return;
     setExecuting(true);
     try {
       const resultado = await notificacionesService.procesarTodasLasNotificaciones();
@@ -153,6 +154,7 @@ export default function NotificacionesPage() {
   };
 
   const handleDiagnostico = async () => {
+    if (!confirm("¿Enviar diagnóstico? Se enviará un correo de prueba con el estado del sistema.")) return;
     setDiagnosticing(true);
     try {
       await notificacionesService.ejecutarDiagnostico();
@@ -318,7 +320,7 @@ export default function NotificacionesPage() {
                 <Play className="w-4 h-4 mr-2" />
                 {messages.notificaciones.ejecutarAhora}
               </Button>
-              <Button onClick={handleDiagnostico} loading={diagnosticing} variant="secondary" className="flex-1">
+              <Button onClick={handleDiagnostico} loading={diagnosticing} className="flex-1">
                 <Stethoscope className="w-4 h-4 mr-2" />
                 {messages.notificaciones.diagnostico}
               </Button>

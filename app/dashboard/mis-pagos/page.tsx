@@ -9,7 +9,7 @@ import { pagosService } from "@/lib/services/pagos/pagos.service";
 import { configService } from "@/lib/services/config/config.service";
 import { createClient } from "@/lib/supabase/client";
 import { formatCurrency, getMonthName } from "@/lib/utils";
-import { CreditCard, CheckCircle, Clock, Calendar, Trash2, FileText, Plus, Search, User, DollarSign, Upload, Send, Gift, AlertTriangle, ChevronDown, X, Save } from "lucide-react";
+import { CreditCard, CheckCircle, Clock, Calendar, Trash2, FileText, Plus, Search, User, DollarSign, Upload, Send, Gift, AlertTriangle, ChevronDown, ChevronRight, X, Save } from "lucide-react";
 import { showToast } from "@/components/ui/toast";
 import { messages } from "@/lib/messages";
 import { Avatar } from "@/components/ui/avatar";
@@ -67,9 +67,11 @@ export default function MisPagosPage() {
     notas: "",
     pagar_inscripcion: false,
     pagar_mensualidad: false,
+    solicitar_suspension: false,
     fecha_pago: new Date().toISOString().split("T")[0],
   });
   const [comprobante, setComprobante] = useState<File | null>(null);
+  const [showPagosRealizados, setShowPagosRealizados] = useState(false);
 
   const loadData = useCallback(async () => {
     try {
@@ -179,29 +181,26 @@ export default function MisPagosPage() {
     setMiembroSeleccionado(m);
     setShowSearch(false);
     setMiembroSearch("");
-    setFormData({ meses: [], metodo_pago: "efectivo", codigo_billete: "", notas: "", pagar_inscripcion: false, pagar_mensualidad: false, fecha_pago: new Date().toISOString().split("T")[0] });
+    setFormData({ meses: [], metodo_pago: "efectivo", codigo_billete: "", notas: "", pagar_inscripcion: false, pagar_mensualidad: false, solicitar_suspension: false, fecha_pago: new Date().toISOString().split("T")[0] });
   };
 
   const toggleMonth = (mes: number, anio: number) => {
     setFormData(prev => {
       const existe = prev.meses.some(m => m.mes === mes && m.anio === anio);
+      const source = prev.solicitar_suspension ? mesesParaSuspender : mesesDisponiblesParaPagar;
       if (existe) {
-        const idx = mesesPendientes.findIndex(m => m.mes === mes && m.anio === anio);
+        const idx = source.findIndex(m => m.mes === mes && m.anio === anio);
         const nuevosMeses = prev.meses.filter(m => {
-          const mIdx = mesesPendientes.findIndex(sp => sp.mes === m.mes && sp.anio === m.anio);
+          const mIdx = source.findIndex(sp => sp.mes === m.mes && sp.anio === m.anio);
           return mIdx < idx;
         });
         return { ...prev, meses: nuevosMeses, pagar_mensualidad: nuevosMeses.length > 0 };
       } else {
-        const idx = mesesPendientes.findIndex(m => m.mes === mes && m.anio === anio);
-        const nuevosMeses = mesesPendientes.slice(0, idx + 1);
-        return { ...prev, meses: nuevosMeses, pagar_mensualidad: true };
+        const idx = source.findIndex(m => m.mes === mes && m.anio === anio);
+        const nuevosMeses = source.slice(0, idx + 1);
+        return { ...prev, meses: nuevosMeses, pagar_mensualidad: !prev.solicitar_suspension && nuevosMeses.length > 0 };
       }
     });
-  };
-
-  const selectAllMonths = () => {
-    setFormData(prev => ({ ...prev, meses: [...mesesPendientes], pagar_mensualidad: true }));
   };
 
   const getMontoByMetodo = useCallback((metodo: MetodoPago, tipo: "mensual" | "inscripcion"): number => {
@@ -230,15 +229,15 @@ export default function MisPagosPage() {
     e.preventDefault();
     setSubmitted(true);
 
-    if (!formData.pagar_inscripcion && !formData.pagar_mensualidad) {
+    if (!formData.pagar_inscripcion && !formData.pagar_mensualidad && !formData.solicitar_suspension) {
       setTimeout(() => msgConceptoRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 100);
       return;
     }
-    if (formData.pagar_mensualidad && formData.meses.length === 0) {
+    if ((formData.pagar_mensualidad || formData.solicitar_suspension) && formData.meses.length === 0) {
       setTimeout(() => msgMesesRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 100);
       return;
     }
-    if (montoTotal === 0) return;
+    if (!formData.solicitar_suspension && montoTotal === 0) return;
 
     setSavingPago(true);
     try {
@@ -248,6 +247,18 @@ export default function MisPagosPage() {
 
       const targetId = miembroSeleccionado?.id || user.id;
       const isSelf = !miembroSeleccionado || miembroSeleccionado.id === user.id;
+
+      // Handle suspension request
+      if (formData.solicitar_suspension) {
+        if (formData.meses.length === 0) {
+          throw new Error("Selecciona al menos un mes para solicitar suspensión");
+        }
+        await pagosService.crearPagoSuspendido(targetId, formData.meses, formData.notas || undefined);
+        showToast(messages.misPagos.solicitudEnviada, "success");
+        setFormData({ meses: [], metodo_pago: "efectivo", codigo_billete: "", notas: "", pagar_inscripcion: false, pagar_mensualidad: false, solicitar_suspension: false, fecha_pago: new Date().toISOString().split("T")[0] });
+        await loadData();
+        return;
+      }
 
       if (!formData.pagar_inscripcion && !formData.pagar_mensualidad) {
         throw new Error("Selecciona al menos inscripción o mensualidad");
@@ -304,9 +315,10 @@ export default function MisPagosPage() {
       } else {
         setShowForm(true);
         setSubmitted(false);
-        setFormData({ meses: [], metodo_pago: "efectivo", codigo_billete: "", notas: "", pagar_inscripcion: false, pagar_mensualidad: false, fecha_pago: new Date().toISOString().split("T")[0] });
+        setFormData({ meses: [], metodo_pago: "efectivo", codigo_billete: "", notas: "", pagar_inscripcion: false, pagar_mensualidad: false, solicitar_suspension: false, fecha_pago: new Date().toISOString().split("T")[0] });
         setComprobante(null);
         await loadData();
+        await reloadPendientes();
       }
     } catch (err: any) {
       showToast(err.message || "Error al registrar pago", "error");
@@ -315,6 +327,20 @@ export default function MisPagosPage() {
     }
   };
 
+  const reloadPendientes = useCallback(async () => {
+    try {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const targetId = miembroSeleccionado?.id || user.id;
+      if (miembroSeleccionado) {
+        await loadMiembroPendientes(targetId, anioSeleccionado);
+      } else {
+        await loadSelfPendientes(targetId, anioSeleccionado);
+      }
+    } catch {}
+  }, [miembroSeleccionado, anioSeleccionado, loadMiembroPendientes, loadSelfPendientes]);
+
   const handleDelete = async (pagoId: string) => {
     if (!confirm(messages.pagos.eliminarPagoConfirm)) return;
     setDeleting(pagoId);
@@ -322,6 +348,7 @@ export default function MisPagosPage() {
       await pagosService.eliminarPago(pagoId);
       showToast(messages.toast.pagoEliminado, "success");
       await loadData();
+      await reloadPendientes();
     } catch (err: any) {
       showToast(err.message || messages.toast.pagoEliminadoError, "error");
     } finally {
@@ -341,6 +368,31 @@ export default function MisPagosPage() {
 
   const showInscriptionCheckbox = !inscripcionPagada && !inscripcionPendiente && gymConfig && getMontoByMetodo(formData.metodo_pago, "inscripcion") > 0;
 
+  const mesesConPagoPendiente = useMemo(() => {
+    return pagos
+      .filter(p => p.estado === "pendiente" || p.estado === "suspendido_pendiente")
+      .map(p => ({ mes: p.mes_pagar, anio: p.anio_pagar, estado: p.estado }));
+  }, [pagos]);
+
+  const mesesDisponiblesParaPagar = useMemo(() => {
+    const mesesConPago = new Set(
+      pagos
+        .filter(p => p.estado === "pendiente" || p.estado === "aprobado" || p.estado === "suspendido_pendiente")
+        .map(p => `${p.anio_pagar}-${p.mes_pagar}`)
+    );
+    return mesesPendientes.filter(m => !mesesConPago.has(`${m.anio}-${m.mes}`));
+  }, [mesesPendientes, pagos]);
+
+  const mesesParaSuspender = useMemo(() => {
+    const all: { mes: number; anio: number }[] = [...mesesPendientes];
+    for (const m of mesesConPagoPendiente) {
+      if (!all.some(x => x.mes === m.mes && x.anio === m.anio)) {
+        all.push({ mes: m.mes, anio: m.anio });
+      }
+    }
+    return all.sort((a, b) => a.anio - b.anio || a.mes - b.mes);
+  }, [mesesPendientes, mesesConPagoPendiente]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -351,7 +403,7 @@ export default function MisPagosPage() {
 
   return (
     <div className="space-y-4 animate-fadeIn">
-      <LoadingOverlay show={savingPago} message={messages.common.guardando} />
+      <LoadingOverlay show={savingPago || !!deleting} message={savingPago ? messages.common.guardando : messages.common.eliminando} />
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
@@ -472,7 +524,7 @@ export default function MisPagosPage() {
                         <input
                           type="checkbox"
                           checked={formData.pagar_inscripcion}
-                          onChange={(e) => setFormData({ ...formData, pagar_inscripcion: e.target.checked })}
+                          onChange={(e) => setFormData({ ...formData, pagar_inscripcion: e.target.checked, solicitar_suspension: false })}
                           className="w-5 h-5 rounded border-gym-border text-gym-primary focus:ring-gym-primary"
                         />
                         <div className="flex-1">
@@ -486,7 +538,7 @@ export default function MisPagosPage() {
                       <input
                         type="checkbox"
                         checked={formData.pagar_mensualidad}
-                        onChange={(e) => setFormData({ ...formData, pagar_mensualidad: e.target.checked })}
+                        onChange={(e) => setFormData({ ...formData, pagar_mensualidad: e.target.checked, solicitar_suspension: false })}
                         className="w-5 h-5 rounded border-gym-border text-gym-primary focus:ring-gym-primary"
                       />
                       <div className="flex-1">
@@ -495,8 +547,23 @@ export default function MisPagosPage() {
                       </div>
                       <Badge variant="primary">{formData.meses.length} meses</Badge>
                     </label>
+                    {mesesParaSuspender.length > 0 && (
+                      <label className="flex items-center gap-3 p-3 bg-gym-bg rounded-xl cursor-pointer hover:bg-gym-surface transition-colors">
+                        <input
+                          type="checkbox"
+                          checked={formData.solicitar_suspension}
+                          onChange={(e) => setFormData({ ...formData, solicitar_suspension: e.target.checked, pagar_inscripcion: false, pagar_mensualidad: false })}
+                          className="w-5 h-5 rounded border-gym-border text-gym-primary focus:ring-gym-primary"
+                        />
+                        <div className="flex-1">
+                          <p className="font-medium text-gym-text">{messages.misPagos.solicitarSuspension}</p>
+                          <p className="text-xs text-gym-muted">{messages.misPagos.suspensionDescripcion}</p>
+                        </div>
+                        <Badge variant="warning">?</Badge>
+                      </label>
+                    )}
                   </div>
-                  {submitted && !formData.pagar_inscripcion && !formData.pagar_mensualidad && (
+                  {submitted && !formData.pagar_inscripcion && !formData.pagar_mensualidad && !formData.solicitar_suspension && (
                     <div ref={msgConceptoRef} className="flex items-center gap-2 mt-3 p-3 bg-gym-warning/10 border border-gym-warning/30 rounded-xl">
                       <AlertTriangle className="w-4 h-4 text-gym-warning flex-shrink-0" />
                       <p className="text-sm text-gym-warning">Debe seleccionar un concepto de pago</p>
@@ -505,12 +572,15 @@ export default function MisPagosPage() {
                 </div>
 
                 {/* Months selector */}
-                {formData.pagar_mensualidad && (
+                {(formData.pagar_mensualidad || formData.solicitar_suspension) && (
                   <div>
                     <div className="flex items-center justify-between mb-3">
                       <label className="text-sm font-medium text-gym-muted">Meses a pagar</label>
-                      {!loadingPendientes && mesesPendientes.length > 0 && (
-                        <Button type="button" variant="ghost" size="sm" onClick={selectAllMonths}>Seleccionar todos</Button>
+                      {!loadingPendientes && (formData.solicitar_suspension ? mesesParaSuspender : mesesDisponiblesParaPagar).length > 0 && (
+                        <Button type="button" variant="ghost" size="sm" onClick={() => {
+                          const lista = formData.solicitar_suspension ? mesesParaSuspender : mesesDisponiblesParaPagar;
+                          setFormData(prev => ({ ...prev, meses: [...lista], pagar_mensualidad: !formData.solicitar_suspension }));
+                        }}>Seleccionar todos</Button>
                       )}
                     </div>
                     {loadingPendientes ? (
@@ -518,7 +588,7 @@ export default function MisPagosPage() {
                         <div className="animate-spin w-6 h-6 border-2 border-gym-primary border-t-transparent rounded-full" />
                         <span className="ml-2 text-sm text-gym-muted">Cargando meses pendientes...</span>
                       </div>
-                    ) : mesesPendientes.length === 0 ? (
+                    ) : (formData.solicitar_suspension ? mesesParaSuspender : mesesDisponiblesParaPagar).length === 0 ? (
                       <div className="text-center py-8 bg-gym-bg rounded-xl">
                         <CheckCircle className="w-12 h-12 text-gym-success mx-auto mb-2 animate-pulse-glow" />
                         <p className="text-gym-muted font-medium">Sin deuda mensual</p>
@@ -526,7 +596,7 @@ export default function MisPagosPage() {
                       </div>
                     ) : (
                       <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                        {mesesPendientes.map(({ mes, anio }) => {
+                        {(formData.solicitar_suspension ? mesesParaSuspender : mesesDisponiblesParaPagar).map(({ mes, anio }) => {
                           const seleccionado = formData.meses.some(m => m.mes === mes && m.anio === anio);
                           return (
                             <button
@@ -549,7 +619,7 @@ export default function MisPagosPage() {
                       </div>
                     )}
                     <p className="text-xs text-gym-muted mt-2">{formData.meses.length} mes(es) seleccionados</p>
-                    {submitted && formData.meses.length === 0 && mesesPendientes.length > 0 && (
+                    {submitted && formData.meses.length === 0 && (formData.solicitar_suspension ? mesesParaSuspender : mesesDisponiblesParaPagar).length > 0 && (
                       <div ref={msgMesesRef} className="flex items-center gap-2 mt-3 p-3 bg-gym-warning/10 border border-gym-warning/30 rounded-xl">
                         <AlertTriangle className="w-4 h-4 text-gym-warning flex-shrink-0" />
                         <p className="text-sm text-gym-warning">Debe seleccionar mes(es) a pagar</p>
@@ -559,28 +629,30 @@ export default function MisPagosPage() {
                 )}
 
                 {/* Payment method */}
-                <div>
-                  <label className="block text-sm font-medium text-gym-muted mb-2">Método de pago</label>
-                  <div className="flex gap-2">
-                    {metodosPago.filter(m => m.habilitado || m.metodo_pago === "efectivo").map(m => (
-                      <button
-                        key={m.metodo_pago}
-                        type="button"
-                        onClick={() => setFormData({ ...formData, metodo_pago: m.metodo_pago })}
-                        className={`flex-1 p-2 rounded-xl text-sm font-medium transition-all ${
-                          formData.metodo_pago === m.metodo_pago
-                            ? "bg-gym-primary text-white"
-                            : "bg-gym-bg text-gym-muted border border-gym-border hover:border-gym-primary"
-                        }`}
-                      >
-                        {m.metodo_pago === "efectivo" ? "💵 Efectivo" : m.metodo_pago === "bs" ? "🇻🇪 Bs" : "🟡 Binance"}
-                      </button>
-                    ))}
+                {!formData.solicitar_suspension && (
+                  <div>
+                    <label className="block text-sm font-medium text-gym-muted mb-2">Método de pago</label>
+                    <div className="flex gap-2">
+                      {metodosPago.filter(m => m.habilitado || m.metodo_pago === "efectivo").map(m => (
+                        <button
+                          key={m.metodo_pago}
+                          type="button"
+                          onClick={() => setFormData({ ...formData, metodo_pago: m.metodo_pago })}
+                          className={`flex-1 p-2 rounded-xl text-sm font-medium transition-all ${
+                            formData.metodo_pago === m.metodo_pago
+                              ? "bg-gym-primary text-white"
+                              : "bg-gym-bg text-gym-muted border border-gym-border hover:border-gym-primary"
+                          }`}
+                        >
+                          {m.metodo_pago === "efectivo" ? "💵 Efectivo" : m.metodo_pago === "bs" ? "🇻🇪 Bs" : "🟡 Binance"}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* Bill code for cash */}
-                {formData.metodo_pago === "efectivo" && (
+                {!formData.solicitar_suspension && formData.metodo_pago === "efectivo" && (
                   <div>
                     <label className="block text-sm font-medium text-gym-muted mb-2">
                       <FileText className="w-4 h-4 inline mr-1" /> Código(s) del billete
@@ -595,7 +667,7 @@ export default function MisPagosPage() {
                 )}
 
                 {/* Comprobante for non-cash */}
-                {needsComprobante(formData.metodo_pago) && (
+                {!formData.solicitar_suspension && needsComprobante(formData.metodo_pago) && (
                   <div>
                     <label className="block text-sm font-medium text-gym-muted mb-2">Comprobante de pago</label>
                     <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-gym-border rounded-xl cursor-pointer hover:border-gym-primary transition-colors">
@@ -618,25 +690,35 @@ export default function MisPagosPage() {
                 </div>
 
                 {/* Date */}
-                <div>
-                  <label className="block text-sm font-medium text-gym-muted mb-2">
-                    <Calendar className="w-4 h-4 inline mr-1" /> Fecha de pago
-                  </label>
-                  <input
-                    type="date"
-                    value={formData.fecha_pago}
-                    onChange={(e) => setFormData({ ...formData, fecha_pago: e.target.value })}
-                    className="w-full px-4 py-2.5 bg-gym-bg border border-gym-border rounded-xl text-gym-text text-sm focus:outline-none focus:ring-2 focus:ring-gym-primary"
-                  />
-                </div>
+                {!formData.solicitar_suspension && (
+                  <div>
+                    <label className="block text-sm font-medium text-gym-muted mb-2">
+                      <Calendar className="w-4 h-4 inline mr-1" /> Fecha de pago
+                    </label>
+                    <input
+                      type="date"
+                      value={formData.fecha_pago}
+                      onChange={(e) => setFormData({ ...formData, fecha_pago: e.target.value })}
+                      className="w-full px-4 py-2.5 bg-gym-bg border border-gym-border rounded-xl text-gym-text text-sm focus:outline-none focus:ring-2 focus:ring-gym-primary"
+                    />
+                  </div>
+                )}
 
                 {/* Total */}
-                <div className="p-4 bg-gym-bg rounded-xl neon-border">
-                  <div className="flex items-center justify-between">
-                    <span className="text-gym-muted">Total a pagar:</span>
-                    <span className="text-2xl font-bold text-gym-text neon-text">{formatCurrency(montoTotal)}</span>
+                {!formData.solicitar_suspension && (
+                  <div className="p-4 bg-gym-bg rounded-xl neon-border">
+                    <div className="flex items-center justify-between">
+                      <span className="text-gym-muted">Total a pagar:</span>
+                      <span className="text-2xl font-bold text-gym-text neon-text">{formatCurrency(montoTotal)}</span>
+                    </div>
                   </div>
-                </div>
+                )}
+
+                {formData.solicitar_suspension && (
+                  <div className="p-4 bg-gym-warning/10 border border-gym-warning/30 rounded-xl">
+                    <p className="text-sm text-gym-warning">{messages.misPagos.seleccionarMesesSuspender}</p>
+                  </div>
+                )}
 
                 <div className="hidden sm:flex gap-2">
                   <Button type="button" variant="secondary" className="flex-1" onClick={() => setShowForm(false)}>
@@ -648,7 +730,7 @@ export default function MisPagosPage() {
                     loading={savingPago}
                   >
                     <Save className="w-4 h-4 mr-1" />
-                    Guardar
+                    {formData.solicitar_suspension ? messages.misPagos.enviarSolicitud : "Guardar"}
                   </Button>
                 </div>
               </form>
@@ -676,15 +758,29 @@ export default function MisPagosPage() {
 
       {/* Payment list */}
       <Card className="neon-card">
-        <CardHeader className="pb-2">
-          <CardTitle className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <CreditCard className="w-5 h-5 text-gym-primary" />
-              Pagos Realizados
-            </div>
-            <span className="text-sm font-normal text-gym-muted">{pagos.length} pago(s)</span>
-          </CardTitle>
-        </CardHeader>
+        <button
+          type="button"
+          onClick={() => setShowPagosRealizados(!showPagosRealizados)}
+          className="w-full"
+        >
+          <CardHeader className="pb-2 cursor-pointer">
+            <CardTitle className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <CreditCard className="w-5 h-5 text-gym-primary" />
+                Pagos Realizados
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-normal text-gym-muted">{pagos.length} pago(s)</span>
+                {showPagosRealizados ? (
+                  <ChevronDown className="w-4 h-4 text-gym-muted" />
+                ) : (
+                  <ChevronRight className="w-4 h-4 text-gym-muted" />
+                )}
+              </div>
+            </CardTitle>
+          </CardHeader>
+        </button>
+        {showPagosRealizados && (
         <CardContent>
           {pagos.length === 0 ? (
             <div className="text-center py-12">
@@ -704,7 +800,7 @@ export default function MisPagosPage() {
                           variant={pago.estado === "aprobado" ? "success" : pago.estado === "rechazado" ? "danger" : "warning"}
                           className="text-[10px] px-1.5 py-0 flex-shrink-0"
                         >
-                          {pago.estado === "aprobado" ? "Aprobado" : pago.estado === "rechazado" ? "Rechazado" : pago.estado === "suspendido" ? "Suspendido" : "Pendiente"}
+                          {pago.estado === "aprobado" ? "Aprobado" : pago.estado === "rechazado" ? "Rechazado" : pago.estado === "suspendido" ? "Suspendido" : pago.estado === "suspendido_pendiente" ? "Susp. Pendiente" : "Pendiente"}
                         </Badge>
                       </div>
                       <div className="flex items-center gap-2 text-[11px] text-gym-muted">
@@ -745,6 +841,7 @@ export default function MisPagosPage() {
             </div>
           )}
         </CardContent>
+        )}
       </Card>
 
       {/* Totals */}

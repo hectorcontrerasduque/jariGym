@@ -368,12 +368,6 @@ export default function MisPagosPage() {
 
   const showInscriptionCheckbox = !inscripcionPagada && !inscripcionPendiente && gymConfig && getMontoByMetodo(formData.metodo_pago, "inscripcion") > 0;
 
-  const mesesConPagoPendiente = useMemo(() => {
-    return pagos
-      .filter(p => p.estado === "pendiente" || p.estado === "suspendido_pendiente")
-      .map(p => ({ mes: p.mes_pagar, anio: p.anio_pagar, estado: p.estado }));
-  }, [pagos]);
-
   const mesesDisponiblesParaPagar = useMemo(() => {
     const mesesConPago = new Set(
       pagos

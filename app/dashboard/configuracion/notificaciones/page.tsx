@@ -185,7 +185,8 @@ export default function NotificacionesPage() {
         </CardContent>
       </Card>
 
-      {gymConfig.notificaciones_enabled && configs.map((config) => {
+      {gymConfig.notificaciones_enabled && <>
+      {configs.map((config) => {
         const info = tipoLabels[config.tipo_notificacion];
         return (
           <Card key={config.id}>
@@ -336,7 +337,7 @@ export default function NotificacionesPage() {
           )}
         </CardContent>
       </Card>
-      )}
+      </>}
 
       {/* Mobile floating save button */}
       <button

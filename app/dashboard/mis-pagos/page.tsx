@@ -257,6 +257,7 @@ export default function MisPagosPage() {
         showToast(messages.misPagos.solicitudEnviada, "success");
         setFormData({ meses: [], metodo_pago: "efectivo", codigo_billete: "", notas: "", pagar_inscripcion: false, pagar_mensualidad: false, solicitar_suspension: false, fecha_pago: new Date().toISOString().split("T")[0] });
         await loadData();
+        await reloadPendientes();
         return;
       }
 

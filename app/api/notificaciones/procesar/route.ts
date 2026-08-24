@@ -48,10 +48,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ ejecutadas: 0, enviados: 0, errores: 0 });
     }
 
-    const { data: configs } = await supabase
+    const body = await request.json().catch(() => ({}));
+    const tipoFiltro = body?.tipo;
+
+    let query = supabase
       .from("notificacion_config")
       .select("*")
       .eq("habilitado", true);
+    if (tipoFiltro) {
+      query = query.eq("tipo_notificacion", tipoFiltro);
+    }
+    const { data: configs } = await query;
 
     if (!configs || configs.length === 0) {
       return NextResponse.json({ ejecutadas: 0, enviados: 0, errores: 0 });

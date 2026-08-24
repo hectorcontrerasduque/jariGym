@@ -15,6 +15,7 @@ import {
   Stethoscope,
   CheckCircle,
   XCircle,
+  Send,
 } from "lucide-react";
 import { showToast } from "@/components/ui/toast";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
@@ -53,6 +54,7 @@ export default function NotificacionesPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [executing, setExecuting] = useState(false);
+  const [executingTipo, setExecutingTipo] = useState<string | null>(null);
   const [diagnosticing, setDiagnosticing] = useState(false);
 
   useEffect(() => {
@@ -64,7 +66,7 @@ export default function NotificacionesPage() {
       const [configData, configsData, historialData] = await Promise.all([
         configService.getConfig(),
         notificacionesService.getNotificacionesConfig(),
-        notificacionesService.getHistorial(20),
+        notificacionesService.getHistorial(4),
       ]);
       if (configData) setGymConfig(configData);
       setConfigs(configsData);
@@ -111,6 +113,11 @@ export default function NotificacionesPage() {
     }
   };
 
+  const refreshHistorial = async () => {
+    const historialData = await notificacionesService.getHistorial(4);
+    setHistorial(historialData);
+  };
+
   const handleEjecutarAhora = async () => {
     setExecuting(true);
     try {
@@ -120,11 +127,28 @@ export default function NotificacionesPage() {
       } else {
         showToast(messages.notificaciones.ejecutado, "success");
       }
-      loadData();
+      await refreshHistorial();
     } catch (error) {
       showToast(messages.notificaciones.errorEjecutar, "error");
     } finally {
       setExecuting(false);
+    }
+  };
+
+  const handleEjecutarTipo = async (tipo: string) => {
+    setExecutingTipo(tipo);
+    try {
+      const resultado = await notificacionesService.procesarTodasLasNotificaciones(tipo);
+      if (resultado.errores > 0) {
+        showToast(`${tipoLabels[tipo]?.label}: ${resultado.enviados} enviados (${resultado.errores} errores)`, "warning");
+      } else {
+        showToast(`${tipoLabels[tipo]?.label}: ${resultado.enviados} notificación(es) enviada(s)`, "success");
+      }
+      await refreshHistorial();
+    } catch (error) {
+      showToast(messages.notificaciones.errorEjecutar, "error");
+    } finally {
+      setExecutingTipo(null);
     }
   };
 
@@ -140,23 +164,27 @@ export default function NotificacionesPage() {
     }
   };
 
+  const isLoading = saving || executing || diagnosticing || executingTipo !== null;
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
+      <div className="flex items-center justify-center min-h-[60vh]">
         <div className="animate-spin w-8 h-8 border-2 border-gym-primary border-t-transparent rounded-full" />
       </div>
     );
   }
 
   return (
-    <div className="space-y-6 animate-fadeIn">
-      <LoadingOverlay show={saving} />
-      <div className="flex items-center justify-between">
+    <div className="space-y-4 animate-fadeIn relative">
+      <LoadingOverlay show={isLoading} message={saving ? messages.common.guardando : executing || executingTipo ? "Enviando notificaciones..." : diagnosticing ? "Ejecutando diagnóstico..." : undefined} />
+
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 relative z-10">
         <div>
-          <h1 className="text-2xl font-display font-bold text-gym-text">
+          <h1 className="text-2xl font-display font-bold text-gym-text neon-text">
             {messages.notificaciones.title}
           </h1>
-          <p className="text-gym-muted">{messages.notificaciones.subtitle}</p>
+          <p className="text-gym-muted text-sm">{messages.notificaciones.subtitle}</p>
         </div>
         <Button onClick={handleSave} loading={saving} className="hidden sm:flex">
           <Save className="w-4 h-4 mr-2" />
@@ -165,7 +193,7 @@ export default function NotificacionesPage() {
       </div>
 
       {/* Global toggle */}
-      <Card>
+      <Card className="neon-card relative z-10">
         <CardContent className="p-4">
           <div className="flex items-center justify-between">
             <div>
@@ -189,11 +217,23 @@ export default function NotificacionesPage() {
         {configs.map((config) => {
           const info = tipoLabels[config.tipo_notificacion];
           return (
-            <Card key={config.id}>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  {info.icon}
-                  {info.label}
+            <Card key={config.id} className="neon-card relative z-10">
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    {info.icon}
+                    {info.label}
+                  </div>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => handleEjecutarTipo(config.tipo_notificacion)}
+                    loading={executingTipo === config.tipo_notificacion}
+                    className="text-xs"
+                  >
+                    <Send className="w-3 h-3 mr-1" />
+                    Ejecutar
+                  </Button>
                 </CardTitle>
                 <p className="text-sm text-gym-muted">{info.desc}</p>
               </CardHeader>
@@ -213,7 +253,7 @@ export default function NotificacionesPage() {
 
                 <div>
                   <p className="text-sm font-medium text-gym-text mb-2">{messages.notificaciones.frecuencia}</p>
-                  <div className="flex gap-4">
+                  <div className="flex flex-wrap gap-4">
                     {[
                       { field: "frecuencia_semanal", label: messages.notificaciones.semanaS },
                       { field: "frecuencia_quincenal", label: messages.notificaciones.quincenalS },
@@ -270,20 +310,21 @@ export default function NotificacionesPage() {
           );
         })}
 
-        <Card>
+        {/* Acciones */}
+        <Card className="neon-card relative z-10">
           <CardContent className="p-4 space-y-3">
-            <div className="flex gap-3">
+            <div className="flex flex-col sm:flex-row gap-3">
               <Button onClick={handleEjecutarAhora} loading={executing} className="flex-1">
                 <Play className="w-4 h-4 mr-2" />
                 {messages.notificaciones.ejecutarAhora}
               </Button>
-              <Button onClick={handleDiagnostico} loading={diagnosticing} className="flex-1">
+              <Button onClick={handleDiagnostico} loading={diagnosticing} variant="secondary" className="flex-1">
                 <Stethoscope className="w-4 h-4 mr-2" />
                 {messages.notificaciones.diagnostico}
               </Button>
             </div>
             <p className="text-xs text-gym-muted">
-              <strong>Ejecutar Notificaciones Ahora:</strong> Revisa la frecuencia de cada notificación habilitado y envía los correos pendientes inmediatamente.
+              <strong>Ejecutar Notificaciones Ahora:</strong> Revisa la frecuencia de cada notificación habilitada y envía los correos pendientes inmediatamente.
             </p>
             <p className="text-xs text-gym-muted">
               <strong>Ejecutar Diagnóstico:</strong> Envía un correo de prueba con un reporte completo del estado del sistema para verificar que el email funciona correctamente.
@@ -291,48 +332,38 @@ export default function NotificacionesPage() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
+        {/* Historial */}
+        <Card className="neon-card relative z-10">
+          <CardHeader className="pb-2">
             <CardTitle className="text-lg">{messages.notificaciones.historial}</CardTitle>
           </CardHeader>
           <CardContent>
             {historial.length === 0 ? (
               <p className="text-gym-muted text-center py-8">{messages.notificaciones.sinRegistros}</p>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-gym-border">
-                      <th className="text-left py-2 text-gym-muted font-medium">{messages.notificaciones.fecha}</th>
-                      <th className="text-left py-2 text-gym-muted font-medium">{messages.notificaciones.tipo}</th>
-                      <th className="text-center py-2 text-gym-muted font-medium">{messages.notificaciones.miembros}</th>
-                      <th className="text-center py-2 text-gym-muted font-medium">{messages.notificaciones.estado}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {historial.map((log) => {
-                      const tipoConfig = log.notificacion_config;
-                      const tipoInfo = tipoConfig ? tipoLabels[tipoConfig.tipo_notificacion] : null;
-                      const fecha = new Date(log.fecha_hora_envio);
-                      return (
-                        <tr key={log.id} className="border-b border-gym-border/50">
-                          <td className="py-3 text-gym-text">
-                            {fecha.getDate()} {mesesNombres[fecha.getMonth()]} {fecha.getHours().toString().padStart(2, "0")}:{fecha.getMinutes().toString().padStart(2, "0")}
-                          </td>
-                          <td className="py-3 text-gym-text">{tipoInfo?.label || tipoConfig?.tipo_notificacion}</td>
-                          <td className="py-3 text-gym-text text-center">{log.miembros_notificados}</td>
-                          <td className="py-3 text-center">
-                            {log.sin_problemas ? (
-                              <CheckCircle className="w-4 h-4 text-green-500 inline" />
-                            ) : (
-                              <XCircle className="w-4 h-4 text-red-500 inline" />
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+              <div className="max-h-64 overflow-y-auto space-y-2">
+                {historial.map((log) => {
+                  const tipoConfig = log.notificacion_config;
+                  const tipoInfo = tipoConfig ? tipoLabels[tipoConfig.tipo_notificacion] : null;
+                  const fecha = new Date(log.fecha_hora_envio);
+                  return (
+                    <div key={log.id} className="flex items-center justify-between p-3 bg-gym-bg rounded-xl">
+                      <div className="flex items-center gap-3 min-w-0">
+                        {log.sin_problemas ? (
+                          <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
+                        ) : (
+                          <XCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
+                        )}
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-gym-text truncate">{tipoInfo?.label || tipoConfig?.tipo_notificacion}</p>
+                          <p className="text-xs text-gym-muted">
+                            {fecha.getDate()} {mesesNombres[fecha.getMonth()]} {fecha.getHours().toString().padStart(2, "0")}:{fecha.getMinutes().toString().padStart(2, "0")} · {log.miembros_notificados} miembro(s)
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </CardContent>

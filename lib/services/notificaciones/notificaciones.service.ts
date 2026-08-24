@@ -82,7 +82,7 @@ export class NotificacionesService {
 
   // ─── EJECUTAR NOTIFICACIONES (via API) ────────
 
-  async procesarTodasLasNotificaciones(): Promise<{
+  async procesarTodasLasNotificaciones(tipo?: string): Promise<{
     ejecutadas: number;
     enviados: number;
     errores: number;
@@ -96,6 +96,7 @@ export class NotificacionesService {
         "Content-Type": "application/json",
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
+      body: tipo ? JSON.stringify({ tipo }) : undefined,
     });
 
     if (!res.ok) {

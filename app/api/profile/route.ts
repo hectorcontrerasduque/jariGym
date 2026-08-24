@@ -36,7 +36,7 @@ export async function PUT(request: Request) {
 
     const { data: currentData } = await serviceSupabase
       .from("profiles")
-      .select("nombre_completo, email, whatsapp, cedula, horario_entreno, notas_admin")
+      .select("nombre_completo, email, whatsapp, cedula, horario_entreno, hora_llegada, hora_salida, notas_admin")
       .eq("id", targetUserId)
       .single();
 
@@ -46,6 +46,8 @@ export async function PUT(request: Request) {
       whatsapp: updates.whatsapp ?? currentData?.whatsapp,
       cedula: updates.cedula ?? currentData?.cedula,
       horario_entreno: updates.horario_entreno ?? currentData?.horario_entreno,
+      hora_llegada: updates.hora_llegada ?? currentData?.hora_llegada,
+      hora_salida: updates.hora_salida ?? currentData?.hora_salida,
     };
     if (isAdmin && profileAdmin?.role === "super_admin") {
       profileUpdates.role = updates.role;

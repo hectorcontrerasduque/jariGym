@@ -6,6 +6,8 @@ export interface Profile {
   whatsapp: string | null;
   cedula: string | null;
   horario_entreno: string | null;
+  hora_llegada: string | null;
+  hora_salida: string | null;
   role: "super_admin" | "admin" | "miembro";
   activo: boolean;
   fecha_inscripcion: string;

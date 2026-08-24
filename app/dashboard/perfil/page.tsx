@@ -51,6 +51,8 @@ function PerfilContent() {
     whatsapp: "",
     cedula: "",
     horario_entreno: "",
+    hora_llegada: "--:--",
+    hora_salida: "--:--",
     role: "" as Profile["role"],
     notas_admin: "",
     password: "",
@@ -89,6 +91,8 @@ function PerfilContent() {
           whatsapp: data.whatsapp || "",
           cedula: data.cedula || "",
           horario_entreno: data.horario_entreno || "",
+          hora_llegada: data.hora_llegada || "--:--",
+          hora_salida: data.hora_salida || "--:--",
           role: data.role,
           notas_admin: data.notas_admin || "",
           password: "",
@@ -129,6 +133,8 @@ function PerfilContent() {
             whatsapp: formData.whatsapp,
             cedula: formData.cedula || null,
             horario_entreno: formData.horario_entreno || null,
+            hora_llegada: formData.hora_llegada || null,
+            hora_salida: formData.hora_salida || null,
             role: currentUserRole === "super_admin" ? formData.role : undefined,
             notas_admin: currentUserRole === "super_admin" ? formData.notas_admin || null : undefined,
           },
@@ -263,13 +269,25 @@ function PerfilContent() {
               />
             </div>
           )}
-          <div>
-            <label className="text-xs text-gym-muted mb-1 block">Horario posible a entrenar (opcional)</label>
-            <Input
-              value={formData.horario_entreno}
-              onChange={(e) => setFormData({ ...formData, horario_entreno: e.target.value })}
-              placeholder="Lunes a Viernes 6am-8pm"
-            />
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-xs text-gym-muted mb-1 block">Hora llegada</label>
+              <input
+                type="time"
+                value={formData.hora_llegada === "--:--" ? "" : formData.hora_llegada}
+                onChange={(e) => setFormData({ ...formData, hora_llegada: e.target.value || "--:--" })}
+                className="w-full px-3 py-2 rounded-xl border border-gym-border bg-gym-surface text-gym-text text-sm focus:outline-none focus:ring-2 focus:ring-gym-primary/50"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-gym-muted mb-1 block">Hora salida</label>
+              <input
+                type="time"
+                value={formData.hora_salida === "--:--" ? "" : formData.hora_salida}
+                onChange={(e) => setFormData({ ...formData, hora_salida: e.target.value || "--:--" })}
+                className="w-full px-3 py-2 rounded-xl border border-gym-border bg-gym-surface text-gym-text text-sm focus:outline-none focus:ring-2 focus:ring-gym-primary/50"
+              />
+            </div>
           </div>
         </CardContent>
       </Card>

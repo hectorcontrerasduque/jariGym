@@ -416,15 +416,12 @@ export default function DashboardPage() {
 
       {/* Distribución por hora de entrenamiento */}
       {hourEntries.length > 0 && (
-        <Card className="neon-card relative z-10">
-          <CardHeader className="pb-2 cursor-pointer select-none" onClick={() => setCollapseDistHoras(!collapseDistHoras)}>
-            <CardTitle className="flex items-center gap-2">
-              {collapseDistHoras ? <ChevronRight className="w-5 h-5 text-gym-primary" /> : <ChevronDown className="w-5 h-5 text-gym-primary" />}
-              Distribución por hora
-            </CardTitle>
-          </CardHeader>
-          {!collapseDistHoras && (
-          <CardContent>
+        <details open={!collapseDistHoras} onToggle={(e) => setCollapseDistHoras(!(e.target as HTMLDetailsElement).open)} className="neon-card relative z-10 rounded-2xl border border-gym-border bg-gym-surface">
+          <summary className="p-6 cursor-pointer select-none list-none flex items-center gap-2 font-semibold text-lg text-gym-text [&::-webkit-details-marker]:hidden">
+            {collapseDistHoras ? <ChevronRight className="w-5 h-5 text-gym-primary" /> : <ChevronDown className="w-5 h-5 text-gym-primary" />}
+            Distribución por hora
+          </summary>
+          <div className="px-6 pb-6">
             <div className="space-y-2">
               {hourEntries.map(([hour, count]) => (
                 <div key={hour} className="flex items-center gap-3">
@@ -439,9 +436,8 @@ export default function DashboardPage() {
                 </div>
               ))}
             </div>
-          </CardContent>
-          )}
-        </Card>
+          </div>
+        </details>
       )}
     </div>
   );

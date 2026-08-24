@@ -23,6 +23,8 @@ import {
   BarChart3,
   FileText,
   Calendar,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
 
 interface MonthlyStat {
@@ -45,6 +47,9 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [monthlyStats, setMonthlyStats] = useState<{ totalMiembros: number; libres: number; meses: MonthlyStat[] } | null>(null);
   const [showAllMonths, setShowAllMonths] = useState(false);
+  const [collapsePagosMes, setCollapsePagosMes] = useState(false);
+  const [collapsePagosRecientes, setCollapsePagosRecientes] = useState(false);
+  const [collapseDistHoras, setCollapseDistHoras] = useState(false);
   const [miembros, setMiembros] = useState<Profile[]>([]);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [showBanner, setShowBanner] = useState(true);
@@ -250,12 +255,13 @@ export default function DashboardPage() {
       {/* Bar Chart */}
       {monthlyStats && (
         <Card className="neon-card relative z-10">
-          <CardHeader>
+          <CardHeader className="pb-2 cursor-pointer select-none" onClick={() => setCollapsePagosMes(!collapsePagosMes)}>
             <CardTitle className="flex items-center gap-2">
-              <BarChart3 className="w-5 h-5 text-gym-primary" />
+              {collapsePagosMes ? <ChevronRight className="w-5 h-5 text-gym-primary" /> : <ChevronDown className="w-5 h-5 text-gym-primary" />}
               Pagos por Mes - {anioSeleccionado}
             </CardTitle>
           </CardHeader>
+          {!collapsePagosMes && (
           <CardContent>
             <div className="space-y-4">
               {(showAllMonths ? [...monthlyStats.meses].reverse() : [...monthlyStats.meses].reverse().slice(0, 3)).map((m) => {
@@ -338,17 +344,19 @@ export default function DashboardPage() {
               </div>
             )}
           </CardContent>
+          )}
         </Card>
       )}
 
       {/* Pagos recientes - solo aprobados */}
       <Card className="neon-card relative z-10">
-        <CardHeader className="pb-2">
+        <CardHeader className="pb-2 cursor-pointer select-none" onClick={() => setCollapsePagosRecientes(!collapsePagosRecientes)}>
           <CardTitle className="flex items-center gap-2">
-            <CreditCard className="w-5 h-5 text-gym-primary" />
+            {collapsePagosRecientes ? <ChevronRight className="w-5 h-5 text-gym-primary" /> : <ChevronDown className="w-5 h-5 text-gym-primary" />}
             Pagos Recientes
           </CardTitle>
         </CardHeader>
+        {!collapsePagosRecientes && (
         <CardContent>
           {pagosRecientes.length === 0 ? (
             <p className="text-center text-gym-muted py-8">{messages.dashboard.noPagosRegistrados}</p>
@@ -387,6 +395,7 @@ export default function DashboardPage() {
             </div>
           )}
         </CardContent>
+        )}
       </Card>
 
       {/* Distribución por hora de entrenamiento */}
@@ -409,12 +418,13 @@ export default function DashboardPage() {
         if (entries.length === 0) return null;
         return (
           <Card>
-            <CardHeader>
+            <CardHeader className="pb-2 cursor-pointer select-none" onClick={() => setCollapseDistHoras(!collapseDistHoras)}>
               <CardTitle className="flex items-center gap-2">
-                <BarChart3 className="w-5 h-5 text-gym-primary" />
+                {collapseDistHoras ? <ChevronRight className="w-5 h-5 text-gym-primary" /> : <ChevronDown className="w-5 h-5 text-gym-primary" />}
                 Distribución por hora
               </CardTitle>
             </CardHeader>
+            {!collapseDistHoras && (
             <CardContent>
               <div className="space-y-2">
                 {entries.map(([hour, count]) => (
@@ -431,6 +441,7 @@ export default function DashboardPage() {
                 ))}
               </div>
             </CardContent>
+            )}
           </Card>
         );
       })()}

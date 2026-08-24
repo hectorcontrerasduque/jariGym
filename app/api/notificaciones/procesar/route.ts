@@ -174,7 +174,7 @@ async function procesarMiembrosDeudores(gymConfig: Record<string, unknown>): Pro
     .from("profiles")
     .select("id, email, nombre_completo")
     .eq("role", "miembro")
-    .eq("activo", true)
+    .or("activo.eq.true,activo.is.null")
     .not("email", "is", null);
 
   if (!miembros || miembros.length === 0) return 0;
@@ -199,7 +199,7 @@ async function procesarMiembrosDeudores(gymConfig: Record<string, unknown>): Pro
       .from("pagos")
       .select("mes_pagar, anio_pagar, monto")
       .eq("usuario_id", miembro.id)
-      .in("estado", ["pendiente", "suspendido"]);
+      .in("estado", ["pendiente", "suspendido", "suspendido_pendiente"]);
 
     if (!pagosPendientes || pagosPendientes.length === 0) continue;
 
@@ -233,7 +233,7 @@ async function procesarRecordatorioPago(diasPrevio: number, gymConfig: Record<st
     .from("profiles")
     .select("id, email, nombre_completo")
     .eq("role", "miembro")
-    .eq("activo", true)
+    .or("activo.eq.true,activo.is.null")
     .not("email", "is", null);
 
   if (!miembros || miembros.length === 0) return 0;
@@ -316,7 +316,7 @@ async function procesarResumenDueno(gymConfig: Record<string, unknown>): Promise
   const { data: pagosPendientes } = await supabase
     .from("pagos")
     .select("monto")
-    .in("estado", ["pendiente", "suspendido"])
+    .in("estado", ["pendiente", "suspendido", "suspendido_pendiente"])
     .eq("mes_pagar", mesActual)
     .eq("anio_pagar", anioActual);
 
@@ -324,7 +324,7 @@ async function procesarResumenDueno(gymConfig: Record<string, unknown>): Promise
     .from("profiles")
     .select("id", { count: "exact", head: true })
     .eq("role", "miembro")
-    .eq("activo", true);
+    .or("activo.eq.true,activo.is.null");
 
   const { count: migraciones } = await supabase
     .from("migracion")
@@ -367,7 +367,7 @@ async function procesarEstatusSistema(gymConfig: Record<string, unknown>): Promi
   const { count: totalActivos } = await supabase
     .from("profiles")
     .select("id", { count: "exact", head: true })
-    .eq("activo", true);
+    .or("activo.eq.true,activo.is.null");
 
   const { count: totalInactivos } = await supabase
     .from("profiles")
@@ -384,7 +384,7 @@ async function procesarEstatusSistema(gymConfig: Record<string, unknown>): Promi
   const { data: pagosPendientesMes } = await supabase
     .from("pagos")
     .select("monto")
-    .in("estado", ["pendiente", "suspendido"])
+    .in("estado", ["pendiente", "suspendido", "suspendido_pendiente"])
     .eq("mes_pagar", mesActual)
     .eq("anio_pagar", anioActual);
 

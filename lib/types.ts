@@ -39,13 +39,14 @@ export interface Pago {
   usuario_id: string;
   monto: number;
   comprobante_url: string | null;
-  estado: "pendiente" | "aprobado" | "rechazado" | "suspendido";
+  estado: "pendiente" | "aprobado" | "rechazado" | "suspendido_pendiente" | "suspendido";
   metodo_pago: MetodoPago;
   tipo_pago: TipoPago;
   codigo_billete: string | null;
   notas: string | null;
   approved_by: string | null;
   approved_at: string | null;
+  created_by: string | null;
   fecha_pago_real: string | null;
   mes_pagar: number;
   anio_pagar: number;
@@ -53,6 +54,7 @@ export interface Pago {
   updated_at: string;
   profile?: Profile;
   approved_by_profile?: Profile;
+  created_by_profile?: Profile;
 }
 
 export type TipoMovimiento = "inscripcion" | "mensualidad" | "otros";

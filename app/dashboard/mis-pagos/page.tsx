@@ -71,7 +71,7 @@ export default function MisPagosPage() {
     fecha_pago: new Date().toISOString().split("T")[0],
   });
   const [comprobante, setComprobante] = useState<File | null>(null);
-  const [showPagosRealizados, setShowPagosRealizados] = useState(false);
+  const [showPagosRealizados, setShowPagosRealizados] = useState(true);
 
   const loadData = useCallback(async () => {
     try {

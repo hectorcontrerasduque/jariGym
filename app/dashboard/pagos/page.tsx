@@ -64,8 +64,13 @@ export default function PagosPage() {
 
   const handleAprobar = async (pagoId: string) => {
     try {
+      const pago = pagos.find(p => p.id === pagoId);
       await pagosService.aprobarPago(pagoId);
-      showToast(messages.toast.pagoAprobado, "success");
+      if (pago?.estado === "suspendido_pendiente") {
+        showToast(messages.toast.suspensionAprobada, "success");
+      } else {
+        showToast(messages.toast.pagoAprobado, "success");
+      }
       await loadData();
       setModalOpen(false);
     } catch (error) {
@@ -75,8 +80,13 @@ export default function PagosPage() {
 
   const handleRechazar = async (pagoId: string) => {
     try {
+      const pago = pagos.find(p => p.id === pagoId);
       await pagosService.rechazarPago(pagoId);
-      showToast(messages.toast.pagoRechazado, "success");
+      if (pago?.estado === "suspendido_pendiente") {
+        showToast(messages.toast.suspensionRechazada, "success");
+      } else {
+        showToast(messages.toast.pagoRechazado, "success");
+      }
       await loadData();
       setModalOpen(false);
     } catch (error) {
@@ -99,7 +109,11 @@ export default function PagosPage() {
   };
 
   const pagosFiltrados = (() => {
-    let result = filtro === "todos" ? pagos : pagos.filter((p) => p.estado === filtro);
+    let result = filtro === "todos"
+      ? pagos
+      : filtro === "rechazados_suspendidos"
+      ? pagos.filter((p) => p.estado === "rechazado" || p.estado === "suspendido")
+      : pagos.filter((p) => p.estado === filtro);
     if (busquedaMiembro) {
       const q = busquedaMiembro.toLowerCase();
       const matchedMiembroIds = miembros
@@ -215,16 +229,21 @@ export default function PagosPage() {
 
       {/* Filters */}
       <div className="flex gap-1 sm:gap-3 relative z-10">
-        {["todos", "pendiente", "aprobado", "rechazado", "suspendido_pendiente", "suspendido"].map((f) => (
+        {[
+          { key: "todos", label: "Todos" },
+          { key: "pendiente", label: "Pendiente" },
+          { key: "aprobado", label: "Aprobado" },
+          { key: "rechazados_suspendidos", label: "Rechazados/Suspendidos" },
+        ].map((f) => (
           <Button
-            key={f}
-            variant={filtro === f ? "primary" : "secondary"}
+            key={f.key}
+            variant={filtro === f.key ? "primary" : "secondary"}
             size="sm"
-            onClick={() => setFiltro(f)}
+            onClick={() => setFiltro(f.key)}
             className="px-2 sm:px-4 py-1 sm:py-2 text-[10px] sm:text-sm whitespace-nowrap"
           >
-            {f === "todos" ? "Todos" : f.charAt(0).toUpperCase() + f.slice(1)}
-            {f === "pendiente" && pendientes.length > 0 && ` (${pendientes.length})`}
+            {f.label}
+            {f.key === "pendiente" && pendientes.length > 0 && ` (${pendientes.length})`}
           </Button>
         ))}
       </div>

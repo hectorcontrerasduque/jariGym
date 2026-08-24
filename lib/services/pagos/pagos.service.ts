@@ -188,8 +188,7 @@ export class PagosService {
 
     let query = this.supabase
       .from("pagos")
-      .select("*")
-      .eq("usuario_id", usuarioId)
+      .select("*, profile:profiles(nombre_completo, avatar_url, email), approved_by_profile:profiles!approved_by(nombre_completo)")
       .order("created_at", { ascending: false });
 
     if (anio) {
@@ -319,7 +318,7 @@ export class PagosService {
 
     let query = this.supabase
       .from("pagos")
-      .select("*, profile:profiles(nombre_completo, avatar_url, email)")
+      .select("*, profile:profiles(nombre_completo, avatar_url, email), approved_by_profile:profiles!approved_by(nombre_completo)")
       .order("created_at", { ascending: false });
 
     if (estado) {

@@ -372,15 +372,30 @@ export default function MisPagosPage() {
   const mesesDisponiblesParaPagar = useMemo(() => {
     const mesesConPago = new Set(
       pagos
-        .filter(p => p.estado === "pendiente" || p.estado === "aprobado" || p.estado === "suspendido_pendiente")
+        .filter(p => {
+          if (isSuperAdmin && miembroSeleccionado) {
+            return p.estado === "pendiente" || p.estado === "aprobado" || p.estado === "suspendido" || p.estado === "suspendido_pendiente";
+          }
+          return p.estado === "pendiente" || p.estado === "aprobado" || p.estado === "suspendido_pendiente";
+        })
         .map(p => `${p.anio_pagar}-${p.mes_pagar}`)
     );
     return mesesPendientes.filter(m => !mesesConPago.has(`${m.anio}-${m.mes}`));
-  }, [mesesPendientes, pagos]);
+  }, [mesesPendientes, pagos, isSuperAdmin, miembroSeleccionado]);
 
   const mesesParaSuspender = useMemo(() => {
-    return [...mesesPendientes].sort((a, b) => a.anio - b.anio || a.mes - b.mes);
-  }, [mesesPendientes]);
+    const mesesConPago = new Set(
+      pagos
+        .filter(p => {
+          if (isSuperAdmin && miembroSeleccionado) {
+            return p.estado === "pendiente" || p.estado === "aprobado" || p.estado === "suspendido" || p.estado === "suspendido_pendiente";
+          }
+          return p.estado === "pendiente" || p.estado === "aprobado" || p.estado === "suspendido_pendiente";
+        })
+        .map(p => `${p.anio_pagar}-${p.mes_pagar}`)
+    );
+    return mesesPendientes.filter(m => !mesesConPago.has(`${m.anio}-${m.mes}`)).sort((a, b) => a.anio - b.anio || a.mes - b.mes);
+  }, [mesesPendientes, pagos, isSuperAdmin, miembroSeleccionado]);
 
   if (loading) {
     return (
@@ -807,11 +822,16 @@ export default function MisPagosPage() {
                           </>
                         )}
                       </div>
+                      {pago.estado === "aprobado" && pago.approved_by_profile && (
+                        <p className="text-[10px] text-gym-success/80 mt-0.5">
+                          Aprobado por {pago.approved_by_profile.nombre_completo}{pago.approved_at ? ` · ${new Date(pago.approved_at).toLocaleDateString("es-ES")}` : ""}
+                        </p>
+                      )}
                       {pago.notas && (
                         <p className="text-[10px] text-gym-muted/70 truncate mt-0.5">{pago.notas}</p>
                       )}
                     </div>
-                    {pago.estado === "pendiente" && (
+                    {(pago.estado === "pendiente" || pago.estado === "suspendido_pendiente") && (
                       <button
                         onClick={() => handleDelete(pago.id)}
                         disabled={deleting === pago.id}

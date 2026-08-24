@@ -11,7 +11,27 @@ const CRON_SECRET = process.env.CRON_SECRET || "gym-notifications-cron-secret";
 export async function POST(request: Request) {
   const authHeader = request.headers.get("authorization");
 
-  if (authHeader !== `Bearer ${CRON_SECRET}`) {
+  // Accept either CRON_SECRET or admin user token
+  let isCronAuth = authHeader === `Bearer ${CRON_SECRET}`;
+  let isAdminAuth = false;
+
+  if (!isCronAuth && authHeader) {
+    const { data: { user } } = await supabase.auth.getUser(
+      authHeader.replace("Bearer ", "")
+    );
+    if (user) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .single();
+      if (profile?.role === "super_admin" || profile?.role === "admin") {
+        isAdminAuth = true;
+      }
+    }
+  }
+
+  if (!isCronAuth && !isAdminAuth) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -348,6 +368,11 @@ async function procesarResumenDueno(gymConfig: {
     .eq("role", "miembro")
     .eq("activo", true);
 
+  const { count: migraciones } = await supabase
+    .from("migracion")
+    .select("id", { count: "exact", head: true })
+    .eq("migrado", "migrado");
+
   try {
     const { sendAdminSummaryEmail } = await import(
       "@/lib/services/email/email.service"
@@ -368,6 +393,7 @@ async function procesarResumenDueno(gymConfig: {
         ),
         miembrosAlDia: miembrosActivos || 0,
         miembrosDeudores: 0,
+        migraciones: migraciones || 0,
       },
       `${process.env.NEXT_PUBLIC_SITE_URL}/dashboard/pagos`,
       gymConfig.logo_url
@@ -427,6 +453,19 @@ async function procesarEstatusSistema(gymConfig: {
     .limit(1)
     .single();
 
+  const { data: erroresRecientes } = await supabase
+    .from("notificacion_log")
+    .select("id, fecha_hora_envio, error_detalle, notificacion_config(tipo_notificacion)")
+    .eq("sin_problemas", false)
+    .order("fecha_hora_envio", { ascending: false })
+    .limit(10);
+
+  const erroresFormateados = (erroresRecientes || []).map((e: any) => ({
+    tipo: e.notificacion_config?.tipo_notificacion || "desconocido",
+    fecha: new Date(e.fecha_hora_envio).toLocaleDateString("es-ES"),
+    detalle: e.error_detalle || "Sin detalle",
+  }));
+
   try {
     const { sendSystemStatusEmail } = await import(
       "@/lib/services/email/email.service"
@@ -456,7 +495,9 @@ async function procesarEstatusSistema(gymConfig: {
           ? new Date(ultimoPago.created_at).toLocaleDateString("es-ES")
           : "N/A",
       },
-      gymConfig.logo_url
+      gymConfig.logo_url,
+      undefined,
+      erroresFormateados
     );
     return 1;
   } catch (error) {

@@ -12,7 +12,8 @@ export function estatusSistemaTemplate(
     ultimoMiembroRegistrado: string;
     ultimoPagoRegistrado: string;
   },
-  gymLogo?: string | null
+  gymLogo?: string | null,
+  erroresRecientes?: Array<{ tipo: string; fecha: string; detalle: string }>
 ): string {
   const logoHtml = gymLogo
     ? `<img src="${gymLogo}" alt="${gymName}" style="width:60px;height:60px;object-fit:cover;border-radius:12px;">`
@@ -112,6 +113,35 @@ export function estatusSistemaTemplate(
                   </td>
                 </tr>
               </table>
+
+              ${erroresRecientes && erroresRecientes.length > 0 ? `
+              <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#fef2f2;border-radius:8px;border:1px solid #fecaca;margin:0 0 20px;">
+                <tr>
+                  <td style="padding:16px;">
+                    <p style="color:#dc2626;font-size:12px;margin:0 0 8px;font-weight:bold;text-transform:uppercase;">Errores Recientes</p>
+                    ${erroresRecientes.map(e => `
+                    <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:8px;">
+                      <tr>
+                        <td style="padding:4px 0;color:#dc2626;font-size:13px;font-weight:bold;">${e.tipo}</td>
+                        <td style="padding:4px 0;color:#94a3b8;font-size:12px;text-align:right;">${e.fecha}</td>
+                      </tr>
+                      <tr>
+                        <td colspan="2" style="padding:2px 0 8px;color:#64748b;font-size:12px;border-bottom:1px solid #fecaca;">${e.detalle}</td>
+                      </tr>
+                    </table>
+                    `).join("")}
+                  </td>
+                </tr>
+              </table>
+              ` : `
+              <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f0fdf4;border-radius:8px;border:1px solid #bbf7d0;margin:0 0 20px;">
+                <tr>
+                  <td style="padding:16px;text-align:center;">
+                    <p style="color:#16a34a;font-size:14px;font-weight:bold;margin:0;">Sin errores recientes</p>
+                  </td>
+                </tr>
+              </table>
+              `}
 
               <p style="color:#cbd5e1;font-size:11px;line-height:1.5;margin:15px 0 0;">
                 Este es un reporte automático del sistema. No requiere acción.

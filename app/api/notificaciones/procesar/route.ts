@@ -319,6 +319,11 @@ async function procesarResumenDueno(gymConfig: Record<string, unknown>): Promise
     .eq("role", "miembro")
     .eq("activo", true);
 
+  const { count: migraciones } = await supabase
+    .from("migracion")
+    .select("id", { count: "exact", head: true })
+    .eq("migrado", "migrado");
+
   try {
     await sendAdminSummaryEmail(
       duenoEmail,
@@ -330,6 +335,7 @@ async function procesarResumenDueno(gymConfig: Record<string, unknown>): Promise
         montoPendiente: (pagosPendientes || []).reduce((s, p) => s + p.monto, 0),
         miembrosAlDia: miembrosActivos || 0,
         miembrosDeudores: 0,
+        migraciones: migraciones || 0,
       },
       `${process.env.NEXT_PUBLIC_SITE_URL}/dashboard/pagos`,
       logoUrl,
@@ -389,6 +395,19 @@ async function procesarEstatusSistema(gymConfig: Record<string, unknown>): Promi
     .limit(1)
     .single();
 
+  const { data: erroresRecientes } = await supabase
+    .from("notificacion_log")
+    .select("id, fecha_hora_envio, error_detalle, notificacion_config(tipo_notificacion)")
+    .eq("sin_problemas", false)
+    .order("fecha_hora_envio", { ascending: false })
+    .limit(10);
+
+  const erroresFormateados = (erroresRecientes || []).map((e: any) => ({
+    tipo: e.notificacion_config?.tipo_notificacion || "desconocido",
+    fecha: new Date(e.fecha_hora_envio).toLocaleDateString("es-ES"),
+    detalle: e.error_detalle || "Sin detalle",
+  }));
+
   try {
     await sendSystemStatusEmail(
       destino,
@@ -408,7 +427,8 @@ async function procesarEstatusSistema(gymConfig: Record<string, unknown>): Promi
           : "N/A",
       },
       logoUrl,
-      direccion
+      direccion,
+      erroresFormateados
     );
     return 1;
   } catch (error) {

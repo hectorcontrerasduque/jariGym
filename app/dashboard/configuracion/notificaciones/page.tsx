@@ -99,7 +99,7 @@ export default function NotificacionesPage() {
           frecuencia_mensual: config.frecuencia_mensual,
           dias_previo: config.dias_previo,
           notificar_por_email: config.notificar_por_email,
-          notificar_por_whatsapp: config.notificar_por_whatsapp,
+          notificar_por_whatsapp: false,
         });
       }
 
@@ -227,7 +227,7 @@ export default function NotificacionesPage() {
 
               <div>
                 <p className="text-sm font-medium text-gym-text mb-2">{messages.notificaciones.canales}</p>
-                <div className="flex gap-4">
+                <div className="flex gap-4 items-center">
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
                       type="checkbox"
@@ -237,15 +237,10 @@ export default function NotificacionesPage() {
                     />
                     <span className="text-sm text-gym-text">{messages.notificaciones.email}</span>
                   </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      className="w-4 h-4 rounded border-gym-border text-gym-primary focus:ring-gym-primary"
-                      checked={config.notificar_por_whatsapp}
-                      onChange={(e) => handleToggleConfig(config.id, "notificar_por_whatsapp", e.target.checked)}
-                    />
-                    <span className="text-sm text-gym-text">{messages.notificaciones.whatsapp}</span>
-                  </label>
+                  <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-gym-muted bg-gym-surface border border-gym-border rounded-lg opacity-60 cursor-not-allowed">
+                    {messages.notificaciones.whatsapp}
+                    <span className="text-[10px] bg-gym-border/50 px-1.5 py-0.5 rounded-md ml-1">Próximamente</span>
+                  </span>
                 </div>
               </div>
             </CardContent>

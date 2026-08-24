@@ -64,10 +64,18 @@ export class PagosService {
       throw new Error(messages.toast.noAutorizado);
     }
 
+    const { data: pagoActual } = await this.supabase
+      .from("pagos")
+      .select("estado")
+      .eq("id", pagoId)
+      .single();
+
+    const nuevoEstado = pagoActual?.estado === "suspendido_pendiente" ? "suspendido" : "aprobado";
+
     const { data, error } = await this.supabase
       .from("pagos")
       .update({
-        estado: "aprobado",
+        estado: nuevoEstado,
         approved_by: user.id,
         approved_at: new Date().toISOString(),
       })

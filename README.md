@@ -64,6 +64,32 @@ En Vercel Dashboard → Settings → Environment Variables, agrega:
 npm run dev
 ```
 
+### 7. Configurar Cron de Notificaciones (cron-job.org)
+
+Las notificaciones automáticas se disparan de dos formas:
+1. **Cron externo**: llama al endpoint `/api/notificaciones` semanalmente
+2. **Login de admin**: al hacer login, el sidebar dispara en background una verificación
+
+Para configurar el cron externo con [cron-job.org](https://cron-job.org) (gratis):
+
+1. Crea una cuenta en https://cron-job.org
+2. Crea un nuevo cron job con estos settings:
+   - **URL**: `https://TU-DOMINIO.vercel.app/api/notificaciones`
+   - **Method**: `POST`
+   - **Schedule**: `0 9 * * 1` (cada lunes a 9:00 AM)
+   - **Headers**:
+     ```
+     Authorization: Bearer TU_CRON_SECRET
+     Content-Type: application/json
+     ```
+3. Genera un `CRON_SECRET` aleatorio y agrégalo como env var en Vercel
+4. Activa las notificaciones en **Configuración → Notificaciones** del dashboard
+
+```bash
+# Generar CRON_SECRET aleatorio (ejecutar una vez)
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
 ## Comandos
 
 ```bash

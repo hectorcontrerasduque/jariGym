@@ -88,6 +88,29 @@ export function Sidebar() {
     getProfile();
     getGymConfig();
 
+    // Background: trigger notifications check for admins on login
+    const triggerNotifications = async () => {
+      try {
+        const supabase = createClient();
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.access_token) return;
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", session.user.id)
+          .single();
+        if (profile?.role !== "super_admin" && profile?.role !== "admin") return;
+        await fetch("/api/notificaciones", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${session.access_token}`,
+          },
+        }).catch(() => {});
+      } catch {}
+    };
+    triggerNotifications();
+
     const handleConfigUpdated = () => getGymConfig();
     window.addEventListener("config:updated", handleConfigUpdated);
     return () => window.removeEventListener("config:updated", handleConfigUpdated);

@@ -7,6 +7,7 @@ export function resumenDuenoTemplate(
     montoPendiente: number;
     miembrosAlDia: number;
     miembrosDeudores: number;
+    migraciones: number;
   },
   appUrl: string,
   gymLogo?: string | null
@@ -79,6 +80,10 @@ export function resumenDuenoTemplate(
                       <tr>
                         <td style="padding:8px 0;color:#64748b;font-size:14px;border-top:1px solid #e2e8f0;">Miembros Deudores</td>
                         <td style="padding:8px 0;color:#dc2626;font-size:14px;font-weight:bold;text-align:right;border-top:1px solid #e2e8f0;">${resumen.miembrosDeudores}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding:8px 0;color:#64748b;font-size:14px;border-top:1px solid #e2e8f0;">Migraciones</td>
+                        <td style="padding:8px 0;color:#38bdf8;font-size:14px;font-weight:bold;text-align:right;border-top:1px solid #e2e8f0;">${resumen.migraciones}</td>
                       </tr>
                     </table>
                   </td>

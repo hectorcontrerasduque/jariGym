@@ -222,6 +222,7 @@ export async function sendAdminSummaryEmail(
     montoPendiente: number;
     miembrosAlDia: number;
     miembrosDeudores: number;
+    migraciones: number;
   },
   appUrl: string,
   gymLogo?: string | null,
@@ -254,9 +255,10 @@ export async function sendSystemStatusEmail(
     ultimoPagoRegistrado: string;
   },
   gymLogo?: string | null,
-  direccion?: string | null
+  direccion?: string | null,
+  erroresRecientes?: Array<{ tipo: string; fecha: string; detalle: string }>
 ): Promise<void> {
-  const baseHtml = estatusSistemaTemplate(gymName, metricas, gymLogo);
+  const baseHtml = estatusSistemaTemplate(gymName, metricas, gymLogo, erroresRecientes);
   await sendNotificationEmail({
     to,
     subject: `${gymName} - Estado del sistema`,

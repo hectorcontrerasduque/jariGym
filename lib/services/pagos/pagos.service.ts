@@ -138,9 +138,9 @@ export class PagosService {
     const query = this.supabase.from("pagos").delete().eq("id", pagoId);
 
     if (isAdmin) {
-      query.eq("estado", "pendiente");
+      query.in("estado", ["pendiente", "suspendido_pendiente"]);
     } else {
-      query.eq("usuario_id", user.id).eq("estado", "pendiente");
+      query.eq("usuario_id", user.id).in("estado", ["pendiente", "suspendido_pendiente"]);
     }
 
     const { error } = await query;
@@ -188,7 +188,7 @@ export class PagosService {
 
     let query = this.supabase
       .from("pagos")
-      .select("*, profile:profiles(nombre_completo, avatar_url, email), approved_by_profile:profiles!approved_by(nombre_completo)")
+      .select("*, profile:profiles(nombre_completo, avatar_url, email), approved_by_profile:profiles!pagos_approved_by_fkey(nombre_completo)")
       .order("created_at", { ascending: false });
 
     if (anio) {
@@ -326,7 +326,7 @@ export class PagosService {
 
     let query = this.supabase
       .from("pagos")
-      .select("*, profile:profiles(nombre_completo, avatar_url, email), approved_by_profile:profiles!approved_by(nombre_completo)")
+      .select("*, profile:profiles(nombre_completo, avatar_url, email), approved_by_profile:profiles!pagos_approved_by_fkey(nombre_completo)")
       .order("created_at", { ascending: false });
 
     if (estado) {

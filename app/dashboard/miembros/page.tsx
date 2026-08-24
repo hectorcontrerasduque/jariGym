@@ -11,7 +11,7 @@ import { Avatar } from "@/components/ui/avatar";
 import { miembrosService } from "@/lib/services/miembros/miembros.service";
 import { formatDate, formatCurrency, formatDateTime } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
-import { Users, Search, Plus, Eye, UserX, UserCheck, Settings, Save } from "lucide-react";
+import { Users, Search, Plus, Eye, UserX, UserCheck, Settings, Save, Pencil } from "lucide-react";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { showToast } from "@/components/ui/toast";
 import { messages } from "@/lib/messages";
@@ -336,6 +336,11 @@ export default function MiembrosPage() {
                     <td className="px-4 py-3 text-xs text-gym-muted">{miembro.whatsapp || "—"}</td>
                     <td className="px-4 py-3">
                       <div className="flex gap-1">
+                        <Link href={`/dashboard/perfil?user_id=${miembro.id}`}>
+                          <Button variant="ghost" size="sm" title="Editar">
+                            <Pencil className="w-4 h-4" />
+                          </Button>
+                        </Link>
                         <Button variant="ghost" size="sm" onClick={() => verDetalle(miembro)}>
                           <Eye className="w-4 h-4" />
                         </Button>
@@ -380,6 +385,11 @@ export default function MiembrosPage() {
                 <span>{formatDate(miembro.fecha_inscripcion || miembro.created_at)}</span>
               </div>
               <div className="flex gap-2">
+                <Link href={`/dashboard/perfil?user_id=${miembro.id}`} className="flex-1">
+                  <Button variant="ghost" size="sm" className="w-full">
+                    <Pencil className="w-4 h-4 mr-1" /> Editar
+                  </Button>
+                </Link>
                 <Button variant="ghost" size="sm" className="flex-1" onClick={() => verDetalle(miembro)}>
                   <Eye className="w-4 h-4 mr-1" /> Ver detalle
                 </Button>

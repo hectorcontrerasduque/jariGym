@@ -18,6 +18,12 @@ import type { Pago, Profile, MetodoPago, MetodoPagoConfig, GymConfig, TipoPago }
 
 const MESES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 
+const metodoLabels: Record<MetodoPago, string> = {
+  efectivo: "Efectivo",
+  bs: "Bs",
+  binance: "Binance",
+};
+
 function getPagoLabel(pago: Pago): string {
   if (pago.tipo_pago === "inscripcion") return "Inscripción";
   return `${getMonthName(pago.mes_pagar)} ${pago.anio_pagar}`;
@@ -238,6 +244,22 @@ export default function MisPagosPage() {
       return;
     }
     if (!formData.solicitar_suspension && montoTotal === 0) return;
+
+    const nombreMiembro = miembroSeleccionado?.nombre_completo || profile?.nombre_completo || "tu cuenta";
+    const acciones: string[] = [];
+    if (formData.solicitar_suspension) {
+      const mesesStr = formData.meses.map(m => `${getMonthName(m.mes)} ${m.anio}`).join(", ");
+      acciones.push(`Solicitar suspensión de: ${mesesStr}`);
+    } else {
+      if (formData.pagar_inscripcion) acciones.push(`Inscripción: ${formatCurrency(getMontoByMetodo(formData.metodo_pago, "inscripcion"))}`);
+      if (formData.pagar_mensualidad && formData.meses.length > 0) {
+        const mesesStr = formData.meses.map(m => `${getMonthName(m.mes)} ${m.anio}`).join(", ");
+        acciones.push(`Mensualidad (${formData.meses.length} mes(es)): ${mesesStr} — Total: ${formatCurrency(montoTotal)}`);
+      }
+    }
+    const metodoLabel = metodoLabels[formData.metodo_pago] || formData.metodo_pago;
+    const confirmMsg = `Confirmar acción para ${nombreMiembro}:\n\n${acciones.join("\n")}\n\nMétodo de pago: ${metodoLabel}\n¿Continuar?`;
+    if (!confirm(confirmMsg)) return;
 
     setSavingPago(true);
     try {

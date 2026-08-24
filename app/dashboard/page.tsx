@@ -416,15 +416,13 @@ export default function DashboardPage() {
 
       {/* Distribución por hora de entrenamiento */}
       {hourEntries.length > 0 && (
-        <Card>
-          <div onClick={() => setCollapseDistHoras(!collapseDistHoras)}>
-            <CardHeader className="pb-2 cursor-pointer select-none">
-              <CardTitle className="flex items-center gap-2">
-                {collapseDistHoras ? <ChevronRight className="w-5 h-5 text-gym-primary" /> : <ChevronDown className="w-5 h-5 text-gym-primary" />}
-                Distribución por hora
-              </CardTitle>
-            </CardHeader>
-          </div>
+        <Card className="neon-card relative z-10">
+          <CardHeader className="pb-2 cursor-pointer select-none" onClick={() => setCollapseDistHoras(!collapseDistHoras)}>
+            <CardTitle className="flex items-center gap-2">
+              {collapseDistHoras ? <ChevronRight className="w-5 h-5 text-gym-primary" /> : <ChevronDown className="w-5 h-5 text-gym-primary" />}
+              Distribución por hora
+            </CardTitle>
+          </CardHeader>
           {!collapseDistHoras && (
           <CardContent>
             <div className="space-y-2">

@@ -47,9 +47,9 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [monthlyStats, setMonthlyStats] = useState<{ totalMiembros: number; libres: number; meses: MonthlyStat[] } | null>(null);
   const [showAllMonths, setShowAllMonths] = useState(false);
-  const [collapsePagosMes, setCollapsePagosMes] = useState(false);
-  const [collapsePagosRecientes, setCollapsePagosRecientes] = useState(false);
-  const [collapseDistHoras, setCollapseDistHoras] = useState(false);
+  const [collapsePagosMes, setCollapsePagosMes] = useState(true);
+  const [collapsePagosRecientes, setCollapsePagosRecientes] = useState(true);
+  const [collapseDistHoras, setCollapseDistHoras] = useState(true);
   const [miembros, setMiembros] = useState<Profile[]>([]);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [showBanner, setShowBanner] = useState(true);
@@ -418,12 +418,14 @@ export default function DashboardPage() {
         if (entries.length === 0) return null;
         return (
           <Card>
-            <CardHeader className="pb-2 cursor-pointer select-none" onClick={() => setCollapseDistHoras(!collapseDistHoras)}>
-              <CardTitle className="flex items-center gap-2">
-                {collapseDistHoras ? <ChevronRight className="w-5 h-5 text-gym-primary" /> : <ChevronDown className="w-5 h-5 text-gym-primary" />}
-                Distribución por hora
-              </CardTitle>
-            </CardHeader>
+            <button type="button" className="w-full text-left" onClick={() => setCollapseDistHoras(!collapseDistHoras)}>
+              <CardHeader className="pb-2 cursor-pointer select-none">
+                <CardTitle className="flex items-center gap-2">
+                  {collapseDistHoras ? <ChevronRight className="w-5 h-5 text-gym-primary" /> : <ChevronDown className="w-5 h-5 text-gym-primary" />}
+                  Distribución por hora
+                </CardTitle>
+              </CardHeader>
+            </button>
             {!collapseDistHoras && (
             <CardContent>
               <div className="space-y-2">

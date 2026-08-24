@@ -215,7 +215,7 @@ export default function PagosPage() {
 
       {/* Filters */}
       <div className="flex gap-1 sm:gap-3 relative z-10">
-        {["todos", "pendiente", "aprobado", "rechazado", "suspendido"].map((f) => (
+        {["todos", "pendiente", "aprobado", "rechazado", "suspendido_pendiente", "suspendido"].map((f) => (
           <Button
             key={f}
             variant={filtro === f ? "primary" : "secondary"}
@@ -300,6 +300,8 @@ export default function PagosPage() {
                               ? "danger"
                               : pago.estado === "suspendido"
                               ? "warning"
+                              : pago.estado === "suspendido_pendiente"
+                              ? "warning"
                               : "warning"
                           }
                           className="text-[10px] px-1.5 py-0"
@@ -310,6 +312,8 @@ export default function PagosPage() {
                             ? "Rechazado"
                             : pago.estado === "suspendido"
                             ? "Suspendido"
+                            : pago.estado === "suspendido_pendiente"
+                            ? "Susp. Pendiente"
                             : "Pendiente"}
                         </Badge>
                       </div>
@@ -382,13 +386,13 @@ export default function PagosPage() {
               <p className="text-sm text-gym-muted">Notas</p>
               <p className="text-gym-text">{selectedPago.notas || "—"}</p>
             </div>
-            {selectedPago.estado === "pendiente" && (
+            {(selectedPago.estado === "pendiente" || selectedPago.estado === "suspendido_pendiente") && (
               <div className="flex gap-2 pt-4">
                 <Button className="flex-1 glow-success" onClick={() => handleAprobar(selectedPago.id)}>
-                  <Check className="w-4 h-4 mr-2" /> Aprobar
+                  <Check className="w-4 h-4 mr-2" /> {selectedPago.estado === "suspendido_pendiente" ? messages.misPagos.aprobarSuspension : "Aprobar"}
                 </Button>
                 <Button variant="danger" className="flex-1 glow-danger" onClick={() => handleRechazar(selectedPago.id)}>
-                  <X className="w-4 h-4 mr-2" /> Rechazar
+                  <X className="w-4 h-4 mr-2" /> {selectedPago.estado === "suspendido_pendiente" ? messages.misPagos.rechazarSuspension : "Rechazar"}
                 </Button>
               </div>
             )}

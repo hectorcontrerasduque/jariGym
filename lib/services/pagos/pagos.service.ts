@@ -28,6 +28,7 @@ export class PagosService {
     const pagoData: Record<string, unknown> = {
       ...input,
       estado: "pendiente",
+      created_by: user.id,
     };
 
     if (input.metodo_pago === "efectivo") {
@@ -65,7 +66,11 @@ export class PagosService {
 
     const { data, error } = await this.supabase
       .from("pagos")
-      .update({ estado: "aprobado" })
+      .update({
+        estado: "aprobado",
+        approved_by: user.id,
+        approved_at: new Date().toISOString(),
+      })
       .eq("id", pagoId)
       .select()
       .single();
@@ -105,9 +110,11 @@ export class PagosService {
       .update({
         estado: "rechazado",
         notas: notas || "Pago rechazado",
+        approved_by: user.id,
+        approved_at: new Date().toISOString(),
       })
       .eq("id", pagoId)
-      .eq("estado", "pendiente")
+      .in("estado", ["pendiente", "suspendido_pendiente"])
       .select()
       .single();
 
@@ -126,16 +133,17 @@ export class PagosService {
       .select("role")
       .eq("id", user.id)
       .single();
-    if (profile?.role !== "super_admin" && profile?.role !== "admin") {
-      throw new Error(messages.toast.noAutorizado);
+    const isAdmin = profile?.role === "super_admin" || profile?.role === "admin";
+
+    const query = this.supabase.from("pagos").delete().eq("id", pagoId);
+
+    if (isAdmin) {
+      query.eq("estado", "pendiente");
+    } else {
+      query.eq("usuario_id", user.id).eq("estado", "pendiente");
     }
 
-    const { error } = await this.supabase
-      .from("pagos")
-      .delete()
-      .eq("id", pagoId)
-      .eq("estado", "pendiente");
-
+    const { error } = await query;
     if (error) throw error;
   }
 
@@ -211,6 +219,9 @@ export class PagosService {
     const pagoData: Record<string, unknown> = {
       ...input,
       estado: "aprobado",
+      created_by: user.id,
+      approved_by: user.id,
+      approved_at: new Date().toISOString(),
       fecha_pago_real: input.fecha_pago_real || new Date().toISOString(),
     };
 
@@ -237,6 +248,58 @@ export class PagosService {
     }
 
     return data;
+  }
+
+  async crearPagoSuspendido(usuarioId: string, meses: { mes: number; anio: number }[], motivo?: string): Promise<number> {
+    const {
+      data: { user },
+    } = await this.supabase.auth.getUser();
+    if (!user) throw new Error(messages.toast.noAutenticado);
+
+    let count = 0;
+
+    for (const { mes, anio } of meses) {
+      const { data: existente } = await this.supabase
+        .from("pagos")
+        .select("id, estado")
+        .eq("usuario_id", usuarioId)
+        .eq("mes_pagar", mes)
+        .eq("anio_pagar", anio)
+        .in("estado", ["pendiente", "suspendido_pendiente"])
+        .maybeSingle();
+
+      if (existente) {
+        const { error } = await this.supabase
+          .from("pagos")
+          .update({
+            estado: "suspendido_pendiente",
+            monto: 0,
+            metodo_pago: "efectivo",
+            notas: motivo || "Solicitud de suspensión",
+            approved_by: null,
+            approved_at: null,
+          })
+          .eq("id", existente.id);
+        if (!error) count++;
+      } else {
+        const { error } = await this.supabase
+          .from("pagos")
+          .insert({
+            usuario_id: usuarioId,
+            monto: 0,
+            mes_pagar: mes,
+            anio_pagar: anio,
+            metodo_pago: "efectivo",
+            tipo_pago: "membresia",
+            estado: "suspendido_pendiente",
+            notas: motivo || "Solicitud de suspensión",
+            created_by: user.id,
+          });
+        if (!error) count++;
+      }
+    }
+
+    return count;
   }
 
   async listarPagos(estado?: string, anio?: number, mes?: number): Promise<Pago[]> {
@@ -290,7 +353,7 @@ export class PagosService {
       .from("pagos")
       .select("mes_pagar, anio_pagar, estado")
       .eq("usuario_id", usuarioId)
-      .in("estado", ["aprobado", "pendiente"])
+      .in("estado", ["aprobado", "pendiente", "suspendido_pendiente"])
       .order("anio_pagar", { ascending: false })
       .order("mes_pagar", { ascending: false });
 

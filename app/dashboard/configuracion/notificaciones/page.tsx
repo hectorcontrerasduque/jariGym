@@ -149,7 +149,7 @@ export default function NotificacionesPage() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6 animate-fadeIn">
+    <div className="space-y-6 animate-fadeIn">
       <LoadingOverlay show={saving} />
       <div className="flex items-center justify-between">
         <div>

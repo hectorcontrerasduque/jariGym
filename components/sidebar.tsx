@@ -14,6 +14,7 @@ import {
   Settings,
   LogOut,
   Dumbbell,
+  Bell,
   User,
 } from "lucide-react";
 import type { Profile } from "@/lib/types";
@@ -22,6 +23,7 @@ const adminNavItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/dashboard/pagos", label: "Pagos", icon: CreditCard },
   { href: "/dashboard/miembros", label: "Miembros", icon: Users },
+  { href: "/dashboard/configuracion/notificaciones", label: "Notificaciones", icon: Bell },
   { href: "/dashboard/configuracion", label: "Config", icon: Settings },
 ];
 

@@ -196,7 +196,15 @@ export class PagosService {
     }
 
     const { data, error } = await query;
-    if (error) throw error;
+    if (error) {
+      const fallback = await this.supabase
+        .from("pagos")
+        .select("*, profile:profiles(nombre_completo, avatar_url, email)")
+        .eq("usuario_id", usuarioId)
+        .order("created_at", { ascending: false });
+      if (fallback.error) throw fallback.error;
+      return fallback.data || [];
+    }
     return data || [];
   }
 

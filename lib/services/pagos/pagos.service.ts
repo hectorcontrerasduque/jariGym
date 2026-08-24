@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/client";
 import { getMonthName } from "@/lib/utils";
 import { messages } from "@/lib/messages";
-import type { Pago, MetodoPago, TipoPago } from "@/lib/types";
+import type { Pago, MetodoPago, TipoPago, Profile } from "@/lib/types";
 
 export interface CreatePagoInput {
   usuario_id: string;
@@ -172,23 +172,10 @@ export class PagosService {
   }
 
   async listarPagosUsuario(usuarioId: string, anio?: number): Promise<Pago[]> {
-    const {
-      data: { user },
-    } = await this.supabase.auth.getUser();
-    if (!user) throw new Error(messages.toast.noAutenticado);
-
-    const { data: profile } = await this.supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .single();
-    if (profile?.role !== "super_admin" && profile?.role !== "admin") {
-      throw new Error(messages.toast.noAutorizado);
-    }
-
     let query = this.supabase
       .from("pagos")
-      .select("*, profile:profiles(nombre_completo, avatar_url, email), approved_by_profile:profiles!pagos_approved_by_fkey(nombre_completo)")
+      .select("*, profile:profiles!pagos_usuario_id_fkey(nombre_completo, avatar_url, email)")
+      .eq("usuario_id", usuarioId)
       .order("created_at", { ascending: false });
 
     if (anio) {
@@ -196,16 +183,25 @@ export class PagosService {
     }
 
     const { data, error } = await query;
-    if (error) {
-      const fallback = await this.supabase
-        .from("pagos")
-        .select("*, profile:profiles(nombre_completo, avatar_url, email)")
-        .eq("usuario_id", usuarioId)
-        .order("created_at", { ascending: false });
-      if (fallback.error) throw fallback.error;
-      return fallback.data || [];
+    if (error) throw error;
+
+    const pagos = data || [];
+
+    const approvedIds = Array.from(new Set(pagos.filter(p => p.approved_by).map(p => p.approved_by as string)));
+    if (approvedIds.length > 0) {
+      const { data: approvers } = await this.supabase
+        .from("profiles")
+        .select("id, nombre_completo")
+        .in("id", approvedIds);
+      const approverMap = new Map((approvers || []).map(a => [a.id, a.nombre_completo]));
+      for (const pago of pagos) {
+        if (pago.approved_by) {
+          pago.approved_by_profile = { nombre_completo: approverMap.get(pago.approved_by) || "—" } as Profile;
+        }
+      }
     }
-    return data || [];
+
+    return pagos;
   }
 
   async crearPagoAprobado(input: CreatePagoInput): Promise<Pago> {
@@ -310,23 +306,9 @@ export class PagosService {
   }
 
   async listarPagos(estado?: string, anio?: number, mes?: number): Promise<Pago[]> {
-    const {
-      data: { user },
-    } = await this.supabase.auth.getUser();
-    if (!user) throw new Error(messages.toast.noAutenticado);
-
-    const { data: profile } = await this.supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .single();
-    if (profile?.role !== "super_admin" && profile?.role !== "admin") {
-      throw new Error(messages.toast.noAutorizado);
-    }
-
     let query = this.supabase
       .from("pagos")
-      .select("*, profile:profiles(nombre_completo, avatar_url, email), approved_by_profile:profiles!pagos_approved_by_fkey(nombre_completo)")
+      .select("*, profile:profiles!pagos_usuario_id_fkey(nombre_completo, avatar_url, email)")
       .order("created_at", { ascending: false });
 
     if (estado) {
@@ -340,15 +322,24 @@ export class PagosService {
     }
 
     const { data, error } = await query;
-    if (error) {
-      const fallback = await this.supabase
-        .from("pagos")
-        .select("*")
-        .order("created_at", { ascending: false });
-      if (fallback.error) throw fallback.error;
-      return fallback.data || [];
+    if (error) throw error;
+
+    const pagos = data || [];
+    const approvedIds = Array.from(new Set(pagos.filter(p => p.approved_by).map(p => p.approved_by as string)));
+    if (approvedIds.length > 0) {
+      const { data: approvers } = await this.supabase
+        .from("profiles")
+        .select("id, nombre_completo")
+        .in("id", approvedIds);
+      const approverMap = new Map((approvers || []).map(a => [a.id, a.nombre_completo]));
+      for (const pago of pagos) {
+        if (pago.approved_by) {
+          pago.approved_by_profile = { nombre_completo: approverMap.get(pago.approved_by) || "—" } as Profile;
+        }
+      }
     }
-    return data || [];
+
+    return pagos;
   }
 
   async pagosPendientes(): Promise<Pago[]> {

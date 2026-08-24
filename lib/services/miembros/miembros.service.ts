@@ -8,11 +8,11 @@ export class MiembrosService {
   async listarMiembros(): Promise<Profile[]> {
     const { data, error } = await this.supabase
       .from("profiles")
-      .select("*")
+      .select("id, nombre_completo, email, avatar_url, activo, role, fecha_inscripcion, notas_admin, inscripcion_pagada")
       .order("fecha_inscripcion", { ascending: false });
 
     if (error) throw error;
-    return data || [];
+    return (data || []) as Profile[];
   }
 
   async buscarMiembros(busqueda: string): Promise<Profile[]> {

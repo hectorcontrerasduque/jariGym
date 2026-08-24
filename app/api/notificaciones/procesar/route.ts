@@ -408,6 +408,11 @@ async function procesarEstatusSistema(gymConfig: Record<string, unknown>): Promi
     detalle: e.error_detalle || "Sin detalle",
   }));
 
+  const { count: migraciones } = await supabase
+    .from("migracion")
+    .select("id", { count: "exact", head: true })
+    .eq("migrado", "migrado");
+
   try {
     await sendSystemStatusEmail(
       destino,
@@ -425,6 +430,7 @@ async function procesarEstatusSistema(gymConfig: Record<string, unknown>): Promi
         ultimoPagoRegistrado: ultimoPago
           ? new Date(ultimoPago.created_at).toLocaleDateString("es-ES")
           : "N/A",
+        migraciones: migraciones || 0,
       },
       logoUrl,
       direccion,

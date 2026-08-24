@@ -11,6 +11,7 @@ export function estatusSistemaTemplate(
     maxMiembros: number;
     ultimoMiembroRegistrado: string;
     ultimoPagoRegistrado: string;
+    migraciones: number;
   },
   gymLogo?: string | null,
   erroresRecientes?: Array<{ tipo: string; fecha: string; detalle: string }>
@@ -72,6 +73,10 @@ export function estatusSistemaTemplate(
                       <tr>
                         <td style="padding:6px 0;color:#64748b;font-size:14px;border-top:1px solid #e2e8f0;">Capacidad</td>
                         <td style="padding:6px 0;color:#1e293b;font-size:14px;font-weight:bold;text-align:right;border-top:1px solid #e2e8f0;">${metricas.capacidad}/${metricas.maxMiembros} (${porcentajeCapacidad}%)</td>
+                      </tr>
+                      <tr>
+                        <td style="padding:6px 0;color:#64748b;font-size:14px;border-top:1px solid #e2e8f0;">Migraciones</td>
+                        <td style="padding:6px 0;color:#38bdf8;font-size:14px;font-weight:bold;text-align:right;border-top:1px solid #e2e8f0;">${metricas.migraciones}</td>
                       </tr>
                     </table>
                   </td>

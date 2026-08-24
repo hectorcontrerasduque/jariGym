@@ -164,7 +164,28 @@ export default function NotificacionesPage() {
         </Button>
       </div>
 
-      {configs.map((config) => {
+      {/* Global toggle */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <span className="text-sm font-medium text-gym-text">{messages.notificaciones.switchGlobal}</span>
+              <p className="text-xs text-gym-muted">{messages.notificaciones.switchGlobalDesc}</p>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer">
+              <input
+                type="checkbox"
+                className="sr-only peer"
+                checked={gymConfig.notificaciones_enabled || false}
+                onChange={(e) => setGymConfig({ ...gymConfig, notificaciones_enabled: e.target.checked })}
+              />
+              <div className="w-11 h-6 bg-gym-surface peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-gym-primary rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-gym-primary"></div>
+            </label>
+          </div>
+        </CardContent>
+      </Card>
+
+      {gymConfig.notificaciones_enabled && configs.map((config) => {
         const info = tipoLabels[config.tipo_notificacion];
         return (
           <Card key={config.id}>
@@ -260,6 +281,12 @@ export default function NotificacionesPage() {
               {messages.notificaciones.diagnostico}
             </Button>
           </div>
+          <p className="text-xs text-gym-muted">
+            <strong>Ejecutar Ahora:</strong> Revisa la frecuencia de cada notificación habilitado y envía los correos pendientes inmediatamente.
+          </p>
+          <p className="text-xs text-gym-muted">
+            <strong>Diagnóstico:</strong> Envía un correo de prueba con un reporte completo del estado del sistema para verificar que el email funciona correctamente.
+          </p>
         </CardContent>
       </Card>
 
@@ -309,6 +336,7 @@ export default function NotificacionesPage() {
           )}
         </CardContent>
       </Card>
+      )}
 
       {/* Mobile floating save button */}
       <button

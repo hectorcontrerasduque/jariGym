@@ -253,6 +253,7 @@ export async function sendSystemStatusEmail(
     maxMiembros: number;
     ultimoMiembroRegistrado: string;
     ultimoPagoRegistrado: string;
+    migraciones: number;
   },
   gymLogo?: string | null,
   direccion?: string | null,

@@ -466,6 +466,11 @@ async function procesarEstatusSistema(gymConfig: {
     detalle: e.error_detalle || "Sin detalle",
   }));
 
+  const { count: migraciones } = await supabase
+    .from("migracion")
+    .select("id", { count: "exact", head: true })
+    .eq("migrado", "migrado");
+
   try {
     const { sendSystemStatusEmail } = await import(
       "@/lib/services/email/email.service"
@@ -494,6 +499,7 @@ async function procesarEstatusSistema(gymConfig: {
         ultimoPagoRegistrado: ultimoPago
           ? new Date(ultimoPago.created_at).toLocaleDateString("es-ES")
           : "N/A",
+        migraciones: migraciones || 0,
       },
       gymConfig.logo_url,
       undefined,

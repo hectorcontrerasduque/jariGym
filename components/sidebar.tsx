@@ -23,13 +23,6 @@ const adminNavItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/dashboard/pagos", label: "Pagos", icon: CreditCard },
   { href: "/dashboard/miembros", label: "Miembros", icon: Users },
-  { href: "/dashboard/configuracion", label: "Config", icon: Settings },
-];
-
-const adminNavItemsConNotificaciones = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/dashboard/pagos", label: "Pagos", icon: CreditCard },
-  { href: "/dashboard/miembros", label: "Miembros", icon: Users },
   { href: "/dashboard/configuracion/notificaciones", label: "Notificaciones", icon: Bell },
   { href: "/dashboard/configuracion", label: "Config", icon: Settings },
 ];
@@ -45,7 +38,6 @@ export function Sidebar() {
   const [gymName, setGymName] = useState("GymApp");
   const [gymLogo, setGymLogo] = useState("");
   const [hasConfig, setHasConfig] = useState<boolean | null>(null);
-  const [notificacionesEnabled, setNotificacionesEnabled] = useState(false);
 
   useEffect(() => {
     const supabase = createClient();
@@ -76,7 +68,6 @@ export function Sidebar() {
           setHasConfig(true);
           if (config.nombre_gym) setGymName(config.nombre_gym);
           if (config.logo_url) setGymLogo(config.logo_url);
-          setNotificacionesEnabled(config.notificaciones_enabled || false);
         } else {
           setHasConfig(false);
         }
@@ -127,7 +118,7 @@ export function Sidebar() {
   const navItems = hasConfig === false
     ? (isSuperAdmin ? [{ href: "/dashboard/configuracion", label: "Config", icon: Settings }] : [])
     : (isAdmin
-      ? (notificacionesEnabled ? adminNavItemsConNotificaciones : adminNavItems)
+      ? adminNavItems
       : miembroNavItems);
 
   return (

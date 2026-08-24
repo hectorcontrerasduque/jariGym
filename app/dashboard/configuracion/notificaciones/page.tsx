@@ -186,157 +186,157 @@ export default function NotificacionesPage() {
       </Card>
 
       {gymConfig.notificaciones_enabled && <>
-      {configs.map((config) => {
-        const info = tipoLabels[config.tipo_notificacion];
-        return (
-          <Card key={config.id}>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                {info.icon}
-                {info.label}
-              </CardTitle>
-              <p className="text-sm text-gym-muted">{info.desc}</p>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between p-3 bg-gym-bg rounded-xl">
-                <span className="text-sm font-medium text-gym-text">{messages.notificaciones.habilitado}</span>
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    className="sr-only peer"
-                    checked={config.habilitado}
-                    onChange={(e) => handleToggleConfig(config.id, "habilitado", e.target.checked)}
-                  />
-                  <div className="w-11 h-6 bg-gym-surface peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-gym-primary rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-gym-primary"></div>
-                </label>
-              </div>
+        {configs.map((config) => {
+          const info = tipoLabels[config.tipo_notificacion];
+          return (
+            <Card key={config.id}>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  {info.icon}
+                  {info.label}
+                </CardTitle>
+                <p className="text-sm text-gym-muted">{info.desc}</p>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center justify-between p-3 bg-gym-bg rounded-xl">
+                  <span className="text-sm font-medium text-gym-text">{messages.notificaciones.habilitado}</span>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="sr-only peer"
+                      checked={config.habilitado}
+                      onChange={(e) => handleToggleConfig(config.id, "habilitado", e.target.checked)}
+                    />
+                    <div className="w-11 h-6 bg-gym-surface peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-gym-primary rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-gym-primary"></div>
+                  </label>
+                </div>
 
-              <div>
-                <p className="text-sm font-medium text-gym-text mb-2">{messages.notificaciones.frecuencia}</p>
-                <div className="flex gap-4">
-                  {[
-                    { field: "frecuencia_semanal", label: messages.notificaciones.semanaS },
-                    { field: "frecuencia_quincenal", label: messages.notificaciones.quincenalS },
-                    { field: "frecuencia_mensual", label: messages.notificaciones.mensualS },
-                  ].map((freq) => (
-                    <label key={freq.field} className="flex items-center gap-2 cursor-pointer">
+                <div>
+                  <p className="text-sm font-medium text-gym-text mb-2">{messages.notificaciones.frecuencia}</p>
+                  <div className="flex gap-4">
+                    {[
+                      { field: "frecuencia_semanal", label: messages.notificaciones.semanaS },
+                      { field: "frecuencia_quincenal", label: messages.notificaciones.quincenalS },
+                      { field: "frecuencia_mensual", label: messages.notificaciones.mensualS },
+                    ].map((freq) => (
+                      <label key={freq.field} className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          className="w-4 h-4 rounded border-gym-border text-gym-primary focus:ring-gym-primary"
+                          checked={config[freq.field as keyof NotificacionConfig] as boolean || false}
+                          onChange={(e) => handleToggleConfig(config.id, freq.field, e.target.checked)}
+                        />
+                        <span className="text-sm text-gym-text">{freq.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                {config.tipo_notificacion === "recordatorio_pago" && (
+                  <div>
+                    <p className="text-sm font-medium text-gym-text mb-1">{messages.notificaciones.diasPrevio}</p>
+                    <p className="text-xs text-gym-muted mb-2">{messages.notificaciones.diasPrevioDesc}</p>
+                    <input
+                      type="number"
+                      min="1"
+                      max="30"
+                      value={config.dias_previo}
+                      onChange={(e) => handleDiasPrevioChange(config.id, parseInt(e.target.value) || 3)}
+                      className="w-20 px-3 py-2 bg-gym-surface border border-gym-border rounded-xl text-gym-text focus:outline-none focus:ring-2 focus:ring-gym-primary"
+                    />
+                  </div>
+                )}
+
+                <div>
+                  <p className="text-sm font-medium text-gym-text mb-2">{messages.notificaciones.canales}</p>
+                  <div className="flex gap-4 items-center">
+                    <label className="flex items-center gap-2 cursor-pointer">
                       <input
                         type="checkbox"
                         className="w-4 h-4 rounded border-gym-border text-gym-primary focus:ring-gym-primary"
-                        checked={config[freq.field as keyof NotificacionConfig] as boolean || false}
-                        onChange={(e) => handleToggleConfig(config.id, freq.field, e.target.checked)}
+                        checked={config.notificar_por_email}
+                        onChange={(e) => handleToggleConfig(config.id, "notificar_por_email", e.target.checked)}
                       />
-                      <span className="text-sm text-gym-text">{freq.label}</span>
+                      <span className="text-sm text-gym-text">{messages.notificaciones.email}</span>
                     </label>
-                  ))}
+                    <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-gym-muted bg-gym-surface border border-gym-border rounded-lg opacity-60 cursor-not-allowed">
+                      {messages.notificaciones.whatsapp}
+                      <span className="text-[10px] bg-gym-border/50 px-1.5 py-0.5 rounded-md ml-1">Próximamente</span>
+                    </span>
+                  </div>
                 </div>
-              </div>
+              </CardContent>
+            </Card>
+          );
+        })}
 
-              {config.tipo_notificacion === "recordatorio_pago" && (
-                <div>
-                  <p className="text-sm font-medium text-gym-text mb-1">{messages.notificaciones.diasPrevio}</p>
-                  <p className="text-xs text-gym-muted mb-2">{messages.notificaciones.diasPrevioDesc}</p>
-                  <input
-                    type="number"
-                    min="1"
-                    max="30"
-                    value={config.dias_previo}
-                    onChange={(e) => handleDiasPrevioChange(config.id, parseInt(e.target.value) || 3)}
-                    className="w-20 px-3 py-2 bg-gym-surface border border-gym-border rounded-xl text-gym-text focus:outline-none focus:ring-2 focus:ring-gym-primary"
-                  />
-                </div>
-              )}
-
-              <div>
-                <p className="text-sm font-medium text-gym-text mb-2">{messages.notificaciones.canales}</p>
-                <div className="flex gap-4 items-center">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      className="w-4 h-4 rounded border-gym-border text-gym-primary focus:ring-gym-primary"
-                      checked={config.notificar_por_email}
-                      onChange={(e) => handleToggleConfig(config.id, "notificar_por_email", e.target.checked)}
-                    />
-                    <span className="text-sm text-gym-text">{messages.notificaciones.email}</span>
-                  </label>
-                  <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-gym-muted bg-gym-surface border border-gym-border rounded-lg opacity-60 cursor-not-allowed">
-                    {messages.notificaciones.whatsapp}
-                    <span className="text-[10px] bg-gym-border/50 px-1.5 py-0.5 rounded-md ml-1">Próximamente</span>
-                  </span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        );
-      })}
-
-      <Card>
-        <CardContent className="p-4 space-y-3">
-          <div className="flex gap-3">
-            <Button onClick={handleEjecutarAhora} loading={executing} className="flex-1">
-              <Play className="w-4 h-4 mr-2" />
-              {messages.notificaciones.ejecutarAhora}
-            </Button>
-            <Button onClick={handleDiagnostico} loading={diagnosticing} className="flex-1">
-              <Stethoscope className="w-4 h-4 mr-2" />
-              {messages.notificaciones.diagnostico}
-            </Button>
-          </div>
-          <p className="text-xs text-gym-muted">
-            <strong>Ejecutar Ahora:</strong> Revisa la frecuencia de cada notificación habilitado y envía los correos pendientes inmediatamente.
-          </p>
-          <p className="text-xs text-gym-muted">
-            <strong>Diagnóstico:</strong> Envía un correo de prueba con un reporte completo del estado del sistema para verificar que el email funciona correctamente.
-          </p>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">{messages.notificaciones.historial}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {historial.length === 0 ? (
-            <p className="text-gym-muted text-center py-8">{messages.notificaciones.sinRegistros}</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-gym-border">
-                    <th className="text-left py-2 text-gym-muted font-medium">{messages.notificaciones.fecha}</th>
-                    <th className="text-left py-2 text-gym-muted font-medium">{messages.notificaciones.tipo}</th>
-                    <th className="text-center py-2 text-gym-muted font-medium">{messages.notificaciones.miembros}</th>
-                    <th className="text-center py-2 text-gym-muted font-medium">{messages.notificaciones.estado}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {historial.map((log) => {
-                    const tipoConfig = log.notificacion_config;
-                    const tipoInfo = tipoConfig ? tipoLabels[tipoConfig.tipo_notificacion] : null;
-                    const fecha = new Date(log.fecha_hora_envio);
-                    return (
-                      <tr key={log.id} className="border-b border-gym-border/50">
-                        <td className="py-3 text-gym-text">
-                          {fecha.getDate()} {mesesNombres[fecha.getMonth()]} {fecha.getHours().toString().padStart(2, "0")}:{fecha.getMinutes().toString().padStart(2, "0")}
-                        </td>
-                        <td className="py-3 text-gym-text">{tipoInfo?.label || tipoConfig?.tipo_notificacion}</td>
-                        <td className="py-3 text-gym-text text-center">{log.miembros_notificados}</td>
-                        <td className="py-3 text-center">
-                          {log.sin_problemas ? (
-                            <CheckCircle className="w-4 h-4 text-green-500 inline" />
-                          ) : (
-                            <XCircle className="w-4 h-4 text-red-500 inline" />
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+        <Card>
+          <CardContent className="p-4 space-y-3">
+            <div className="flex gap-3">
+              <Button onClick={handleEjecutarAhora} loading={executing} className="flex-1">
+                <Play className="w-4 h-4 mr-2" />
+                {messages.notificaciones.ejecutarAhora}
+              </Button>
+              <Button onClick={handleDiagnostico} loading={diagnosticing} className="flex-1">
+                <Stethoscope className="w-4 h-4 mr-2" />
+                {messages.notificaciones.diagnostico}
+              </Button>
             </div>
-          )}
-        </CardContent>
-      </Card>
+            <p className="text-xs text-gym-muted">
+              <strong>Ejecutar Notificaciones Ahora:</strong> Revisa la frecuencia de cada notificación habilitado y envía los correos pendientes inmediatamente.
+            </p>
+            <p className="text-xs text-gym-muted">
+              <strong>Ejecutar Diagnóstico:</strong> Envía un correo de prueba con un reporte completo del estado del sistema para verificar que el email funciona correctamente.
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">{messages.notificaciones.historial}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {historial.length === 0 ? (
+              <p className="text-gym-muted text-center py-8">{messages.notificaciones.sinRegistros}</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gym-border">
+                      <th className="text-left py-2 text-gym-muted font-medium">{messages.notificaciones.fecha}</th>
+                      <th className="text-left py-2 text-gym-muted font-medium">{messages.notificaciones.tipo}</th>
+                      <th className="text-center py-2 text-gym-muted font-medium">{messages.notificaciones.miembros}</th>
+                      <th className="text-center py-2 text-gym-muted font-medium">{messages.notificaciones.estado}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {historial.map((log) => {
+                      const tipoConfig = log.notificacion_config;
+                      const tipoInfo = tipoConfig ? tipoLabels[tipoConfig.tipo_notificacion] : null;
+                      const fecha = new Date(log.fecha_hora_envio);
+                      return (
+                        <tr key={log.id} className="border-b border-gym-border/50">
+                          <td className="py-3 text-gym-text">
+                            {fecha.getDate()} {mesesNombres[fecha.getMonth()]} {fecha.getHours().toString().padStart(2, "0")}:{fecha.getMinutes().toString().padStart(2, "0")}
+                          </td>
+                          <td className="py-3 text-gym-text">{tipoInfo?.label || tipoConfig?.tipo_notificacion}</td>
+                          <td className="py-3 text-gym-text text-center">{log.miembros_notificados}</td>
+                          <td className="py-3 text-center">
+                            {log.sin_problemas ? (
+                              <CheckCircle className="w-4 h-4 text-green-500 inline" />
+                            ) : (
+                              <XCircle className="w-4 h-4 text-red-500 inline" />
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </>}
 
       {/* Mobile floating save button */}

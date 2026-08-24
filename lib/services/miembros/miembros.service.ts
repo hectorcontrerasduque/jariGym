@@ -8,7 +8,7 @@ export class MiembrosService {
   async listarMiembros(): Promise<Profile[]> {
     const { data, error } = await this.supabase
       .from("profiles")
-      .select("id, nombre_completo, email, avatar_url, activo, role, fecha_inscripcion, notas_admin, inscripcion_pagada")
+      .select("id, nombre_completo, email, avatar_url, activo, role, fecha_inscripcion, notas_admin, inscripcion_pagada, hora_llegada, hora_salida")
       .order("fecha_inscripcion", { ascending: false });
 
     if (error) throw error;

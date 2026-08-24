@@ -243,7 +243,7 @@ export default function DashboardPage() {
               </div>
               <div>
                 <p className="text-xs text-gym-muted">Al día</p>
-                <p className="text-xl font-bold text-gym-success neon-text-success">{stats?.alDiaMensualidad || 0}</p>
+                <p className="text-xl font-bold text-gym-success neon-text-success">{stats?.alDiaMensualidad || 0}/{stats?.miembrosActivos || 0}</p>
               </div>
             </div>
             <div className="mt-3 text-xs text-gym-muted">

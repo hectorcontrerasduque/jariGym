@@ -129,6 +129,22 @@ export default function DashboardPage() {
 
   const maxMiembros = monthlyStats ? Math.max(...monthlyStats.meses.map(m => m.pagados + m.sinPago + m.libres), 1) : 1;
 
+  const hourCounts: Record<string, number> = {};
+  for (const m of miembros) {
+    if (m.hora_llegada && m.hora_salida && m.hora_llegada !== "--:--" && m.hora_salida !== "--:--") {
+      const startH = parseInt(m.hora_llegada.split(":")[0], 10);
+      const endH = parseInt(m.hora_salida.split(":")[0], 10);
+      if (!isNaN(startH) && !isNaN(endH)) {
+        for (let h = startH; h <= endH; h++) {
+          const key = `${String(h).padStart(2, "0")}:00`;
+          hourCounts[key] = (hourCounts[key] || 0) + 1;
+        }
+      }
+    }
+  }
+  const hourEntries = Object.entries(hourCounts).sort((a, b) => a[0].localeCompare(b[0]));
+  const maxHourCount = Math.max(...hourEntries.map((e) => e[1]), 1);
+
   return (
     <div className="space-y-6 animate-fadeIn relative">
       <div className="absolute top-0 right-0 w-72 h-72 bg-gym-primary/5 rounded-full blur-3xl animate-pulse" />
@@ -399,54 +415,34 @@ export default function DashboardPage() {
       </Card>
 
       {/* Distribución por hora de entrenamiento */}
-      {(() => {
-        const hourCounts: Record<string, number> = {};
-        for (const m of miembros) {
-          if (m.hora_llegada && m.hora_salida && m.hora_llegada !== "--:--" && m.hora_salida !== "--:--") {
-            const startH = parseInt(m.hora_llegada.split(":")[0], 10);
-            const endH = parseInt(m.hora_salida.split(":")[0], 10);
-            if (!isNaN(startH) && !isNaN(endH)) {
-              for (let h = startH; h <= endH; h++) {
-                const key = `${String(h).padStart(2, "0")}:00`;
-                hourCounts[key] = (hourCounts[key] || 0) + 1;
-              }
-            }
-          }
-        }
-        const entries = Object.entries(hourCounts).sort((a, b) => a[0].localeCompare(b[0]));
-        const maxCount = Math.max(...entries.map((e) => e[1]), 1);
-        if (entries.length === 0) return null;
-        return (
-          <Card>
-            <button type="button" className="w-full text-left" onClick={() => setCollapseDistHoras(!collapseDistHoras)}>
-              <CardHeader className="pb-2 cursor-pointer select-none">
-                <CardTitle className="flex items-center gap-2">
-                  {collapseDistHoras ? <ChevronRight className="w-5 h-5 text-gym-primary" /> : <ChevronDown className="w-5 h-5 text-gym-primary" />}
-                  Distribución por hora
-                </CardTitle>
-              </CardHeader>
-            </button>
-            {!collapseDistHoras && (
-            <CardContent>
-              <div className="space-y-2">
-                {entries.map(([hour, count]) => (
-                  <div key={hour} className="flex items-center gap-3">
-                    <span className="text-xs text-gym-muted w-12 text-right font-mono">{hour}</span>
-                    <div className="flex-1 h-5 bg-gym-bg rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-gym-primary/70 rounded-full transition-all"
-                        style={{ width: `${(count / maxCount) * 100}%` }}
-                      />
-                    </div>
-                    <span className="text-xs text-gym-text w-6 text-right">{count}</span>
+      {hourEntries.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2 cursor-pointer select-none" onClick={() => setCollapseDistHoras(!collapseDistHoras)}>
+            <CardTitle className="flex items-center gap-2">
+              {collapseDistHoras ? <ChevronRight className="w-5 h-5 text-gym-primary" /> : <ChevronDown className="w-5 h-5 text-gym-primary" />}
+              Distribución por hora
+            </CardTitle>
+          </CardHeader>
+          {!collapseDistHoras && (
+          <CardContent>
+            <div className="space-y-2">
+              {hourEntries.map(([hour, count]) => (
+                <div key={hour} className="flex items-center gap-3">
+                  <span className="text-xs text-gym-muted w-12 text-right font-mono">{hour}</span>
+                  <div className="flex-1 h-5 bg-gym-bg rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-gym-primary/70 rounded-full transition-all"
+                      style={{ width: `${(count / maxHourCount) * 100}%` }}
+                    />
                   </div>
-                ))}
-              </div>
-            </CardContent>
-            )}
-          </Card>
-        );
-      })()}
+                  <span className="text-xs text-gym-text w-6 text-right">{count}</span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+          )}
+        </Card>
+      )}
     </div>
   );
 }

@@ -105,7 +105,7 @@ export function Sidebar() {
     const handleConfigUpdated = () => getGymConfig();
     window.addEventListener("config:updated", handleConfigUpdated);
     return () => window.removeEventListener("config:updated", handleConfigUpdated);
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSignOut = async () => {
     await createClient().auth.signOut();

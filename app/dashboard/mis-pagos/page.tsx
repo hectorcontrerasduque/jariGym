@@ -384,14 +384,8 @@ export default function MisPagosPage() {
   }, [mesesPendientes, pagos]);
 
   const mesesParaSuspender = useMemo(() => {
-    const all: { mes: number; anio: number }[] = [...mesesPendientes];
-    for (const m of mesesConPagoPendiente) {
-      if (!all.some(x => x.mes === m.mes && x.anio === m.anio)) {
-        all.push({ mes: m.mes, anio: m.anio });
-      }
-    }
-    return all.sort((a, b) => a.anio - b.anio || a.mes - b.mes);
-  }, [mesesPendientes, mesesConPagoPendiente]);
+    return [...mesesPendientes].sort((a, b) => a.anio - b.anio || a.mes - b.mes);
+  }, [mesesPendientes]);
 
   if (loading) {
     return (

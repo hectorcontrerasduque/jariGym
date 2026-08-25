@@ -514,11 +514,11 @@ export class PagosService {
     const inscritosPendientes = miembrosActivos.filter((m) => !miembrosConInscripcionPagada.has(m.id)).length;
 
     // Deudores: usar función centralizada
-    const morosos = await this.getMiembrosMorosos();
+    const morosos = await this.getMiembrosMorosos(anioConsulta);
     const deudoresInscripcion = morosos.filter((m) => m.debeInscripcion).length;
-    const deudoresMensualidad = morosos.filter((m) => m.debeMensualidad).length;
+    const deudoresMensualidad = morosos.filter((m) => m.mesesDeuda.length > 0).length;
     const montoDeudaInscripcion = morosos.filter((m) => m.debeInscripcion).length * montoInscripcion;
-    const montoDeudaMensualidad = morosos.filter((m) => m.debeMensualidad).length * montoMensual;
+    const montoDeudaMensualidad = morosos.reduce((sum, m) => sum + m.mesesDeuda.length, 0) * montoMensual;
     const montoDeuda = montoDeudaInscripcion + montoDeudaMensualidad;
 
     // Al día: miembros con inscripción pagada que tienen pago aprobado en mes actual
@@ -553,7 +553,7 @@ export class PagosService {
     };
   }
 
-  async getMiembrosMorosos(): Promise<
+  async getMiembrosMorosos(anio?: number): Promise<
     Array<{
       id: string;
       email: string;
@@ -561,11 +561,12 @@ export class PagosService {
       deudas: Array<{ mes: number; anio: number; monto: number }>;
       totalDeuda: number;
       debeInscripcion: boolean;
-      debeMensualidad: boolean;
+      mesesDeuda: number[];
     }>
   > {
-    const mesActual = new Date().getMonth() + 1;
-    const anioActual = new Date().getFullYear();
+    const hoy = new Date();
+    const anioConsulta = anio || hoy.getFullYear();
+    const mesActual = anioConsulta === hoy.getFullYear() ? hoy.getMonth() + 1 : 12;
 
     const [miembrosResult, configResult, libresResult, ownerResult] = await Promise.all([
       supabase
@@ -576,7 +577,7 @@ export class PagosService {
         .not("email", "is", null),
       supabase
         .from("gym_config_metodos_pago")
-        .select("monto_inscripcion")
+        .select("monto_mensual, monto_inscripcion")
         .eq("habilitado", true)
         .limit(1)
         .maybeSingle(),
@@ -594,13 +595,15 @@ export class PagosService {
     const miembros = miembrosResult.data;
     if (!miembros || miembros.length === 0) return [];
 
+    const montoMensual = configResult.data?.monto_mensual || 0;
     const montoInscripcion = configResult.data?.monto_inscripcion || 0;
     const miembrosLibresIds = new Set((libresResult.data || []).map((l) => l.usuario_id));
     const ownerEmail = ownerResult.data?.dueno_email?.toLowerCase() || "";
 
     const { data: todosPagos } = await supabase
       .from("pagos")
-      .select("usuario_id, mes_pagar, anio_pagar, monto, estado, notas");
+      .select("usuario_id, mes_pagar, anio_pagar, monto, estado, notas")
+      .eq("anio_pagar", anioConsulta);
 
     const pagosAprobados = (todosPagos || []).filter((p) => p.estado === "aprobado");
 
@@ -621,7 +624,7 @@ export class PagosService {
       deudas: Array<{ mes: number; anio: number; monto: number }>;
       totalDeuda: number;
       debeInscripcion: boolean;
-      debeMensualidad: boolean;
+      mesesDeuda: number[];
     }> = [];
 
     for (const miembro of miembros) {
@@ -630,17 +633,25 @@ export class PagosService {
 
       const debeInscripcion = !miembrosConInscripcionPagada.has(miembro.id);
 
+      // Meses sin pago aprobado en el año consultado
       const pagosMiembroAprobados = pagosAprobados.filter((p) => p.usuario_id === miembro.id);
       const mesesPagados = new Set(pagosMiembroAprobados.map((p) => p.mes_pagar));
-      const debeMensualidad = !mesesPagados.has(mesActual);
 
-      if (!debeInscripcion && !debeMensualidad) continue;
+      const mesesDeuda: number[] = [];
+      for (let mes = 1; mes <= mesActual; mes++) {
+        if (!mesesPagados.has(mes)) {
+          mesesDeuda.push(mes);
+        }
+      }
+
+      if (!debeInscripcion && mesesDeuda.length === 0) continue;
 
       // Obtener pagos pendientes/suspendidos para el email
       const { data: pagosPendientes } = await supabase
         .from("pagos")
         .select("mes_pagar, anio_pagar, monto")
         .eq("usuario_id", miembro.id)
+        .eq("anio_pagar", anioConsulta)
         .in("estado", ["pendiente", "suspendido", "suspendido_pendiente"]);
 
       const deudas = (pagosPendientes || []).map((p) => ({
@@ -649,7 +660,8 @@ export class PagosService {
         monto: p.monto,
       }));
 
-      const totalDeuda = deudas.reduce((sum, d) => sum + d.monto, 0) + (debeInscripcion ? montoInscripcion : 0);
+      // Total: meses sin pago * montoMensual + inscripción si la debe
+      const totalDeuda = mesesDeuda.length * montoMensual + (debeInscripcion ? montoInscripcion : 0);
 
       morosos.push({
         id: miembro.id,
@@ -658,7 +670,7 @@ export class PagosService {
         deudas,
         totalDeuda,
         debeInscripcion,
-        debeMensualidad,
+        mesesDeuda,
       });
     }
 

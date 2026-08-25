@@ -640,7 +640,9 @@ export class PagosService {
       const debeInscripcion = !miembrosConInscripcionPagada.has(miembro.id);
 
       // Determinar primer mes que el miembro debería haber pagado
-      const fechaInicioStr = fechaInicioMap.get(miembro.id) || miembro.fecha_inscripcion;
+      const fechaInicioMembresia = fechaInicioMap.get(miembro.id);
+      const fechaInscripcion = miembro.fecha_inscripcion;
+      const fechaInicioStr = fechaInicioMembresia || fechaInscripcion;
       let primerMesDeuda = 1;
       if (fechaInicioStr) {
         const parts = fechaInicioStr.split("-").map(Number);

@@ -217,7 +217,7 @@ async function procesarRecordatorioPago(diasPrevio: number, gymConfig: Record<st
     .from("profiles")
     .select("id, email, nombre_completo")
     .eq("role", "miembro")
-    .or("activo.eq.true,activo.is.null")
+    .eq("activo", true)
     .not("email", "is", null);
 
   if (!miembros || miembros.length === 0) return 0;
@@ -308,7 +308,7 @@ async function procesarResumenDueno(gymConfig: Record<string, unknown>): Promise
     .from("profiles")
     .select("id", { count: "exact", head: true })
     .eq("role", "miembro")
-    .or("activo.eq.true,activo.is.null");
+    .eq("activo", true);
 
   const { count: migraciones } = await supabase
     .from("migracion")
@@ -352,7 +352,7 @@ async function procesarEstatusSistema(gymConfig: Record<string, unknown>): Promi
   const { count: totalActivos } = await supabase
     .from("profiles")
     .select("id", { count: "exact", head: true })
-    .or("activo.eq.true,activo.is.null");
+    .eq("activo", true);
 
   const { count: totalInactivos } = await supabase
     .from("profiles")

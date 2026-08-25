@@ -9,7 +9,7 @@ export interface Profile {
   hora_llegada: string | null;
   hora_salida: string | null;
   role: "super_admin" | "admin" | "miembro";
-  activo: boolean | null;
+  activo: boolean;
   fecha_inscripcion: string;
   monto_inscripcion_pagado: number;
   inscripcion_pagada: boolean;

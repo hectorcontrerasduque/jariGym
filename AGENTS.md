@@ -34,9 +34,13 @@ app/
     reportar-pago/   # Create payments (admin for others, miembro for self, super_admin can approve)
     mis-pagos/       # Miembro's own payment history
     perfil/          # Profile edit (supports ?user_id for super_admin)
+  configuracion/notificaciones/  # Notification config (4 types, per-type toggle, Ejecutar Ahora)
   api/miembros/      # POST endpoint for creating members
   api/migracion/     # POST: migrate member data from Excel, search, ping
   api/profile/       # PUT endpoint for profile updates (uses service role key)
+  api/notificaciones/  # Cron: weekly notification dispatch + admin-triggered
+    route.ts          # POST: auth (cron secret OR admin token), frequency check, dispatches types
+    procesar/route.ts # POST: manual trigger by admin, `forzar` bypasses frequency
   api/auth/
     forgot-password/ # POST: generates token + sends email via Gmail SMTP
     reset-password/  # POST: validates token + sets new password
@@ -73,7 +77,7 @@ __tests__/
   migracion.test.ts # Unit tests for migration flow
 ```
 
-## Critical: Supabase Client Pattern
+## Supabase Client Pattern (CRITICAL)
 
 Three separate clients exist for three contexts:
 - **Browser**: `lib/supabase/client.ts` — `createBrowserClient()`, sync
@@ -81,6 +85,25 @@ Three separate clients exist for three contexts:
 - **Middleware**: `lib/supabase/middleware.ts` — `createServerClient()`, sync
 
 **Do not mix these up.** Server client is `async` — always `await` the call.
+
+### The `pagosService` trap (fixed in commit 85577de)
+
+`PagosService` (`lib/services/pagos/pagos.service.ts`) creates a **browser client** at module level:
+```ts
+private supabase = createClient(); // → createBrowserClient() with anon key
+```
+
+When imported in **server-side API routes**, this client has **NO user session** (no cookies), so all Supabase queries run as **unauthenticated anon**. RLS blocks reads → returns empty results.
+
+**Rule**: Any service method called from API routes that queries RLS-protected tables **must** accept an optional Supabase client parameter. Pass the route's `service_role` client from the API route.
+
+```ts
+// CORRECT — API route passes service_role client
+const morosos = await pagosService.getMiembrosMorosos(undefined, supabase);
+
+// WRONG — uses browser client with no auth in server context
+const morosos = await pagosService.getMiembrosMorosos();
+```
 
 ## Environment Variables
 
@@ -99,7 +122,7 @@ Schema managed via numbered SQL files in `supabase/migrations/`. Run manually:
 1. Go to Supabase Dashboard → SQL Editor
 2. Paste migration content → Run
 
-Tables: `tenants`, `profiles`, `planes`, `membresias`, `pagos`, `gym_config`, `gym_config_metodos_pago`, `migracion`, `notificaciones_config`, `notificaciones_log`, `password_reset_tokens`
+Tables: `tenants`, `profiles`, `planes`, `membresias`, `pagos`, `gym_config`, `gym_config_metodos_pago`, `migracion`, `notificacion_config`, `notificacion_log`, `password_reset_tokens`
 
 RLS uses helper functions (`get_user_role()`, `get_user_tenant_id()`) with `SECURITY DEFINER` to avoid infinite recursion. **Never create RLS policies that query the same table directly.**
 
@@ -233,6 +256,9 @@ inscripcion_fecha: string | null
 ## Recent Git History (newest first)
 
 ```
+85577de fix: getMiembrosMorosos usa service_role en API routes - corrige envio de correos a morosos
+75585b2 fix: boton ejecutar primary + rename Miembros Morosos + logging errores email + fallback deudas vacias
+1fcd567 fix: notificaciones test - import messages en vez de require
 b7fd848 fix: mensajes de error migración centralizados en messages.ts + sin console
 54f1b66 fix: inscripcion_pagada owner + prerequisito migración + mensajes error específicos
 786ca81 fix: inscripcion_pagada en migración + dueño + búsqueda fuzzy por nombre
@@ -245,14 +271,42 @@ bec76e1 fix: mover useEffect de redirect después de declarar isSuperAdmin
 171852d fix: sin config → super_admin solo ve Config, miembro ve mensaje
 ```
 
+## Notifications System
+
+### Config (`notificacion_config` table)
+4 types: `miembros_deudores`, `recordatorio_pago`, `resumen_dueno`, `estatus_sistema`
+- Each has: `habilitado`, `frecuencia_semanal/quincenal/mensual`, `dias_previo`
+- `notificaciones_enabled` in `gym_config` is the master toggle (shows/hides the section)
+
+### Log (`notificacion_log` table)
+- `id_notificacion_config` (FK), `miembros_notificados`, `sin_problemas`, `error_detalle`, `fecha_hora_envio`
+
+### Execution flow
+1. **Cron**: `POST /api/notificaciones` with `Authorization: Bearer <CRON_SECRET>` or admin JWT
+2. **Manual**: `POST /api/notificaciones/procesar` with admin JWT + `{ tipo?: string, forzar?: boolean }`
+3. Route queries `notificacion_config WHERE habilitado = true`, loops configs, checks frequency (skipped if `forzar`), calls `ejecutarTipo()`
+4. `ejecutarTipo()` dispatches to `procesarMiembrosDeudores`, `procesarRecordatorioPago`, `procesarResumenDueno`, `procesarEstatusSistema`
+5. Each logs to `notificacion_log` (success or error)
+
+### Dashboard trigger
+- `app/dashboard/page.tsx` fires `procesarTodasLasNotificaciones()` on mount when `notificaciones_enabled` is true (background, no await)
+
+### Sidebar
+- Notifications link at top level: `<SidebarItem icon={Bell} label="Notificaciones" href="/dashboard/configuracion/notificaciones" />`
+
+### Per-type execution
+- "Ejecutar Ahora" on a specific type sends `{ tipo: "miembros_deudores", forzar: true }` → API skips frequency, executes only that type
+- `forzar: true` bypasses `verificarFrecuencia()` — always runs regardless of last execution date
+
 ## Migrations Applied
 
-001–028 applied in Supabase SQL Editor. Key ones:
+001–029 applied in Supabase SQL Editor. Key ones:
 - **019**: RPC functions (aprobar_pago_atomico, etc.) — **NOTE: 020 dropped these, breaking approval**
 - **020**: Dropped RPC functions
 - **025**: RLS for pagos suspendido + migracion (service_role only)
 - **026**: Nuclear reset — TRUNCATE pagos/membresias, DELETE all users/profiles/config
 - **027**: Added `registered` boolean to profiles
 - **028**: Added `tipo_pago` column to pagos (membresia/inscripcion)
+- **029**: Notifications system — `notificacion_config`, `notificacion_log` tables + RLS
 
 **Pending**: Push commits to origin (user must do from Windows: `git push`)

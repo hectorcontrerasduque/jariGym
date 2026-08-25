@@ -8,6 +8,7 @@ import {
   sendSystemStatusEmail,
   sleep,
 } from "@/lib/services/email/email.service";
+import { pagosService } from "@/lib/services/pagos/pagos.service";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -170,46 +171,19 @@ async function procesarMiembrosDeudores(gymConfig: Record<string, unknown>): Pro
   const logoUrl = gymConfig.logo_url as string | null;
   const direccion = gymConfig.direccion as string | null;
 
-  const { data: miembros } = await supabase
-    .from("profiles")
-    .select("id, email, nombre_completo")
-    .eq("role", "miembro")
-    .or("activo.eq.true,activo.is.null")
-    .not("email", "is", null);
+  const morosos = await pagosService.getMiembrosMorosos();
+  if (morosos.length === 0) return 0;
 
-  if (!miembros || miembros.length === 0) return 0;
-
-  const mesActual = new Date().getMonth() + 1;
-  const anioActual = new Date().getFullYear();
   let count = 0;
 
-  for (const miembro of miembros) {
-    const { data: pagos } = await supabase
-      .from("pagos")
-      .select("id")
-      .eq("usuario_id", miembro.id)
-      .eq("mes_pagar", mesActual)
-      .eq("anio_pagar", anioActual)
-      .eq("estado", "aprobado")
-      .limit(1);
-
-    if (pagos && pagos.length > 0) continue;
-
-    const { data: pagosPendientes } = await supabase
-      .from("pagos")
-      .select("mes_pagar, anio_pagar, monto")
-      .eq("usuario_id", miembro.id)
-      .in("estado", ["pendiente", "suspendido", "suspendido_pendiente"]);
-
-    if (!pagosPendientes || pagosPendientes.length === 0) continue;
-
+  for (const miembro of morosos) {
     try {
       await sendPaymentDebtEmail(
-        miembro.email!,
+        miembro.email,
         miembro.nombre_completo,
         nombreGym,
-        pagosPendientes.map((p) => ({ mes: p.mes_pagar, anio: p.anio_pagar, monto: p.monto })),
-        pagosPendientes.reduce((sum, p) => sum + p.monto, 0),
+        miembro.deudas,
+        miembro.totalDeuda,
         logoUrl,
         direccion
       );
@@ -233,7 +207,7 @@ async function procesarRecordatorioPago(diasPrevio: number, gymConfig: Record<st
     .from("profiles")
     .select("id, email, nombre_completo")
     .eq("role", "miembro")
-    .or("activo.eq.true,activo.is.null")
+    .eq("activo", true)
     .not("email", "is", null);
 
   if (!miembros || miembros.length === 0) return 0;
@@ -324,7 +298,7 @@ async function procesarResumenDueno(gymConfig: Record<string, unknown>): Promise
     .from("profiles")
     .select("id", { count: "exact", head: true })
     .eq("role", "miembro")
-    .or("activo.eq.true,activo.is.null");
+    .eq("activo", true);
 
   const { count: migraciones } = await supabase
     .from("migracion")
@@ -367,7 +341,7 @@ async function procesarEstatusSistema(gymConfig: Record<string, unknown>): Promi
   const { count: totalActivos } = await supabase
     .from("profiles")
     .select("id", { count: "exact", head: true })
-    .or("activo.eq.true,activo.is.null");
+    .eq("activo", true);
 
   const { count: totalInactivos } = await supabase
     .from("profiles")

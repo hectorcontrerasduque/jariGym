@@ -173,7 +173,7 @@ async function procesarMiembrosDeudores(gymConfig: Record<string, unknown>): Pro
   const logoUrl = gymConfig.logo_url as string | null;
   const direccion = gymConfig.direccion as string | null;
 
-  const morosos = await pagosService.getMiembrosMorosos();
+  const morosos = await pagosService.getMiembrosMorosos(undefined, supabase);
   if (morosos.length === 0) return 0;
 
   const { sendPaymentDebtEmail } = await import(

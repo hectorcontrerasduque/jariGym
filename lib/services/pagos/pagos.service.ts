@@ -553,7 +553,7 @@ export class PagosService {
     };
   }
 
-  async getMiembrosMorosos(anio?: number): Promise<
+  async getMiembrosMorosos(anio?: number, supabaseClient?: ReturnType<typeof createClient>): Promise<
     Array<{
       id: string;
       email: string;
@@ -564,27 +564,28 @@ export class PagosService {
       mesesDeuda: number[];
     }>
   > {
+    const supabase = supabaseClient || this.supabase;
     const hoy = new Date();
     const anioConsulta = anio || hoy.getFullYear();
     const mesActual = anioConsulta === hoy.getFullYear() ? hoy.getMonth() + 1 : 12;
 
     const [miembrosResult, configResult, libresResult, ownerResult] = await Promise.all([
-      this.supabase
+      supabase
         .from("profiles")
         .select("id, email, nombre_completo, inscripcion_pagada, activo")
         .in("role", ["miembro", "admin", "super_admin"])
         .not("email", "is", null),
-      this.supabase
+      supabase
         .from("gym_config_metodos_pago")
         .select("monto_mensual, monto_inscripcion")
         .eq("habilitado", true)
         .limit(1)
         .maybeSingle(),
-      this.supabase
+      supabase
         .from("membresias")
         .select("usuario_id")
         .is("fecha_fin", null),
-      this.supabase
+      supabase
         .from("gym_config")
         .select("dueno_email")
         .limit(1)
@@ -599,7 +600,7 @@ export class PagosService {
     const miembrosLibresIds = new Set((libresResult.data || []).map((l) => l.usuario_id));
     const ownerEmail = ownerResult.data?.dueno_email?.toLowerCase() || "";
 
-    const { data: todosPagos } = await this.supabase
+    const { data: todosPagos } = await supabase
       .from("pagos")
       .select("usuario_id, mes_pagar, anio_pagar, monto, estado, notas")
       .eq("anio_pagar", anioConsulta);

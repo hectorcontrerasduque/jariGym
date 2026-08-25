@@ -176,17 +176,22 @@ async function procesarMiembrosDeudores(gymConfig: Record<string, unknown>): Pro
   const morosos = await pagosService.getMiembrosMorosos();
   if (morosos.length === 0) return 0;
 
+  const { sendPaymentDebtEmail } = await import(
+    "@/lib/services/email/email.service"
+  );
+
   let count = 0;
   for (const miembro of morosos) {
     try {
-      const { sendPaymentDebtEmail } = await import(
-        "@/lib/services/email/email.service"
-      );
+      const deudasParaEmail = miembro.deudas.length > 0
+        ? miembro.deudas
+        : [{ mes: new Date().getMonth() + 1, anio: new Date().getFullYear(), monto: miembro.totalDeuda || 0 }];
+
       await sendPaymentDebtEmail(
         miembro.email,
         miembro.nombre_completo,
         nombreGym,
-        miembro.deudas,
+        deudasParaEmail,
         miembro.totalDeuda,
         logoUrl,
         direccion
@@ -194,7 +199,7 @@ async function procesarMiembrosDeudores(gymConfig: Record<string, unknown>): Pro
       count++;
       await sleep(3000);
     } catch (error) {
-      // Non-critical: silent
+      console.error(`[notificaciones] Error enviando deuda a ${miembro.email}:`, error);
     }
   }
 

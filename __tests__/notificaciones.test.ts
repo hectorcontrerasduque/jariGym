@@ -117,9 +117,9 @@ describe("Notificacion config types", () => {
 
   it("each type should have a label in messages", () => {
     const { messages } = require("@/lib/messages");
-    expect(messages.notificaciones.miembrosDeudores).toBeDefined();
-    expect(messages.notificaciones.recordatorioPago).toBeDefined();
-    expect(messages.notificaciones.resumenDueno).toBeDefined();
-    expect(messages.notificaciones.estatusSistema).toBeDefined();
+    expect(messages.notificaciones.tipoMiembrosDeudores).toBeDefined();
+    expect(messages.notificaciones.tipoRecordatorioPago).toBeDefined();
+    expect(messages.notificaciones.tipoResumenDueno).toBeDefined();
+    expect(messages.notificaciones.tipoEstatusSistema).toBeDefined();
   });
 });

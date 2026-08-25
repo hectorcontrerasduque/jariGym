@@ -359,7 +359,7 @@ export const messages = {
     miembros: "Miembros",
     estado: "Estado",
     sinRegistros: "No hay envíos registrados",
-    tipoMiembrosDeudores: "Miembros Deudores",
+    tipoMiembrosDeudores: "Miembros Morosos",
     tipoRecordatorioPago: "Recordatorio de Pago",
     tipoResumenDueno: "Resumen al Dueño",
     tipoEstatusSistema: "Estado del Sistema",

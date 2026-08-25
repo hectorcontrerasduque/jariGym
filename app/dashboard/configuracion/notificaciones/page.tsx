@@ -24,7 +24,7 @@ import type { GymConfig, NotificacionConfig, NotificacionLog } from "@/lib/types
 
 const tipoLabels: Record<string, { label: string; icon: React.ReactNode; desc: string }> = {
   miembros_deudores: {
-    label: "Miembros Deudores",
+    label: "Miembros Morosos",
     icon: <Users className="w-5 h-5 text-red-500" />,
     desc: "Notifica a miembros con pagos pendientes",
   },
@@ -227,7 +227,6 @@ export default function NotificacionesPage() {
                     {info.label}
                   </div>
                   <Button
-                    variant="secondary"
                     size="sm"
                     onClick={() => handleEjecutarTipo(config.tipo_notificacion)}
                     loading={executingTipo === config.tipo_notificacion}

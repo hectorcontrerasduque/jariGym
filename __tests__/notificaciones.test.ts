@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { messages } from "@/lib/messages";
 
 interface NotificacionConfig {
   id: string;
@@ -116,7 +117,6 @@ describe("Notificacion config types", () => {
   });
 
   it("each type should have a label in messages", () => {
-    const { messages } = require("@/lib/messages");
     expect(messages.notificaciones.tipoMiembrosDeudores).toBeDefined();
     expect(messages.notificaciones.tipoRecordatorioPago).toBeDefined();
     expect(messages.notificaciones.tipoResumenDueno).toBeDefined();

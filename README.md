@@ -34,6 +34,7 @@ cp .env.example .env.local
 | `NEXT_PUBLIC_ADMIN_EMAIL` | Email del admin inicial | `admin@gmail.com` |
 | `GMAIL_USER` | Gmail para enviar emails | `tucorreo@gmail.com` |
 | `GMAIL_APP_PASSWORD` | App Password de Gmail (16 chars) | `abcd efgh ijkl mnop` |
+| `CRON_SECRET` | Secret for cron job auth (generate once) | random hex string |
 
 ### 3. Gmail App Password
 
@@ -51,6 +52,7 @@ En Supabase Dashboard → SQL Editor, ejecuta las migraciones en orden:
 2. ... (todas las migraciones numeradas)
 3. `supabase/migrations/023_password_reset_tokens.sql`
 4. `supabase/migrations/024_gym_config_public_read.sql`
+5. `supabase/migrations/029_notificaciones_global.sql`
 
 ### 5. Variables en Vercel
 
@@ -109,13 +111,18 @@ app/
   auth/callback/             # OAuth callback + gym owner detection
   dashboard/
     configuracion/           # Gym config, logos, métodos de pago, dueno
+    configuracion/notificaciones/  # Notification config (4 types, per-type toggle, Ejecutar Ahora)
     miembros/                # CRUD miembros, stats con max_miembros
     pagos/                   # Lista de pagos (super_admin)
     reportar-pago/           # Crear pagos (admin/miembro)
     mis-pagos/               # Historial del miembro
     perfil/                  # Edición de perfil (?user_id para super_admin)
   api/miembros/              # POST crear miembros
+  api/migracion/             # POST: migrate member data from Excel, search, ping
   api/profile/               # PUT actualizar perfil
+  api/notificaciones/        # Cron + manual trigger
+    route.ts                 # POST: cron dispatch (CRON_SECRET or admin token)
+    procesar/route.ts        # POST: admin-triggered, forzar bypasses frequency
   api/auth/
     forgot-password/         # POST: genera token + envía email
     reset-password/          # POST: valida token + cambia contraseña
@@ -125,8 +132,9 @@ lib/
     email/templates/         # Templates HTML de emails
     auth/                    # signIn, resetPassword, etc.
     config/                  # Config CRUD + dueno email promotion
-    pagos/                   # Pagos CRUD + aprobación
+    pagos/                   # Pagos CRUD + aprobación + getMiembrosMorosos
     miembros/                # Miembros CRUD + stats
+    notificaciones/          # Notification service (procesarTodasLasNotificaciones)
   supabase/                  # Clientes Supabase (browser/server/middleware)
   messages.ts                # i18n centralizado
 components/

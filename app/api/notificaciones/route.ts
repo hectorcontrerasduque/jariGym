@@ -377,7 +377,7 @@ async function procesarResumenDueno(gymConfig: {
   logo_url: string | null;
   dueno_email: string | null;
 }): Promise<number> {
-  if (!gymConfig.dueno_email) return 0;
+  if (!gymConfig.dueno_email) throw new Error(messages.notificaciones.noDuenoEmail);
 
   const mesActual = new Date().getMonth() + 1;
   const anioActual = new Date().getFullYear();

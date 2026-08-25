@@ -371,6 +371,7 @@ export const messages = {
     emailYaRegistradoActivo: "Este correo ya está registrado como miembro activo. Use otro correo.",
     notificacionesDeshabilitadas: "Notificaciones deshabilitadas",
     noConfiguracionesHabilitadas: "No hay configuraciones habilitadas",
+    noDuenoEmail: "No hay correo de propietario configurado. Configure el correo en Configuración del Gym.",
   },
 } as const;
 

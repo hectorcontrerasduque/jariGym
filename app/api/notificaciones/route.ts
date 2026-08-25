@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { pagosService } from "@/lib/services/pagos/pagos.service";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -190,53 +191,21 @@ async function procesarMiembrosDeudores(gymConfig: {
   logo_url: string | null;
   direccion: string | null;
 }): Promise<number> {
-  const { data: miembros } = await supabase
-    .from("profiles")
-    .select("id, email, nombre_completo")
-    .eq("role", "miembro")
-    .eq("activo", true)
-    .not("email", "is", null);
+  const morosos = await pagosService.getMiembrosMorosos();
+  if (morosos.length === 0) return 0;
 
-  if (!miembros || miembros.length === 0) return 0;
-
-  const mesActual = new Date().getMonth() + 1;
-  const anioActual = new Date().getFullYear();
   let count = 0;
-
-  for (const miembro of miembros) {
-    const { data: pagos } = await supabase
-      .from("pagos")
-      .select("id")
-      .eq("usuario_id", miembro.id)
-      .eq("mes_pagar", mesActual)
-      .eq("anio_pagar", anioActual)
-      .eq("estado", "aprobado")
-      .limit(1);
-
-    if (pagos && pagos.length > 0) continue;
-
-    const { data: pagosPendientes } = await supabase
-      .from("pagos")
-      .select("mes_pagar, anio_pagar, monto")
-      .eq("usuario_id", miembro.id)
-      .in("estado", ["pendiente", "suspendido", "suspendido_pendiente"]);
-
-    if (!pagosPendientes || pagosPendientes.length === 0) continue;
-
+  for (const miembro of morosos) {
     try {
       const { sendPaymentDebtEmail } = await import(
         "@/lib/services/email/email.service"
       );
       await sendPaymentDebtEmail(
-        miembro.email!,
+        miembro.email,
         miembro.nombre_completo,
         gymConfig.nombre_gym || "GymApp",
-        pagosPendientes.map((p) => ({
-          mes: p.mes_pagar,
-          anio: p.anio_pagar,
-          monto: p.monto,
-        })),
-        pagosPendientes.reduce((sum, p) => sum + p.monto, 0),
+        miembro.deudas,
+        miembro.totalDeuda,
         gymConfig.logo_url,
         gymConfig.direccion
       );

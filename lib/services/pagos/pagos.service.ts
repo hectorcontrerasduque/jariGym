@@ -569,7 +569,7 @@ export class PagosService {
     const mesActual = anioConsulta === hoy.getFullYear() ? hoy.getMonth() + 1 : 12;
 
     const [miembrosResult, configResult, libresResult, ownerResult] = await Promise.all([
-      supabase
+      this.supabase
         .from("profiles")
         .select("id, email, nombre_completo, inscripcion_pagada, activo")
         .in("role", ["miembro", "admin", "super_admin"])

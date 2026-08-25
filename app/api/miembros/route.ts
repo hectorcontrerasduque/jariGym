@@ -113,7 +113,7 @@ export async function POST(request: Request) {
         }
       }
     } catch (emailErr) {
-      // Email error non-critical
+      console.error("[miembros] Error enviando email de bienvenida:", emailErr);
     }
 
     return NextResponse.json({

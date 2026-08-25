@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { pagosService } from "@/lib/services/pagos/pagos.service";
+import { messages } from "@/lib/messages";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -33,7 +34,7 @@ export async function POST(request: Request) {
   }
 
   if (!isCronAuth && !isAdminAuth) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: messages.toast.noAutorizado }, { status: 401 });
   }
 
   try {
@@ -46,7 +47,7 @@ export async function POST(request: Request) {
     if (!gymConfig || !gymConfig.notificaciones_enabled) {
       return NextResponse.json({
         success: true,
-        message: "Notificaciones deshabilitadas",
+        message: messages.notificaciones.notificacionesDeshabilitadas,
         ejecutadas: 0,
       });
     }
@@ -59,7 +60,7 @@ export async function POST(request: Request) {
     if (!configs || configs.length === 0) {
       return NextResponse.json({
         success: true,
-        message: "No hay configuraciones habilitadas",
+        message: messages.notificaciones.noConfiguracionesHabilitadas,
         ejecutadas: 0,
       });
     }
@@ -286,7 +287,7 @@ async function procesarRecordatorioPago(
         );
         count++;
       } catch (error) {
-        // Non-critical: silent
+        console.error("[notificaciones] Error enviando recordatorio de pago:", error);
       }
     }
   }
@@ -305,7 +306,7 @@ async function procesarRecordatorioPago(
       );
       count++;
     } catch (error) {
-      // Non-critical: silent
+      console.error("[notificaciones] Error enviando recordatorio al dueño:", error);
     }
   }
 
@@ -374,6 +375,7 @@ async function procesarResumenDueno(gymConfig: {
     );
     return 1;
   } catch (error) {
+    console.error("[notificaciones] Error enviando resumen al dueño:", error);
     return 0;
   }
 }
@@ -481,6 +483,7 @@ async function procesarEstatusSistema(gymConfig: {
     );
     return 1;
   } catch (error) {
+    console.error("[notificaciones] Error enviando email de estatus del sistema:", error);
     return 0;
   }
 }

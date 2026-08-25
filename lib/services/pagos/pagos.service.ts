@@ -572,7 +572,7 @@ export class PagosService {
     const [miembrosResult, configResult, libresResult, ownerResult] = await Promise.all([
       supabase
         .from("profiles")
-        .select("id, email, nombre_completo, inscripcion_pagada, activo")
+        .select("id, email, nombre_completo, inscripcion_pagada, activo, fecha_inscripcion")
         .in("role", ["miembro", "admin", "super_admin"])
         .not("email", "is", null),
       supabase
@@ -583,7 +583,7 @@ export class PagosService {
         .maybeSingle(),
       supabase
         .from("membresias")
-        .select("usuario_id")
+        .select("usuario_id, fecha_inicio")
         .is("fecha_fin", null),
       supabase
         .from("gym_config")
@@ -598,6 +598,10 @@ export class PagosService {
     const montoMensual = configResult.data?.monto_mensual || 0;
     const montoInscripcion = configResult.data?.monto_inscripcion || 0;
     const miembrosLibresIds = new Set((libresResult.data || []).map((l) => l.usuario_id));
+    const fechaInicioMap = new Map<string, string>();
+    for (const l of libresResult.data || []) {
+      if (l.fecha_inicio) fechaInicioMap.set(l.usuario_id, l.fecha_inicio);
+    }
     const ownerEmail = ownerResult.data?.dueno_email?.toLowerCase() || "";
 
     const { data: todosPagos } = await supabase
@@ -635,12 +639,24 @@ export class PagosService {
 
       const debeInscripcion = !miembrosConInscripcionPagada.has(miembro.id);
 
+      // Determinar primer mes que el miembro debería haber pagado
+      const fechaInicioStr = fechaInicioMap.get(miembro.id) || miembro.fecha_inscripcion;
+      let primerMesDeuda = 1;
+      if (fechaInicioStr) {
+        const fechaInicio = new Date(fechaInicioStr);
+        const anioInicio = fechaInicio.getFullYear();
+        if (anioInicio > anioConsulta) continue; // Aún no entra en el periodo
+        if (anioInicio === anioConsulta) {
+          primerMesDeuda = fechaInicio.getMonth() + 1;
+        }
+      }
+
       // Meses cubiertos (aprobado o suspendido)
       const pagosMiembroQueCubren = pagosQueCubrenMes.filter((p) => p.usuario_id === miembro.id);
       const mesesCubiertos = new Set(pagosMiembroQueCubren.map((p) => p.mes_pagar));
 
       const mesesDeuda: number[] = [];
-      for (let mes = 1; mes <= mesActual; mes++) {
+      for (let mes = primerMesDeuda; mes <= mesActual; mes++) {
         if (!mesesCubiertos.has(mes)) {
           mesesDeuda.push(mes);
         }
@@ -696,6 +712,7 @@ export class PagosService {
         .maybeSingle();
       config = data;
     } catch (error) {
+      console.warn("[pagos] Error obteniendo config de métodos de pago, usando default:", error);
       config = null;
     }
     const montoMensual = config?.monto_mensual || 5;

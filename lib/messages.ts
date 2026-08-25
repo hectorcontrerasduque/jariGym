@@ -369,6 +369,8 @@ export const messages = {
     notificacionesDisabled: "Sin notificaciones",
     configuracion: "Config Notificaciones",
     emailYaRegistradoActivo: "Este correo ya está registrado como miembro activo. Use otro correo.",
+    notificacionesDeshabilitadas: "Notificaciones deshabilitadas",
+    noConfiguracionesHabilitadas: "No hay configuraciones habilitadas",
   },
 } as const;
 

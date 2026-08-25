@@ -78,7 +78,7 @@ export class ConfigService {
               body: JSON.stringify({ email: updates.dueno_email, nombre: updates.dueno_nombre, inscripcion_pagada: true }),
             });
           } catch (error) {
-            // Non-critical: silent
+            console.error("[config] Error creando super_admin via ensure-super-admin:", error);
           }
         }
       } else if (!existing) {
@@ -105,7 +105,7 @@ export class ConfigService {
               body: JSON.stringify({ email: updates.dueno_email, nombre: updates.dueno_nombre, inscripcion_pagada: true }),
             });
           } catch (error) {
-            // Non-critical: silent
+            console.error("[config] Error creando super_admin via ensure-super-admin:", error);
           }
         }
       }

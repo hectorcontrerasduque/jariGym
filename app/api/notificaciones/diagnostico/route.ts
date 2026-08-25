@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { messages } from "@/lib/messages";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -9,7 +10,7 @@ const supabase = createClient(
 export async function POST(request: Request) {
   const authHeader = request.headers.get("authorization");
   if (!authHeader) {
-    return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+    return NextResponse.json({ error: messages.toast.noAutenticado }, { status: 401 });
   }
 
   try {
@@ -17,7 +18,7 @@ export async function POST(request: Request) {
       authHeader.replace("Bearer ", "")
     );
     if (authError || !user) {
-      return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+      return NextResponse.json({ error: messages.toast.noAutenticado }, { status: 401 });
     }
 
     const { data: profile } = await supabase
@@ -27,7 +28,7 @@ export async function POST(request: Request) {
       .single();
 
     if (profile?.role !== "super_admin" && profile?.role !== "admin") {
-      return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+      return NextResponse.json({ error: messages.toast.noAutorizado }, { status: 403 });
     }
 
     const resultados: Array<{

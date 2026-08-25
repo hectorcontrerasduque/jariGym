@@ -122,7 +122,7 @@ Schema managed via numbered SQL files in `supabase/migrations/`. Run manually:
 1. Go to Supabase Dashboard → SQL Editor
 2. Paste migration content → Run
 
-Tables: `tenants`, `profiles`, `planes`, `membresias`, `pagos`, `gym_config`, `gym_config_metodos_pago`, `migracion`, `notificacion_config`, `notificacion_log`, `password_reset_tokens`
+Tables: `profiles`, `membresias`, `pagos`, `gym_config`, `gym_config_metodos_pago`, `migracion`, `notificacion_config`, `notificacion_log`, `password_reset_tokens`
 
 RLS uses helper functions (`get_user_role()`, `get_user_tenant_id()`) with `SECURITY DEFINER` to avoid infinite recursion. **Never create RLS policies that query the same table directly.**
 
@@ -175,11 +175,13 @@ showToast(messages.toast.success, "success"); // or "error", "warning", "info"
 ### Profile Type
 ```ts
 role: "super_admin" | "admin" | "miembro"
-activo: boolean | null  // null = active
+activo: boolean | null  // null = active (DO NOT use `if (profile.activo)` — null is active!)
 registered: boolean  // must be true to login (except admin/owner emails)
 notas_admin: string | null
 inscripcion_pagada: boolean
 inscripcion_fecha: string | null
+hora_llegada: string | null  // HH:MM format
+hora_salida: string | null   // HH:MM format
 ```
 
 ### Dashboard Stats Logic
@@ -231,15 +233,15 @@ inscripcion_fecha: string | null
 ## Known Issues / TODO
 
 ### Critical
-- [ ] **`aprobar_pago_atomico` RPC dropped** — migration 020 dropped this RPC but `aprobarPago` service still calls it. Payment approval may fail.
-- [ ] **`Profile.activo` type mismatch** — TypeScript says `boolean` but code handles `null` (null = active). Update type to `boolean | null`.
-- [ ] **`confirmLink` in migration route is broken** — generates magic link but throws it away, uses static callback URL. New users' emails never confirmed.
+- [x] **`aprobar_pago_atomico` RPC dropped** — FIXED: `aprobarPago()` now uses direct `.update()` on pagos table, no longer calls the RPC.
+- [x] **`Profile.activo` type mismatch** — FIXED: Type updated to `boolean | null` in `lib/types.ts`.
+- [x] **`confirmLink` in migration route** — FIXED: Token is now generated, stored in `password_reset_tokens`, and sent via welcome email. Dedicated `/api/auth/confirm-email` route validates it.
 
 ### Code Quality
-- [ ] **Hardcoded messages in API routes** — `app/api/miembros/route.ts` (3 strings), `app/api/profile/route.ts` (2 strings), `lib/services/config/config.service.ts` (2 strings) should use `messages.ts`
+- [x] **Hardcoded messages in API routes** — FIXED: `api/miembros/route.ts`, `api/profile/route.ts`, `lib/services/config/config.service.ts` now use `messages.ts`. Notification API routes also migrated.
 - [ ] **`ensure-super-admin` uses `listUsers()` to find one user** — fetches ALL auth users. Performance disaster. Should use filtered query.
 - [ ] **`saveMetodosPago` swallows all errors silently** — no error handling on RPC/insert/delete operations
-- [ ] **14+ empty `catch {}` blocks** across codebase silently swallow errors (see audit in chat history)
+- [x] **14+ empty `catch {}` blocks** — FIXED: All silent catch blocks now log with `console.error` for production debugging.
 - [ ] **`migrateStep: "error"` state is dead code** in login page — never set, never reached
 - [ ] **`errorConfig` and `existingUserTitle` messages defined but unused** in messages.ts
 
@@ -300,7 +302,7 @@ bec76e1 fix: mover useEffect de redirect después de declarar isSuperAdmin
 
 ## Migrations Applied
 
-001–029 applied in Supabase SQL Editor. Key ones:
+001–031 applied in Supabase SQL Editor. Key ones:
 - **019**: RPC functions (aprobar_pago_atomico, etc.) — **NOTE: 020 dropped these, breaking approval**
 - **020**: Dropped RPC functions
 - **025**: RLS for pagos suspendido + migracion (service_role only)
@@ -308,5 +310,6 @@ bec76e1 fix: mover useEffect de redirect después de declarar isSuperAdmin
 - **027**: Added `registered` boolean to profiles
 - **028**: Added `tipo_pago` column to pagos (membresia/inscripcion)
 - **029**: Notifications system — `notificacion_config`, `notificacion_log` tables + RLS
-
-**Pending**: Push commits to origin (user must do from Windows: `git push`)
+- **030a**: Added `hora_llegada` and `hora_salida` text columns to profiles
+- **030b**: Suspension workflow — `suspendido_pendiente` estado, `created_by` audit column
+- **031**: RLS DELETE policies for `suspendido_pendiente` pagos

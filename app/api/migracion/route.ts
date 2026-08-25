@@ -345,7 +345,7 @@ export async function POST(request: Request) {
         if (config?.nombre_gym) gymName = config.nombre_gym;
         if (config?.logo_url) gymLogo = config.logo_url;
       } catch {
-        // Non-critical: gym config fetch failed, use defaults
+        console.error("[migracion] Error obteniendo config del gym, usando defaults");
       }
 
       if (isNewUser) {
@@ -364,13 +364,13 @@ export async function POST(request: Request) {
 
           confirmLink = `${siteUrl}/api/auth/confirm-email?token=${token}`;
         } catch (error) {
-          // Non-critical: silent
+          console.error("[migracion] Error generando token de confirmación:", error);
         }
 
         try {
           await sendWelcomeEmail(email, email, password, gymName, gymLogo, confirmLink || undefined);
         } catch {
-          // Non-critical: welcome email failed, migration succeeded
+          console.error("[migracion] Error enviando email de bienvenida, migración exitosa");
         }
       } else {
         // Existing user: no email needed, they already have an account

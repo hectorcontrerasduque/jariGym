@@ -8,6 +8,7 @@ import {
   sleep,
 } from "@/lib/services/email/email.service";
 import { pagosService } from "@/lib/services/pagos/pagos.service";
+import { messages } from "@/lib/messages";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -17,7 +18,7 @@ const supabase = createClient(
 export async function POST(request: Request) {
   const authHeader = request.headers.get("authorization");
   if (!authHeader) {
-    return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+    return NextResponse.json({ error: messages.toast.noAutenticado }, { status: 401 });
   }
 
   try {
@@ -25,7 +26,7 @@ export async function POST(request: Request) {
       authHeader.replace("Bearer ", "")
     );
     if (authError || !user) {
-      return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+      return NextResponse.json({ error: messages.toast.noAutenticado }, { status: 401 });
     }
 
     const { data: profile } = await supabase
@@ -35,7 +36,7 @@ export async function POST(request: Request) {
       .single();
 
     if (profile?.role !== "super_admin" && profile?.role !== "admin") {
-      return NextResponse.json({ error: "No autorizado" }, { status: 403 });
+      return NextResponse.json({ error: messages.toast.noAutorizado }, { status: 403 });
     }
 
     const { data: gymConfig } = await supabase
@@ -262,7 +263,7 @@ async function procesarRecordatorioPago(diasPrevio: number, gymConfig: Record<st
         count++;
         await sleep(3000);
       } catch (error) {
-        // Non-critical: silent
+        console.error("[notificaciones/procesar] Error enviando recordatorio de pago:", error);
       }
     }
   }
@@ -272,7 +273,7 @@ async function procesarRecordatorioPago(diasPrevio: number, gymConfig: Record<st
       await sendAdminReminderEmail(duenoEmail, duenoEmail, nombreGym, [], logoUrl, direccion);
       count++;
     } catch (error) {
-      // Non-critical: silent
+      console.error("[notificaciones/procesar] Error enviando recordatorio al dueño:", error);
     }
   }
 
@@ -333,6 +334,7 @@ async function procesarResumenDueno(gymConfig: Record<string, unknown>): Promise
     );
     return 1;
   } catch (error) {
+    console.error("[notificaciones/procesar] Error enviando resumen al dueño:", error);
     return 0;
   }
 }
@@ -428,6 +430,7 @@ async function procesarEstatusSistema(gymConfig: Record<string, unknown>): Promi
     );
     return 1;
   } catch (error) {
+    console.error("[notificaciones/procesar] Error enviando email de estatus del sistema:", error);
     return 0;
   }
 }

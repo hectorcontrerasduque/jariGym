@@ -15,12 +15,16 @@ export async function createClient() {
         set(name: string, value: string, options: CookieOptions) {
           try {
             cookieStore.set({ name, value, ...options });
-          } catch (error) {}
+          } catch (error) {
+            // Server Components cannot set cookies — expected in that context
+          }
         },
         remove(name: string, options: CookieOptions) {
           try {
             cookieStore.set({ name, value: "", ...options });
-          } catch (error) {}
+          } catch (error) {
+            // Server Components cannot set cookies — expected in that context
+          }
         },
       },
     }

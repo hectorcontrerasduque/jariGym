@@ -49,10 +49,14 @@ describe("Pago type", () => {
     const pendiente = createMockPago({ estado: "pendiente" });
     const aprobado = createMockPago({ estado: "aprobado" });
     const rechazado = createMockPago({ estado: "rechazado" });
+    const suspendido = createMockPago({ estado: "suspendido" });
+    const suspendidoPendiente = createMockPago({ estado: "suspendido_pendiente" });
 
     expect(pendiente.estado).toBe("pendiente");
     expect(aprobado.estado).toBe("aprobado");
     expect(rechazado.estado).toBe("rechazado");
+    expect(suspendido.estado).toBe("suspendido");
+    expect(suspendidoPendiente.estado).toBe("suspendido_pendiente");
   });
 
   it("should support all payment methods", () => {
@@ -85,6 +89,13 @@ describe("Pago type", () => {
     expect(pago.approved_by).toBeNull();
     expect(pago.approved_at).toBeNull();
     expect(pago.fecha_pago_real).toBeNull();
+  });
+
+  it("should support tipo_pago field", () => {
+    const membresia = createMockPago({ tipo_pago: "membresia" });
+    const inscripcion = createMockPago({ tipo_pago: "inscripcion" });
+    expect(membresia.tipo_pago).toBe("membresia");
+    expect(inscripcion.tipo_pago).toBe("inscripcion");
   });
 
   it("should default estado to pendiente", () => {

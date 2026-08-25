@@ -122,7 +122,7 @@ export default function NotificacionesPage() {
     if (!confirm("¿Ejecutar notificaciones ahora? Se enviarán los correos pendientes según la frecuencia configurada.")) return;
     setExecuting(true);
     try {
-      const resultado = await notificacionesService.procesarTodasLasNotificaciones();
+      const resultado = await notificacionesService.procesarTodasLasNotificaciones(undefined, true);
       if (resultado.errores > 0) {
         showToast(messages.notificaciones.ejecutado + " (" + resultado.errores + " errores)", "warning");
       } else {
@@ -139,7 +139,7 @@ export default function NotificacionesPage() {
   const handleEjecutarTipo = async (tipo: string) => {
     setExecutingTipo(tipo);
     try {
-      const resultado = await notificacionesService.procesarTodasLasNotificaciones(tipo);
+      const resultado = await notificacionesService.procesarTodasLasNotificaciones(tipo, true);
       if (resultado.errores > 0) {
         showToast(`${tipoLabels[tipo]?.label}: ${resultado.enviados} enviados (${resultado.errores} errores)`, "warning");
       } else {

@@ -50,6 +50,7 @@ export async function POST(request: Request) {
 
     const body = await request.json().catch(() => ({}));
     const tipoFiltro = body?.tipo;
+    const forzar = body?.forzar === true;
 
     let query = supabase
       .from("notificacion_config")
@@ -69,8 +70,10 @@ export async function POST(request: Request) {
     let errores = 0;
 
     for (const config of configs) {
-      const debeEjecutar = await verificarFrecuencia(config);
-      if (!debeEjecutar) continue;
+      if (!forzar) {
+        const debeEjecutar = await verificarFrecuencia(config);
+        if (!debeEjecutar) continue;
+      }
 
       ejecutadas++;
       const resultado = await ejecutarTipo(config, gymConfig);

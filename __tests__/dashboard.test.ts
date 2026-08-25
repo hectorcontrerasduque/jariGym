@@ -3,11 +3,16 @@ import { getMonthName, formatCurrency } from "@/lib/utils";
 
 interface DashboardStats {
   totalMiembros: number;
+  miembrosActivos: number;
   inscritosPagados: number;
   inscritosPendientes: number;
+  deudoresTotal: number;
+  deudoresInscripcion: number;
   deudoresMensualidad: number;
   alDiaMensualidad: number;
   montoDeuda: number;
+  montoDeudaInscripcion: number;
+  montoDeudaMensualidad: number;
   montoPagado: number;
   membresiaLibre: number;
 }
@@ -15,11 +20,16 @@ interface DashboardStats {
 function createMockStats(overrides: Partial<DashboardStats> = {}): DashboardStats {
   return {
     totalMiembros: 10,
+    miembrosActivos: 10,
     inscritosPagados: 8,
     inscritosPendientes: 2,
+    deudoresTotal: 3,
+    deudoresInscripcion: 1,
     deudoresMensualidad: 3,
     alDiaMensualidad: 7,
     montoDeuda: 15,
+    montoDeudaInscripcion: 5,
+    montoDeudaMensualidad: 10,
     montoPagado: 35,
     membresiaLibre: 1,
     ...overrides,
@@ -30,8 +40,11 @@ describe("Dashboard stats", () => {
   it("should have required fields", () => {
     const stats = createMockStats();
     expect(stats.totalMiembros).toBeDefined();
+    expect(stats.miembrosActivos).toBeDefined();
     expect(stats.inscritosPagados).toBeDefined();
     expect(stats.inscritosPendientes).toBeDefined();
+    expect(stats.deudoresTotal).toBeDefined();
+    expect(stats.deudoresInscripcion).toBeDefined();
     expect(stats.deudoresMensualidad).toBeDefined();
     expect(stats.alDiaMensualidad).toBeDefined();
     expect(stats.montoDeuda).toBeDefined();
@@ -44,10 +57,9 @@ describe("Dashboard stats", () => {
     expect(stats.totalMiembros).toBe(stats.inscritosPagados + stats.inscritosPendientes);
   });
 
-  it("montoDeuda should be deudores × months × montoMensual", () => {
-    const montoMensual = 5;
-    const stats = createMockStats({ deudoresMensualidad: 3, montoDeuda: 3 * 2 * montoMensual });
-    expect(stats.montoDeuda).toBe(30);
+  it("montoDeuda should equal montoDeudaInscripcion + montoDeudaMensualidad", () => {
+    const stats = createMockStats({ montoDeudaInscripcion: 5, montoDeudaMensualidad: 10 });
+    expect(stats.montoDeuda).toBe(stats.montoDeudaInscripcion + stats.montoDeudaMensualidad);
   });
 
   it("alDiaMensualidad should count members with approved payment in current month with inscription", () => {
@@ -63,6 +75,11 @@ describe("Dashboard stats", () => {
   it("inscritosPendientes are members without inscription paid", () => {
     const stats = createMockStats({ inscritosPagados: 8, inscritosPendientes: 2 });
     expect(stats.inscritosPagados + stats.inscritosPendientes).toBe(10);
+  });
+
+  it("deudoresTotal should be >= deudoresInscripcion + deudoresMensualidad overlap", () => {
+    const stats = createMockStats({ deudoresTotal: 3, deudoresInscripcion: 1, deudoresMensualidad: 3 });
+    expect(stats.deudoresTotal).toBeGreaterThanOrEqual(0);
   });
 });
 

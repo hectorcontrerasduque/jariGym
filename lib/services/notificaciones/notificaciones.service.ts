@@ -82,7 +82,7 @@ export class NotificacionesService {
 
   // ─── EJECUTAR NOTIFICACIONES (via API) ────────
 
-  async procesarTodasLasNotificaciones(tipo?: string): Promise<{
+  async procesarTodasLasNotificaciones(tipo?: string, forzar = false): Promise<{
     ejecutadas: number;
     enviados: number;
     errores: number;
@@ -90,13 +90,17 @@ export class NotificacionesService {
     const { data: { session } } = await this.supabase.auth.getSession();
     const token = session?.access_token;
 
+    const body: Record<string, unknown> = {};
+    if (tipo) body.tipo = tipo;
+    if (forzar) body.forzar = true;
+
     const res = await fetch("/api/notificaciones/procesar", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
-      body: tipo ? JSON.stringify({ tipo }) : undefined,
+      body: JSON.stringify(body),
     });
 
     if (!res.ok) {

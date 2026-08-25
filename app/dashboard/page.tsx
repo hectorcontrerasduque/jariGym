@@ -179,7 +179,7 @@ export default function DashboardPage() {
         .eq("mes_pagar", mesActual)
         .eq("anio_pagar", anioActual)
         .eq("estado", "aprobado");
-      const idsAlDia = [...new Set((pagosMes || []).map((p) => p.usuario_id))];
+      const idsAlDia = Array.from(new Set((pagosMes || []).map((p) => p.usuario_id)));
       const alDia = miembros.filter((m) => idsAlDia.includes(m.id));
       setModalData({
         title: "Al día",

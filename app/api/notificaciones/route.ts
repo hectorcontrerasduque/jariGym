@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { pagosService } from "@/lib/services/pagos/pagos.service";
 import { messages } from "@/lib/messages";
+import { sleep } from "@/lib/services/email/email.service";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -74,7 +75,7 @@ export async function POST(request: Request) {
       if (!debeEjecutar) continue;
 
       ejecutadas++;
-      const resultado = await ejecutarTipo(config, gymConfig);
+      const resultado = await ejecutarTipo(config, gymConfig, false);
       if (resultado.sinProblemas) {
         enviados += resultado.miembrosNotificados;
       } else {
@@ -145,7 +146,8 @@ async function ejecutarTipo(
     dueno_email: string | null;
     max_miembros: number;
     direccion: string | null;
-  }
+  },
+  forzar: boolean = false
 ): Promise<{ miembrosNotificados: number; sinProblemas: boolean }> {
   try {
     let miembrosNotificados = 0;
@@ -157,7 +159,8 @@ async function ejecutarTipo(
       case "recordatorio_pago":
         miembrosNotificados = await procesarRecordatorioPago(
           config.dias_previo,
-          gymConfig
+          gymConfig,
+          forzar
         );
         break;
       case "resumen_dueno":
@@ -230,79 +233,135 @@ async function procesarRecordatorioPago(
     nombre_gym: string | null;
     logo_url: string | null;
     dueno_email: string | null;
-  }
+    direccion: string | null;
+  },
+  forzar: boolean = false
 ): Promise<number> {
+  const nombreGym = gymConfig.nombre_gym || "GymApp";
+  const logoUrl = gymConfig.logo_url;
+  const duenoEmail = gymConfig.dueno_email;
+  const direccion = gymConfig.direccion;
+
+  const mesActual = new Date().getMonth() + 1;
+  const anioActual = new Date().getFullYear();
+  const hoy = new Date();
+
+  if (!forzar) {
+    const { data: configRecordatorio } = await supabase
+      .from("notificacion_config")
+      .select("id")
+      .eq("tipo_notificacion", "recordatorio_pago")
+      .maybeSingle();
+
+    if (configRecordatorio) {
+      const inicioMes = new Date(anioActual, mesActual - 1, 1).toISOString();
+      const finMes = new Date(anioActual, mesActual, 0, 23, 59, 59).toISOString();
+      const { data: logExistente } = await supabase
+        .from("notificacion_log")
+        .select("id")
+        .eq("id_notificacion_config", configRecordatorio.id)
+        .gte("fecha_hora_envio", inicioMes)
+        .lte("fecha_hora_envio", finMes)
+        .limit(1)
+        .maybeSingle();
+
+      if (logExistente) return 0;
+    }
+
+    const diasEnMes = new Date(anioActual, mesActual, 0).getDate();
+    const diaActual = hoy.getDate();
+    const diasRestantesMes = diasEnMes - diaActual;
+    if (diasRestantesMes > diasPrevio) return 0;
+  }
+
   const { data: miembros } = await supabase
     .from("profiles")
-    .select("id, email, nombre_completo")
-    .eq("role", "miembro")
+    .select("id, email, nombre_completo, fecha_inscripcion")
+    .in("role", ["miembro", "admin", "super_admin"])
     .eq("activo", true)
     .not("email", "is", null);
 
   if (!miembros || miembros.length === 0) return 0;
 
-  const hoy = new Date();
+  let candidatos = miembros.filter((m) => m.email !== duenoEmail);
+
+  candidatos = candidatos.filter((m) => {
+    if (!m.fecha_inscripcion) return true;
+    const fechaInsc = new Date(m.fecha_inscripcion);
+    const diasDesdeInscripcion =
+      (hoy.getTime() - fechaInsc.getTime()) / (1000 * 60 * 60 * 24);
+    return diasDesdeInscripcion >= 30;
+  });
+
+  if (candidatos.length === 0) return 0;
+
+  const idsCandidatos = candidatos.map((m) => m.id);
+  const { data: libreRows } = await supabase
+    .from("membresias")
+    .select("usuario_id")
+    .in("usuario_id", idsCandidatos)
+    .is("fecha_fin", null);
+
+  const idsLibres = new Set((libreRows || []).map((r) => r.usuario_id));
+  candidatos = candidatos.filter((m) => !idsLibres.has(m.id));
+
+  if (candidatos.length === 0) return 0;
+
+  const { data: pagosMes } = await supabase
+    .from("pagos")
+    .select("usuario_id")
+    .eq("mes_pagar", mesActual)
+    .eq("anio_pagar", anioActual)
+    .in("estado", ["aprobado", "suspendido"]);
+
+  const usuariosConPago = new Set((pagosMes || []).map((p) => p.usuario_id));
+
+  const deudores = candidatos.filter((m) => !usuariosConPago.has(m.id));
+
+  if (deudores.length === 0) return 0;
+
+  const diasEnMes = new Date(anioActual, mesActual, 0).getDate();
+  const diaActual = hoy.getDate();
+  const diasRestantesMes = diasEnMes - diaActual;
+
   let count = 0;
-
-  for (const miembro of miembros) {
-    const { data: ultimoPago } = await supabase
-      .from("pagos")
-      .select("mes_pagar, anio_pagar")
-      .eq("usuario_id", miembro.id)
-      .eq("estado", "aprobado")
-      .order("anio_pagar", { ascending: false })
-      .order("mes_pagar", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (!ultimoPago) continue;
-
-    let fechaVencimiento: Date;
-    if (ultimoPago.mes_pagar === 12) {
-      fechaVencimiento = new Date(ultimoPago.anio_pagar + 1, 0, 1);
-    } else {
-      fechaVencimiento = new Date(
-        ultimoPago.anio_pagar,
-        ultimoPago.mes_pagar,
-        1
+  for (const deudor of deudores) {
+    try {
+      const { sendPaymentReminderEmail } = await import(
+        "@/lib/services/email/email.service"
       );
-    }
-
-    const diasRestantes = Math.ceil(
-      (fechaVencimiento.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24)
-    );
-
-    if (diasRestantes <= diasPrevio && diasRestantes >= 0) {
-      try {
-        const { sendPaymentReminderEmail } = await import(
-          "@/lib/services/email/email.service"
-        );
-        await sendPaymentReminderEmail(
-          miembro.email!,
-          miembro.nombre_completo,
-          gymConfig.nombre_gym || "GymApp",
-          diasRestantes,
-          fechaVencimiento.toLocaleDateString("es-ES"),
-          gymConfig.logo_url
-        );
-        count++;
-      } catch (error) {
-        console.error("[notificaciones] Error enviando recordatorio de pago:", error);
-      }
+      await sendPaymentReminderEmail(
+        deudor.email!,
+        deudor.nombre_completo,
+        nombreGym,
+        forzar ? 0 : diasRestantesMes,
+        new Date(anioActual, mesActual, 0).toLocaleDateString("es-ES"),
+        logoUrl,
+        direccion
+      );
+      count++;
+      await sleep(3000);
+    } catch (error) {
+      console.error("[notificaciones] Error enviando recordatorio:", error);
     }
   }
 
-  if (gymConfig.dueno_email) {
+  if (duenoEmail && count > 0) {
     try {
       const { sendAdminReminderEmail } = await import(
         "@/lib/services/email/email.service"
       );
       await sendAdminReminderEmail(
-        gymConfig.dueno_email,
-        gymConfig.dueno_email,
-        gymConfig.nombre_gym || "GymApp",
-        [],
-        gymConfig.logo_url
+        duenoEmail,
+        duenoEmail,
+        nombreGym,
+        deudores.map((d) => ({
+          nombre: d.nombre_completo,
+          diasRestantes: forzar ? 0 : diasRestantesMes,
+          fechaVencimiento: new Date(anioActual, mesActual, 0).toLocaleDateString("es-ES"),
+        })),
+        logoUrl,
+        direccion
       );
       count++;
     } catch (error) {

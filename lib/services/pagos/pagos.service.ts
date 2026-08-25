@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/client";
-import { getMonthName } from "@/lib/utils";
+import { getMonthName, getDiaCobro } from "@/lib/utils";
 import { messages } from "@/lib/messages";
 import type { Pago, MetodoPago, TipoPago, Profile } from "@/lib/types";
 
@@ -639,18 +639,28 @@ export class PagosService {
 
       const debeInscripcion = !miembrosConInscripcionPagada.has(miembro.id);
 
-      // Determinar primer mes que el miembro debería haber pagado
+      // Determinar primer mes que el miembro debería haber pagado (30 días de gracia)
       const fechaInicioMembresia = fechaInicioMap.get(miembro.id);
       const fechaInscripcion = miembro.fecha_inscripcion;
       const fechaInicioStr = fechaInicioMembresia || fechaInscripcion;
       let primerMesDeuda = 1;
+      let diaInscripcion = 1;
       if (fechaInicioStr) {
         const parts = fechaInicioStr.split("-").map(Number);
         const anioInicio = parts[0];
         const mesInicio = parts[1];
-        if (anioInicio > anioConsulta) continue;
-        if (anioInicio === anioConsulta) {
-          primerMesDeuda = mesInicio;
+        diaInscripcion = parts[2] || 1;
+
+        let mesDeuda = mesInicio + 1;
+        let anioDeuda = anioInicio;
+        if (mesDeuda > 12) {
+          mesDeuda = 1;
+          anioDeuda = anioInicio + 1;
+        }
+
+        if (anioDeuda > anioConsulta) continue;
+        if (anioDeuda === anioConsulta) {
+          primerMesDeuda = mesDeuda;
         }
       }
 
@@ -660,9 +670,13 @@ export class PagosService {
 
       const mesesDeuda: number[] = [];
       for (let mes = primerMesDeuda; mes <= mesActual; mes++) {
-        if (!mesesCubiertos.has(mes)) {
-          mesesDeuda.push(mes);
-        }
+        if (mesesCubiertos.has(mes)) continue;
+
+        const diaCobro = getDiaCobro(fechaInicioStr || "2000-01-01", mes, anioConsulta);
+
+        if (mes === mesActual && hoy.getDate() < diaCobro) continue;
+
+        mesesDeuda.push(mes);
       }
 
       if (!debeInscripcion && mesesDeuda.length === 0) continue;

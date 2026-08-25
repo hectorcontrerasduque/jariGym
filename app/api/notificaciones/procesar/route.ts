@@ -9,6 +9,7 @@ import {
 } from "@/lib/services/email/email.service";
 import { pagosService } from "@/lib/services/pagos/pagos.service";
 import { messages } from "@/lib/messages";
+import { getDiaCobro, getDiaNotificacion } from "@/lib/utils";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -243,11 +244,6 @@ async function procesarRecordatorioPago(
 
       if (logExistente) return 0;
     }
-
-    const diasEnMes = new Date(anioActual, mesActual, 0).getDate();
-    const diaActual = hoy.getDate();
-    const diasRestantesMes = diasEnMes - diaActual;
-    if (diasRestantesMes > diasPrevio) return 0;
   }
 
   const { data: miembros } = await supabase
@@ -292,23 +288,36 @@ async function procesarRecordatorioPago(
 
   const usuariosConPago = new Set((pagosMes || []).map((p) => p.usuario_id));
 
-  const deudores = candidatos.filter((m) => !usuariosConPago.has(m.id));
+  const diasEnMes = new Date(anioActual, mesActual, 0).getDate();
+
+  const deudores = candidatos.filter((m) => {
+    if (usuariosConPago.has(m.id)) return false;
+    if (!m.fecha_inscripcion) return false;
+
+    if (forzar) return true;
+
+    const diaCobro = getDiaCobro(m.fecha_inscripcion, mesActual, anioActual);
+    const notif = getDiaNotificacion(diaCobro, diasPrevio, mesActual, anioActual);
+
+    return hoy.getDate() === notif.dia &&
+      hoy.getMonth() + 1 === notif.mes &&
+      hoy.getFullYear() === notif.anio;
+  });
 
   if (deudores.length === 0) return 0;
-
-  const diasEnMes = new Date(anioActual, mesActual, 0).getDate();
-  const diaActual = hoy.getDate();
-  const diasRestantesMes = diasEnMes - diaActual;
 
   let count = 0;
   for (const deudor of deudores) {
     try {
+      const diaCobro = getDiaCobro(deudor.fecha_inscripcion!, mesActual, anioActual);
+      const diasRestantesMes = diaCobro - hoy.getDate();
+
       await sendPaymentReminderEmail(
         deudor.email!,
         deudor.nombre_completo,
         nombreGym,
-        forzar ? 0 : diasRestantesMes,
-        new Date(anioActual, mesActual, 0).toLocaleDateString("es-ES"),
+        forzar ? 0 : Math.max(0, diasRestantesMes),
+        new Date(anioActual, mesActual, diaCobro).toLocaleDateString("es-ES"),
         logoUrl,
         direccion
       );
@@ -325,11 +334,14 @@ async function procesarRecordatorioPago(
         duenoEmail,
         duenoEmail,
         nombreGym,
-        deudores.map((d) => ({
-          nombre: d.nombre_completo,
-          diasRestantes: forzar ? 0 : diasRestantesMes,
-          fechaVencimiento: new Date(anioActual, mesActual, 0).toLocaleDateString("es-ES"),
-        })),
+        deudores.map((d) => {
+          const diaCobro = getDiaCobro(d.fecha_inscripcion!, mesActual, anioActual);
+          return {
+            nombre: d.nombre_completo,
+            diasRestantes: forzar ? 0 : Math.max(0, diaCobro - hoy.getDate()),
+            fechaVencimiento: new Date(anioActual, mesActual, diaCobro).toLocaleDateString("es-ES"),
+          };
+        }),
         logoUrl,
         direccion
       );

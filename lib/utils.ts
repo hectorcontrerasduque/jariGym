@@ -45,3 +45,84 @@ export function getMonthShort(month: number) {
   ];
   return months[month - 1] || "";
 }
+
+export function getDiaCobro(fechaInscripcion: string, mes: number, anio: number): number {
+  const dia = new Date(fechaInscripcion).getDate();
+  const ultimoDiaMes = new Date(anio, mes, 0).getDate();
+  return Math.min(dia, ultimoDiaMes);
+}
+
+export function getDiaNotificacion(
+  diaCobro: number,
+  diasPrevio: number,
+  mes: number,
+  anio: number
+): { dia: number; mes: number; anio: number } {
+  let resultado = diaCobro - diasPrevio;
+  let mesNotif = mes;
+  let anioNotif = anio;
+
+  while (resultado < 1) {
+    mesNotif--;
+    if (mesNotif < 1) {
+      mesNotif = 12;
+      anioNotif--;
+    }
+    const ultimoDiaMesAnterior = new Date(anioNotif, mesNotif, 0).getDate();
+    resultado = ultimoDiaMesAnterior + resultado;
+  }
+
+  return { dia: resultado, mes: mesNotif, anio: anioNotif };
+}
+
+export function esDiaDeNotificacion(
+  fechaInscripcion: string,
+  diasPrevio: number,
+  fechaActual: Date = new Date()
+): boolean {
+  const mesActual = fechaActual.getMonth() + 1;
+  const anioActual = fechaActual.getFullYear();
+  const diaActual = fechaActual.getDate();
+
+  const diaCobro = getDiaCobro(fechaInscripcion, mesActual, anioActual);
+  const notif = getDiaNotificacion(diaCobro, diasPrevio, mesActual, anioActual);
+
+  return diaActual === notif.dia &&
+    fechaActual.getMonth() + 1 === notif.mes &&
+    fechaActual.getFullYear() === notif.anio;
+}
+
+export function esMoroso(
+  fechaInscripcion: string,
+  mesesCubiertos: Set<number>,
+  mesActual: number,
+  anioActual: number,
+  fechaActual: Date = new Date()
+): boolean {
+  const diaInscripcion = new Date(fechaInscripcion).getDate();
+  const parts = fechaInscripcion.split("-").map(Number);
+  const anioInicio = parts[0];
+  const mesInicio = parts[1];
+
+  let mesDeuda = mesInicio + 1;
+  let anioDeuda = anioInicio;
+  if (mesDeuda > 12) {
+    mesDeuda = 1;
+    anioDeuda = anioInicio + 1;
+  }
+
+  if (anioDeuda > anioActual) return false;
+  const primerMesDeuda = anioDeuda === anioActual ? mesDeuda : 1;
+
+  for (let mes = primerMesDeuda; mes <= mesActual; mes++) {
+    if (mesesCubiertos.has(mes)) continue;
+
+    const diaCobro = Math.min(diaInscripcion, new Date(anioActual, mes, 0).getDate());
+
+    if (mes === mesActual && fechaActual.getDate() < diaCobro) continue;
+
+    return true;
+  }
+
+  return false;
+}

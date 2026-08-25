@@ -605,6 +605,8 @@ export class PagosService {
       .eq("anio_pagar", anioConsulta);
 
     const pagosAprobados = (todosPagos || []).filter((p) => p.estado === "aprobado");
+    // suspendido también cubre el mes (miembro no es moroso por ese mes)
+    const pagosQueCubrenMes = (todosPagos || []).filter((p) => p.estado === "aprobado" || p.estado === "suspendido");
 
     // Determinar inscripción pagada
     const miembrosConInscripcionPagada = new Set<string>();
@@ -632,23 +634,23 @@ export class PagosService {
 
       const debeInscripcion = !miembrosConInscripcionPagada.has(miembro.id);
 
-      // Meses sin pago aprobado en el año consultado
-      const pagosMiembroAprobados = pagosAprobados.filter((p) => p.usuario_id === miembro.id);
-      const mesesPagados = new Set(pagosMiembroAprobados.map((p) => p.mes_pagar));
+      // Meses cubiertos (aprobado o suspendido)
+      const pagosMiembroQueCubren = pagosQueCubrenMes.filter((p) => p.usuario_id === miembro.id);
+      const mesesCubiertos = new Set(pagosMiembroQueCubren.map((p) => p.mes_pagar));
 
       const mesesDeuda: number[] = [];
       for (let mes = 1; mes <= mesActual; mes++) {
-        if (!mesesPagados.has(mes)) {
+        if (!mesesCubiertos.has(mes)) {
           mesesDeuda.push(mes);
         }
       }
 
       if (!debeInscripcion && mesesDeuda.length === 0) continue;
 
-      // Build deudas from months without approved payment
+      // Build deudas from months without covered payment
       const pagosPendientes = (todosPagos || []).filter(
         (p) => p.usuario_id === miembro.id && p.anio_pagar === anioConsulta &&
-          ["pendiente", "suspendido", "suspendido_pendiente"].includes(p.estado)
+          ["pendiente", "rechazado", "suspendido_pendiente"].includes(p.estado)
       );
       const montoByMes = new Map<number, number>();
       for (const p of pagosPendientes) {
@@ -752,7 +754,7 @@ export class PagosService {
       .from("pagos")
       .select("usuario_id, estado, monto, mes_pagar, anio_pagar")
       .eq("anio_pagar", anioConsulta)
-      .in("estado", ["aprobado", "pendiente"]);
+      .in("estado", ["aprobado", "pendiente", "suspendido"]);
 
     const pagosAll = allPagos || [];
 
@@ -760,7 +762,7 @@ export class PagosService {
       const pagosMes = pagosAll.filter((p) => p.mes_pagar === m.mes && p.anio_pagar === m.anio);
 
       const pagados = new Set(
-        pagosMes.filter((p) => p.estado === "aprobado" && m.idsMes.has(p.usuario_id)).map((p) => p.usuario_id)
+        pagosMes.filter((p) => (p.estado === "aprobado" || p.estado === "suspendido") && m.idsMes.has(p.usuario_id)).map((p) => p.usuario_id)
       ).size;
 
       const montoAcumulado = pagosMes

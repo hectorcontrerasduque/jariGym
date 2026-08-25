@@ -51,11 +51,12 @@ function simulateGetMorosos(params: {
     const fechaInicioStr = fechaInicioMap.get(miembro.id) || miembro.fecha_inscripcion;
     let primerMesDeuda = 1;
     if (fechaInicioStr) {
-      const fechaInicio = new Date(fechaInicioStr);
-      const anioInicio = fechaInicio.getFullYear();
+      const parts = fechaInicioStr.split("-").map(Number);
+      const anioInicio = parts[0];
+      const mesInicio = parts[1];
       if (anioInicio > anioConsulta) continue;
       if (anioInicio === anioConsulta) {
-        primerMesDeuda = fechaInicio.getMonth() + 1;
+        primerMesDeuda = mesInicio;
       }
     }
 

@@ -236,7 +236,7 @@ async function procesarRecordatorioPago(
     .from("profiles")
     .select("id, email, nombre_completo")
     .eq("role", "miembro")
-    .eq("activo", true)
+    .or("activo.eq.true,activo.is.null")
     .not("email", "is", null);
 
   if (!miembros || miembros.length === 0) return 0;
@@ -253,7 +253,7 @@ async function procesarRecordatorioPago(
       .order("anio_pagar", { ascending: false })
       .order("mes_pagar", { ascending: false })
       .limit(1)
-      .single();
+      .maybeSingle();
 
     if (!ultimoPago) continue;
 
@@ -341,7 +341,7 @@ async function procesarResumenDueno(gymConfig: {
     .from("profiles")
     .select("id", { count: "exact", head: true })
     .eq("role", "miembro")
-    .eq("activo", true);
+    .or("activo.eq.true,activo.is.null");
 
   const { count: migraciones } = await supabase
     .from("migracion")
@@ -394,7 +394,7 @@ async function procesarEstatusSistema(gymConfig: {
   const { count: totalActivos } = await supabase
     .from("profiles")
     .select("id", { count: "exact", head: true })
-    .eq("activo", true);
+    .or("activo.eq.true,activo.is.null");
 
   const { count: totalInactivos } = await supabase
     .from("profiles")

@@ -113,7 +113,7 @@ export async function POST(request: Request) {
       .from("profiles")
       .select("id", { count: "exact", head: true })
       .eq("role", "miembro")
-      .eq("activo", true)
+      .or("activo.eq.true,activo.is.null")
       .not("email", "is", null);
     resultados.push({
       paso: "Miembros activos",

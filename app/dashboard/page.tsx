@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Modal } from "@/components/ui/modal";
 import { createClient } from "@/lib/supabase/client";
 import { pagosService } from "@/lib/services/pagos/pagos.service";
 import { miembrosService } from "@/lib/services/miembros/miembros.service";
@@ -53,6 +54,8 @@ export default function DashboardPage() {
   const [miembros, setMiembros] = useState<Profile[]>([]);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [showBanner, setShowBanner] = useState(true);
+  const [modalData, setModalData] = useState<{ title: string; members: Array<{ id: string; nombre: string; detalle?: string }> } | null>(null);
+  const [loadingModal, setLoadingModal] = useState(false);
 
   useEffect(() => {
     if (isSuperAdmin) {
@@ -145,6 +148,82 @@ export default function DashboardPage() {
   const hourEntries = Object.entries(hourCounts).sort((a, b) => a[0].localeCompare(b[0]));
   const maxHourCount = Math.max(...hourEntries.map((e) => e[1]), 1);
 
+  const handleClickMorosos = async () => {
+    setLoadingModal(true);
+    try {
+      const morosos = await pagosService.getMiembrosMorosos(anioSeleccionado);
+      setModalData({
+        title: "Morosos",
+        members: morosos.map((m) => ({
+          id: m.id,
+          nombre: m.nombre_completo,
+          detalle: `${m.mesesDeuda.length} mes(es) sin pago${m.debeInscripcion ? " + inscripción" : ""} — ${formatCurrency(m.totalDeuda)}`,
+        })),
+      });
+    } catch {
+      showToast("Error al cargar morosos", "error");
+    } finally {
+      setLoadingModal(false);
+    }
+  };
+
+  const handleClickAlDia = async () => {
+    setLoadingModal(true);
+    try {
+      const supabase = createClient();
+      const mesActual = new Date().getMonth() + 1;
+      const anioActual = new Date().getFullYear();
+      const { data: pagosMes } = await supabase
+        .from("pagos")
+        .select("usuario_id")
+        .eq("mes_pagar", mesActual)
+        .eq("anio_pagar", anioActual)
+        .eq("estado", "aprobado");
+      const idsAlDia = [...new Set((pagosMes || []).map((p) => p.usuario_id))];
+      const alDia = miembros.filter((m) => idsAlDia.includes(m.id));
+      setModalData({
+        title: "Al día",
+        members: alDia.map((m) => ({ id: m.id, nombre: m.nombre_completo })),
+      });
+    } catch {
+      showToast("Error al cargar datos", "error");
+    } finally {
+      setLoadingModal(false);
+    }
+  };
+
+  const handleClickMembresiaLibre = async () => {
+    setLoadingModal(true);
+    try {
+      const supabase = createClient();
+      const { data: libres } = await supabase
+        .from("membresias")
+        .select("usuario_id")
+        .is("fecha_fin", null);
+      const libresIds = new Set((libres || []).map((l) => l.usuario_id));
+      const libresList = miembros.filter((m) => libresIds.has(m.id));
+      setModalData({
+        title: "Membresía Libre",
+        members: libresList.map((m) => ({ id: m.id, nombre: m.nombre_completo })),
+      });
+    } catch {
+      showToast("Error al cargar datos", "error");
+    } finally {
+      setLoadingModal(false);
+    }
+  };
+
+  const handleClickActivos = () => {
+    setModalData({
+      title: "Miembros Activos",
+      members: miembros.map((m) => ({
+        id: m.id,
+        nombre: m.nombre_completo,
+        detalle: m.email || "",
+      })),
+    });
+  };
+
   return (
     <div className="space-y-6 animate-fadeIn relative">
       <div className="absolute top-0 right-0 w-72 h-72 bg-gym-primary/5 rounded-full blur-3xl animate-pulse" />
@@ -188,7 +267,7 @@ export default function DashboardPage() {
       {/* Stats Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 relative z-10">
         {/* Miembros Activos */}
-        <Card className="neon-card hover:border-gym-primary/50 transition-all hover:shadow-[0_0_20px_rgba(56,189,248,0.15)]">
+        <Card className="neon-card hover:border-gym-primary/50 transition-all hover:shadow-[0_0_20px_rgba(56,189,248,0.15)] cursor-pointer" onClick={handleClickActivos}>
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-gym-primary/20 rounded-xl flex items-center justify-center">
@@ -210,15 +289,15 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Deudores - inscripciones y mensualidades pendientes */}
-        <Card className="neon-card hover:border-gym-danger/50 transition-all hover:shadow-[0_0_20px_rgba(251,113,133,0.15)]">
+        {/* Morosos - inscripciones y mensualidades pendientes */}
+        <Card className="neon-card hover:border-gym-danger/50 transition-all hover:shadow-[0_0_20px_rgba(251,113,133,0.15)] cursor-pointer" onClick={handleClickMorosos}>
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-gym-danger/20 rounded-xl flex items-center justify-center">
                 <AlertTriangle className="w-5 h-5 text-gym-danger" />
               </div>
               <div>
-                <p className="text-xs text-gym-muted">Deudores</p>
+                <p className="text-xs text-gym-muted">Morosos</p>
                 <p className="text-xl font-bold text-gym-danger neon-text-danger">{stats?.deudoresTotal || 0}</p>
               </div>
             </div>
@@ -235,7 +314,7 @@ export default function DashboardPage() {
         </Card>
 
         {/* Al día - pagaron mes actual */}
-        <Card className="neon-card hover:border-gym-success/50 transition-all hover:shadow-[0_0_20px_rgba(52,211,153,0.15)]">
+        <Card className="neon-card hover:border-gym-success/50 transition-all hover:shadow-[0_0_20px_rgba(52,211,153,0.15)] cursor-pointer" onClick={handleClickAlDia}>
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-gym-success/20 rounded-xl flex items-center justify-center">
@@ -253,7 +332,7 @@ export default function DashboardPage() {
         </Card>
 
         {/* Membresía Libre */}
-        <Card className="neon-card hover:border-gym-secondary/50 transition-all hover:shadow-[0_0_20px_rgba(129,140,248,0.15)]">
+        <Card className="neon-card hover:border-gym-secondary/50 transition-all hover:shadow-[0_0_20px_rgba(129,140,248,0.15)] cursor-pointer" onClick={handleClickMembresiaLibre}>
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-gym-secondary/20 rounded-xl flex items-center justify-center">
@@ -441,6 +520,27 @@ export default function DashboardPage() {
           )}
         </div>
       </details>
+
+      <Modal isOpen={!!modalData} onClose={() => setModalData(null)} title={modalData?.title}>
+        {loadingModal ? (
+          <div className="flex items-center justify-center py-8">
+            <div className="animate-spin w-6 h-6 border-2 border-gym-primary border-t-transparent rounded-full" />
+          </div>
+        ) : modalData?.members.length === 0 ? (
+          <p className="text-center text-gym-muted py-8">Sin miembros para mostrar</p>
+        ) : (
+          <div className="space-y-2 max-h-[60vh] overflow-y-auto">
+            {modalData?.members.map((m) => (
+              <div key={m.id} className="flex items-center justify-between p-3 bg-gym-bg rounded-xl">
+                <div className="min-w-0">
+                  <p className="font-medium text-gym-text text-sm truncate">{m.nombre}</p>
+                  {m.detalle && <p className="text-xs text-gym-muted truncate">{m.detalle}</p>}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }

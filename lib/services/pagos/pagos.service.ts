@@ -569,11 +569,10 @@ export class PagosService {
     const mesActual = anioConsulta === hoy.getFullYear() ? hoy.getMonth() + 1 : 12;
 
     const [miembrosResult, configResult, libresResult, ownerResult] = await Promise.all([
-      this.supabase
+      supabase
         .from("profiles")
-        .select("id, email, nombre_completo, inscripcion_pagada")
-        .eq("role", "miembro")
-        .eq("activo", true)
+        .select("id, email, nombre_completo, inscripcion_pagada, activo")
+        .in("role", ["miembro", "admin", "super_admin"])
         .not("email", "is", null),
       this.supabase
         .from("gym_config_metodos_pago")
@@ -592,8 +591,8 @@ export class PagosService {
         .maybeSingle(),
     ]);
 
-    const miembros = miembrosResult.data;
-    if (!miembros || miembros.length === 0) return [];
+    const miembros = (miembrosResult.data || []).filter((m) => m.activo !== false);
+    if (miembros.length === 0) return [];
 
     const montoMensual = configResult.data?.monto_mensual || 0;
     const montoInscripcion = configResult.data?.monto_inscripcion || 0;

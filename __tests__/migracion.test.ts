@@ -110,13 +110,15 @@ describe("Migración API", () => {
   });
 
   it("falla si nombre exacto ya fue migrado", async () => {
+    let migracionCallCount = 0;
     mockSupabase.from.mockImplementation((table: string) => {
       if (table === "gym_config") return chainReturn({ id: "1" });
       if (table === "migracion") {
-        // First query: fuzzy search returns results
-        // Second query (exact match filter): returns empty after filter
-        // Third query: check migrated → returns data
-        return chainReturn([{ nombre: "HAIDEE", migrado: "si" }]);
+        migracionCallCount++;
+        // 1st call: fuzzy search with migrado="no" → empty (no unmigrated records)
+        // 2nd call: check migrado="si" → found (already migrated)
+        if (migracionCallCount === 1) return chainReturn([]);
+        return chainReturn([{ nombre: "HAIDEE" }]);
       }
       return chainReturn(null);
     });

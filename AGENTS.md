@@ -277,18 +277,31 @@ bec76e1 fix: mover useEffect de redirect después de declarar isSuperAdmin
 
 ### Config (`notificacion_config` table)
 4 types: `miembros_deudores`, `recordatorio_pago`, `resumen_dueno`, `estatus_sistema`
-- Each has: `habilitado`, `frecuencia_semanal/quincenal/mensual`, `dias_previo`
+- Each has: `habilitado`, `frecuencia_diaria/semanal/quincenal/mensual`, `dias_previo`
 - `notificaciones_enabled` in `gym_config` is the master toggle (shows/hides the section)
+- `frecuencia_diaria` = runs every day (requires daily cron trigger)
 
 ### Log (`notificacion_log` table)
 - `id_notificacion_config` (FK), `miembros_notificados`, `sin_problemas`, `error_detalle`, `fecha_hora_envio`
 
 ### Execution flow
-1. **Cron**: `POST /api/notificaciones` with `Authorization: Bearer <CRON_SECRET>` or admin JWT
+1. **Cron**: `POST /api/notificaciones` with `Authorization: Bearer <CRON_SECRET>` or admin JWT. Recommended schedule: `0 0 * * *` (daily at midnight)
 2. **Manual**: `POST /api/notificaciones/procesar` with admin JWT + `{ tipo?: string, forzar?: boolean }`
 3. Route queries `notificacion_config WHERE habilitado = true`, loops configs, checks frequency (skipped if `forzar`), calls `ejecutarTipo()`
 4. `ejecutarTipo()` dispatches to `procesarMiembrosDeudores`, `procesarRecordatorioPago`, `procesarResumenDueno`, `procesarEstatusSistema`
 5. Each logs to `notificacion_log` (success or error)
+
+### Recordatorio de Pago - Día de Cobro
+- `recordatorio_pago` uses per-member billing day logic
+- Billing day = day of inscription, adjusted for months with fewer days (e.g., Feb 28/29)
+- Notification sent on `diaCobro - dias_previo` (wraps to previous month if < 1)
+- 30-day grace period: first billing month is month after inscription
+- Helper functions in `lib/utils.ts`: `getDiaCobro()`, `getDiaNotificacion()`, `esDiaDeNotificacion()`, `esMoroso()`
+
+### Miembros Morosos - Día de Cobro
+- `getMiembrosMorosos()` uses `getDiaCobro()` to determine debt start
+- First debt month = month after inscription (30-day grace)
+- Current month only counted as debt if `hoy.getDate() >= diaCobro`
 
 ### Dashboard trigger
 - `app/dashboard/page.tsx` fires `procesarTodasLasNotificaciones()` on mount when `notificaciones_enabled` is true (background, no await)
@@ -302,7 +315,7 @@ bec76e1 fix: mover useEffect de redirect después de declarar isSuperAdmin
 
 ## Migrations Applied
 
-001–031 applied in Supabase SQL Editor. Key ones:
+001–032 applied in Supabase SQL Editor. Key ones:
 - **019**: RPC functions (aprobar_pago_atomico, etc.) — **NOTE: 020 dropped these, breaking approval**
 - **020**: Dropped RPC functions
 - **025**: RLS for pagos suspendido + migracion (service_role only)
@@ -313,3 +326,4 @@ bec76e1 fix: mover useEffect de redirect después de declarar isSuperAdmin
 - **030a**: Added `hora_llegada` and `hora_salida` text columns to profiles
 - **030b**: Suspension workflow — `suspendido_pendiente` estado, `created_by` audit column
 - **031**: RLS DELETE policies for `suspendido_pendiente` pagos
+- **032**: Added `frecuencia_diaria` boolean to `notificacion_config`

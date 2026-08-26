@@ -333,6 +333,7 @@ export const messages = {
     habilitado: "Habilitado",
     deshabilitado: "Deshabilitado",
     frecuencia: "Frecuencia",
+    diariaS: "Diaria",
     semanaS: "Semanal",
     quincenalS: "Quincenal",
     mensualS: "Mensual",

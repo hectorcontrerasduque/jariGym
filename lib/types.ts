@@ -119,6 +119,7 @@ export interface NotificacionConfig {
   id: string;
   tipo_notificacion: TipoNotificacion;
   habilitado: boolean;
+  frecuencia_diaria: boolean;
   frecuencia_semanal: boolean;
   frecuencia_quincenal: boolean;
   frecuencia_mensual: boolean;

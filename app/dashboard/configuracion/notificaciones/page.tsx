@@ -96,6 +96,7 @@ export default function NotificacionesPage() {
       for (const config of configs) {
         await notificacionesService.updateNotificacionConfig(config.id, {
           habilitado: config.habilitado,
+          frecuencia_diaria: config.frecuencia_diaria,
           frecuencia_semanal: config.frecuencia_semanal,
           frecuencia_quincenal: config.frecuencia_quincenal,
           frecuencia_mensual: config.frecuencia_mensual,
@@ -256,6 +257,7 @@ export default function NotificacionesPage() {
                   <p className="text-sm font-medium text-gym-text mb-2">{messages.notificaciones.frecuencia}</p>
                   <div className="flex flex-wrap gap-4">
                     {[
+                      { field: "frecuencia_diaria", label: messages.notificaciones.diariaS },
                       { field: "frecuencia_semanal", label: messages.notificaciones.semanaS },
                       { field: "frecuencia_quincenal", label: messages.notificaciones.quincenalS },
                       { field: "frecuencia_mensual", label: messages.notificaciones.mensualS },

@@ -97,11 +97,13 @@ export async function POST(request: Request) {
 
 async function verificarFrecuencia(config: {
   id: string;
+  frecuencia_diaria: boolean;
   frecuencia_semanal: boolean;
   frecuencia_quincenal: boolean;
   frecuencia_mensual: boolean;
 }): Promise<boolean> {
   const tieneFrecuencia =
+    config.frecuencia_diaria ||
     config.frecuencia_semanal ||
     config.frecuencia_quincenal ||
     config.frecuencia_mensual;
@@ -122,6 +124,7 @@ async function verificarFrecuencia(config: {
   const diasDesdeUltimo =
     (ahora.getTime() - ultimoEnvio.getTime()) / (1000 * 60 * 60 * 24);
 
+  if (config.frecuencia_diaria && diasDesdeUltimo >= 1) return true;
   if (config.frecuencia_semanal && diasDesdeUltimo >= 7) return true;
   if (config.frecuencia_quincenal && diasDesdeUltimo >= 15) return true;
   if (config.frecuencia_mensual && diasDesdeUltimo >= 30) return true;

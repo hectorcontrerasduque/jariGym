@@ -216,11 +216,11 @@ async function procesarMiembrosDeudores(gymConfig: {
       await sendPaymentDebtEmail(
         miembro.email,
         miembro.nombre_completo,
-        gymConfig.nombre_gym || "GymApp",
+        (gymConfig.nombre_gym as string) || "GymApp",
         deudasParaEmail,
         miembro.totalDeuda,
-        gymConfig.logo_url,
-        gymConfig.direccion
+        gymConfig.logo_url as string | null,
+        gymConfig.direccion as string | null
       );
       count++;
     } catch (error) {
@@ -435,7 +435,7 @@ async function procesarResumenDueno(gymConfig: Record<string, unknown>): Promise
         migraciones: migraciones || 0,
       },
       `${process.env.NEXT_PUBLIC_SITE_URL}/dashboard/pagos`,
-      gymConfig.logo_url
+      gymConfig.logo_url as string | null
     );
     return 1;
   } catch (error) {
@@ -528,7 +528,7 @@ async function procesarEstatusSistema(gymConfig: Record<string, unknown>): Promi
           0
         ),
         capacidad: totalActivos || 0,
-        maxMiembros: gymConfig.max_miembros,
+        maxMiembros: gymConfig.max_miembros as number,
         ultimoMiembroRegistrado: ultimoMiembro
           ? ultimoMiembro.nombre_completo
           : "N/A",
@@ -537,7 +537,7 @@ async function procesarEstatusSistema(gymConfig: Record<string, unknown>): Promi
           : "N/A",
         migraciones: migraciones || 0,
       },
-      gymConfig.logo_url,
+      gymConfig.logo_url as string | null,
       undefined,
       erroresFormateados
     );

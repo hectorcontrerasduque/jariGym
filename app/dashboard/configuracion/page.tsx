@@ -332,6 +332,40 @@ export default function ConfiguracionPage() {
         </CardContent>
       </Card>
 
+      {/* Modo de Cobro */}
+      <Card className="neon-card relative z-10">
+        <CardContent className="p-4">
+          <div>
+            <span className="text-sm font-medium text-gym-text">{messages.notificaciones.modoCobro}</span>
+            <p className="text-xs text-gym-muted mb-3">{messages.notificaciones.modoCobroDesc}</p>
+            <div className="flex flex-wrap gap-4">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="modo_cobro"
+                  value="dia_uno"
+                  checked={(config.modo_cobro || "dia_uno") === "dia_uno"}
+                  onChange={() => setConfig({ ...config, modo_cobro: "dia_uno" })}
+                  className="w-4 h-4 text-gym-primary focus:ring-gym-primary"
+                />
+                <span className="text-sm text-gym-text">{messages.notificaciones.modoCobroDiaUno}</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="modo_cobro"
+                  value="fecha_inscripcion"
+                  checked={config.modo_cobro === "fecha_inscripcion"}
+                  onChange={() => setConfig({ ...config, modo_cobro: "fecha_inscripcion" })}
+                  className="w-4 h-4 text-gym-primary focus:ring-gym-primary"
+                />
+                <span className="text-sm text-gym-text">{messages.notificaciones.modoCobroFechaInscripcion}</span>
+              </label>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Zona Horaria y Moneda */}
       <Card className="neon-card relative z-10">
         <CardHeader>

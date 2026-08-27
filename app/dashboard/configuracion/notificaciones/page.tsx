@@ -91,7 +91,6 @@ export default function NotificacionesPage() {
     try {
       await configService.updateConfig({
         notificaciones_enabled: gymConfig.notificaciones_enabled,
-        modo_cobro: gymConfig.modo_cobro || "dia_uno",
       } as Partial<GymConfig>);
 
       for (const config of configs) {
@@ -213,39 +212,6 @@ export default function NotificacionesPage() {
               />
               <div className="w-11 h-6 bg-gym-surface peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-gym-primary rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-gym-primary"></div>
             </label>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card className="neon-card relative z-10">
-        <CardContent className="p-4">
-          <div>
-            <span className="text-sm font-medium text-gym-text">{messages.notificaciones.modoCobro}</span>
-            <p className="text-xs text-gym-muted mb-3">{messages.notificaciones.modoCobroDesc}</p>
-            <div className="flex flex-wrap gap-4">
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="radio"
-                  name="modo_cobro"
-                  value="dia_uno"
-                  checked={(gymConfig.modo_cobro || "dia_uno") === "dia_uno"}
-                  onChange={() => setGymConfig({ ...gymConfig, modo_cobro: "dia_uno" })}
-                  className="w-4 h-4 text-gym-primary focus:ring-gym-primary"
-                />
-                <span className="text-sm text-gym-text">{messages.notificaciones.modoCobroDiaUno}</span>
-              </label>
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="radio"
-                  name="modo_cobro"
-                  value="fecha_inscripcion"
-                  checked={gymConfig.modo_cobro === "fecha_inscripcion"}
-                  onChange={() => setGymConfig({ ...gymConfig, modo_cobro: "fecha_inscripcion" })}
-                  className="w-4 h-4 text-gym-primary focus:ring-gym-primary"
-                />
-                <span className="text-sm text-gym-text">{messages.notificaciones.modoCobroFechaInscripcion}</span>
-              </label>
-            </div>
           </div>
         </CardContent>
       </Card>

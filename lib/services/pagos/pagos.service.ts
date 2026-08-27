@@ -587,7 +587,7 @@ export class PagosService {
         .is("fecha_fin", null),
       supabase
         .from("gym_config")
-        .select("dueno_email")
+        .select("dueno_email, modo_cobro")
         .limit(1)
         .maybeSingle(),
     ]);
@@ -603,6 +603,7 @@ export class PagosService {
       if (l.fecha_inicio) fechaInicioMap.set(l.usuario_id, l.fecha_inicio);
     }
     const ownerEmail = ownerResult.data?.dueno_email?.toLowerCase() || "";
+    const modoCobro = (ownerResult.data?.modo_cobro as "dia_uno" | "fecha_inscripcion") || "dia_uno";
 
     const { data: todosPagos } = await supabase
       .from("pagos")
@@ -672,7 +673,7 @@ export class PagosService {
       for (let mes = primerMesDeuda; mes <= mesActual; mes++) {
         if (mesesCubiertos.has(mes)) continue;
 
-        const diaCobro = getDiaCobro(fechaInicioStr || "2000-01-01", mes, anioConsulta);
+        const diaCobro = getDiaCobro(fechaInicioStr || "2000-01-01", mes, anioConsulta, modoCobro);
 
         if (mes === mesActual && hoy.getDate() < diaCobro) continue;
 

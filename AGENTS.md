@@ -281,6 +281,12 @@ bec76e1 fix: mover useEffect de redirect después de declarar isSuperAdmin
 - `notificaciones_enabled` in `gym_config` is the master toggle (shows/hides the section)
 - `frecuencia_diaria` = runs every day (requires daily cron trigger)
 
+### Billing Mode (`gym_config.modo_cobro`)
+- `"dia_uno"` (default): all members billed on the 1st of each month
+- `"fecha_inscripcion"`: each member billed on their inscription day (adjusted for month length)
+- Affects: `getDiaCobro()`, `getMiembrosMorosos()`, `procesarRecordatorioPago()`
+- Configurable via UI: Notificaciones → Modo de cobro radio buttons
+
 ### Log (`notificacion_log` table)
 - `id_notificacion_config` (FK), `miembros_notificados`, `sin_problemas`, `error_detalle`, `fecha_hora_envio`
 
@@ -327,3 +333,4 @@ bec76e1 fix: mover useEffect de redirect después de declarar isSuperAdmin
 - **030b**: Suspension workflow — `suspendido_pendiente` estado, `created_by` audit column
 - **031**: RLS DELETE policies for `suspendido_pendiente` pagos
 - **032**: Added `frecuencia_diaria` boolean to `notificacion_config`
+- **033**: Added `modo_cobro` text to `gym_config` ('dia_uno' | 'fecha_inscripcion')

@@ -59,6 +59,8 @@ export interface Pago {
 
 export type TipoMovimiento = "inscripcion" | "mensualidad" | "otros";
 
+export type ModoCobro = "dia_uno" | "fecha_inscripcion";
+
 export interface Movimiento {
   id: string;
   usuario_id: string;
@@ -95,6 +97,7 @@ export interface GymConfig {
   moneda: string;
   timezone: string;
   notificaciones_enabled: boolean;
+  modo_cobro: ModoCobro;
   created_at: string;
   updated_at: string;
 }

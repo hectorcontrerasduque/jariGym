@@ -1,5 +1,6 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import type { ModoCobro } from "./types";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -46,7 +47,14 @@ export function getMonthShort(month: number) {
   return months[month - 1] || "";
 }
 
-export function getDiaCobro(fechaInscripcion: string, mes: number, anio: number): number {
+export function getDiaCobro(
+  fechaInscripcion: string,
+  mes: number,
+  anio: number,
+  modoCobro: ModoCobro = "dia_uno"
+): number {
+  if (modoCobro === "dia_uno") return 1;
+
   const dia = new Date(fechaInscripcion).getDate();
   const ultimoDiaMes = new Date(anio, mes, 0).getDate();
   return Math.min(dia, ultimoDiaMes);

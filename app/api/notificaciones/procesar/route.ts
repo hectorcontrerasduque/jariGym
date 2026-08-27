@@ -221,6 +221,7 @@ async function procesarRecordatorioPago(
   const logoUrl = gymConfig.logo_url as string | null;
   const duenoEmail = gymConfig.dueno_email as string | null;
   const direccion = gymConfig.direccion as string | null;
+  const modoCobro = (gymConfig.modo_cobro as "dia_uno" | "fecha_inscripcion") || "dia_uno";
 
   const mesActual = new Date().getMonth() + 1;
   const anioActual = new Date().getFullYear();
@@ -299,7 +300,7 @@ async function procesarRecordatorioPago(
 
     if (forzar) return true;
 
-    const diaCobro = getDiaCobro(m.fecha_inscripcion, mesActual, anioActual);
+    const diaCobro = getDiaCobro(m.fecha_inscripcion, mesActual, anioActual, modoCobro);
     const notif = getDiaNotificacion(diaCobro, diasPrevio, mesActual, anioActual);
 
     return hoy.getDate() === notif.dia &&
@@ -312,7 +313,7 @@ async function procesarRecordatorioPago(
   let count = 0;
   for (const deudor of deudores) {
     try {
-      const diaCobro = getDiaCobro(deudor.fecha_inscripcion!, mesActual, anioActual);
+      const diaCobro = getDiaCobro(deudor.fecha_inscripcion!, mesActual, anioActual, modoCobro);
       const diasRestantesMes = diaCobro - hoy.getDate();
 
       await sendPaymentReminderEmail(
@@ -338,7 +339,7 @@ async function procesarRecordatorioPago(
         duenoEmail,
         nombreGym,
         deudores.map((d) => {
-          const diaCobro = getDiaCobro(d.fecha_inscripcion!, mesActual, anioActual);
+          const diaCobro = getDiaCobro(d.fecha_inscripcion!, mesActual, anioActual, modoCobro);
           return {
             nombre: d.nombre_completo,
             diasRestantes: forzar ? 0 : Math.max(0, diaCobro - hoy.getDate()),

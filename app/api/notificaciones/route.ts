@@ -233,19 +233,13 @@ async function procesarMiembrosDeudores(gymConfig: {
 
 async function procesarRecordatorioPago(
   diasPrevio: number,
-  gymConfig: {
-    nombre_gym: string | null;
-    logo_url: string | null;
-    dueno_email: string | null;
-    direccion: string | null;
-    modo_cobro: string | null;
-  },
+  gymConfig: Record<string, unknown>,
   forzar: boolean = false
 ): Promise<number> {
-  const nombreGym = gymConfig.nombre_gym || "GymApp";
-  const logoUrl = gymConfig.logo_url;
-  const duenoEmail = gymConfig.dueno_email;
-  const direccion = gymConfig.direccion;
+  const nombreGym = (gymConfig.nombre_gym as string) || "GymApp";
+  const logoUrl = gymConfig.logo_url as string | null;
+  const duenoEmail = gymConfig.dueno_email as string | null;
+  const direccion = gymConfig.direccion as string | null;
   const modoCobro = (gymConfig.modo_cobro as "dia_uno" | "fecha_inscripcion") || "dia_uno";
 
   const mesActual = new Date().getMonth() + 1;
@@ -387,11 +381,7 @@ async function procesarRecordatorioPago(
   return count;
 }
 
-async function procesarResumenDueno(gymConfig: {
-  nombre_gym: string | null;
-  logo_url: string | null;
-  dueno_email: string | null;
-}): Promise<number> {
+async function procesarResumenDueno(gymConfig: Record<string, unknown>): Promise<number> {
   if (!gymConfig.dueno_email) throw new Error(messages.notificaciones.noDuenoEmail);
 
   const mesActual = new Date().getMonth() + 1;
@@ -427,8 +417,8 @@ async function procesarResumenDueno(gymConfig: {
       "@/lib/services/email/email.service"
     );
     await sendAdminSummaryEmail(
-      gymConfig.dueno_email,
-      gymConfig.nombre_gym || "GymApp",
+      gymConfig.dueno_email as string,
+      (gymConfig.nombre_gym as string) || "GymApp",
       {
         pagosAprobados: (pagosAprobados || []).length,
         pagosPendientes: (pagosPendientes || []).length,
@@ -454,11 +444,7 @@ async function procesarResumenDueno(gymConfig: {
   }
 }
 
-async function procesarEstatusSistema(gymConfig: {
-  nombre_gym: string | null;
-  logo_url: string | null;
-  max_miembros: number;
-}): Promise<number> {
+async function procesarEstatusSistema(gymConfig: Record<string, unknown>): Promise<number> {
   const destino = process.env.NEXT_PUBLIC_ADMIN_EMAIL;
   if (!destino) return 0;
 
@@ -527,7 +513,7 @@ async function procesarEstatusSistema(gymConfig: {
     );
     await sendSystemStatusEmail(
       destino,
-      gymConfig.nombre_gym || "GymApp",
+      (gymConfig.nombre_gym as string) || "GymApp",
       {
         totalMiembrosActivos: totalActivos || 0,
         totalMiembrosInactivos: totalInactivos || 0,

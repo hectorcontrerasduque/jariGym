@@ -136,15 +136,32 @@ export default function MiembrosPage() {
     setNotasAdmin(miembro.notas_admin || "");
     try {
       const supabase = createClient();
-      const { data: detalleInscripcion } = await supabase
-        .from("detalle_pago")
-        .select("pago_id, pagos!inner(*)")
-        .eq("tipo_pago", "inscripcion")
-        .eq("pagos.usuario_id", miembro.id)
-        .eq("pagos.estado", "aprobado")
-        .order("pagos(created_at)", { ascending: false })
+
+      const { data: inscPago } = await supabase
+        .from("pagos")
+        .select("id")
+        .eq("usuario_id", miembro.id)
+        .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
+
+      let pagoInsc: Pago | null = null;
+      if (inscPago) {
+        const { data: detInsc } = await supabase
+          .from("detalle_pago")
+          .select("pago_id")
+          .eq("pago_id", inscPago.id)
+          .eq("tipo_pago", "inscripcion")
+          .maybeSingle();
+        if (detInsc) {
+          const { data: pagoFull } = await supabase
+            .from("pagos")
+            .select("*")
+            .eq("id", inscPago.id)
+            .single();
+          pagoInsc = pagoFull;
+        }
+      }
 
       const { data: libreData } = await supabase
         .from("membresias")
@@ -154,7 +171,7 @@ export default function MiembrosPage() {
         .limit(1)
         .maybeSingle();
 
-      if (detalleInscripcion?.pagos) setPagoInscripcion(detalleInscripcion.pagos as Pago);
+      if (pagoInsc) setPagoInscripcion(pagoInsc);
       setIsMembresiaLibre(!!libreData);
     } catch (error) {
       showToast(messages.toast.errorCargaDatos, "error");

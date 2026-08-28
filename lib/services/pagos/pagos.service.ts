@@ -45,7 +45,12 @@ export class PagosService {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      if (error.message?.includes("row-level security")) {
+        throw new Error("No tienes permiso para registrar este pago");
+      }
+      throw new Error(messages.toast.pagoError);
+    }
     return data;
   }
 
@@ -246,7 +251,12 @@ export class PagosService {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      if (error.message?.includes("row-level security")) {
+        throw new Error("No tienes permiso para registrar este pago");
+      }
+      throw new Error(messages.toast.pagoError);
+    }
 
     if (data.tipo_pago === "inscripcion") {
       await this.supabase

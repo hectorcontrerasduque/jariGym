@@ -255,16 +255,24 @@ export async function POST(request: Request) {
     for (const record of recordsToProcess) {
       const pagoEstado = record.estado === "pagado" ? "aprobado" : "suspendido";
 
-      const { data: existingDetalle } = await supabase
-        .from("detalle_pago")
-        .select("pago_id, pagos!inner(id, estado)")
-        .eq("mes", record.mes_pagar)
-        .eq("anio", record.anio_pagar)
-        .eq("pagos.usuario_id", userId)
+      const { data: existingPago } = await supabase
+        .from("pagos")
+        .select("id, estado")
+        .eq("usuario_id", userId)
         .maybeSingle();
 
+      const { data: existingDetalle } = existingPago
+        ? await supabase
+            .from("detalle_pago")
+            .select("pago_id")
+            .eq("pago_id", existingPago.id)
+            .eq("mes", record.mes_pagar)
+            .eq("anio", record.anio_pagar)
+            .maybeSingle()
+        : { data: null };
+
       if (existingDetalle) {
-        if (existingDetalle.pagos?.estado === "pendiente" || existingDetalle.pagos?.estado === "suspendido") {
+        if (existingPago?.estado === "pendiente" || existingPago?.estado === "suspendido") {
           const { error } = await supabase
             .from("pagos")
             .update({
@@ -272,7 +280,7 @@ export async function POST(request: Request) {
               notas: "Actualizado por migración de data",
               approved_at: pagoEstado === "aprobado" ? new Date().toISOString() : null,
             })
-            .eq("id", existingDetalle.pago_id);
+            .eq("id", existingPago.id);
           if (!error) {
             await supabase
               .from("detalle_pago")

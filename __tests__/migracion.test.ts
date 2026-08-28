@@ -38,6 +38,32 @@ function chainReturn(data: unknown, error: unknown = null) {
   return chain;
 }
 
+function chainReturnOnInsert(insertData: unknown) {
+  const chain: Record<string, ReturnType<typeof vi.fn>> = {};
+  const methods = [
+    "select", "insert", "update", "delete",
+    "eq", "ilike", "or", "in", "order", "limit",
+    "maybeSingle", "single",
+  ];
+  let isInsert = false;
+  for (const m of methods) {
+    if (m === "insert") {
+      chain[m] = vi.fn(() => { isInsert = true; return chain; });
+    } else if (m === "select") {
+      chain[m] = vi.fn(() => chain);
+    } else if (m === "single") {
+      chain[m] = vi.fn(() => chain);
+    } else {
+      chain[m] = vi.fn(() => chain);
+    }
+  }
+  chain.then = (resolve: Function, reject: Function) => {
+    resolve({ data: isInsert ? insertData : null, error: null });
+    return chain;
+  };
+  return chain;
+}
+
 function makeReq(body: Record<string, unknown>) {
   return new Request("http://localhost/api/migracion", {
     method: "POST",
@@ -139,7 +165,7 @@ describe("Migración API", () => {
         { id: "m2", nombre: "HAIDEE", mes_pagar: 2, anio_pagar: 2026, estado: "pagado", migrado: "no" },
       ]);
       if (table === "profiles") return chainReturn(null);
-      if (table === "pagos") return chainReturn(null);
+      if (table === "pagos") return chainReturnOnInsert({ id: "pago-1", usuario_id: "user-1" });
       if (table === "detalle_pago") return chainReturn(null);
       if (table === "password_reset_tokens") return chainReturn(null);
       return chainReturn(null);
@@ -171,7 +197,7 @@ describe("Migración API", () => {
         { id: "m1", nombre: "HAIDEE LOPEZ", mes_pagar: 1, anio_pagar: 2026, estado: "pagado", migrado: "no" },
       ]);
       if (table === "profiles") return chainReturn(null);
-      if (table === "pagos") return chainReturn(null);
+      if (table === "pagos") return chainReturnOnInsert({ id: "pago-1", usuario_id: "user-1" });
       if (table === "detalle_pago") return chainReturn(null);
       if (table === "password_reset_tokens") return chainReturn(null);
       return chainReturn(null);
@@ -202,7 +228,7 @@ describe("Migración API", () => {
         { id: "m1", nombre: "HAIDEE", mes_pagar: 1, anio_pagar: 2026, estado: "pagado", migrado: "no" },
       ]);
       if (table === "profiles") return chainReturn({ id: "existing-user" });
-      if (table === "pagos") return chainReturn(null);
+      if (table === "pagos") return chainReturnOnInsert({ id: "pago-1", usuario_id: "existing-user" });
       if (table === "detalle_pago") return chainReturn(null);
       if (table === "password_reset_tokens") return chainReturn(null);
       return chainReturn(null);
@@ -219,6 +245,7 @@ describe("Migración API", () => {
   });
 
   it("solo procesa registros pagado y suspendido, no debe", async () => {
+    let pagoIdCounter = 0;
     mockSupabase.from.mockImplementation((table: string) => {
       if (table === "gym_config") return chainReturn({ id: "1" });
       if (table === "gym_config_metodos_pago") return chainReturn({ monto_mensual: 10, monto_inscripcion: 0 });
@@ -228,7 +255,7 @@ describe("Migración API", () => {
         { id: "m3", nombre: "HAIDEE", mes_pagar: 3, anio_pagar: 2026, estado: "suspendido", migrado: "no" },
       ]);
       if (table === "profiles") return chainReturn(null);
-      if (table === "pagos") return chainReturn(null);
+      if (table === "pagos") return chainReturnOnInsert({ id: `pago-${++pagoIdCounter}`, usuario_id: "user-1" });
       if (table === "detalle_pago") return chainReturn(null);
       if (table === "password_reset_tokens") return chainReturn(null);
       return chainReturn(null);

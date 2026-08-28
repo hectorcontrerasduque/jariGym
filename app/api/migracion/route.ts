@@ -309,17 +309,20 @@ export async function POST(request: Request) {
       }
     }
 
+    const { data: primerPagoUsuario } = await supabase
+      .from("pagos")
+      .select("id")
+      .eq("usuario_id", userId)
+      .limit(1)
+      .maybeSingle();
+
+    const pagoIdParaInscripcion = primerPagoUsuario?.id || "00000000-0000-0000-0000-000000000000";
+
     const { data: inscripcionExistente } = await supabase
       .from("detalle_pago")
       .select("id")
       .eq("tipo_pago", "inscripcion")
-      .eq("pago_id", (await supabase
-        .from("pagos")
-        .select("id")
-        .eq("usuario_id", userId)
-        .limit(1)
-        .maybeSingle()
-      ).data?.id || "00000000-0000-0000-0000-000000000000")
+      .eq("pago_id", pagoIdParaInscripcion)
       .maybeSingle();
 
     if (!inscripcionExistente) {

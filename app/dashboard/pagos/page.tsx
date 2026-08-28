@@ -36,7 +36,7 @@ export default function PagosPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [anios, setAnios] = useState<number[]>([]);
   const [anioSeleccionado, setAnioSeleccionado] = useState(new Date().getFullYear());
-  const [mesSeleccionado, setMesSeleccionado] = useState<number>(new Date().getMonth() + 1);
+  const [mesSeleccionado, setMesSeleccionado] = useState<number>(0);
   const [miembros, setMiembros] = useState<Profile[]>([]);
   const [miembroSeleccionado, setMiembroSeleccionado] = useState<string>("");
   const [busquedaMiembro, setBusquedaMiembro] = useState("");
@@ -46,7 +46,7 @@ export default function PagosPage() {
     setLoading(true);
     try {
       const [pagosResult, aniosResult, miembrosResult] = await Promise.allSettled([
-        pagosService.listarPagos(undefined, anioSeleccionado, mesSeleccionado),
+        pagosService.listarPagos(undefined, anioSeleccionado, mesSeleccionado === 0 ? undefined : mesSeleccionado),
         pagosService.aniosConPagos(),
         miembrosService.listarMiembros(),
       ]);
@@ -192,6 +192,7 @@ export default function PagosPage() {
               onChange={(e) => setMesSeleccionado(Number(e.target.value))}
               className="px-3 py-2 bg-gym-primary/10 border border-gym-primary/30 rounded-xl text-gym-text text-sm font-medium focus:outline-none focus:ring-2 focus:ring-gym-primary"
             >
+              <option value={0}>Todos</option>
               {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => (
                 <option key={m} value={m}>{getMonthName(m)}</option>
               ))}

@@ -140,6 +140,7 @@ describe("Migración API", () => {
       ]);
       if (table === "profiles") return chainReturn(null);
       if (table === "pagos") return chainReturn(null);
+      if (table === "detalle_pago") return chainReturn(null);
       if (table === "password_reset_tokens") return chainReturn(null);
       return chainReturn(null);
     });
@@ -171,6 +172,7 @@ describe("Migración API", () => {
       ]);
       if (table === "profiles") return chainReturn(null);
       if (table === "pagos") return chainReturn(null);
+      if (table === "detalle_pago") return chainReturn(null);
       if (table === "password_reset_tokens") return chainReturn(null);
       return chainReturn(null);
     });
@@ -201,6 +203,7 @@ describe("Migración API", () => {
       ]);
       if (table === "profiles") return chainReturn({ id: "existing-user" });
       if (table === "pagos") return chainReturn(null);
+      if (table === "detalle_pago") return chainReturn(null);
       if (table === "password_reset_tokens") return chainReturn(null);
       return chainReturn(null);
     });
@@ -226,6 +229,7 @@ describe("Migración API", () => {
       ]);
       if (table === "profiles") return chainReturn(null);
       if (table === "pagos") return chainReturn(null);
+      if (table === "detalle_pago") return chainReturn(null);
       if (table === "password_reset_tokens") return chainReturn(null);
       return chainReturn(null);
     });

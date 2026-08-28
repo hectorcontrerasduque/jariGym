@@ -1,15 +1,51 @@
 -- Migration 035: Pago normalizado - pagos (cabecera) + detalle_pago (detalle por mes)
--- Strategy: Rename pagos → pagos_historial, create new pagos + detalle_pago, migrate data
+-- Idempotent: safe to re-run if partially failed
 
 -- =============================================
--- 1. RENAME old table
+-- 0. Clean up new tables from previous failed runs
 -- =============================================
-ALTER TABLE IF EXISTS pagos RENAME TO pagos_historial;
+DROP INDEX IF EXISTS idx_pagos_usuario;
+DROP INDEX IF EXISTS idx_pagos_estado;
+DROP INDEX IF EXISTS idx_detalle_pago_pago;
+DROP INDEX IF EXISTS idx_detalle_pago_usuario_mes;
+DROP TABLE IF EXISTS detalle_pago CASCADE;
+
+-- Only drop pagos if it has the NEW schema (has 'metodo_pago' column but NOT 'monto')
+-- This avoids dropping the OLD pagos table we need to rename
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'pagos' AND table_schema = 'public' AND column_name = 'metodo_pago'
+  ) AND NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'pagos' AND table_schema = 'public' AND column_name = 'monto'
+  ) THEN
+    DROP TABLE pagos CASCADE;
+  END IF;
+END $$;
+
+-- =============================================
+-- 1. Rename old pagos → pagos_historial (if old schema still exists)
+-- =============================================
+DO $$
+BEGIN
+  -- Only rename if pagos has the old 'monto' column (old schema)
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'pagos' AND table_schema = 'public' AND column_name = 'monto'
+  ) AND NOT EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_name = 'pagos_historial' AND table_schema = 'public'
+  ) THEN
+    ALTER TABLE pagos RENAME TO pagos_historial;
+  END IF;
+END $$;
 
 -- =============================================
 -- 2. Create new pagos (cabecera)
 -- =============================================
-CREATE TABLE pagos (
+CREATE TABLE IF NOT EXISTS pagos (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   usuario_id uuid NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
   estado text NOT NULL DEFAULT 'pendiente' CHECK (estado IN ('pendiente', 'aprobado', 'rechazado', 'suspendido')),
@@ -24,13 +60,13 @@ CREATE TABLE pagos (
   updated_at timestamptz DEFAULT now()
 );
 
-CREATE INDEX idx_pagos_usuario ON pagos(usuario_id);
-CREATE INDEX idx_pagos_estado ON pagos(estado);
+CREATE INDEX IF NOT EXISTS idx_pagos_usuario ON pagos(usuario_id);
+CREATE INDEX IF NOT EXISTS idx_pagos_estado ON pagos(estado);
 
 -- =============================================
 -- 3. Create detalle_pago (detalle por mes/inscripcion)
 -- =============================================
-CREATE TABLE detalle_pago (
+CREATE TABLE IF NOT EXISTS detalle_pago (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   pago_id uuid NOT NULL REFERENCES pagos(id) ON DELETE CASCADE,
   mes int CHECK (mes BETWEEN 1 AND 12),
@@ -39,49 +75,62 @@ CREATE TABLE detalle_pago (
   monto numeric(10,2) NOT NULL DEFAULT 0
 );
 
-CREATE INDEX idx_detalle_pago_pago ON detalle_pago(pago_id);
-CREATE INDEX idx_detalle_pago_usuario_mes ON detalle_pago(pago_id, mes, anio);
+CREATE INDEX IF NOT EXISTS idx_detalle_pago_pago ON detalle_pago(pago_id);
+CREATE INDEX IF NOT EXISTS idx_detalle_pago_usuario_mes ON detalle_pago(pago_id, mes, anio);
 
 -- =============================================
 -- 4. Migrate data from pagos_historial
 -- =============================================
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_name = 'pagos_historial' AND table_schema = 'public'
+  ) THEN
+    -- Only migrate if detalle_pago is empty (may have partial data from failed run)
+    IF NOT EXISTS (SELECT 1 FROM detalle_pago LIMIT 1) THEN
+      -- Clear pagos if it was partially populated from a failed run
+      DELETE FROM pagos;
 
--- 4a. Create pagos records (grouped by usuario_id + estado + metodo_pago + notas + created_by)
-INSERT INTO pagos (id, usuario_id, estado, metodo_pago, codigo_billete, comprobante_url, notas, approved_by, approved_at, created_by, created_at, updated_at)
-SELECT
-  gen_random_uuid(),
-  h.usuario_id,
-  h.estado,
-  COALESCE(h.metodo_pago, 'efectivo'),
-  h.codigo_billete,
-  h.comprobante_url,
-  h.notas,
-  h.approved_by,
-  h.approved_at,
-  h.created_by,
-  MIN(h.created_at),
-  MAX(h.updated_at)
-FROM pagos_historial h
-GROUP BY h.usuario_id, h.estado, h.metodo_pago, h.codigo_billete, h.comprobante_url, h.notas, h.approved_by, h.approved_at, h.created_by;
+      -- 4a. Create pagos records
+      INSERT INTO pagos (id, usuario_id, estado, metodo_pago, codigo_billete, comprobante_url, notas, approved_by, approved_at, created_by, created_at, updated_at)
+      SELECT
+        gen_random_uuid(),
+        h.usuario_id,
+        h.estado,
+        COALESCE(h.metodo_pago, 'efectivo'),
+        h.codigo_billete,
+        h.comprobante_url,
+        h.notas,
+        h.approved_by,
+        h.approved_at,
+        h.created_by,
+        MIN(h.created_at),
+        MAX(h.updated_at)
+      FROM pagos_historial h
+      GROUP BY h.usuario_id, h.estado, h.metodo_pago, h.codigo_billete, h.comprobante_url, h.notas, h.approved_by, h.approved_at, h.created_by;
 
--- 4b. Create detalle_pago records (one per old pagos row)
-INSERT INTO detalle_pago (id, pago_id, mes, anio, tipo_pago, monto)
-SELECT
-  gen_random_uuid(),
-  p.id,
-  h.mes_pagar,
-  h.anio_pagar,
-  COALESCE(h.tipo_pago, 'mensualidad'),
-  h.monto
-FROM pagos_historial h
-JOIN pagos p ON
-  p.usuario_id = h.usuario_id
-  AND p.estado = h.estado
-  AND p.metodo_pago = COALESCE(h.metodo_pago, 'efectivo')
-  AND p.notas IS NOT DISTINCT FROM h.notas
-  AND p.created_by IS NOT DISTINCT FROM h.created_by
-  AND DATE(p.created_at) = DATE(h.created_at)
-ORDER BY h.created_at;
+      -- 4b. Create detalle_pago records
+      INSERT INTO detalle_pago (id, pago_id, mes, anio, tipo_pago, monto)
+      SELECT
+        gen_random_uuid(),
+        p.id,
+        h.mes_pagar,
+        h.anio_pagar,
+        CASE WHEN h.tipo_pago = 'membresia' THEN 'mensualidad' ELSE COALESCE(h.tipo_pago, 'mensualidad') END,
+        h.monto
+      FROM pagos_historial h
+      JOIN pagos p ON
+        p.usuario_id = h.usuario_id
+        AND p.estado = h.estado
+        AND p.metodo_pago = COALESCE(h.metodo_pago, 'efectivo')
+        AND p.notas IS NOT DISTINCT FROM h.notas
+        AND p.created_by IS NOT DISTINCT FROM h.created_by
+        AND DATE(p.created_at) = DATE(h.created_at)
+      ORDER BY h.created_at;
+    END IF;
+  END IF;
+END $$;
 
 -- =============================================
 -- 5. RLS policies

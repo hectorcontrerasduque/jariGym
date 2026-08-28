@@ -21,11 +21,15 @@ const metodoLabels: Record<MetodoPago, string> = {
 };
 
 function isInscripcion(pago: Pago): boolean {
-  return pago.notas?.toLowerCase().includes("inscripción") || pago.notas?.toLowerCase().includes("inscripcion") || false;
+  return pago.detalle?.some(d => d.tipo_pago === "inscripcion") || false;
 }
 
 function getTipoLabel(pago: Pago): string {
   return isInscripcion(pago) ? "Inscripción" : "Mensualidad";
+}
+
+function getTotalMonto(pago: Pago): number {
+  return pago.detalle?.reduce((sum, d) => sum + d.monto, 0) || 0;
 }
 
 export default function PagosPage() {
@@ -64,13 +68,8 @@ export default function PagosPage() {
 
   const handleAprobar = async (pagoId: string) => {
     try {
-      const pago = pagos.find(p => p.id === pagoId);
       await pagosService.aprobarPago(pagoId);
-      if (pago?.estado === "suspendido_pendiente") {
-        showToast(messages.toast.suspensionAprobada, "success");
-      } else {
-        showToast(messages.toast.pagoAprobado, "success");
-      }
+      showToast(messages.toast.pagoAprobado, "success");
       await loadData();
       setModalOpen(false);
     } catch (error) {
@@ -80,13 +79,8 @@ export default function PagosPage() {
 
   const handleRechazar = async (pagoId: string) => {
     try {
-      const pago = pagos.find(p => p.id === pagoId);
       await pagosService.rechazarPago(pagoId);
-      if (pago?.estado === "suspendido_pendiente") {
-        showToast(messages.toast.suspensionRechazada, "success");
-      } else {
-        showToast(messages.toast.pagoRechazado, "success");
-      }
+      showToast(messages.toast.pagoRechazado, "success");
       await loadData();
       setModalOpen(false);
     } catch (error) {
@@ -132,8 +126,8 @@ export default function PagosPage() {
 
   const aprobados = pagosFiltrados.filter((p) => p.estado === "aprobado");
   const pendientes = pagosFiltrados.filter((p) => p.estado === "pendiente");
-  const montoAprobado = aprobados.reduce((sum, p) => sum + (p.monto || 0), 0);
-  const montoPendiente = pendientes.reduce((sum, p) => sum + (p.monto || 0), 0);
+  const montoAprobado = aprobados.reduce((sum, p) => sum + getTotalMonto(p), 0);
+  const montoPendiente = pendientes.reduce((sum, p) => sum + getTotalMonto(p), 0);
 
   const getNombreMiembro = (pago: Pago): string => {
     if (pago.profile?.nombre_completo) return pago.profile.nombre_completo;
@@ -306,7 +300,7 @@ export default function PagosPage() {
                         {getNombreMiembro(pago)}
                       </p>
                       <div className="flex items-center gap-2 mt-0.5">
-                        <span className="text-xs text-gym-muted">{getMonthName(pago.mes_pagar)} {pago.anio_pagar}</span>
+                        <span className="text-xs text-gym-muted">{pago.detalle?.[0]?.mes ? `${getMonthName(pago.detalle[0].mes)} ${pago.detalle[0].anio}` : "—"}</span>
                         <span className="text-xs text-gym-muted">·</span>
                         <span className={`text-xs ${isInscripcion(pago) ? "text-gym-primary" : "text-gym-secondary"}`}>
                           {getTipoLabel(pago)}
@@ -318,10 +312,6 @@ export default function PagosPage() {
                               ? "success"
                               : pago.estado === "rechazado"
                               ? "danger"
-                              : pago.estado === "suspendido"
-                              ? "warning"
-                              : pago.estado === "suspendido_pendiente"
-                              ? "warning"
                               : "warning"
                           }
                           className="text-[10px] px-1.5 py-0"
@@ -332,15 +322,13 @@ export default function PagosPage() {
                             ? "Rechazado"
                             : pago.estado === "suspendido"
                             ? "Suspendido"
-                            : pago.estado === "suspendido_pendiente"
-                            ? "Susp. Pendiente"
                             : "Pendiente"}
                         </Badge>
                       </div>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
                       <span className="font-semibold text-gym-text text-sm">
-                        {pago.monto > 0 ? formatCurrency(pago.monto) : "Gratis"}
+                        {getTotalMonto(pago) > 0 ? formatCurrency(getTotalMonto(pago)) : "Gratis"}
                       </span>
                       <button
                         onClick={() => { setSelectedPago(pago); setModalOpen(true); }}
@@ -368,7 +356,7 @@ export default function PagosPage() {
             </div>
             <div>
               <p className="text-sm text-gym-muted">Concepto</p>
-              <p className="text-gym-text font-medium">{getMonthName(selectedPago.mes_pagar)} {selectedPago.anio_pagar}</p>
+              <p className="text-gym-text font-medium">{selectedPago.detalle?.[0]?.mes ? `${getMonthName(selectedPago.detalle[0].mes)} ${selectedPago.detalle[0].anio}` : isInscripcion(selectedPago) ? "Inscripción" : "—"}</p>
             </div>
             <div>
               <p className="text-sm text-gym-muted">Tipo</p>
@@ -376,7 +364,7 @@ export default function PagosPage() {
             </div>
             <div>
               <p className="text-sm text-gym-muted">Monto</p>
-              <p className="text-2xl font-bold text-gym-text neon-text">{formatCurrency(selectedPago.monto)}</p>
+              <p className="text-2xl font-bold text-gym-text neon-text">{formatCurrency(getTotalMonto(selectedPago))}</p>
             </div>
             <div>
               <p className="text-sm text-gym-muted">Método</p>
@@ -386,12 +374,6 @@ export default function PagosPage() {
               <div>
                 <p className="text-sm text-gym-muted">Código billete</p>
                 <p className="text-gym-text font-mono">{selectedPago.codigo_billete}</p>
-              </div>
-            )}
-            {selectedPago.fecha_pago_real && (
-              <div>
-                <p className="text-sm text-gym-muted">Fecha de pago</p>
-                <p className="text-gym-text">{new Date(selectedPago.fecha_pago_real).toLocaleDateString("es-ES")}</p>
               </div>
             )}
             {selectedPago.comprobante_url && (
@@ -406,13 +388,13 @@ export default function PagosPage() {
               <p className="text-sm text-gym-muted">Notas</p>
               <p className="text-gym-text">{selectedPago.notas || "—"}</p>
             </div>
-            {(selectedPago.estado === "pendiente" || selectedPago.estado === "suspendido_pendiente") && (
+            {(selectedPago.estado === "pendiente") && (
               <div className="flex gap-2 pt-4">
                 <Button className="flex-1 glow-success" onClick={() => handleAprobar(selectedPago.id)}>
-                  <Check className="w-4 h-4 mr-2" /> {selectedPago.estado === "suspendido_pendiente" ? messages.misPagos.aprobarSuspension : "Aprobar"}
+                  <Check className="w-4 h-4 mr-2" /> Aprobar
                 </Button>
                 <Button variant="danger" className="flex-1 glow-danger" onClick={() => handleRechazar(selectedPago.id)}>
-                  <X className="w-4 h-4 mr-2" /> {selectedPago.estado === "suspendido_pendiente" ? messages.misPagos.rechazarSuspension : "Rechazar"}
+                  <X className="w-4 h-4 mr-2" /> Rechazar
                 </Button>
               </div>
             )}

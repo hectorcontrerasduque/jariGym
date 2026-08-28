@@ -206,14 +206,6 @@ function ReportarPagoForm() {
     try {
       const targetUserId = isAdmin && miembroSeleccionado ? miembroSeleccionado : userId;
 
-      if (!formData.pagar_inscripcion && !formData.pagar_mensualidad) {
-        throw new Error("Selecciona al menos inscripción o mensualidad");
-      }
-
-      if (formData.pagar_mensualidad && formData.meses.length === 0) {
-        throw new Error("Selecciona al menos un mes");
-      }
-
       if (!isAdmin && formData.pagar_inscripcion && inscripcionPagada) {
         throw new Error("La inscripción ya está pagada");
       }
@@ -231,44 +223,47 @@ function ReportarPagoForm() {
         comprobanteUrl = urlData.publicUrl;
       }
 
-      if (formData.pagar_inscripcion && !inscripcionPagada && getMontoByMetodo(formData.metodo_pago, "inscripcion") > 0) {
-        const pagoInscripcion = await pagosService.crearPago({
-          usuario_id: targetUserId,
-          monto: getMontoByMetodo(formData.metodo_pago, "inscripcion"),
-          mes_pagar: new Date().getMonth() + 1,
-          anio_pagar: new Date().getFullYear(),
-          metodo_pago: formData.metodo_pago,
-          tipo_pago: "inscripcion",
-          comprobante_url: comprobanteUrl || undefined,
-          codigo_billete: formData.metodo_pago === "efectivo" ? formData.codigo_billete : undefined,
-          notas: `Inscripción - ${formData.notas || ""}`,
-          fecha_pago_real: formData.fecha_pago,
-        });
+      const detalles: Array<{ mes: number | null; anio: number | null; tipo_pago: "mensualidad" | "inscripcion"; monto: number }> = [];
 
-        if (isAdmin && formData.estado_pago === "aprobado") {
-          await pagosService.aprobarPago(pagoInscripcion.id);
-        }
+      if (formData.pagar_inscripcion && !inscripcionPagada && getMontoByMetodo(formData.metodo_pago, "inscripcion") > 0) {
+        detalles.push({
+          mes: new Date().getMonth() + 1,
+          anio: new Date().getFullYear(),
+          tipo_pago: "inscripcion",
+          monto: getMontoByMetodo(formData.metodo_pago, "inscripcion"),
+        });
       }
 
       if (formData.pagar_mensualidad && formData.meses.length > 0) {
         for (const { mes, anio } of formData.meses) {
-          const pago = await pagosService.crearPago({
-            usuario_id: targetUserId,
+          detalles.push({
+            mes,
+            anio,
+            tipo_pago: "mensualidad",
             monto: getMontoByMetodo(formData.metodo_pago, "mensual"),
-            mes_pagar: mes,
-            anio_pagar: anio,
-            metodo_pago: formData.metodo_pago,
-            tipo_pago: "membresia",
-            comprobante_url: comprobanteUrl || undefined,
-            codigo_billete: formData.metodo_pago === "efectivo" ? formData.codigo_billete : undefined,
-            notas: formData.notas || undefined,
-            fecha_pago_real: formData.fecha_pago,
           });
-
-          if (isAdmin && formData.estado_pago === "aprobado") {
-            await pagosService.aprobarPago(pago.id);
-          }
         }
+      }
+
+      if (detalles.length === 0) {
+        throw new Error("Selecciona al menos un concepto de pago");
+      }
+
+      const notasPago = formData.pagar_inscripcion && !inscripcionPagada
+        ? `Inscripción - ${formData.notas || ""}`
+        : formData.notas || undefined;
+
+      const pago = await pagosService.crearPago({
+        usuario_id: targetUserId,
+        metodo_pago: formData.metodo_pago,
+        comprobante_url: comprobanteUrl || undefined,
+        codigo_billete: formData.metodo_pago === "efectivo" ? formData.codigo_billete : undefined,
+        notas: notasPago,
+        detalles,
+      });
+
+      if (isAdmin && formData.estado_pago === "aprobado") {
+        await pagosService.aprobarPago(pago.id);
       }
 
       setSuccess(true);

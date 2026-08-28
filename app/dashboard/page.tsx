@@ -173,13 +173,23 @@ export default function DashboardPage() {
       const supabase = createClient();
       const mesActual = new Date().getMonth() + 1;
       const anioActual = new Date().getFullYear();
-      const { data: pagosMes } = await supabase
+      const { data: pagosHeader } = await supabase
         .from("pagos")
-        .select("usuario_id")
-        .eq("mes_pagar", mesActual)
-        .eq("anio_pagar", anioActual)
+        .select("id, usuario_id")
         .eq("estado", "aprobado");
-      const idsAlDia = Array.from(new Set((pagosMes || []).map((p) => p.usuario_id)));
+
+      const pagoIds = (pagosHeader || []).map((p) => p.id);
+      const { data: pagosDetalles } = await supabase
+        .from("detalle_pago")
+        .select("pago_id")
+        .in("pago_id", pagoIds.length > 0 ? pagoIds : ["00000000-0000-0000-0000-000000000000"])
+        .eq("mes", mesActual)
+        .eq("anio", anioActual);
+
+      const pagoUsuarioMap = new Map((pagosHeader || []).map((p) => [p.id, p.usuario_id]));
+      const idsAlDia = Array.from(new Set(
+        (pagosDetalles || []).map((d) => pagoUsuarioMap.get(d.pago_id)).filter(Boolean)
+      ));
       const alDia = miembros.filter((m) => idsAlDia.includes(m.id));
       setModalData({
         title: "Al día",
@@ -458,7 +468,7 @@ export default function DashboardPage() {
           ) : (
             <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
               {pagosRecientes.map((pago: Pago) => {
-                const isInscripcion = pago.notas?.toLowerCase().includes("inscripción") || pago.notas?.toLowerCase().includes("inscripcion");
+                const isInscripcion = pago.detalle?.some(d => d.tipo_pago === "inscripcion");
                 return (
                   <div key={pago.id} className="flex items-center justify-between p-3 bg-gym-bg rounded-xl hover:bg-gym-surface transition-colors">
                     <div className="flex items-center gap-3 min-w-0">
@@ -474,12 +484,12 @@ export default function DashboardPage() {
                           {getNombreMiembro(pago)}
                         </p>
                         <p className="text-xs text-gym-muted">
-                          {isInscripcion ? "Inscripción" : `${getMonthName(pago.mes_pagar)} ${pago.anio_pagar}`}
+                          {isInscripcion ? "Inscripción" : pago.detalle?.[0]?.mes ? `${getMonthName(pago.detalle[0].mes)} ${pago.detalle[0].anio}` : "—"}
                         </p>
                       </div>
                     </div>
                     <div className="flex items-center gap-3 flex-shrink-0">
-                      <p className="font-semibold text-gym-text text-sm">{formatCurrency(pago.monto)}</p>
+                      <p className="font-semibold text-gym-text text-sm">{formatCurrency(pago.detalle?.reduce((s, d) => s + d.monto, 0) || 0)}</p>
                       <Badge variant="success">
                         <CheckCircle className="w-3 h-3 mr-1" /> ✓
                       </Badge>

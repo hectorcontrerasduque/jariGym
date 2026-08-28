@@ -14,7 +14,7 @@ import { showToast } from "@/components/ui/toast";
 import { messages } from "@/lib/messages";
 import { Avatar } from "@/components/ui/avatar";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
-import type { Pago, Profile, MetodoPago, MetodoPagoConfig, GymConfig, TipoPago } from "@/lib/types";
+import type { Pago, Profile, MetodoPago, MetodoPagoConfig, GymConfig } from "@/lib/types";
 
 const MESES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 
@@ -25,12 +25,15 @@ const metodoLabels: Record<MetodoPago, string> = {
 };
 
 function getPagoLabel(pago: Pago): string {
-  if (pago.tipo_pago === "inscripcion") return "Inscripción";
-  return `${getMonthName(pago.mes_pagar)} ${pago.anio_pagar}`;
+  const det = pago.detalle?.[0];
+  if (det?.tipo_pago === "inscripcion") return "Inscripción";
+  if (det?.mes && det?.anio) return `${getMonthName(det.mes)} ${det.anio}`;
+  return "Pago";
 }
 
 function getPagoIcon(pago: Pago) {
-  if (pago.tipo_pago === "inscripcion") return <FileText className="w-5 h-5 text-gym-primary" />;
+  const det = pago.detalle?.[0];
+  if (det?.tipo_pago === "inscripcion") return <FileText className="w-5 h-5 text-gym-primary" />;
   return <Calendar className="w-5 h-5 text-gym-secondary" />;
 }
 
@@ -301,35 +304,45 @@ export default function MisPagosPage() {
 
       const useAutoApprove = isSelf && isAdmin;
 
+      const detalles: Array<{ mes: number | null; anio: number | null; tipo_pago: "mensualidad" | "inscripcion"; monto: number }> = [];
+
       if (formData.pagar_inscripcion && !inscripcionPagada && getMontoByMetodo(formData.metodo_pago, "inscripcion") > 0) {
-        const pagoData = {
-          usuario_id: targetId, monto: getMontoByMetodo(formData.metodo_pago, "inscripcion"),
-          mes_pagar: new Date().getMonth() + 1, anio_pagar: new Date().getFullYear(),
-          metodo_pago: formData.metodo_pago, tipo_pago: "inscripcion" as TipoPago,
-          comprobante_url: comprobanteUrl || undefined, notas: "Inscripción", fecha_pago_real: formData.fecha_pago,
-          codigo_billete: formData.codigo_billete || undefined,
-        };
-        if (useAutoApprove) {
-          await pagosService.crearPagoAprobado(pagoData);
-        } else {
-          await pagosService.crearPago(pagoData);
-        }
+        detalles.push({
+          mes: new Date().getMonth() + 1,
+          anio: new Date().getFullYear(),
+          tipo_pago: "inscripcion",
+          monto: getMontoByMetodo(formData.metodo_pago, "inscripcion"),
+        });
       }
 
       if (formData.pagar_mensualidad && formData.meses.length > 0) {
         for (const { mes, anio } of formData.meses) {
-          const pagoData = {
-            usuario_id: targetId, monto: getMontoByMetodo(formData.metodo_pago, "mensual"),
-            mes_pagar: mes, anio_pagar: anio,             metodo_pago: formData.metodo_pago, tipo_pago: "membresia" as TipoPago,
-            comprobante_url: comprobanteUrl || undefined, notas: formData.notas || undefined, fecha_pago_real: formData.fecha_pago,
-            codigo_billete: formData.codigo_billete || undefined,
-          };
-          if (useAutoApprove) {
-            await pagosService.crearPagoAprobado(pagoData);
-          } else {
-            await pagosService.crearPago(pagoData);
-          }
+          detalles.push({
+            mes,
+            anio,
+            tipo_pago: "mensualidad",
+            monto: getMontoByMetodo(formData.metodo_pago, "mensual"),
+          });
         }
+      }
+
+      if (detalles.length === 0) {
+        throw new Error("Selecciona al menos un concepto de pago");
+      }
+
+      const pagoInput = {
+        usuario_id: targetId,
+        metodo_pago: formData.metodo_pago,
+        comprobante_url: comprobanteUrl || undefined,
+        codigo_billete: formData.codigo_billete || undefined,
+        notas: formData.pagar_inscripcion && !inscripcionPagada ? "Inscripción" : formData.notas || undefined,
+        detalles,
+      };
+
+      if (useAutoApprove) {
+        await pagosService.crearPagoAprobado(pagoInput);
+      } else {
+        await pagosService.crearPago(pagoInput);
       }
 
       showToast(isSelf ? "Pago registrado y aprobado" : "Pago registrado (pendiente de aprobación)", "success");
@@ -381,8 +394,8 @@ export default function MisPagosPage() {
 
   const aprobados = pagos.filter(p => p.estado === "aprobado");
   const pendientes = pagos.filter(p => p.estado === "pendiente");
-  const montoAprobado = aprobados.reduce((sum, p) => sum + (p.monto || 0), 0);
-  const montoPendiente = pendientes.reduce((sum, p) => sum + (p.monto || 0), 0);
+  const montoAprobado = aprobados.reduce((sum, p) => sum + (p.detalle?.reduce((s, d) => s + d.monto, 0) || 0), 0);
+  const montoPendiente = pendientes.reduce((sum, p) => sum + (p.detalle?.reduce((s, d) => s + d.monto, 0) || 0), 0);
 
   const filteredMiembros = miembros.filter(m => {
     const s = miembroSearch.toLowerCase();
@@ -396,11 +409,12 @@ export default function MisPagosPage() {
       pagos
         .filter(p => {
           if (isSuperAdmin && miembroSeleccionado) {
-            return p.estado === "pendiente" || p.estado === "aprobado" || p.estado === "suspendido" || p.estado === "suspendido_pendiente";
+            return p.estado === "pendiente" || p.estado === "aprobado" || p.estado === "suspendido";
           }
-          return p.estado === "pendiente" || p.estado === "aprobado" || p.estado === "suspendido_pendiente";
+          return p.estado === "pendiente" || p.estado === "aprobado";
         })
-        .map(p => `${p.anio_pagar}-${p.mes_pagar}`)
+        .flatMap(p => (p.detalle || []).map(d => d.mes && d.anio ? `${d.anio}-${d.mes}` : null))
+        .filter(Boolean)
     );
     return mesesPendientes.filter(m => !mesesConPago.has(`${m.anio}-${m.mes}`));
   }, [mesesPendientes, pagos, isSuperAdmin, miembroSeleccionado]);
@@ -410,11 +424,12 @@ export default function MisPagosPage() {
       pagos
         .filter(p => {
           if (isSuperAdmin && miembroSeleccionado) {
-            return p.estado === "pendiente" || p.estado === "aprobado" || p.estado === "suspendido" || p.estado === "suspendido_pendiente";
+            return p.estado === "pendiente" || p.estado === "aprobado" || p.estado === "suspendido";
           }
-          return p.estado === "pendiente" || p.estado === "aprobado" || p.estado === "suspendido_pendiente";
+          return p.estado === "pendiente" || p.estado === "aprobado";
         })
-        .map(p => `${p.anio_pagar}-${p.mes_pagar}`)
+        .flatMap(p => (p.detalle || []).map(d => d.mes && d.anio ? `${d.anio}-${d.mes}` : null))
+        .filter(Boolean)
     );
     return mesesPendientes.filter(m => !mesesConPago.has(`${m.anio}-${m.mes}`)).sort((a, b) => a.anio - b.anio || a.mes - b.mes);
   }, [mesesPendientes, pagos, isSuperAdmin, miembroSeleccionado]);
@@ -826,17 +841,11 @@ export default function MisPagosPage() {
                           variant={pago.estado === "aprobado" ? "success" : pago.estado === "rechazado" ? "danger" : "warning"}
                           className="text-[10px] px-1.5 py-0 flex-shrink-0"
                         >
-                          {pago.estado === "aprobado" ? "Aprobado" : pago.estado === "rechazado" ? "Rechazado" : pago.estado === "suspendido" ? "Suspendido" : pago.estado === "suspendido_pendiente" ? "Susp. Pendiente" : "Pendiente"}
+                          {pago.estado === "aprobado" ? "Aprobado" : pago.estado === "rechazado" ? "Rechazado" : pago.estado === "suspendido" ? "Suspendido" : "Pendiente"}
                         </Badge>
                       </div>
                       <div className="flex items-center gap-2 text-[11px] text-gym-muted">
-                        <span>{pago.monto > 0 ? formatCurrency(pago.monto) : "Gratis"}</span>
-                        {pago.fecha_pago_real && (
-                          <>
-                            <span>·</span>
-                            <span>{new Date(pago.fecha_pago_real).toLocaleDateString("es-ES")}</span>
-                          </>
-                        )}
+                        <span>{(pago.detalle?.reduce((s, d) => s + d.monto, 0) || 0) > 0 ? formatCurrency(pago.detalle?.reduce((s, d) => s + d.monto, 0) || 0) : "Gratis"}</span>
                         {pago.codigo_billete && (
                           <>
                             <span>·</span>
@@ -853,7 +862,7 @@ export default function MisPagosPage() {
                         <p className="text-[10px] text-gym-muted/70 truncate mt-0.5">{pago.notas}</p>
                       )}
                     </div>
-                    {(pago.estado === "pendiente" || pago.estado === "suspendido_pendiente") && (
+                    {(pago.estado === "pendiente") && (
                       <button
                         onClick={() => handleDelete(pago.id)}
                         disabled={deleting === pago.id}

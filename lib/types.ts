@@ -32,29 +32,41 @@ export interface Membresia {
 
 export type MetodoPago = "efectivo" | "bs" | "binance";
 
-export type TipoPago = "membresia" | "inscripcion";
+export type TipoPago = "mensualidad" | "inscripcion";
 
+// Pago = cabecera del pago (tabla pagos)
 export interface Pago {
   id: string;
   usuario_id: string;
-  monto: number;
-  comprobante_url: string | null;
-  estado: "pendiente" | "aprobado" | "rechazado" | "suspendido_pendiente" | "suspendido";
+  estado: "pendiente" | "aprobado" | "rechazado" | "suspendido";
   metodo_pago: MetodoPago;
-  tipo_pago: TipoPago;
   codigo_billete: string | null;
+  comprobante_url: string | null;
   notas: string | null;
   approved_by: string | null;
   approved_at: string | null;
   created_by: string | null;
-  fecha_pago_real: string | null;
-  mes_pagar: number;
-  anio_pagar: number;
   created_at: string;
   updated_at: string;
   profile?: Profile;
   approved_by_profile?: Profile;
   created_by_profile?: Profile;
+  detalle?: DetallePago[];
+}
+
+// DetallePago = detalle por mes o inscripcion (tabla detalle_pago)
+export interface DetallePago {
+  id: string;
+  pago_id: string;
+  mes: number | null;
+  anio: number | null;
+  tipo_pago: TipoPago;
+  monto: number;
+}
+
+// PagoConDetalle = cabecera con detalle incluido (para queries con JOIN)
+export interface PagoConDetalle extends Pago {
+  detalle: DetallePago[];
 }
 
 export type TipoMovimiento = "inscripcion" | "mensualidad" | "otros";
@@ -70,13 +82,12 @@ export interface Movimiento {
   comprobante_url: string | null;
   codigo_billete: string | null;
   notas: string | null;
-  mes_pagar: number | null;
-  anio_pagar: number | null;
+  mes: number | null;
+  anio: number | null;
   estado: "pendiente" | "aprobado" | "rechazado" | "suspendido";
   activo: boolean;
   approved_by: string | null;
   approved_at: string | null;
-  fecha_pago_real: string | null;
   created_at: string;
   updated_at: string;
   profile?: Profile;

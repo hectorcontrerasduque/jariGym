@@ -122,7 +122,7 @@ Schema managed via numbered SQL files in `supabase/migrations/`. Run manually:
 1. Go to Supabase Dashboard → SQL Editor
 2. Paste migration content → Run
 
-Tables: `profiles`, `membresias`, `pagos`, `gym_config`, `gym_config_metodos_pago`, `migracion`, `notificacion_config`, `notificacion_log`, `password_reset_tokens`
+Tables: `profiles`, `membresias`, `pagos` (header), `detalle_pago` (detail per month/inscription), `pagos_historial` (old data), `gym_config`, `gym_config_metodos_pago`, `migracion`, `notificacion_config`, `notificacion_log`, `password_reset_tokens`
 
 RLS uses helper functions (`get_user_role()`, `get_user_tenant_id()`) with `SECURITY DEFINER` to avoid infinite recursion. **Never create RLS policies that query the same table directly.**
 
@@ -185,7 +185,7 @@ hora_salida: string | null   // HH:MM format
 ```
 
 ### Dashboard Stats Logic
-- **Inscritos**: From `pagos` table (approved payments with "inscripción" in notas) + `profile.inscripcion_pagada`
+- **Inscritos**: From `pagos`+`detalle_pago` tables (approved payments with tipo_pago="inscripcion") + `profile.inscripcion_pagada`
 - **Deudores**: Active members (no libre, inscription paid) without approved payment for current month
 - **Al día**: Active members with approved payment for current month
 - **Pagos recientes**: Approved payments only, with fallback when profile join fails
@@ -194,7 +194,7 @@ hora_salida: string | null   // HH:MM format
 - Total card shows `active/max` format (e.g. `11/80`) using `gym_config.max_miembros`
 
 ### Payment Approval
-- `aprobarPago()` now auto-updates `profiles.inscripcion_pagada = true` when approving inscription payments
+- `aprobarPago()` now auto-updates `profiles.inscripcion_pagada = true` when approving inscription payments (checks `detalle_pago.tipo_pago`)
 - Super admin can approve payments (not just regular admin)
 
 ### Config Service
@@ -224,7 +224,7 @@ hora_salida: string | null   // HH:MM format
 
 ### Member Self-Migration
 - Login page has "Ya soy miembro" link → opens migration modal
-- Flow: search by name → select match (if multiple) → create auth user + profile + pagos + inscription
+- Flow: search by name → select match (if multiple) → create auth user + profile + pagos + detalle_pago + inscription
 - Prerequisites: gym_config must exist + at least one enabled payment method with monto > 0
 - Only processes `pagado` (→ aprobado) and `suspendido` (→ suspendido) records from `migracion` table
 - Fuzzy name search: each word generates prefix match (word without last char) for partial matches
@@ -236,6 +236,7 @@ hora_salida: string | null   // HH:MM format
 - [x] **`aprobar_pago_atomico` RPC dropped** — FIXED: `aprobarPago()` now uses direct `.update()` on pagos table, no longer calls the RPC.
 - [x] **`Profile.activo` type mismatch** — FIXED: Type updated to `boolean | null` in `lib/types.ts`.
 - [x] **`confirmLink` in migration route** — FIXED: Token is now generated, stored in `password_reset_tokens`, and sent via welcome email. Dedicated `/api/auth/confirm-email` route validates it.
+- [x] **Payment schema normalized** — FIXED: pagos = header (id, usuario_id, estado, metodo_pago, etc.), detalle_pago = detail (pago_id, mes, anio, tipo_pago, monto). Old pagos renamed to pagos_historial.
 
 ### Code Quality
 - [x] **Hardcoded messages in API routes** — FIXED: `api/miembros/route.ts`, `api/profile/route.ts`, `lib/services/config/config.service.ts` now use `messages.ts`. Notification API routes also migrated.
@@ -321,7 +322,7 @@ bec76e1 fix: mover useEffect de redirect después de declarar isSuperAdmin
 
 ## Migrations Applied
 
-001–032 applied in Supabase SQL Editor. Key ones:
+001–034 applied in Supabase SQL Editor. Key ones:
 - **019**: RPC functions (aprobar_pago_atomico, etc.) — **NOTE: 020 dropped these, breaking approval**
 - **020**: Dropped RPC functions
 - **025**: RLS for pagos suspendido + migracion (service_role only)
@@ -334,3 +335,5 @@ bec76e1 fix: mover useEffect de redirect después de declarar isSuperAdmin
 - **031**: RLS DELETE policies for `suspendido_pendiente` pagos
 - **032**: Added `frecuencia_diaria` boolean to `notificacion_config`
 - **033**: Added `modo_cobro` text to `gym_config` ('dia_uno' | 'fecha_inscripcion')
+- **034**: Admin INSERT RLS for pagos + comprobantes storage
+- **035**: **Payment normalization** — renames old `pagos` → `pagos_historial`, creates new `pagos` (header) + `detalle_pago` (detail per month/inscription). `CreatePagoInput` now takes `detalles[]` instead of flat fields.

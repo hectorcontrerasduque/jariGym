@@ -34,25 +34,44 @@ serve(async (req) => {
     }
 
     const body = await req.json();
-    const { monto, mes_pagar, anio_pagar, comprobante_url, notas } = body;
+    const { metodo_pago, comprobante_url, notas, detalles } = body;
 
-    const { data, error } = await supabase
+    if (!detalles || !Array.isArray(detalles) || detalles.length === 0) {
+      throw new Error("Se requiere al menos un detalle de pago");
+    }
+
+    const { data: pago, error: pagoError } = await supabase
       .from("pagos")
       .insert({
         usuario_id: user.id,
-        monto,
-        mes_pagar,
-        anio_pagar,
-        comprobante_url,
-        notas,
         estado: "pendiente",
+        metodo_pago: metodo_pago || "efectivo",
+        comprobante_url: comprobante_url || null,
+        notas: notas || null,
       })
       .select()
       .single();
 
-    if (error) throw error;
+    if (pagoError) throw pagoError;
 
-    return new Response(JSON.stringify({ success: true, data }), {
+    const detalleRows = detalles.map((d: { mes: number | null; anio: number | null; tipo_pago: string; monto: number }) => ({
+      pago_id: pago.id,
+      mes: d.mes,
+      anio: d.anio,
+      tipo_pago: d.tipo_pago,
+      monto: d.monto,
+    }));
+
+    const { error: detalleError } = await supabase
+      .from("detalle_pago")
+      .insert(detalleRows);
+
+    if (detalleError) {
+      await supabase.from("pagos").delete().eq("id", pago.id);
+      throw detalleError;
+    }
+
+    return new Response(JSON.stringify({ success: true, data: { ...pago, detalle: detalleRows } }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {

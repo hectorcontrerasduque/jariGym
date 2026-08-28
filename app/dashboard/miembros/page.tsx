@@ -137,14 +137,15 @@ export default function MiembrosPage() {
     try {
       const supabase = createClient();
       const [pagoIns, libreData] = await Promise.all([
-        supabase
-          .from("pagos")
-          .select("*")
-          .eq("usuario_id", miembro.id)
-          .ilike("notas", "%Inscripción%")
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .maybeSingle(),
+      const { data: detalleInscripcion } = await supabase
+        .from("detalle_pago")
+        .select("pago_id, pagos!inner(*)")
+        .eq("tipo_pago", "inscripcion")
+        .eq("pagos.usuario_id", miembro.id)
+        .eq("pagos.estado", "aprobado")
+        .order("pagos(created_at)", { ascending: false })
+        .limit(1)
+        .maybeSingle();
         supabase
           .from("membresias")
           .select("id, fecha_fin")
@@ -153,7 +154,7 @@ export default function MiembrosPage() {
           .limit(1)
           .maybeSingle(),
       ]);
-      if (pagoIns.data) setPagoInscripcion(pagoIns.data);
+      if (detalleInscripcion?.pagos) setPagoInscripcion(detalleInscripcion.pagos as Pago);
       setIsMembresiaLibre(!!libreData.data);
     } catch (error) {
       showToast(messages.toast.errorCargaDatos, "error");
@@ -475,7 +476,7 @@ export default function MiembrosPage() {
                 <div>
                   <div className="flex items-center justify-between">
                     <Badge variant="success">Pagada</Badge>
-                    <span className="text-lg font-bold text-gym-text neon-text">{formatCurrency(pagoInscripcion.monto)}</span>
+                    <span className="text-lg font-bold text-gym-text neon-text">{formatCurrency(pagoInscripcion.detalle?.reduce((s, d) => s + d.monto, 0) || 0)}</span>
                   </div>
                   <p className="text-xs text-gym-muted mt-1">
                     Pago: {formatDateTime(pagoInscripcion.created_at)}

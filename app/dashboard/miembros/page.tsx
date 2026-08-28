@@ -136,7 +136,6 @@ export default function MiembrosPage() {
     setNotasAdmin(miembro.notas_admin || "");
     try {
       const supabase = createClient();
-      const [pagoIns, libreData] = await Promise.all([
       const { data: detalleInscripcion } = await supabase
         .from("detalle_pago")
         .select("pago_id, pagos!inner(*)")
@@ -146,16 +145,17 @@ export default function MiembrosPage() {
         .order("pagos(created_at)", { ascending: false })
         .limit(1)
         .maybeSingle();
-        supabase
-          .from("membresias")
-          .select("id, fecha_fin")
-          .eq("usuario_id", miembro.id)
-          .is("fecha_fin", null)
-          .limit(1)
-          .maybeSingle(),
-      ]);
+
+      const { data: libreData } = await supabase
+        .from("membresias")
+        .select("id, fecha_fin")
+        .eq("usuario_id", miembro.id)
+        .is("fecha_fin", null)
+        .limit(1)
+        .maybeSingle();
+
       if (detalleInscripcion?.pagos) setPagoInscripcion(detalleInscripcion.pagos as Pago);
-      setIsMembresiaLibre(!!libreData.data);
+      setIsMembresiaLibre(!!libreData);
     } catch (error) {
       showToast(messages.toast.errorCargaDatos, "error");
     }

@@ -49,6 +49,17 @@ export async function POST(request: Request) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
+    // Proactive duplicate email check
+    const { data: existingProfile } = await serviceSupabase
+      .from("profiles")
+      .select("id")
+      .ilike("email", email)
+      .maybeSingle();
+
+    if (existingProfile) {
+      return NextResponse.json({ error: messages.miembros.emailDuplicado }, { status: 409 });
+    }
+
     const isGmail = email.toLowerCase().endsWith("@gmail.com");
     const userPassword = password || randomBytes(12).toString("base64url").slice(0, 16);
 
@@ -62,20 +73,7 @@ export async function POST(request: Request) {
     let userId = authUser?.user?.id;
 
     if (authError) {
-      if (authError.message?.includes("already") || authError.message?.includes("exists")) {
-        const { data: existingProfile } = await serviceSupabase
-          .from("profiles")
-          .select("id")
-          .eq("email", email)
-          .maybeSingle();
-        if (existingProfile) {
-          userId = existingProfile.id;
-        } else {
-          return NextResponse.json({ error: messages.toast.miembroError }, { status: 400 });
-        }
-      } else {
-        return NextResponse.json({ error: messages.toast.miembroError }, { status: 400 });
-      }
+      return NextResponse.json({ error: messages.toast.miembroError }, { status: 400 });
     }
 
     if (!userId) {

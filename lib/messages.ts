@@ -136,6 +136,7 @@ export const messages = {
     errorObtenerUsuario: "No se pudo obtener el ID del usuario",
     emailInvalido: "Email inválido",
     emailDemasiadoLargo: "Email demasiado largo",
+    emailDuplicado: "Este correo ya está registrado. Use otro correo.",
     nombreDemasiadoLargo: "Nombre demasiado largo",
   },
   configuracion: {

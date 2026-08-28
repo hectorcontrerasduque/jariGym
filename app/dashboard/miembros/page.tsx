@@ -110,7 +110,10 @@ export default function MiembrosPage() {
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
+      if (!res.ok) {
+        setEmailError(data.error);
+        return;
+      }
       setModalNuevo(false);
       setNuevoEmail("");
       setNuevoNombre("");

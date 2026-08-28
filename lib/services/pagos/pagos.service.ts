@@ -203,14 +203,14 @@ export class PagosService {
         .eq("mes", mes || 0);
 
       if (mes && detalleMatches && detalleMatches.length > 0) {
-        const pagoIds = [...new Set(detalleMatches.map((d) => d.pago_id))];
+        const pagoIds = Array.from(new Set(detalleMatches.map((d) => d.pago_id)));
         query = query.in("id", pagoIds);
       } else if (anio && !mes) {
         const { data: detalleAnio } = await this.supabase
           .from("detalle_pago")
           .select("pago_id")
           .eq("anio", anio);
-        const pagoIds = [...new Set((detalleAnio || []).map((d) => d.pago_id))];
+        const pagoIds = Array.from(new Set((detalleAnio || []).map((d) => d.pago_id)));
         if (pagoIds.length > 0) {
           query = query.in("id", pagoIds);
         } else {
@@ -236,20 +236,20 @@ export class PagosService {
         .from("detalle_pago")
         .select("pago_id")
         .eq("anio", anio);
-      const pagoIds = [...new Set((detalleAnio || []).map((d) => d.pago_id))];
-      if (pagoIds.length > 0) {
-        query = query.in("id", pagoIds);
-      } else {
-        return [];
+        const pagoIds = Array.from(new Set((detalleAnio || []).map((d) => d.pago_id)));
+        if (pagoIds.length > 0) {
+          query = query.in("id", pagoIds);
+        } else {
+          return [];
+        }
       }
-    }
 
-    const { data, error } = await query;
-    if (error) throw error;
+      const { data, error } = await query;
+      if (error) throw error;
 
-    const pagos = data || [];
+      const pagos = data || [];
 
-    const approvedIds = Array.from(new Set(pagos.filter(p => p.approved_by).map(p => p.approved_by as string)));
+      const approvedIds = Array.from(new Set(pagos.filter(p => p.approved_by).map(p => p.approved_by as string)));
     if (approvedIds.length > 0) {
       const { data: approvers } = await this.supabase
         .from("profiles")
@@ -412,7 +412,7 @@ export class PagosService {
       if (anio) detalleQuery = detalleQuery.eq("anio", anio);
       if (mes) detalleQuery = detalleQuery.eq("mes", mes);
       const { data: detalleMatches } = await detalleQuery;
-      const pagoIds = [...new Set((detalleMatches || []).map((d) => d.pago_id))];
+      const pagoIds = Array.from(new Set((detalleMatches || []).map((d) => d.pago_id)));
       if (pagoIds.length > 0) {
         query = query.in("id", pagoIds);
       } else {
@@ -523,7 +523,7 @@ export class PagosService {
         .from("detalle_pago")
         .select("pago_id")
         .eq("anio", anio);
-      const pagoIds = [...new Set((detalleAnio || []).map((d) => d.pago_id))];
+      const pagoIds = Array.from(new Set((detalleAnio || []).map((d) => d.pago_id)));
       if (pagoIds.length > 0) {
         query = query.in("id", pagoIds);
       } else {

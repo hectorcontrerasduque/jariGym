@@ -48,7 +48,8 @@ export class MiembrosService {
     const allowedKeys = ["nombre_completo", "email", "whatsapp", "cedula", "horario_entreno", "activo", "notas_admin", "inscripcion_pagada", "inscripcion_fecha", "monto_inscripcion_pagado", "membresia_libre"];
     for (const key of allowedKeys) {
       if (key in updates) {
-        allowedFields[key] = (updates as Record<string, unknown>)[key];
+        // eslint-disable-next-line security/detect-object-injection
+        allowedFields[key] = updates[key];
       }
     }
 
@@ -114,7 +115,7 @@ export class MiembrosService {
       .select("role")
       .eq("id", user.id)
       .single();
-    if (profile?.role !== "super_admin" && profile?.role !== "admin") {
+    if (profile?.role !== "super_admin") {
       throw new Error(messages.toast.noAutorizado);
     }
 
@@ -137,7 +138,7 @@ export class MiembrosService {
       .select("role")
       .eq("id", user.id)
       .single();
-    if (profile?.role !== "super_admin" && profile?.role !== "admin") {
+    if (profile?.role !== "super_admin") {
       throw new Error(messages.toast.noAutorizado);
     }
 

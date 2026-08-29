@@ -4,14 +4,13 @@ import { useState, useEffect, useMemo, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { pagosService } from "@/lib/services/pagos/pagos.service";
 import { configService } from "@/lib/services/config/config.service";
 import { miembrosService } from "@/lib/services/miembros/miembros.service";
 import { createClient } from "@/lib/supabase/client";
-import { Upload, CheckCircle, XCircle, DollarSign, User, FileText, Gift, Calendar, ArrowLeft, AlertTriangle, Send } from "lucide-react";
-import { getMonthName, formatCurrency, formatDate } from "@/lib/utils";
+import { Upload, CheckCircle, DollarSign, User, FileText, Gift, Calendar, ArrowLeft, AlertTriangle, Send } from "lucide-react";
+import { getMonthName, formatCurrency } from "@/lib/utils";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { showToast } from "@/components/ui/toast";
 import { messages } from "@/lib/messages";
@@ -45,7 +44,7 @@ function ReportarPagoForm() {
   const [configLoading, setConfigLoading] = useState(true);
   const [metodosPago, setMetodosPago] = useState<MetodoPagoConfig[]>([]);
   const [miembros, setMiembros] = useState<Profile[]>([]);
-  const [miembroSeleccionado, setMiembroSeleccionado] = useState<string>("");
+  const [miembroSeleccionado, setMiembroSeleccionado] = useState<string>(memberParam || "");
   const [inscripcionPagada, setInscripcionPagada] = useState(false);
   const [inscripcionPendiente, setInscripcionPendiente] = useState(false);
   const [mesesPendientes, setMesesPendientes] = useState<{ mes: number; anio: number }[]>([]);
@@ -63,102 +62,104 @@ function ReportarPagoForm() {
   });
   const [comprobante, setComprobante] = useState<File | null>(null);
 
-  const isAdmin = userRole === "super_admin" || userRole === "admin";
+  const isAdmin = userRole === "super_admin";
 
-  useEffect(() => {
-    if (isAdmin && memberParam && miembros.length > 0) {
-      setMiembroSeleccionado(memberParam);
-    }
-  }, [memberParam, miembros, isAdmin]);
+   
+   useEffect(() => {
+    let cancelled = false;
+    const loadData = async () => {
+      try {
+        const supabase = createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          if (!cancelled) setUserId(user.id);
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("role, inscripcion_pagada")
+            .eq("id", user.id)
+            .single();
 
-  const loadData = useCallback(async () => {
-    try {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        setUserId(user.id);
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("role, inscripcion_pagada")
-          .eq("id", user.id)
-          .single();
+          if (!cancelled && profile) {
+            setUserRole(profile.role);
+            setInscripcionPagada(profile.inscripcion_pagada);
+          }
 
-        if (profile) {
-          setUserRole(profile.role);
-          setInscripcionPagada(profile.inscripcion_pagada);
-        }
+          const currentIsAdmin = profile?.role === "super_admin";
 
-        const currentIsAdmin = profile?.role === "super_admin" || profile?.role === "admin";
+          if (currentIsAdmin) {
+            const members = await miembrosService.listarMiembros();
+            if (!cancelled) setMiembros(members);
+          } else {
+            const [meses, tienePendiente] = await Promise.all([
+              pagosService.mesesPendientes(user.id),
+              pagosService.tieneInscripcionPendiente(user.id),
+            ]);
+            if (!cancelled) {
+              setMesesPendientes(meses);
+              setInscripcionPendiente(tienePendiente);
+            }
 
-        if (currentIsAdmin) {
-          const members = await miembrosService.listarMiembros();
-          setMiembros(members);
-        } else {
-          const [meses, tienePendiente] = await Promise.all([
-            pagosService.mesesPendientes(user.id),
-            pagosService.tieneInscripcionPendiente(user.id),
-          ]);
-          setMesesPendientes(meses);
-          setInscripcionPendiente(tienePendiente);
+            const { data: libreData } = await supabase
+              .from("membresias")
+              .select("fecha_inicio, fecha_fin, asignado_por_nombre")
+              .eq("usuario_id", user.id)
+              .order("created_at", { ascending: false })
+              .limit(1)
+              .maybeSingle();
 
-          const { data: libreData } = await supabase
-            .from("membresias")
-            .select("fecha_inicio, fecha_fin, asignado_por_nombre")
-            .eq("usuario_id", user.id)
-            .order("created_at", { ascending: false })
-            .limit(1)
-            .maybeSingle();
-
-          if (libreData) {
-            setMembresiaLibreInfo(libreData as MembresiaLibreInfo);
+            if (!cancelled && libreData) {
+              setMembresiaLibreInfo(libreData as MembresiaLibreInfo);
+            }
           }
         }
+
+        const config = await configService.getConfig();
+        if (!cancelled) setGymConfig(config);
+
+        const metodos = await configService.getMetodosPago();
+        if (!cancelled) setMetodosPago(metodos);
+      } catch {
+        if (!cancelled) showToast(messages.toast.errorCargaDatos, "error");
+      } finally {
+        if (!cancelled) setConfigLoading(false);
       }
-
-      const config = await configService.getConfig();
-      setGymConfig(config);
-
-      const metodos = await configService.getMetodosPago();
-      setMetodosPago(metodos);
-    } catch (err) {
-      showToast(messages.toast.errorCargaDatos, "error");
-    } finally {
-      setConfigLoading(false);
-    }
-  }, []);
-
-  useEffect(() => { loadData(); }, [loadData]);
-
-  const loadMiembroPendientes = useCallback(async (miembroId: string) => {
-    try {
-      const [meses, profile, libreData, tienePendiente] = await Promise.all([
-        pagosService.mesesPendientesAdmin(miembroId),
-        createClient().from("profiles").select("inscripcion_pagada").eq("id", miembroId).single(),
-        createClient().from("membresias").select("fecha_inicio, fecha_fin, asignado_por_nombre").eq("usuario_id", miembroId).order("created_at", { ascending: false }).limit(1).maybeSingle(),
-        pagosService.tieneInscripcionPendiente(miembroId),
-      ]);
-
-      setMesesPendientes(meses);
-      if (profile.data) setInscripcionPagada(profile.data.inscripcion_pagada);
-      setInscripcionPendiente(tienePendiente);
-
-      if (libreData.data) {
-        setMembresiaLibreInfo(libreData.data as MembresiaLibreInfo);
-      } else {
-        setMembresiaLibreInfo(null);
-      }
-
-      setFormData(prev => ({ ...prev, meses: [], pagar_inscripcion: false, pagar_mensualidad: false }));
-    } catch (err) {
-      showToast(messages.toast.errorCargaDatos, "error");
-    }
+    };
+    loadData();
+    return () => { cancelled = true; };
   }, []);
 
   useEffect(() => {
-    if (isAdmin && miembroSeleccionado) {
-      loadMiembroPendientes(miembroSeleccionado);
-    }
-  }, [miembroSeleccionado, isAdmin, loadMiembroPendientes]);
+    if (!isAdmin || !miembroSeleccionado) return;
+    let cancelled = false;
+    const loadMiembroPendientes = async (miembroId: string) => {
+      try {
+        const [meses, profile, libreData, tienePendiente] = await Promise.all([
+          pagosService.mesesPendientesAdmin(miembroId),
+          createClient().from("profiles").select("inscripcion_pagada").eq("id", miembroId).single(),
+          createClient().from("membresias").select("fecha_inicio, fecha_fin, asignado_por_nombre").eq("usuario_id", miembroId).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+          pagosService.tieneInscripcionPendiente(miembroId),
+        ]);
+
+        if (!cancelled) {
+          setMesesPendientes(meses);
+          if (profile.data) setInscripcionPagada(profile.data.inscripcion_pagada);
+          setInscripcionPendiente(tienePendiente);
+
+          if (libreData.data) {
+            setMembresiaLibreInfo(libreData.data as MembresiaLibreInfo);
+          } else {
+            setMembresiaLibreInfo(null);
+          }
+
+          setFormData(prev => ({ ...prev, meses: [], pagar_inscripcion: false, pagar_mensualidad: false }));
+        }
+      } catch {
+        if (!cancelled) showToast(messages.toast.errorCargaDatos, "error");
+      }
+    };
+    loadMiembroPendientes(miembroSeleccionado);
+    return () => { cancelled = true; };
+  }, [miembroSeleccionado, isAdmin]);
 
   const toggleMonth = (mes: number, anio: number) => {
     setFormData((prev) => {
@@ -268,8 +269,8 @@ function ReportarPagoForm() {
 
       setSuccess(true);
       setTimeout(() => router.push(isAdmin ? "/dashboard/pagos" : "/dashboard/mis-pagos"), 2000);
-    } catch (err: any) {
-      setError(err.message || "Error al reportar pago");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Error al reportar pago");
     } finally {
       setLoading(false);
     }

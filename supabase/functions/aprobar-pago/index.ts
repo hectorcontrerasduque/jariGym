@@ -54,7 +54,7 @@ serve(async (req) => {
       throw new Error("El pago ya fue procesado");
     }
 
-    const updates: any = {
+    const updates: Record<string, unknown> = {
       estado: accion === "aprobar" ? "aprobado" : "rechazado",
       approved_by: user.id,
       approved_at: new Date().toISOString(),

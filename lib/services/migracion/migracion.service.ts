@@ -1,5 +1,4 @@
 import { messages } from "@/lib/messages";
-import type { MigracionRecord } from "@/lib/types";
 
 export class MigracionService {
   async searchByName(nombreCompleto: string): Promise<string[]> {

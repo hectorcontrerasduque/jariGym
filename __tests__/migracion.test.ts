@@ -20,6 +20,16 @@ vi.mock("@/lib/services/email/email.service", () => ({
   sendWelcomeEmail: vi.fn(),
 }));
 
+vi.mock("@/lib/middleware/rate-limit", () => ({
+  applyRateLimit: vi.fn().mockResolvedValue(null),
+}));
+
+vi.mock("@/lib/utils/sanitize", () => ({
+  sanitizeOrFilter: vi.fn((words: string[]) => 
+    words.map(w => `nombre.ilike.%${w}%`).join(",")
+  ),
+}));
+
 function chainReturn(data: unknown, error: unknown = null) {
   const chain: Record<string, ReturnType<typeof vi.fn>> = {};
   const methods = [
@@ -28,9 +38,10 @@ function chainReturn(data: unknown, error: unknown = null) {
     "maybeSingle", "single",
   ];
   for (const m of methods) {
+    // eslint-disable-next-line security/detect-object-injection
     chain[m] = vi.fn(() => chain);
   }
-  chain.then = (resolve: Function, reject: Function) => {
+  chain.then = (resolve: (value: unknown) => void) => {
     if (error) reject(error);
     else resolve({ data, error });
     return chain;
@@ -48,16 +59,20 @@ function chainReturnOnInsert(insertData: unknown) {
   let isInsert = false;
   for (const m of methods) {
     if (m === "insert") {
+      // eslint-disable-next-line security/detect-object-injection
       chain[m] = vi.fn(() => { isInsert = true; return chain; });
     } else if (m === "select") {
+      // eslint-disable-next-line security/detect-object-injection
       chain[m] = vi.fn(() => chain);
     } else if (m === "single") {
+      // eslint-disable-next-line security/detect-object-injection
       chain[m] = vi.fn(() => chain);
     } else {
+      // eslint-disable-next-line security/detect-object-injection
       chain[m] = vi.fn(() => chain);
     }
   }
-  chain.then = (resolve: Function, reject: Function) => {
+  chain.then = (resolve: (value: unknown) => void) => {
     resolve({ data: isInsert ? insertData : null, error: null });
     return chain;
   };
@@ -88,7 +103,7 @@ describe("Migración API", () => {
     const req = makeReq({ nombreCompleto: "" });
     const { POST } = await import("@/app/api/migracion/route");
     const res = await POST(req);
-    const body = await res.json();
+    await res.json();
     expect(res.status).toBe(400);
   });
 
@@ -96,7 +111,7 @@ describe("Migración API", () => {
     const req = makeReq({ ...baseBody, correo: "noemail" });
     const { POST } = await import("@/app/api/migracion/route");
     const res = await POST(req);
-    const body = await res.json();
+    await res.json();
     expect(res.status).toBe(400);
   });
 
@@ -104,7 +119,7 @@ describe("Migración API", () => {
     const req = makeReq({ ...baseBody, password: "12345" });
     const { POST } = await import("@/app/api/migracion/route");
     const res = await POST(req);
-    const body = await res.json();
+    await res.json();
     expect(res.status).toBe(400);
   });
 
@@ -117,7 +132,7 @@ describe("Migración API", () => {
     const req = makeReq(baseBody);
     const { POST } = await import("@/app/api/migracion/route");
     const res = await POST(req);
-    const body = await res.json();
+    await res.json();
     expect(res.status).toBe(400);
   });
 
@@ -131,7 +146,7 @@ describe("Migración API", () => {
     const req = makeReq(baseBody);
     const { POST } = await import("@/app/api/migracion/route");
     const res = await POST(req);
-    const body = await res.json();
+    await res.json();
     expect(res.status).toBe(404);
   });
 
@@ -152,7 +167,7 @@ describe("Migración API", () => {
     const req = makeReq(baseBody);
     const { POST } = await import("@/app/api/migracion/route");
     const res = await POST(req);
-    const body = await res.json();
+    await res.json();
     expect(res.status).toBe(400);
   });
 
@@ -182,11 +197,11 @@ describe("Migración API", () => {
     const req = makeReq(baseBody);
     const { POST } = await import("@/app/api/migracion/route");
     const res = await POST(req);
-    const body = await res.json();
+    const _body = await res.json();
 
     expect(res.status).toBe(200);
-    expect(body.success).toBe(true);
-    expect(body.pagosCreados).toBeGreaterThanOrEqual(1);
+    expect(_body.success).toBe(true);
+    expect(_body.pagosCreados).toBeGreaterThanOrEqual(1);
   });
 
   it("exitoso con selectedNombre diferente", async () => {
@@ -214,10 +229,10 @@ describe("Migración API", () => {
     const req = makeReq({ ...baseBody, selectedNombre: "HAIDEE LOPEZ" });
     const { POST } = await import("@/app/api/migracion/route");
     const res = await POST(req);
-    const body = await res.json();
+    const _body = await res.json();
 
     expect(res.status).toBe(200);
-    expect(body.success).toBe(true);
+    expect(_body.success).toBe(true);
   });
 
   it("exitoso: usuario existente actualiza profile y pagos", async () => {
@@ -237,11 +252,11 @@ describe("Migración API", () => {
     const req = makeReq(baseBody);
     const { POST } = await import("@/app/api/migracion/route");
     const res = await POST(req);
-    const body = await res.json();
+    const _body = await res.json();
 
     expect(res.status).toBe(200);
-    expect(body.success).toBe(true);
-    expect(body.existingUser).toBe(true);
+    expect(_body.success).toBe(true);
+    expect(_body.existingUser).toBe(true);
   });
 
   it("solo procesa registros pagado y suspendido, no debe", async () => {

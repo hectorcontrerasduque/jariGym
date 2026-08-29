@@ -63,8 +63,7 @@ serve(async (req) => {
     const resultados = [];
 
     for (const pago of pagosPendientes || []) {
-      const notisConfig = (pago as any).notificaciones_config;
-      const profile = (pago as any).profile;
+      const notisConfig = pago.notificaciones_config;
 
       if (notisConfig?.email_enabled) {
         await supabase.from("notificaciones_log").insert({

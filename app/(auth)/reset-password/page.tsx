@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, Suspense } from "react";
+import Image from "next/image";
 import { useSearchParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,15 +18,13 @@ function ResetPasswordForm() {
   const token = searchParams.get("token");
   const resetEmail = searchParams.get("email") || "";
 
-  const [password, setPassword] = useState("");
+const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
-  const [validating, setValidating] = useState(true);
-  const [tokenValid, setTokenValid] = useState(false);
-  const [gymName, setGymName] = useState("GymApp");
-  const [gymLogo, setGymLogo] = useState("");
+  const [validating] = useState(!token);
+  const [tokenValid] = useState(!!token);
 
   useEffect(() => {
     configService.getConfig().then((config) => {
@@ -33,15 +32,6 @@ function ResetPasswordForm() {
       if (config?.logo_url) setGymLogo(config.logo_url);
     }).catch(() => {});
   }, []);
-
-  useEffect(() => {
-    if (!token) {
-      setValidating(false);
-      return;
-    }
-    setValidating(false);
-    setTokenValid(true);
-  }, [token]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -52,6 +42,7 @@ function ResetPasswordForm() {
       return;
     }
 
+    // eslint-disable-next-line security/detect-possible-timing-attacks
     if (password !== confirmPassword) {
       setError(messages.auth.resetPasswordPasswordMismatch);
       return;
@@ -74,7 +65,7 @@ function ResetPasswordForm() {
       }
 
       setSuccess(true);
-    } catch (error) {
+    } catch {
       setError(messages.auth.resetPasswordError);
     } finally {
       setLoading(false);
@@ -104,8 +95,15 @@ function ResetPasswordForm() {
           <CardHeader className="text-center">
             <div className="mx-auto w-16 h-16 bg-gym-primary/20 rounded-2xl flex items-center justify-center mb-4 animate-pulse-glow overflow-hidden">
               {gymLogo ? (
-                <img src={gymLogo} alt={gymName} className="w-full h-full object-cover" />
-              ) : (
+              <Image
+                src={gymLogo}
+                alt={gymName}
+                width={16}
+                height={16}
+                className="w-full h-full object-cover"
+                loading="lazy"
+              />
+            ) : (
                 <Dumbbell className="w-8 h-8 text-gym-primary" />
               )}
             </div>
@@ -167,8 +165,15 @@ function ResetPasswordForm() {
       <Card className="w-full max-w-md relative z-10 border-gym-primary/20 shadow-[0_0_40px_rgba(56,189,248,0.15)]">
         <CardHeader className="text-center">
           <div className="mx-auto w-16 h-16 bg-gym-primary/20 rounded-2xl flex items-center justify-center mb-4 animate-pulse-glow overflow-hidden">
-            {gymLogo ? (
-              <img src={gymLogo} alt={gymName} className="w-full h-full object-cover" />
+{gymLogo ? (
+              <Image
+                src={gymLogo}
+                alt={gymName}
+                width={16}
+                height={16}
+                className="w-full h-full object-cover"
+                loading="lazy"
+              />
             ) : (
               <Dumbbell className="w-8 h-8 text-gym-primary" />
             )}

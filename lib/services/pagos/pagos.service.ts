@@ -3,6 +3,20 @@ import { getMonthName, getDiaCobro } from "@/lib/utils";
 import { messages } from "@/lib/messages";
 import type { Pago, MetodoPago, TipoPago, Profile, DetallePago } from "@/lib/types";
 
+/**
+ * PagosService - Service for payment operations.
+ * 
+ * IMPORTANT: This service creates a browser client (createClient()) at module level.
+ * When called from Server Components / API Routes, you MUST pass a service_role client
+ * as the optional `supabaseClient` parameter to all read methods.
+ * 
+ * Example:
+ *   const supabase = createServiceClient(url, serviceKey);
+ *   await pagosService.getMiembrosMorosos(year, supabase);
+ *   await pagosService.stats(year, supabase);
+ * 
+ * Otherwise RLS will block queries (runs as anonymous anon key).
+ */
 export interface DetallePagoInput {
   mes: number | null;
   anio: number | null;
@@ -82,7 +96,7 @@ export class PagosService {
       .select("role")
       .eq("id", user.id)
       .single();
-    if (profile?.role !== "super_admin" && profile?.role !== "admin") {
+    if (profile?.role !== "super_admin") {
       throw new Error(messages.toast.noAutorizado);
     }
 
@@ -137,7 +151,7 @@ export class PagosService {
       .select("role")
       .eq("id", user.id)
       .single();
-    if (profile?.role !== "super_admin" && profile?.role !== "admin") {
+    if (profile?.role !== "super_admin") {
       throw new Error(messages.toast.noAutorizado);
     }
 
@@ -169,7 +183,7 @@ export class PagosService {
       .select("role")
       .eq("id", user.id)
       .single();
-    const isAdmin = profile?.role === "super_admin" || profile?.role === "admin";
+    const isAdmin = profile?.role === "super_admin";
 
     const query = this.supabase.from("pagos").delete().eq("id", pagoId);
 
@@ -183,20 +197,21 @@ export class PagosService {
     if (error) throw error;
   }
 
-  async listarMisPagos(anio?: number, mes?: number): Promise<Pago[]> {
+  async listarMisPagos(anio?: number, mes?: number, supabaseClient?: ReturnType<typeof createClient>): Promise<Pago[]> {
+    const supabase = supabaseClient || this.supabase;
     const {
       data: { user },
-    } = await this.supabase.auth.getUser();
+    } = await supabase.auth.getUser();
     if (!user) throw new Error(messages.toast.noAutenticado);
 
-    let query = this.supabase
+    let query = supabase
       .from("pagos")
       .select("*, detalle:detalle_pago(*), profile:profiles!pagos_usuario_id_fkey(nombre_completo, avatar_url, email)")
       .eq("usuario_id", user.id)
       .order("created_at", { ascending: false });
 
     if (anio || mes) {
-      const { data: detalleMatches } = await this.supabase
+      const { data: detalleMatches } = await supabase
         .from("detalle_pago")
         .select("pago_id")
         .eq("anio", anio || new Date().getFullYear())
@@ -206,7 +221,7 @@ export class PagosService {
         const pagoIds = Array.from(new Set(detalleMatches.map((d) => d.pago_id)));
         query = query.in("id", pagoIds);
       } else if (anio && !mes) {
-        const { data: detalleAnio } = await this.supabase
+        const { data: detalleAnio } = await supabase
           .from("detalle_pago")
           .select("pago_id")
           .eq("anio", anio);
@@ -224,15 +239,16 @@ export class PagosService {
     return data || [];
   }
 
-  async listarPagosUsuario(usuarioId: string, anio?: number): Promise<Pago[]> {
-    let query = this.supabase
+  async listarPagosUsuario(usuarioId: string, anio?: number, supabaseClient?: ReturnType<typeof createClient>): Promise<Pago[]> {
+    const supabase = supabaseClient || this.supabase;
+    let query = supabase
       .from("pagos")
       .select("*, detalle:detalle_pago(*), profile:profiles!pagos_usuario_id_fkey(nombre_completo, avatar_url, email)")
       .eq("usuario_id", usuarioId)
       .order("created_at", { ascending: false });
 
     if (anio) {
-      const { data: detalleAnio } = await this.supabase
+      const { data: detalleAnio } = await supabase
         .from("detalle_pago")
         .select("pago_id")
         .eq("anio", anio);
@@ -251,7 +267,7 @@ export class PagosService {
 
       const approvedIds = Array.from(new Set(pagos.filter(p => p.approved_by).map(p => p.approved_by as string)));
     if (approvedIds.length > 0) {
-      const { data: approvers } = await this.supabase
+      const { data: approvers } = await supabase
         .from("profiles")
         .select("id, nombre_completo")
         .in("id", approvedIds);
@@ -277,7 +293,7 @@ export class PagosService {
       .select("role")
       .eq("id", user.id)
       .single();
-    if (profile?.role !== "super_admin" && profile?.role !== "admin") {
+    if (profile?.role !== "super_admin") {
       throw new Error(messages.toast.noAutorizado);
     }
 
@@ -397,8 +413,9 @@ export class PagosService {
     return count;
   }
 
-  async listarPagos(estado?: string, anio?: number, mes?: number): Promise<Pago[]> {
-    let query = this.supabase
+  async listarPagos(estado?: string, anio?: number, mes?: number, supabaseClient?: ReturnType<typeof createClient>): Promise<Pago[]> {
+    const supabase = supabaseClient || this.supabase;
+    let query = supabase
       .from("pagos")
       .select("*, detalle:detalle_pago(*), profile:profiles!pagos_usuario_id_fkey(nombre_completo, avatar_url, email)")
       .order("created_at", { ascending: false });
@@ -408,7 +425,7 @@ export class PagosService {
     }
 
     if (anio || mes) {
-      let detalleQuery = this.supabase.from("detalle_pago").select("pago_id");
+      let detalleQuery = supabase.from("detalle_pago").select("pago_id");
       if (anio) detalleQuery = detalleQuery.eq("anio", anio);
       if (mes) detalleQuery = detalleQuery.eq("mes", mes);
       const { data: detalleMatches } = await detalleQuery;
@@ -426,7 +443,7 @@ export class PagosService {
     const pagos = data || [];
     const approvedIds = Array.from(new Set(pagos.filter(p => p.approved_by).map(p => p.approved_by as string)));
     if (approvedIds.length > 0) {
-      const { data: approvers } = await this.supabase
+      const { data: approvers } = await supabase
         .from("profiles")
         .select("id, nombre_completo")
         .in("id", approvedIds);
@@ -441,12 +458,13 @@ export class PagosService {
     return pagos;
   }
 
-  async pagosPendientes(): Promise<Pago[]> {
-    return this.listarPagos("pendiente");
+  async pagosPendientes(supabaseClient?: ReturnType<typeof createClient>): Promise<Pago[]> {
+    return this.listarPagos("pendiente", undefined, undefined, supabaseClient);
   }
 
-  async mesesPendientes(usuarioId: string, anio?: number): Promise<{ mes: number; anio: number }[]> {
-    const { data: pagos, error } = await this.supabase
+  async mesesPendientes(usuarioId: string, anio?: number, supabaseClient?: ReturnType<typeof createClient>): Promise<{ mes: number; anio: number }[]> {
+    const supabase = supabaseClient || this.supabase;
+    const { data: pagos, error } = await supabase
       .from("pagos")
       .select("id, estado")
       .eq("usuario_id", usuarioId)
@@ -457,7 +475,7 @@ export class PagosService {
     const pagoIds = pagos.map((p) => p.id);
     if (pagoIds.length === 0) return [];
 
-    const { data: detalles } = await this.supabase
+    const { data: detalles } = await supabase
       .from("detalle_pago")
       .select("mes, anio, pago_id")
       .in("pago_id", pagoIds)
@@ -482,12 +500,13 @@ export class PagosService {
     return mesesPendientes.reverse();
   }
 
-  async mesesPendientesAdmin(usuarioId: string, anio?: number): Promise<{ mes: number; anio: number }[]> {
-    return this.mesesPendientes(usuarioId, anio);
+  async mesesPendientesAdmin(usuarioId: string, anio?: number, supabaseClient?: ReturnType<typeof createClient>): Promise<{ mes: number; anio: number }[]> {
+    return this.mesesPendientes(usuarioId, anio, supabaseClient);
   }
 
-  async tieneInscripcionPendiente(usuarioId: string): Promise<boolean> {
-    const { data: pagos } = await this.supabase
+  async tieneInscripcionPendiente(usuarioId: string, supabaseClient?: ReturnType<typeof createClient>): Promise<boolean> {
+    const supabase = supabaseClient || this.supabase;
+    const { data: pagos } = await supabase
       .from("pagos")
       .select("id")
       .eq("usuario_id", usuarioId)
@@ -496,7 +515,7 @@ export class PagosService {
 
     if (!pagos || pagos.length === 0) return false;
 
-    const { data: detalles } = await this.supabase
+    const { data: detalles } = await supabase
       .from("detalle_pago")
       .select("id")
       .eq("pago_id", pagos[0].id)
@@ -506,20 +525,21 @@ export class PagosService {
     return !!detalles && detalles.length > 0;
   }
 
-  async pagosRecientesAprobados(anio?: number): Promise<Pago[]> {
+  async pagosRecientesAprobados(anio?: number, supabaseClient?: ReturnType<typeof createClient>): Promise<Pago[]> {
+    const supabase = supabaseClient || this.supabase;
     const {
       data: { user },
-    } = await this.supabase.auth.getUser();
+    } = await supabase.auth.getUser();
     if (!user) throw new Error(messages.toast.noAutenticado);
 
-    let query = this.supabase
+    let query = supabase
       .from("pagos")
       .select("*, detalle:detalle_pago(*)")
       .eq("estado", "aprobado")
       .order("created_at", { ascending: false });
 
     if (anio) {
-      const { data: detalleAnio } = await this.supabase
+      const { data: detalleAnio } = await supabase
         .from("detalle_pago")
         .select("pago_id")
         .eq("anio", anio);
@@ -536,8 +556,9 @@ export class PagosService {
     return data || [];
   }
 
-  async aniosConPagos(usuarioId?: string): Promise<number[]> {
-    let query = this.supabase
+  async aniosConPagos(usuarioId?: string, supabaseClient?: ReturnType<typeof createClient>): Promise<number[]> {
+    const supabase = supabaseClient || this.supabase;
+    let query = supabase
       .from("pagos")
       .select("id");
 
@@ -548,7 +569,7 @@ export class PagosService {
     const { data: pagos } = await query;
     if (!pagos || pagos.length === 0) return [new Date().getFullYear()];
 
-    const { data: detalles } = await this.supabase
+    const { data: detalles } = await supabase
       .from("detalle_pago")
       .select("anio, pago_id")
       .in("pago_id", pagos.map((p) => p.id));
@@ -560,27 +581,28 @@ export class PagosService {
     return anios.sort((a, b) => b - a);
   }
 
-  async stats(anio?: number) {
+  async stats(anio?: number, supabaseClient?: ReturnType<typeof createClient>) {
+    const supabase = supabaseClient || this.supabase;
     const hoy = new Date();
     const anioConsulta = anio || hoy.getFullYear();
     const mesActual = hoy.getMonth() + 1;
 
     const [allProfiles, libres, configResult, ownerResult] = await Promise.all([
-      this.supabase
+      supabase
         .from("profiles")
         .select("id, inscripcion_pagada, fecha_inscripcion, activo, role, email")
-        .in("role", ["miembro", "admin", "super_admin"]),
-      this.supabase
+        .in("role", ["miembro", "super_admin"]),
+      supabase
         .from("membresias")
         .select("usuario_id")
         .is("fecha_fin", null),
-      this.supabase
+      supabase
         .from("gym_config_metodos_pago")
         .select("monto_mensual, monto_inscripcion")
         .eq("habilitado", true)
         .limit(1)
         .maybeSingle(),
-      this.supabase
+      supabase
         .from("gym_config")
         .select("dueno_email")
         .limit(1)
@@ -595,14 +617,14 @@ export class PagosService {
     const montoMensual = config?.monto_mensual || 5;
     const montoInscripcion = config?.monto_inscripcion || 0;
 
-    const { data: pagosAnio } = await this.supabase
+    const { data: pagosAnio } = await supabase
       .from("pagos")
       .select("id, usuario_id, estado, notas")
       .in("estado", ["aprobado", "pendiente"]);
 
     const pagosIds = (pagosAnio || []).map((p) => p.id);
 
-    const { data: detallesAnio } = await this.supabase
+    const { data: detallesAnio } = await supabase
       .from("detalle_pago")
       .select("pago_id, mes, anio, monto, tipo_pago")
       .in("pago_id", pagosIds.length > 0 ? pagosIds : ["00000000-0000-0000-0000-000000000000"])
@@ -635,7 +657,7 @@ export class PagosService {
     const inscritosPagados = miembrosActivos.filter((m) => miembrosConInscripcionPagada.has(m.id)).length;
     const inscritosPendientes = miembrosActivos.filter((m) => !miembrosConInscripcionPagada.has(m.id)).length;
 
-    const morosos = await this.getMiembrosMorosos(anioConsulta);
+    const morosos = await this.getMiembrosMorosos(anioConsulta, supabase);
     const deudoresInscripcion = morosos.filter((m) => m.debeInscripcion).length;
     const deudoresMensualidad = morosos.filter((m) => m.mesesDeuda.length > 0).length;
     const montoDeudaInscripcion = morosos.filter((m) => m.debeInscripcion).length * montoInscripcion;
@@ -693,7 +715,7 @@ export class PagosService {
       supabase
         .from("profiles")
         .select("id, email, nombre_completo, inscripcion_pagada, activo, fecha_inscripcion")
-        .in("role", ["miembro", "admin", "super_admin"])
+        .in("role", ["miembro", "super_admin"])
         .not("email", "is", null),
       supabase
         .from("gym_config_metodos_pago")
@@ -781,12 +803,10 @@ export class PagosService {
       const fechaInscripcion = miembro.fecha_inscripcion;
       const fechaInicioStr = fechaInicioMembresia || fechaInscripcion;
       let primerMesDeuda = 1;
-      let diaInscripcion = 1;
       if (fechaInicioStr) {
         const parts = fechaInicioStr.split("-").map(Number);
         const anioInicio = parts[0];
         const mesInicio = parts[1];
-        diaInscripcion = parts[2] || 1;
 
         let mesDeuda = mesInicio + 1;
         let anioDeuda = anioInicio;
@@ -849,21 +869,22 @@ export class PagosService {
     return morosos;
   }
 
-  async monthlyStats(anio?: number) {
+  async monthlyStats(anio?: number, supabaseClient?: ReturnType<typeof createClient>) {
+    const supabase = supabaseClient || this.supabase;
     const hoy = new Date();
     const anioConsulta = anio || hoy.getFullYear();
     const mesMaximo = anioConsulta === hoy.getFullYear() ? hoy.getMonth() + 1 : 12;
 
     let config = null;
     try {
-      const { data } = await this.supabase
+      const { data } = await supabase
         .from("gym_config_metodos_pago")
         .select("monto_mensual")
         .eq("habilitado", true)
         .limit(1)
         .maybeSingle();
       config = data;
-    } catch (error) {
+    } catch (_error /* eslint-disable-line @typescript-eslint/no-unused-vars */) {
       config = null;
     }
     const montoMensual = config?.monto_mensual || 5;
@@ -877,23 +898,23 @@ export class PagosService {
       });
     }
 
-    const { data: configData } = await this.supabase
+    const { data: configData } = await supabase
       .from("gym_config")
       .select("dueno_email")
       .limit(1)
       .maybeSingle();
     const ownerEmail = configData?.dueno_email?.toLowerCase() || "";
 
-    const { data: allProfiles } = await this.supabase
+    const { data: allProfiles } = await supabase
       .from("profiles")
       .select("id, fecha_inscripcion, role, email, activo")
-      .in("role", ["miembro", "admin", "super_admin"]);
+      .in("role", ["miembro", "super_admin"]);
 
     const profiles = (allProfiles || []).filter(
       (p) => p.activo !== false && p.email?.toLowerCase() !== ownerEmail
     );
 
-    const { data: libreData } = await this.supabase
+    const { data: libreData } = await supabase
       .from("membresias")
       .select("usuario_id")
       .is("fecha_fin", null);
@@ -918,13 +939,13 @@ export class PagosService {
       })
     );
 
-    const { data: pagosHeader } = await this.supabase
+    const { data: pagosHeader } = await supabase
       .from("pagos")
       .select("id, usuario_id, estado")
       .in("estado", ["aprobado", "pendiente", "suspendido"]);
 
     const pagoIds = (pagosHeader || []).map((p) => p.id);
-    const { data: allDetalles } = await this.supabase
+    const { data: allDetalles } = await supabase
       .from("detalle_pago")
       .select("pago_id, mes, anio, monto")
       .in("pago_id", pagoIds.length > 0 ? pagoIds : ["00000000-0000-0000-0000-000000000000"])

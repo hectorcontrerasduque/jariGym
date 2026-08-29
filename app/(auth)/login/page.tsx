@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useState, useEffect } from "react";
+import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,7 +11,7 @@ import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { authService } from "@/lib/services/auth/auth.service";
 import { migracionService } from "@/lib/services/migracion/migracion.service";
 import { createClient } from "@/lib/supabase/client";
-import { Dumbbell, CheckCircle, Mail, UserCheck } from "lucide-react";
+import { Dumbbell, CheckCircle, Mail } from "lucide-react";
 import { configService } from "@/lib/services/config/config.service";
 import { messages } from "@/lib/messages";
 import { AuthFooter } from "@/components/auth-footer";
@@ -30,9 +31,6 @@ function LoginForm() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
-  const [resetSent, setResetSent] = useState(false);
-  const [showResetForm, setShowResetForm] = useState(false);
   const [resetEmail, setResetEmail] = useState("");
   const [resetLoading, setResetLoading] = useState(false);
   const [gymName, setGymName] = useState("GymApp");
@@ -47,19 +45,24 @@ function LoginForm() {
   const [migrateError, setMigrateError] = useState("");
   const [migNombre, setMigNombre] = useState("");
   const [migWhatsapp, setMigWhatsapp] = useState("");
-  const [migCorreo, setMigCorreo] = useState("");
-  const [migPassword, setMigPassword] = useState("");
-  const [migPasswordConfirm, setMigPasswordConfirm] = useState("");
-  const [migEmailExists, setMigEmailExists] = useState(false);
   const [hasPendingMigration, setHasPendingMigration] = useState(true);
   const [migIsExistingUser, setMigIsExistingUser] = useState(false);
 
-  useEffect(() => {
+  // Initialize state from searchParams using useMemo to avoid useEffect
+  const initialError = useMemo(() => {
     const err = searchParams.get("error");
-    if (err) setError(decodeURIComponent(err));
-    const msg = searchParams.get("message");
-    if (msg) setSuccess(decodeURIComponent(msg));
+    return err ? decodeURIComponent(err) : "";
+  }, [searchParams]);
 
+  const initialError = useMemo(() => {
+    const err = searchParams.get("error");
+    return err ? decodeURIComponent(err) : "";
+  }, [searchParams]);
+
+  const [error, setError] = useState(initialError);
+
+  // Handle URL params and hash errors - run once on mount
+  useEffect(() => {
     // Handle hash fragment errors from Supabase auth (e.g. expired magic links)
     if (typeof window !== "undefined" && window.location.hash) {
       const hash = new URLSearchParams(window.location.hash.substring(1));
@@ -73,7 +76,7 @@ function LoginForm() {
     // Handle confirmation token as query param — redirect to confirm-email route
     const tokenParam = searchParams.get("token");
     if (tokenParam) {
-      window.location.href = `/api/auth/confirm-email?token=${tokenParam}`;
+      router.push(`/api/auth/confirm-email?token=${tokenParam}`);
       return;
     }
 
@@ -88,7 +91,7 @@ function LoginForm() {
       .then((res) => res.json())
       .then(({ pending }) => setHasPendingMigration(pending))
       .catch(() => setHasPendingMigration(false));
-  }, [searchParams]);
+  }, [router, searchParams, setError]); // Run once on mount
 
   // Handle browser back button to close migration modal
   useEffect(() => {
@@ -154,7 +157,7 @@ function LoginForm() {
     }
 
     if (!profile) return false;
-    if (profile.role === "super_admin" || profile.role === "admin") {
+    if (profile.role === "super_admin") {
       if (gymOwnerEmail && userEmail === gymOwnerEmail && profile.role !== "super_admin") {
         await supabase
           .from("profiles")
@@ -173,7 +176,7 @@ function LoginForm() {
     setError("");
     try {
       await authService.signInWithGoogle();
-    } catch (err: any) {
+    } catch (err) {
       setError(err.message || messages.auth.googleLoginError);
       setLoading(false);
     }
@@ -189,7 +192,7 @@ function LoginForm() {
     return messages.auth.emailLoginError;
   };
 
-  const handleEmailLogin = async (e: React.FormEvent) => {
+  const handleEmailLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
     setError("");
@@ -210,21 +213,21 @@ function LoginForm() {
           (result.user?.email === gymOwnerEmail);
         router.push(isAdmin ? "/dashboard" : "/dashboard/mis-pagos");
       }
-    } catch (err: any) {
-      setError(mapAuthError(err.message || ""));
+    } catch (err) {
+      setError(mapAuthError(err instanceof Error ? err.message : String(err)));
       setLoading(false);
     }
   };
 
-  const handleResetPassword = async (e: React.FormEvent) => {
+  const handleResetPassword = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setResetLoading(true);
     setError("");
     try {
       await authService.resetPassword(resetEmail);
       setResetSent(true);
-    } catch (err: any) {
-      setError(err.message || messages.auth.resetPasswordError);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : messages.auth.resetPasswordError);
     } finally {
       setResetLoading(false);
     }
@@ -306,8 +309,8 @@ function LoginForm() {
       });
       setMigIsExistingUser(!!result.existingUser);
       setMigrateStep("success");
-    } catch (err: any) {
-      setMigrateError(err.message || messages.migracion.error);
+    } catch (err) {
+      setMigrateError(err instanceof Error ? err.message : messages.migracion.error);
       setMigrateStep("form");
     }
   };
@@ -339,7 +342,14 @@ function LoginForm() {
         <CardHeader className="text-center">
           <div className="mx-auto w-16 h-16 bg-gym-primary/20 rounded-2xl flex items-center justify-center mb-4 animate-pulse-glow overflow-hidden">
             {gymLogo ? (
-              <img src={gymLogo} alt={gymName} className="w-full h-full object-cover" />
+              <Image
+                src={gymLogo}
+                alt={gymName}
+                width={16}
+                height={16}
+                className="w-full h-full object-cover"
+                loading="lazy"
+              />
             ) : (
               <Dumbbell className="w-8 h-8 text-gym-primary" />
             )}
@@ -405,8 +415,15 @@ function LoginForm() {
             <CardHeader className="text-center">
               <div className="mx-auto w-12 h-12 bg-gym-primary/20 rounded-xl flex items-center justify-center mb-3 overflow-hidden">
                 {gymLogo ? (
-                  <img src={gymLogo} alt={gymName} className="w-full h-full object-cover" />
-                ) : (
+              <Image
+                src={gymLogo}
+                alt={gymName}
+                width={16}
+                height={16}
+                className="w-full h-full object-cover"
+                loading="lazy"
+              />
+            ) : (
                   <Dumbbell className="w-6 h-6 text-gym-primary" />
                 )}
               </div>
@@ -488,8 +505,15 @@ function LoginForm() {
             <CardHeader className="text-center">
               <div className="mx-auto w-12 h-12 bg-gym-secondary/20 rounded-xl flex items-center justify-center mb-3 overflow-hidden">
                 {gymLogo ? (
-                  <img src={gymLogo} alt={gymName} className="w-full h-full object-cover" />
-                ) : (
+              <Image
+                src={gymLogo}
+                alt={gymName}
+                width={16}
+                height={16}
+                className="w-full h-full object-cover"
+                loading="lazy"
+              />
+            ) : (
                   <Dumbbell className="w-6 h-6 text-gym-secondary" />
                 )}
               </div>

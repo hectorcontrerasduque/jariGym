@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import Image from "next/image";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { configService, METODOS_PAGO_DEFAULT } from "@/lib/services/config/config.service";
 import { createClient } from "@/lib/supabase/client";
@@ -44,11 +44,6 @@ export default function ConfiguracionPage() {
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const logoInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    loadData();
-    detectDevice();
-  }, []);
-
   const detectDevice = () => {
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
     const now = new Date();
@@ -73,12 +68,18 @@ export default function ConfiguracionPage() {
       ]);
       if (configData) setConfig(configData);
       setMetodos(buildMetodosState(metodosData));
-    } catch (error) {
+    } catch {
       showToast(messages.toast.errorCargaDatos, "error");
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadData();
+    detectDevice();
+  }, []);
 
   const handleSaveConfig = async () => {
     const enabledMetodos = metodos.filter((m) => m.habilitado);
@@ -96,7 +97,7 @@ export default function ConfiguracionPage() {
       await configService.saveMetodosPago(metodos);
       showToast(messages.toast.configuracionGuardada, "success");
       window.dispatchEvent(new Event("config:updated"));
-    } catch (error) {
+    } catch {
       showToast(messages.toast.configuracionError, "error");
     } finally {
       setSaving(false);
@@ -104,6 +105,7 @@ export default function ConfiguracionPage() {
   };
 
   const handleToggleMetodo = (metodoPago: MetodoPago) => {
+    // eslint-disable-next-line security/detect-object-injection
     if (metodoLabels[metodoPago]?.alwaysOn) return;
     setMetodos((prev) =>
       prev.map((m) =>
@@ -143,7 +145,7 @@ export default function ConfiguracionPage() {
       setConfig({ ...config, logo_url: logoUrl });
       await configService.updateConfig({ logo_url: logoUrl });
       showToast("Logo actualizado", "success");
-    } catch (error) {
+    } catch {
       showToast("Error al subir logo", "error");
     } finally {
       setUploadingLogo(false);
@@ -158,7 +160,7 @@ export default function ConfiguracionPage() {
       setConfig({ ...config, logo_url: "" });
       await configService.updateConfig({ logo_url: "" });
       showToast("Logo eliminado", "success");
-    } catch (error) {
+    } catch {
       showToast("Error al eliminar logo", "error");
     }
   };
@@ -207,7 +209,7 @@ export default function ConfiguracionPage() {
             <div className="relative">
               <div className="w-20 h-20 rounded-xl bg-gym-surface border-2 border-dashed border-gym-border flex items-center justify-center overflow-hidden">
                 {config.logo_url ? (
-                  <img src={config.logo_url} alt="Logo" className="w-full h-full object-cover" />
+                  <Image src={config.logo_url} alt="Logo" width={80} height={80} className="w-full h-full object-cover" />
                 ) : (
                   <Dumbbell className="w-8 h-8 text-gym-muted" />
                 )}

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { useEffect, useState } from "react";
@@ -53,7 +54,7 @@ export function Sidebar() {
           .single();
         setProfile(data);
 
-        if (data && data.role !== "super_admin" && data.role !== "admin") {
+        if (data && data.role !== "super_admin") {
           const allowed = ["/dashboard/mis-pagos", "/dashboard/reportar-pago", "/dashboard/perfil"];
           if (!allowed.some((p) => pathname.startsWith(p))) {
             router.replace("/dashboard/mis-pagos");
@@ -90,7 +91,7 @@ export function Sidebar() {
           .select("role")
           .eq("id", session.user.id)
           .single();
-        if (profile?.role !== "super_admin" && profile?.role !== "admin") return;
+        if (profile?.role !== "super_admin") return;
         await fetch("/api/notificaciones", {
           method: "POST",
           headers: {
@@ -109,10 +110,10 @@ export function Sidebar() {
 
   const handleSignOut = async () => {
     await createClient().auth.signOut();
-    window.location.href = "/login";
+    router.push("/login");
   };
 
-  const isAdmin = profile?.role === "super_admin" || profile?.role === "admin";
+  const isAdmin = profile?.role === "super_admin";
   const isSuperAdmin = profile?.role === "super_admin";
 
   const navItems = hasConfig === false
@@ -156,7 +157,14 @@ export function Sidebar() {
           <div className="flex items-center gap-3">
             <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center overflow-hidden", isSuperAdmin ? "bg-gradient-to-br from-yellow-500/30 to-amber-600/30 shadow-[0_0_15px_rgba(251,191,36,0.3)]" : "bg-gym-primary/20 animate-pulse-glow")}>
               {gymLogo ? (
-                <img src={gymLogo} alt={gymName} className="w-full h-full object-cover" />
+                <Image
+                  src={gymLogo}
+                  alt={gymName}
+                  width={16}
+                  height={16}
+                  className="w-full h-full object-cover"
+                  loading="lazy"
+                />
               ) : (
                 <Dumbbell className={cn("w-6 h-6", isSuperAdmin ? "text-yellow-400" : "text-gym-primary")} />
               )}

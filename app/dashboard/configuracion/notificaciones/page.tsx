@@ -58,25 +58,29 @@ export default function NotificacionesPage() {
   const [diagnosticing, setDiagnosticing] = useState(false);
 
   useEffect(() => {
-    loadData();
+    let active = true;
+    Promise.all([
+      configService.getConfig(),
+      notificacionesService.getNotificacionesConfig(),
+      notificacionesService.getHistorial(4),
+    ])
+      .then(([configData, configsData, historialData]) => {
+        if (active) {
+          if (configData) setGymConfig(configData);
+          setConfigs(configsData);
+          setHistorial(historialData);
+        }
+      })
+      .catch(() => {
+        if (active) showToast(messages.toast.errorCargaDatos, "error");
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
   }, []);
-
-  const loadData = async () => {
-    try {
-      const [configData, configsData, historialData] = await Promise.all([
-        configService.getConfig(),
-        notificacionesService.getNotificacionesConfig(),
-        notificacionesService.getHistorial(4),
-      ]);
-      if (configData) setGymConfig(configData);
-      setConfigs(configsData);
-      setHistorial(historialData);
-    } catch (error) {
-      showToast(messages.toast.errorCargaDatos, "error");
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleToggleConfig = (id: string, field: string, value: boolean) => {
     setConfigs(configs.map((c) => (c.id === id ? { ...c, [field]: value } : c)));
@@ -107,7 +111,7 @@ export default function NotificacionesPage() {
       }
 
       showToast(messages.notificaciones.guardada, "success");
-    } catch (error) {
+    } catch {
       showToast(messages.notificaciones.errorGuardar, "error");
     } finally {
       setSaving(false);
@@ -130,7 +134,7 @@ export default function NotificacionesPage() {
         showToast(messages.notificaciones.ejecutado, "success");
       }
       await refreshHistorial();
-    } catch (error) {
+    } catch {
       showToast(messages.notificaciones.errorEjecutar, "error");
     } finally {
       setExecuting(false);
@@ -141,13 +145,15 @@ export default function NotificacionesPage() {
     setExecutingTipo(tipo);
     try {
       const resultado = await notificacionesService.procesarTodasLasNotificaciones(tipo, true);
+      // eslint-disable-next-line security/detect-object-injection
+      const label = tipoLabels[tipo]?.label || tipo;
       if (resultado.errores > 0) {
-        showToast(`${tipoLabels[tipo]?.label}: ${resultado.enviados} enviados (${resultado.errores} errores)`, "warning");
+        showToast(`${label}: ${String(resultado.enviados)} enviados (${String(resultado.errores)} errores)`, "warning");
       } else {
-        showToast(`${tipoLabels[tipo]?.label}: ${resultado.enviados} notificación(es) enviada(s)`, "success");
+        showToast(`${label}: ${String(resultado.enviados)} notificación(es) enviada(s)`, "success");
       }
       await refreshHistorial();
-    } catch (error) {
+    } catch {
       showToast(messages.notificaciones.errorEjecutar, "error");
     } finally {
       setExecutingTipo(null);
@@ -160,7 +166,7 @@ export default function NotificacionesPage() {
     try {
       await notificacionesService.ejecutarDiagnostico();
       showToast(messages.notificaciones.diagnosticoEnviado, "success");
-    } catch (error) {
+    } catch {
       showToast(messages.notificaciones.errorDiagnostico, "error");
     } finally {
       setDiagnosticing(false);

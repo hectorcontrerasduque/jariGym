@@ -19,7 +19,7 @@ export function sanitizePostgrestILike(input: string): string {
 
 /**
  * Builds a safe .or() filter for nombre.ilike searches.
- * Each word generates two conditions: exact word + prefix (word without last char).
+ * Each word generates one condition: prefix match (word%).
  * All user input is sanitized before inclusion.
  * 
  * @param words - Array of search words (already split and filtered)
@@ -27,7 +27,7 @@ export function sanitizePostgrestILike(input: string): string {
  * 
  * @example
  * sanitizeOrFilter(["juan", "perez"]) 
- * // "nombre.ilike.%juan%,nombre.ilike.%perez%,nombre.ilike.%pere%"
+ * // "nombre.ilike.juan%,nombre.ilike.perez%"
  */
 export function sanitizeOrFilter(words: string[]): string {
   const conditions: string[] = [];
@@ -36,14 +36,7 @@ export function sanitizeOrFilter(words: string[]): string {
     if (w.length < 2) continue;
     
     const safe = sanitizePostgrestILike(w);
-    conditions.push(`nombre.ilike.%${safe}%`);
-    
-    // Prefix match for words longer than 3 chars (fuzzy search)
-    if (w.length > 3) {
-      const prefix = w.slice(0, -1);
-      const safePrefix = sanitizePostgrestILike(prefix);
-      conditions.push(`nombre.ilike.%${safePrefix}%`);
-    }
+    conditions.push(`nombre.ilike.${safe}%`);
   }
   
   return conditions.join(",");

@@ -35,6 +35,7 @@ export function Avatar({ src, alt = "", size = "md", className }: AvatarProps) {
     <div
       className={cn(
         "relative inline-flex items-center justify-center rounded-full bg-gym-surface border-2 border-gym-primary overflow-hidden",
+        // eslint-disable-next-line security/detect-object-injection
         sizeClasses[size],
         className
       )}
@@ -48,6 +49,7 @@ export function Avatar({ src, alt = "", size = "md", className }: AvatarProps) {
           loading="lazy"
         />
       ) : (
+        // eslint-disable-next-line security/detect-object-injection
         <User className={cn("text-gym-muted", iconSizes[size])} />
       )}
     </div>

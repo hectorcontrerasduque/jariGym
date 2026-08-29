@@ -40,7 +40,8 @@ export async function POST(request: Request) {
       .from("migracion")
       .select("nombre")
       .or(orFilter)
-      .eq("migrado", "no");
+      .eq("migrado", "no")
+      .limit(10);
 
     if (error) {
       return NextResponse.json({ error: messages.migracion.error }, { status: 500 });
@@ -50,7 +51,7 @@ export async function POST(request: Request) {
       // Check if records exist but are already migrated
       const { data: migratedData } = await supabase
         .from("migracion")
-        .select("nombre")
+        .select("nombre", { count: "exact", head: true })
         .or(orFilter)
         .eq("migrado", "si")
         .limit(1);

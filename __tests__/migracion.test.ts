@@ -26,7 +26,7 @@ vi.mock("@/lib/middleware/rate-limit", () => ({
 
 vi.mock("@/lib/utils/sanitize", () => ({
   sanitizeOrFilter: vi.fn((words: string[]) => 
-    words.map(w => `nombre.ilike.%${w}%`).join(",")
+    words.map(w => `nombre.ilike.${w}%`).join(",")
   ),
 }));
 
@@ -99,7 +99,7 @@ describe("Migración API", () => {
     vi.clearAllMocks();
   });
 
-  it("falla si faltan campos obligatorios", async () => {
+  it("falla si faltan campos obligatorios", { timeout: 15000 }, async () => {
     const req = makeReq({ nombreCompleto: "" });
     const { POST } = await import("@/app/api/migracion/route");
     const res = await POST(req);

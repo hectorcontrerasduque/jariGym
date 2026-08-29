@@ -12,9 +12,8 @@ describe("sanitizePostgrestILike", () => {
 describe("sanitizeOrFilter", () => {
   it("genera condiciones seguras", () => {
     const result = sanitizeOrFilter(["juan", "perez"]);
-    expect(result).toContain("nombre.ilike.%juan%");
-    expect(result).toContain("nombre.ilike.%perez%");
-    expect(result).toContain("nombre.ilike.%pere%"); // prefix
+    expect(result).toContain("nombre.ilike.juan%");
+    expect(result).toContain("nombre.ilike.perez%");
   });
   it("ignora palabras < 2 chars", () => {
     expect(sanitizeOrFilter(["a", "juan"])).not.toContain("%a%");

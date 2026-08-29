@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-const adminNavItems = [
+const superAdminNavItems = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/dashboard/pagos", label: "Pagos" },
   { href: "/dashboard/miembros", label: "Miembros" },
@@ -13,8 +13,8 @@ const miembroNavItems = [
 ];
 
 describe("Sidebar navigation", () => {
-  it("admin should see Dashboard, Pagos, Miembros, Notificaciones, Config", () => {
-    expect(adminNavItems.map((i) => i.href)).toEqual([
+  it("super_admin should see Dashboard, Pagos, Miembros, Notificaciones, Config", () => {
+    expect(superAdminNavItems.map((i) => i.href)).toEqual([
       "/dashboard",
       "/dashboard/pagos",
       "/dashboard/miembros",
@@ -23,12 +23,12 @@ describe("Sidebar navigation", () => {
     ]);
   });
 
-  it("admin should have exactly 5 nav items", () => {
-    expect(adminNavItems).toHaveLength(5);
+  it("super_admin should have exactly 5 nav items", () => {
+    expect(superAdminNavItems).toHaveLength(5);
   });
 
-  it("admin nav items should include Notificaciones", () => {
-    const labels = adminNavItems.map((i) => i.label);
+  it("super_admin nav items should include Notificaciones", () => {
+    const labels = superAdminNavItems.map((i) => i.label);
     expect(labels).toContain("Notificaciones");
   });
 
@@ -43,12 +43,8 @@ describe("Sidebar navigation", () => {
     expect(miembroNavItems.map((i) => i.label)).toEqual(["Mis Pagos"]);
   });
 
-  it("miembro should have exactly 1 nav item", () => {
-    expect(miembroNavItems).toHaveLength(1);
-  });
-
-  it("admin should not see Mis Pagos in sidebar", () => {
-    const adminHrefs = adminNavItems.map((i) => i.href);
-    expect(adminHrefs).not.toContain("/dashboard/mis-pagos");
+  it("super_admin should not see Mis Pagos in sidebar", () => {
+    const superAdminHrefs = superAdminNavItems.map((i) => i.href);
+    expect(superAdminHrefs).not.toContain("/dashboard/mis-pagos");
   });
 });

@@ -41,11 +41,9 @@ describe("Profile type", () => {
 
   it("should support all role types", () => {
     const miembro = createMockProfile({ role: "miembro" });
-    const admin = createMockProfile({ role: "admin" });
     const superAdmin = createMockProfile({ role: "super_admin" });
 
     expect(miembro.role).toBe("miembro");
-    expect(admin.role).toBe("admin");
     expect(superAdmin.role).toBe("super_admin");
   });
 

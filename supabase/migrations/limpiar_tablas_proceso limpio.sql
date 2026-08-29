@@ -1,16 +1,13 @@
 -- 026: Inicio - Limpiar todo el sistema
 -- ADVERTENCIA: Reset completo
 
--- 1. Limpiar tablas de datos
-TRUNCATE TABLE pagos RESTART IDENTITY;
-TRUNCATE TABLE membresias RESTART IDENTITY;
-TRUNCATE TABLE password_reset_tokens RESTART IDENTITY;
-TRUNCATE TABLE notificacion_config, notificacion_log RESTART IDENTITY CASCADE;
+-- 1. Limpiar tablas de datos (orden: hijos primero, luego padres)
+TRUNCATE TABLE detalle_pago, pagos, membresias, password_reset_tokens, notificacion_log, notificacion_config RESTART IDENTITY CASCADE;
 
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_tables WHERE tablename = 'member_stats') THEN
-    EXECUTE 'TRUNCATE TABLE member_stats RESTART IDENTITY';
+    EXECUTE 'TRUNCATE TABLE member_stats RESTART IDENTITY CASCADE';
   END IF;
 END $$;
 
@@ -23,7 +20,7 @@ DELETE FROM gym_config_metodos_pago;
 DELETE FROM gym_config;
 
 -- 4. Resetear migracion para re-migrar
-UPDATE migracion SET migrado = 'no',whatsapp = null, correo=null;
+UPDATE migracion SET migrado = 'no', whatsapp = null, correo = null;
 
 -- Verificar
 SELECT 'gym_config' as tabla, COUNT(*) as registros FROM gym_config

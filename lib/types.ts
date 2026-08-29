@@ -8,8 +8,9 @@ export interface Profile {
   horario_entreno: string | null;
   hora_llegada: string | null;
   hora_salida: string | null;
-  role: "super_admin" | "admin" | "miembro";
-  activo: boolean;
+  role: "super_admin" | "miembro";
+  /** null = active (legacy profiles), false = inactive, true = explicitly active. Always use `activo !== false` to check active status. */
+  activo: boolean | null;
   fecha_inscripcion: string;
   monto_inscripcion_pagado: number;
   inscripcion_pagada: boolean;
@@ -85,7 +86,7 @@ export interface Movimiento {
   mes: number | null;
   anio: number | null;
   estado: "pendiente" | "aprobado" | "rechazado" | "suspendido";
-  activo: boolean;
+  activo: boolean | null;
   approved_by: string | null;
   approved_at: string | null;
   created_at: string;

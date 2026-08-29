@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { messages } from "@/lib/messages";
 import { createClient } from "@supabase/supabase-js";
+import { applyRateLimit } from "@/lib/middleware/rate-limit";
 
 function getAdminClient() {
   return createClient(
@@ -10,6 +11,13 @@ function getAdminClient() {
 }
 
 export async function POST(request: Request) {
+  const rateLimitResponse = await applyRateLimit(request, {
+    max: 5,
+    windowMs: 20 * 60 * 1000,
+    prefix: "auth",
+  });
+  if (rateLimitResponse) return rateLimitResponse;
+  
   try {
     const { token, password } = await request.json();
 
@@ -52,7 +60,7 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({ message: messages.auth.resetPasswordSuccess });
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { error: messages.auth.resetPasswordError },
       { status: 500 }

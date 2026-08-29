@@ -8,7 +8,7 @@ import { Modal } from "@/components/ui/modal";
 import { pagosService } from "@/lib/services/pagos/pagos.service";
 import { miembrosService } from "@/lib/services/miembros/miembros.service";
 import { formatCurrency, getMonthName } from "@/lib/utils";
-import { Check, X, Eye, CreditCard, Clock, CheckCircle, AlertTriangle, Bell, Calendar, Trash2, FileText, Search, Plus } from "lucide-react";
+import { Check, X, Eye, CreditCard, Clock, CheckCircle, AlertTriangle, Bell, Search, Plus } from "lucide-react";
 import { showToast } from "@/components/ui/toast";
 import { messages } from "@/lib/messages";
 import type { Pago, MetodoPago, Profile } from "@/lib/types";
@@ -42,29 +42,51 @@ export default function PagosPage() {
   const [anioSeleccionado, setAnioSeleccionado] = useState(new Date().getFullYear());
   const [mesSeleccionado, setMesSeleccionado] = useState<number>(0);
   const [miembros, setMiembros] = useState<Profile[]>([]);
-  const [miembroSeleccionado, setMiembroSeleccionado] = useState<string>("");
+  const [miembroSeleccionado] = useState<string>("");
   const [busquedaMiembro, setBusquedaMiembro] = useState("");
-  const [deleting, setDeleting] = useState<string | null>(null);
 
-  const loadData = useCallback(async () => {
+  const fetchAllData = useCallback(async () => {
+    return await Promise.allSettled([
+      pagosService.listarPagos(undefined, anioSeleccionado, mesSeleccionado === 0 ? undefined : mesSeleccionado),
+      pagosService.aniosConPagos(),
+      miembrosService.listarMiembros(),
+    ]);
+  }, [anioSeleccionado, mesSeleccionado]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      setLoading(true);
+      try {
+        const [pagosResult, aniosResult, miembrosResult] = await fetchAllData();
+        if (!cancelled) {
+          if (pagosResult.status === "fulfilled") setPagos(pagosResult.value);
+          if (aniosResult.status === "fulfilled") setAnios(aniosResult.value);
+          if (miembrosResult.status === "fulfilled") setMiembros(miembrosResult.value);
+        }
+      } catch {
+        if (!cancelled) showToast(messages.toast.errorCargaDatos, "error");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    load();
+    return () => { cancelled = true; };
+  }, [fetchAllData]);
+
+  const loadData = async () => {
     setLoading(true);
     try {
-      const [pagosResult, aniosResult, miembrosResult] = await Promise.allSettled([
-        pagosService.listarPagos(undefined, anioSeleccionado, mesSeleccionado === 0 ? undefined : mesSeleccionado),
-        pagosService.aniosConPagos(),
-        miembrosService.listarMiembros(),
-      ]);
+      const [pagosResult, aniosResult, miembrosResult] = await fetchAllData();
       if (pagosResult.status === "fulfilled") setPagos(pagosResult.value);
       if (aniosResult.status === "fulfilled") setAnios(aniosResult.value);
       if (miembrosResult.status === "fulfilled") setMiembros(miembrosResult.value);
-    } catch (error) {
+    } catch {
       showToast(messages.toast.errorCargaDatos, "error");
     } finally {
       setLoading(false);
     }
-  }, [anioSeleccionado, mesSeleccionado]);
-
-  useEffect(() => { loadData(); }, [loadData]);
+  };
 
   const handleAprobar = async (pagoId: string) => {
     try {
@@ -72,7 +94,7 @@ export default function PagosPage() {
       showToast(messages.toast.pagoAprobado, "success");
       await loadData();
       setModalOpen(false);
-    } catch (error) {
+    } catch {
       showToast(messages.toast.pagoAprobadoError, "error");
     }
   };
@@ -83,22 +105,8 @@ export default function PagosPage() {
       showToast(messages.toast.pagoRechazado, "success");
       await loadData();
       setModalOpen(false);
-    } catch (error) {
+    } catch {
       showToast(messages.toast.pagoRechazadoError, "error");
-    }
-  };
-
-  const handleDelete = async (pagoId: string) => {
-    if (!confirm(messages.pagos.eliminarPagoConfirm)) return;
-    setDeleting(pagoId);
-    try {
-      await pagosService.eliminarPago(pagoId);
-      showToast(messages.toast.pagoEliminado, "success");
-      await loadData();
-    } catch (err) {
-      showToast(messages.toast.pagoEliminadoError, "error");
-    } finally {
-      setDeleting(null);
     }
   };
 
@@ -133,12 +141,6 @@ export default function PagosPage() {
     if (pago.profile?.nombre_completo) return pago.profile.nombre_completo;
     const miembro = miembros.find((m) => m.id === pago.usuario_id);
     return miembro?.nombre_completo || "—";
-  };
-
-  const getAvatarMiembro = (pago: Pago): string | undefined => {
-    if (pago.profile?.avatar_url) return pago.profile.avatar_url;
-    const miembro = miembros.find((m) => m.id === pago.usuario_id);
-    return miembro?.avatar_url ?? undefined;
   };
 
   if (loading) {

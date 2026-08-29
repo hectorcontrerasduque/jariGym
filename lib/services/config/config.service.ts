@@ -29,7 +29,7 @@ export class ConfigService {
       .select("role")
       .eq("id", user.id)
       .single();
-    if (profile?.role !== "super_admin" && profile?.role !== "admin") {
+    if (profile?.role !== "super_admin") {
       throw new Error(messages.toast.noAutorizado);
     }
 
@@ -111,7 +111,7 @@ export class ConfigService {
       }
     }
 
-    const { id, created_at, updated_at, ...safeUpdates } = updates as GymConfig;
+    const { id, created_at, updated_at, ...safeUpdates } = updates as GymConfig; // eslint-disable-line @typescript-eslint/no-unused-vars
 
     if (existing) {
       const { data, error } = await this.supabase

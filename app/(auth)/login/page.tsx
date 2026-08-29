@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState, useEffect } from "react";
+import { Suspense, useState, useEffect, useMemo } from "react";
 import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,6 +30,9 @@ function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState("");
+  const [resetSent, setResetSent] = useState(false);
+  const [showResetForm, setShowResetForm] = useState(false);
   const [resetEmail, setResetEmail] = useState("");
   const [resetLoading, setResetLoading] = useState(false);
   const [gymName, setGymName] = useState("GymApp");
@@ -44,15 +47,14 @@ function LoginForm() {
   const [migrateError, setMigrateError] = useState("");
   const [migNombre, setMigNombre] = useState("");
   const [migWhatsapp, setMigWhatsapp] = useState("");
+  const [migCorreo, setMigCorreo] = useState("");
+  const [migPassword, setMigPassword] = useState("");
+  const [migPasswordConfirm, setMigPasswordConfirm] = useState("");
+  const [migEmailExists, setMigEmailExists] = useState(false);
   const [hasPendingMigration, setHasPendingMigration] = useState(true);
   const [migIsExistingUser, setMigIsExistingUser] = useState(false);
 
   // Initialize state from searchParams using useMemo to avoid useEffect
-  const initialError = useMemo(() => {
-    const err = searchParams.get("error");
-    return err ? decodeURIComponent(err) : "";
-  }, [searchParams]);
-
   const initialError = useMemo(() => {
     const err = searchParams.get("error");
     return err ? decodeURIComponent(err) : "";
@@ -175,8 +177,8 @@ function LoginForm() {
     setError("");
     try {
       await authService.signInWithGoogle();
-    } catch (err) {
-      setError(err.message || messages.auth.googleLoginError);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : messages.auth.googleLoginError);
       setLoading(false);
     }
   };

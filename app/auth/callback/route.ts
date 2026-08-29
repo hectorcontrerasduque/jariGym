@@ -30,7 +30,6 @@ export async function GET(request: Request) {
 
       const avatarUrl = user.user_metadata?.avatar_url || user.user_metadata?.picture || null;
       const email = user.email || null;
-      const nombre = user.user_metadata?.nombre_completo || user.user_metadata?.full_name || null;
 
       const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL;
       const isAdminByEmail = adminEmail && user.email === adminEmail;
@@ -105,7 +104,7 @@ export async function GET(request: Request) {
         return NextResponse.redirect(`${origin}/login?error=${msg}`);
       }
 
-      const isAdmin = isAdminByEmail || profile.role === "super_admin" || profile.role === "admin";
+      const isAdmin = isAdminByEmail || profile.role === "super_admin";
       const isActiveMember = profile.activo !== false && profile.registered === true && profile.role === "miembro";
 
       if (!isAdmin && !isActiveMember) {

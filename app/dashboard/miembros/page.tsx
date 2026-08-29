@@ -39,29 +39,66 @@ export default function MiembrosPage() {
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [notasAdmin, setNotasAdmin] = useState("");
 
-  useEffect(() => { loadMiembros(); }, []);
+  const fetchMiembrosData = async () => {
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", user.id)
+        .single();
+      setCurrentUser(profile);
+    }
+
+    const [data, statsData, configData] = await Promise.all([
+      miembrosService.listarMiembros(),
+      miembrosService.stats(),
+      supabase.from("gym_config").select("max_miembros").maybeSingle(),
+    ]);
+    setMiembros(data);
+    setStats({ ...statsData, maxMiembros: configData?.data?.max_miembros || 50 });
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadInitial = async () => {
+      try {
+        const supabase = createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("*")
+            .eq("id", user.id)
+            .single();
+          if (!cancelled) setCurrentUser(profile);
+        }
+
+        const [data, statsData, configData] = await Promise.all([
+          miembrosService.listarMiembros(),
+          miembrosService.stats(),
+          supabase.from("gym_config").select("max_miembros").maybeSingle(),
+        ]);
+        if (!cancelled) {
+          setMiembros(data);
+          setStats({ ...statsData, maxMiembros: configData?.data?.max_miembros || 50 });
+        }
+      } catch {
+        if (!cancelled) showToast(messages.toast.errorCargaDatos, "error");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    loadInitial();
+    return () => { cancelled = true; };
+  }, []);
 
   const loadMiembros = async () => {
+    setLoading(true);
     try {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("id", user.id)
-          .single();
-        setCurrentUser(profile);
-      }
-
-      const [data, statsData, configData] = await Promise.all([
-        miembrosService.listarMiembros(),
-        miembrosService.stats(),
-        supabase.from("gym_config").select("max_miembros").maybeSingle(),
-      ]);
-      setMiembros(data);
-      setStats({ ...statsData, maxMiembros: configData?.data?.max_miembros || 50 });
-    } catch (error) {
+      await fetchMiembrosData();
+    } catch {
       showToast(messages.toast.errorCargaDatos, "error");
     } finally {
       setLoading(false);
@@ -121,7 +158,7 @@ export default function MiembrosPage() {
       setEmailError("");
       setPasswordError("");
       await loadMiembros();
-    } catch (error) {
+    } catch {
       showToast(messages.toast.miembroError, "error");
     } finally {
       setSaving(false);
@@ -173,7 +210,7 @@ export default function MiembrosPage() {
 
       if (pagoInsc) setPagoInscripcion(pagoInsc);
       setIsMembresiaLibre(!!libreData);
-    } catch (error) {
+    } catch {
       showToast(messages.toast.errorCargaDatos, "error");
     }
     setModalDetalle(true);
@@ -186,7 +223,7 @@ export default function MiembrosPage() {
       await miembrosService.actualizarEstado(miembro.id, activar);
       showToast(activar ? messages.toast.miembroActivado : messages.toast.miembroDesactivado, "success");
       await loadMiembros();
-    } catch (error) {
+    } catch {
       showToast(messages.toast.miembroEstadoError, "error");
     }
   };
@@ -199,7 +236,7 @@ export default function MiembrosPage() {
       await miembrosService.toggleMembresiaLibre(miembro.id, currentUser.id, currentUser.nombre_completo);
       setIsMembresiaLibre(!isMembresiaLibre);
       await loadMiembros();
-    } catch (error) {
+    } catch {
       showToast(messages.toast.membresiaLibreError, "error");
     }
   };
@@ -226,7 +263,7 @@ export default function MiembrosPage() {
       if (newRole === "miembro") setNotasAdmin("");
       showToast(newRole === "super_admin" ? "Ahora es Super Admin" : "Rol cambiado a Miembro", "success");
       await loadMiembros();
-    } catch (error) {
+    } catch {
       showToast("Error al cambiar rol", "error");
     }
   };
@@ -247,7 +284,7 @@ export default function MiembrosPage() {
       if (!res.ok) throw new Error(data.error || "Error al guardar notas");
       showToast("Notas actualizadas", "success");
       await loadMiembros();
-    } catch (error) {
+    } catch {
       showToast("Error al guardar notas", "error");
     }
   };
@@ -344,8 +381,8 @@ export default function MiembrosPage() {
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <Badge variant={miembro.role === "super_admin" || miembro.role === "admin" ? "primary" : "secondary"}>
-                        {miembro.role === "super_admin" || miembro.role === "admin" ? "Sí" : "No"}
+                      <Badge variant={miembro.role === "super_admin" ? "primary" : "secondary"}>
+                        {miembro.role === "super_admin" ? "Sí" : "No"}
                       </Badge>
                     </td>
                     <td className="px-4 py-3">
@@ -402,7 +439,7 @@ export default function MiembrosPage() {
                 </Badge>
               </div>
               <div className="flex items-center gap-4 text-xs text-gym-muted mb-3">
-                <span>{miembro.role === "super_admin" || miembro.role === "admin" ? "Admin" : "Miembro"}</span>
+                <span>{miembro.role === "super_admin" ? "Super Admin" : "Miembro"}</span>
                 <span>{formatDate(miembro.fecha_inscripcion || miembro.created_at)}</span>
               </div>
               <div className="flex gap-2">
@@ -458,8 +495,8 @@ export default function MiembrosPage() {
                 <h3 className="font-semibold text-gym-text">{selectedMiembro.nombre_completo}</h3>
                 <p className="text-sm text-gym-muted">{selectedMiembro.email || "Sin email"}</p>
                 <div className="flex gap-2 mt-1">
-                  <Badge variant={selectedMiembro.role === "super_admin" ? "primary" : selectedMiembro.role === "admin" ? "primary" : "secondary"}>
-                    {selectedMiembro.role === "super_admin" ? "Super Admin" : selectedMiembro.role === "admin" ? "Admin" : "Miembro"}
+                  <Badge variant={selectedMiembro.role === "super_admin" ? "primary" : "secondary"}>
+                    {selectedMiembro.role === "super_admin" ? "Super Admin" : "Miembro"}
                   </Badge>
                   <Badge variant={selectedMiembro.activo !== false ? "success" : "danger"}>
                     {selectedMiembro.activo !== false ? "Activo" : "Inactivo"}

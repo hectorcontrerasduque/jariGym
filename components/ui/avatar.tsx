@@ -1,8 +1,8 @@
 "use client";
 
+import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
-import { useEffect, useState } from "react";
 import { User } from "lucide-react";
 
 interface AvatarProps {
@@ -13,21 +13,13 @@ interface AvatarProps {
 }
 
 export function Avatar({ src, alt = "", size = "md", className }: AvatarProps) {
-  const [imageUrl, setImageUrl] = useState(src);
-  const [imgError, setImgError] = useState(false);
+  const supabase = createClient();
 
-  useEffect(() => {
-    if (src) {
-      const supabase = createClient();
-      if (src.startsWith("avatars/")) {
-        const { data } = supabase.storage.from("avatars").getPublicUrl(src);
-        setImageUrl(data.publicUrl);
-      } else {
-        setImageUrl(src);
-      }
-      setImgError(false);
-    }
-  }, [src]);
+  // getPublicUrl is synchronous, so compute imageUrl directly
+  const imageUrl =
+    src && src.startsWith("avatars/")
+      ? supabase.storage.from("avatars").getPublicUrl(src).data.publicUrl
+      : src;
 
   const sizeClasses = {
     sm: "w-8 h-8",
@@ -45,19 +37,23 @@ export function Avatar({ src, alt = "", size = "md", className }: AvatarProps) {
     <div
       className={cn(
         "relative inline-flex items-center justify-center rounded-full bg-gym-surface border-2 border-gym-primary overflow-hidden",
+        // eslint-disable-next-line security/detect-object-injection
         sizeClasses[size],
         className
       )}
     >
-      {imageUrl && !imgError ? (
-        <img
+      {imageUrl ? (
+        <Image
           src={imageUrl}
           alt={alt}
+          width={size === "lg" ? 16 : size === "md" ? 10 : 8}
+          height={size === "lg" ? 16 : size === "md" ? 10 : 8}
           className="w-full h-full object-cover"
-          onError={() => setImgError(true)}
+          loading="lazy"
         />
       ) : (
-        <User className={cn("text-gym-muted", iconSizes[size])} />
+        <User className={cn("text-gym-muted", // eslint-disable-next-line security/detect-object-injection
+        iconSizes[size])} />
       )}
     </div>
   );

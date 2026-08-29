@@ -25,6 +25,8 @@ const [password, setPassword] = useState("");
   const [success, setSuccess] = useState(false);
   const [validating] = useState(!token);
   const [tokenValid] = useState(!!token);
+  const [gymName, setGymName] = useState("GymApp");
+  const [gymLogo, setGymLogo] = useState("");
 
   useEffect(() => {
     configService.getConfig().then((config) => {

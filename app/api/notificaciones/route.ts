@@ -4,6 +4,7 @@ import { pagosService } from "@/lib/services/pagos/pagos.service";
 import { messages } from "@/lib/messages";
 import { sleep } from "@/lib/services/email/email.service";
 import { getDiaCobro, getDiaNotificacion } from "@/lib/utils";
+import { applyRateLimit } from "@/lib/middleware/rate-limit";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -12,24 +13,28 @@ const supabase = createClient(
 
 const CRON_SECRET = process.env.CRON_SECRET || "gym-notifications-cron-secret";
 
-export async function POST(request: Request) {
+import type { NextRequest } from "next/server";
+
+export async function POST(request: NextRequest) {
   const authHeader = request.headers.get("authorization");
 
   // Accept either CRON_SECRET or admin user token
-  let isCronAuth = authHeader === `Bearer ${CRON_SECRET}`;
+  const isCronAuth = authHeader === `Bearer ${CRON_SECRET}`;
   let isAdminAuth = false;
+  let userId: string | null = null;
 
   if (!isCronAuth && authHeader) {
     const { data: { user } } = await supabase.auth.getUser(
       authHeader.replace("Bearer ", "")
     );
     if (user) {
+      userId = user.id;
       const { data: profile } = await supabase
         .from("profiles")
         .select("role")
         .eq("id", user.id)
         .single();
-      if (profile?.role === "super_admin" || profile?.role === "admin") {
+      if (profile?.role === "super_admin") {
         isAdminAuth = true;
       }
     }
@@ -37,6 +42,15 @@ export async function POST(request: Request) {
 
   if (!isCronAuth && !isAdminAuth) {
     return NextResponse.json({ error: messages.toast.noAutorizado }, { status: 401 });
+  }
+
+  if (userId) {
+    const rateLimitResponse = await applyRateLimit(request, {
+      max: 5,
+      windowMs: 20 * 60 * 1000,
+      prefix: "auth",
+    }, userId);
+    if (rateLimitResponse) return rateLimitResponse;
   }
 
   try {
@@ -272,7 +286,7 @@ async function procesarRecordatorioPago(
   const { data: miembros } = await supabase
     .from("profiles")
     .select("id, email, nombre_completo, fecha_inscripcion")
-    .in("role", ["miembro", "admin", "super_admin"])
+    .in("role", ["miembro", "super_admin"])
     .eq("activo", true)
     .not("email", "is", null);
 
@@ -529,8 +543,8 @@ async function procesarEstatusSistema(gymConfig: Record<string, unknown>): Promi
     .order("fecha_hora_envio", { ascending: false })
     .limit(10);
 
-  const erroresFormateados = (erroresRecientes || []).map((e: any) => ({
-    tipo: e.notificacion_config?.tipo_notificacion || "desconocido",
+  const erroresFormateados = (erroresRecientes || []).map((e) => ({
+    tipo: (e as unknown as { notificacion_config?: { tipo_notificacion?: string } }).notificacion_config?.tipo_notificacion || "desconocido",
     fecha: new Date(e.fecha_hora_envio).toLocaleDateString("es-ES"),
     detalle: e.error_detalle || "Sin detalle",
   }));

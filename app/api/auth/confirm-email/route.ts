@@ -1,12 +1,31 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import { applyRateLimit } from "@/lib/middleware/rate-limit";
+import type { NextRequest } from "next/server";
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
+  const rateLimitResponse = await applyRateLimit(request, {
+    max: 5,
+    windowMs: 20 * 60 * 1000,
+    prefix: "auth",
+  });
+  if (rateLimitResponse) return rateLimitResponse;
+  
   const { searchParams, origin } = new URL(request.url);
   const token = searchParams.get("token");
 
+  // SECURITY: Validate origin to prevent open redirect
+  const allowedOrigin = process.env.NEXT_PUBLIC_SITE_URL;
+  if (!allowedOrigin) {
+    console.error("[confirm-email] NEXT_PUBLIC_SITE_URL not configured");
+    return NextResponse.redirect(`${origin}/login?error=Server+misconfiguration`);
+  }
+  if (origin !== allowedOrigin) {
+    return NextResponse.redirect(`${allowedOrigin}/login?error=Invalid+origin`);
+  }
+
   if (!token) {
-    return NextResponse.redirect(`${origin}/login?error=Token+no+proporcionado`);
+    return NextResponse.redirect(`${allowedOrigin}/login?error=Token+no+proporcionado`);
   }
 
   const supabase = createClient(
@@ -21,15 +40,15 @@ export async function GET(request: Request) {
     .maybeSingle();
 
   if (tokenError || !tokenRow) {
-    return NextResponse.redirect(`${origin}/login?error=Enlace+invalido+o+ya+utilizado`);
+    return NextResponse.redirect(`${allowedOrigin}/login?error=Enlace+invalido+o+ya+utilizado`);
   }
 
   if (tokenRow.used_at) {
-    return NextResponse.redirect(`${origin}/login?error=Enlace+ya+utilizado`);
+    return NextResponse.redirect(`${allowedOrigin}/login?error=Enlace+ya+utilizado`);
   }
 
   if (new Date(tokenRow.expires_at) < new Date()) {
-    return NextResponse.redirect(`${origin}/login?error=Enlace+expirado.+Solicita+uno+nuevo`);
+    return NextResponse.redirect(`${allowedOrigin}/login?error=Enlace+expirado.+Solicita+uno+nuevo`);
   }
 
   // Mark token as used
@@ -44,5 +63,5 @@ export async function GET(request: Request) {
   });
 
   const msg = encodeURIComponent("Correo confirmado. Ya puedes iniciar sesión");
-  return NextResponse.redirect(`${origin}/login?message=${msg}`);
+  return NextResponse.redirect(`${allowedOrigin}/login?message=${msg}`);
 }

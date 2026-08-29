@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import type { Pago, MetodoPago, CreatePagoInput } from "@/lib/types";
+import type { Pago, CreatePagoInput } from "@/lib/types";
 import { getMonthName, formatCurrency } from "@/lib/utils";
 
 function createMockPago(overrides: Partial<Pago> = {}): Pago {

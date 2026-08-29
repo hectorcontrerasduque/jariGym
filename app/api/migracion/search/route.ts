@@ -1,8 +1,17 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { messages } from "@/lib/messages";
+import { sanitizeOrFilter } from "@/lib/utils/sanitize";
+import { applyRateLimit } from "@/lib/middleware/rate-limit";
 
 export async function POST(request: Request) {
+  const rateLimitResponse = await applyRateLimit(request, {
+    max: 30,
+    windowMs: 60 * 60 * 1000,
+    prefix: "api",
+  });
+  if (rateLimitResponse) return rateLimitResponse;
+  
   try {
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -24,14 +33,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ matches: [] });
     }
 
-    const conditions: string[] = [];
-    for (const w of words) {
-      conditions.push(`nombre.ilike.%${w}%`);
-      if (w.length > 3) {
-        conditions.push(`nombre.ilike.%${w.slice(0, -1)}%`);
-      }
-    }
-    const orFilter = conditions.join(",");
+    // SECURITY: Sanitize input for PostgREST .or() to prevent injection
+    const orFilter = sanitizeOrFilter(words);
 
     const { data, error } = await supabase
       .from("migracion")
@@ -62,7 +65,7 @@ export async function POST(request: Request) {
     const uniqueNames = Array.from(new Set((data || []).map((r) => r.nombre.toUpperCase()))).sort();
 
     return NextResponse.json({ matches: uniqueNames });
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: messages.toast.errorGenerico }, { status: 500 });
   }
 }

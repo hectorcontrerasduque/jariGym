@@ -49,7 +49,7 @@ export class MiembrosService {
     for (const key of allowedKeys) {
       if (key in updates) {
         // eslint-disable-next-line security/detect-object-injection
-        allowedFields[key] = updates[key];
+        allowedFields[key] = (updates as Record<string, unknown>)[key];
       }
     }
 

@@ -9,14 +9,12 @@ import { pagosService } from "@/lib/services/pagos/pagos.service";
 import { configService } from "@/lib/services/config/config.service";
 import { createClient } from "@/lib/supabase/client";
 import { formatCurrency, getMonthName } from "@/lib/utils";
-import { CreditCard, CheckCircle, Clock, Calendar, Trash2, FileText, Plus, Search, User, DollarSign, Upload, Send, Gift, AlertTriangle, ChevronDown, ChevronRight, X, Save } from "lucide-react";
+import { CreditCard, CheckCircle, Clock, Calendar, Trash2, FileText, Plus, Search, Upload, Gift, AlertTriangle, ChevronDown, ChevronRight, X, Save } from "lucide-react";
 import { showToast } from "@/components/ui/toast";
 import { messages } from "@/lib/messages";
 import { Avatar } from "@/components/ui/avatar";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import type { Pago, Profile, MetodoPago, MetodoPagoConfig, GymConfig } from "@/lib/types";
-
-const MESES = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 
 const metodoLabels: Record<MetodoPago, string> = {
   efectivo: "Efectivo",
@@ -48,7 +46,7 @@ export default function MisPagosPage() {
   const [gymConfig, setGymConfig] = useState<GymConfig | null>(null);
 
   const isSuperAdmin = profile?.role === "super_admin";
-  const isAdmin = profile?.role === "super_admin" || profile?.role === "admin";
+  const isAdmin = profile?.role === "super_admin";
 
   // Super admin: member selector
   const [miembros, setMiembros] = useState<Profile[]>([]);
@@ -82,51 +80,58 @@ export default function MisPagosPage() {
   const [comprobante, setComprobante] = useState<File | null>(null);
   const [showPagosRealizados, setShowPagosRealizados] = useState(true);
 
-  const loadData = useCallback(async () => {
-    try {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+  const fetchMisPagosData = useCallback(async () => {
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
 
-      const { data: profileData } = await supabase
+    const { data: profileData } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", user.id)
+      .single();
+    setProfile(profileData);
+
+    const targetId = miembroSeleccionado?.id || user.id;
+    const currentIsAdmin = profileData?.role === "super_admin";
+
+    const [pagosData, aniosData, config] = await Promise.all([
+      currentIsAdmin ? pagosService.listarPagosUsuario(targetId, anioSeleccionado) : pagosService.listarMisPagos(anioSeleccionado),
+      pagosService.aniosConPagos(targetId),
+      configService.getConfig(),
+    ]);
+    setPagos(pagosData);
+    setAnios(aniosData);
+    setGymConfig(config);
+
+    const metodos = await configService.getMetodosPago();
+    setMetodosPago(metodos);
+
+    if (isAdmin) {
+      const { data: miembrosData } = await supabase
         .from("profiles")
         .select("*")
-        .eq("id", user.id)
-        .single();
-      setProfile(profileData);
-
-      const targetId = miembroSeleccionado?.id || user.id;
-      const currentIsAdmin = profileData?.role === "super_admin" || profileData?.role === "admin";
-
-      const [pagosData, aniosData, config] = await Promise.all([
-        currentIsAdmin ? pagosService.listarPagosUsuario(targetId, anioSeleccionado) : pagosService.listarMisPagos(anioSeleccionado),
-        pagosService.aniosConPagos(targetId),
-        configService.getConfig(),
-      ]);
-      setPagos(pagosData);
-      setAnios(aniosData);
-      setGymConfig(config);
-
-      const metodos = await configService.getMetodosPago();
-      setMetodosPago(metodos);
-
-      if (isAdmin) {
-        const { data: miembrosData } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("activo", true)
-          .eq("registered", true)
-          .order("nombre_completo");
-        if (miembrosData) setMiembros(miembrosData);
-      }
-    } catch (error) {
-      showToast(messages.toast.errorCargaDatos, "error");
-    } finally {
-      setLoading(false);
+        .eq("activo", true)
+        .eq("registered", true)
+        .order("nombre_completo");
+      if (miembrosData) setMiembros(miembrosData);
     }
   }, [anioSeleccionado, miembroSeleccionado, isAdmin]);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  useEffect(() => {
+    let cancelled = false;
+    const loadData = async () => {
+      try {
+        await fetchMisPagosData();
+      } catch {
+        if (!cancelled) showToast(messages.toast.errorCargaDatos, "error");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    loadData();
+    return () => { cancelled = true; };
+  }, [fetchMisPagosData]);
 
   // Load pending months when member changes
   const loadMiembroPendientes = useCallback(async (miembroId: string, anio?: number) => {
@@ -141,16 +146,15 @@ export default function MisPagosPage() {
       setMesesPendientes(meses);
       if (profile.data) setInscripcionPagada(profile.data.inscripcion_pagada);
       setInscripcionPendiente(tienePendiente);
-      setMembresiaLibre(!!libre.data);
+setMembresiaLibre(!!libre.data);
       setFormData(prev => ({ ...prev, meses: [], pagar_inscripcion: false, pagar_mensualidad: false }));
-    } catch (error) {
+    } catch {
       showToast(messages.toast.errorCargaDatos, "error");
     } finally {
       setLoadingPendientes(false);
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const loadSelfPendientes = useCallback(async (userId: string, anio?: number) => {
+  }, []);  
+    const loadSelfPendientes = useCallback(async (userId: string, anio?: number) => {
     setLoadingPendientes(true);
     try {
       const [meses, profile, libre, tienePendiente] = await Promise.all([
@@ -162,28 +166,29 @@ export default function MisPagosPage() {
       setMesesPendientes(meses);
       if (profile.data) setInscripcionPagada(profile.data.inscripcion_pagada);
       setInscripcionPendiente(tienePendiente);
-      setMembresiaLibre(!!libre.data);
+setMembresiaLibre(!!libre.data);
       setFormData(prev => ({ ...prev, meses: [], pagar_inscripcion: false, pagar_mensualidad: false }));
-    } catch (error) {
+    } catch {
       showToast(messages.toast.errorCargaDatos, "error");
     } finally {
       setLoadingPendientes(false);
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
+  }, []);  
+    useEffect(() => {
     if (!showForm) return;
-    setLoadingPendientes(true);
+    let cancelled = false;
     const supabase = createClient();
     supabase.auth.getUser().then(({ data: { user } }) => {
-      if (!user) return;
+      if (!user || cancelled) return;
       const targetId = miembroSeleccionado?.id || user.id;
+      setLoadingPendientes(true);
       if (miembroSeleccionado) {
         loadMiembroPendientes(targetId, anioSeleccionado);
       } else {
         loadSelfPendientes(targetId, anioSeleccionado);
       }
     });
+    return () => { cancelled = true; };
   }, [showForm, miembroSeleccionado, anioSeleccionado, loadMiembroPendientes, loadSelfPendientes]);
 
   const handleSelectMiembro = (m: Profile | null) => {
@@ -281,7 +286,7 @@ export default function MisPagosPage() {
         await pagosService.crearPagoSuspendido(targetId, formData.meses, formData.notas || undefined);
         showToast(messages.misPagos.solicitudEnviada, "success");
         setFormData({ meses: [], metodo_pago: "efectivo", codigo_billete: "", notas: "", pagar_inscripcion: false, pagar_mensualidad: false, solicitar_suspension: false, fecha_pago: new Date().toISOString().split("T")[0] });
-        await loadData();
+        await fetchMisPagosData();
         await reloadPendientes();
         return;
       }
@@ -295,7 +300,7 @@ export default function MisPagosPage() {
 
       let comprobanteUrl = "";
       if (needsComprobante(formData.metodo_pago) && comprobante) {
-        const fileName = `${targetId}/${Date.now()}_${comprobante.name}`;
+        const fileName = `${targetId}/${crypto.randomUUID()}_${comprobante.name}`;
         const { error: uploadError } = await supabase.storage.from("comprobantes").upload(fileName, comprobante);
         if (uploadError) throw uploadError;
         const { data: urlData } = supabase.storage.from("comprobantes").getPublicUrl(fileName);
@@ -353,11 +358,12 @@ export default function MisPagosPage() {
         setSubmitted(false);
         setFormData({ meses: [], metodo_pago: "efectivo", codigo_billete: "", notas: "", pagar_inscripcion: false, pagar_mensualidad: false, solicitar_suspension: false, fecha_pago: new Date().toISOString().split("T")[0] });
         setComprobante(null);
-        await loadData();
+        await fetchMisPagosData();
         await reloadPendientes();
       }
-    } catch (err: any) {
-      showToast(err.message || "Error al registrar pago", "error");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Error al registrar pago";
+      showToast(msg, "error");
     } finally {
       setSavingPago(false);
     }
@@ -383,10 +389,11 @@ export default function MisPagosPage() {
     try {
       await pagosService.eliminarPago(pagoId);
       showToast(messages.toast.pagoEliminado, "success");
-      await loadData();
+      await fetchMisPagosData();
       await reloadPendientes();
-    } catch (err: any) {
-      showToast(err.message || messages.toast.pagoEliminadoError, "error");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : messages.toast.pagoEliminadoError;
+      showToast(msg, "error");
     } finally {
       setDeleting(null);
     }
@@ -404,7 +411,7 @@ export default function MisPagosPage() {
 
   const showInscriptionCheckbox = !inscripcionPagada && !inscripcionPendiente && gymConfig && getMontoByMetodo(formData.metodo_pago, "inscripcion") > 0;
 
-  const mesesDisponiblesParaPagar = useMemo(() => {
+  const mesesDisponiblesParaPagar = (() => {
     const mesesConPago = new Set(
       pagos
         .filter(p => {
@@ -417,22 +424,9 @@ export default function MisPagosPage() {
         .filter(Boolean)
     );
     return mesesPendientes.filter(m => !mesesConPago.has(`${m.anio}-${m.mes}`));
-  }, [mesesPendientes, pagos, isSuperAdmin, miembroSeleccionado]);
+  })();
 
-  const mesesParaSuspender = useMemo(() => {
-    const mesesConPago = new Set(
-      pagos
-        .filter(p => {
-          if (isSuperAdmin && miembroSeleccionado) {
-            return p.estado === "pendiente" || p.estado === "aprobado" || p.estado === "suspendido";
-          }
-          return p.estado === "pendiente" || p.estado === "aprobado";
-        })
-        .flatMap(p => (p.detalle || []).map(d => d.mes && d.anio ? `${d.anio}-${d.mes}` : null))
-        .filter(Boolean)
-    );
-    return mesesPendientes.filter(m => !mesesConPago.has(`${m.anio}-${m.mes}`)).sort((a, b) => a.anio - b.anio || a.mes - b.mes);
-  }, [mesesPendientes, pagos, isSuperAdmin, miembroSeleccionado]);
+  const mesesParaSuspender = [...mesesDisponiblesParaPagar].sort((a, b) => a.anio - b.anio || a.mes - b.mes);
 
   if (loading) {
     return (

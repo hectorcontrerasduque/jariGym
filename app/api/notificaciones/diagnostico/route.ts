@@ -27,7 +27,7 @@ export async function POST(request: Request) {
       .eq("id", user.id)
       .single();
 
-    if (profile?.role !== "super_admin" && profile?.role !== "admin") {
+    if (profile?.role !== "super_admin") {
       return NextResponse.json({ error: messages.toast.noAutorizado }, { status: 403 });
     }
 

@@ -2,8 +2,16 @@ import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { messages } from "@/lib/messages";
+import { applyRateLimit } from "@/lib/middleware/rate-limit";
 
 export async function PUT(request: Request) {
+  const rateLimitResponse = await applyRateLimit(request, {
+    max: 30,
+    windowMs: 60 * 60 * 1000,
+    prefix: "api",
+  });
+  if (rateLimitResponse) return rateLimitResponse;
+  
   try {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -18,7 +26,7 @@ export async function PUT(request: Request) {
       .eq("id", user.id)
       .single();
 
-    const isAdmin = profileAdmin?.role === "super_admin" || profileAdmin?.role === "admin";
+    const isAdmin = profileAdmin?.role === "super_admin";
 
     const body = await request.json();
     const { user_id, updates, password, currentPassword } = body;
@@ -49,7 +57,7 @@ export async function PUT(request: Request) {
       hora_llegada: updates.hora_llegada ?? currentData?.hora_llegada,
       hora_salida: updates.hora_salida ?? currentData?.hora_salida,
     };
-    if (isAdmin && profileAdmin?.role === "super_admin") {
+    if (isAdmin) {
       profileUpdates.role = updates.role;
       profileUpdates.notas_admin = updates.notas_admin ?? currentData?.notas_admin;
     }

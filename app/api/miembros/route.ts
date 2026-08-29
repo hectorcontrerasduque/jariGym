@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { messages } from "@/lib/messages";
 import { randomBytes } from "crypto";
+import { applyRateLimit } from "@/lib/middleware/rate-limit";
 
 export async function POST(request: Request) {
   try {
@@ -19,9 +20,16 @@ export async function POST(request: Request) {
       .eq("id", user.id)
       .single();
 
-    if (profileAdmin?.role !== "super_admin" && profileAdmin?.role !== "admin") {
+    if (profileAdmin?.role !== "super_admin") {
       return NextResponse.json({ error: messages.toast.noAutorizado }, { status: 403 });
     }
+
+    const rateLimitResponse = await applyRateLimit(request, {
+      max: 30,
+      windowMs: 60 * 60 * 1000,
+      prefix: "api",
+    }, user.id);
+    if (rateLimitResponse) return rateLimitResponse;
 
     const { email, nombre, password } = await request.json();
 
@@ -60,7 +68,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: messages.miembros.emailDuplicado }, { status: 409 });
     }
 
-    const isGmail = email.toLowerCase().endsWith("@gmail.com");
     const userPassword = password || randomBytes(12).toString("base64url").slice(0, 16);
 
     const { data: authUser, error: authError } = await serviceSupabase.auth.admin.createUser({
@@ -70,7 +77,7 @@ export async function POST(request: Request) {
       user_metadata: { nombre_completo: nombre, display_email: email },
     });
 
-    let userId = authUser?.user?.id;
+    const userId = authUser?.user?.id;
 
     if (authError) {
       return NextResponse.json({ error: messages.toast.miembroError }, { status: 400 });
@@ -120,7 +127,7 @@ export async function POST(request: Request) {
       loginEmail: email,
       welcomeEmailSent,
     });
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: messages.toast.errorGenerico }, { status: 500 });
   }
 }

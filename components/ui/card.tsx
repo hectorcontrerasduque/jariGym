@@ -1,9 +1,7 @@
 import { cn } from "@/lib/utils";
-import { HTMLAttributes, forwardRef } from "react";
+import { forwardRef, type HTMLAttributes } from "react";
 
-interface CardProps extends HTMLAttributes<HTMLDivElement> {}
-
-const Card = forwardRef<HTMLDivElement, CardProps>(
+const Card = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(
   ({ className, ...props }, ref) => (
     <div
       ref={ref}
@@ -17,7 +15,7 @@ const Card = forwardRef<HTMLDivElement, CardProps>(
 );
 Card.displayName = "Card";
 
-const CardHeader = forwardRef<HTMLDivElement, CardProps>(
+const CardHeader = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(
   ({ className, ...props }, ref) => (
     <div
       ref={ref}
@@ -28,14 +26,14 @@ const CardHeader = forwardRef<HTMLDivElement, CardProps>(
 );
 CardHeader.displayName = "CardHeader";
 
-const CardContent = forwardRef<HTMLDivElement, CardProps>(
+const CardContent = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(
   ({ className, ...props }, ref) => (
     <div ref={ref} className={cn("p-6", className)} {...props} />
   )
 );
 CardContent.displayName = "CardContent";
 
-const CardTitle = forwardRef<HTMLHeadingElement, CardProps>(
+const CardTitle = forwardRef<HTMLHeadingElement, HTMLAttributes<HTMLDivElement>>(
   ({ className, ...props }, ref) => (
     <h3
       ref={ref}

@@ -1,7 +1,54 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import { applyRateLimit } from "@/lib/middleware/rate-limit";
+import type { NextRequest } from "next/server";
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
+  const rateLimitResponse = await applyRateLimit(request, {
+    max: 5,
+    windowMs: 20 * 60 * 1000,
+    prefix: "auth",
+  });
+  if (rateLimitResponse) return rateLimitResponse;
+  
+  // SECURITY: Require authentication - either CRON_SECRET or super_admin JWT
+  const authHeader = request.headers.get("authorization");
+  const cronSecret = process.env.CRON_SECRET;
+
+  if (!cronSecret) {
+    console.error("[ensure-super-admin] CRON_SECRET not configured");
+    return NextResponse.json({ error: "Server misconfiguration" }, { status: 500 });
+  }
+
+  let isAuthorized = false;
+
+  // Option 1: CRON_SECRET (for automated jobs/scripts)
+  if (authHeader === `Bearer ${cronSecret}`) {
+    isAuthorized = true;
+  } else if (authHeader?.startsWith("Bearer ")) {
+    // Option 2: Validate JWT and check super_admin role
+    const token = authHeader.replace("Bearer ", "");
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    if (!authError && user) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .single();
+      if (profile?.role === "super_admin") {
+        isAuthorized = true;
+      }
+    }
+  }
+
+  if (!isAuthorized) {
+    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+  }
+
   try {
     const { email, nombre, inscripcion_pagada } = await request.json();
     if (!email || typeof email !== "string") {
@@ -45,12 +92,17 @@ export async function POST(request: Request) {
 
     if (authError) {
       if (authError.message?.includes("already") || authError.message?.includes("exists")) {
-        const { data: existingAuth } = await supabase.auth.admin.listUsers();
-        const authUser = existingAuth?.users?.find((u) => u.email === emailLower);
-        if (!authUser) {
+        // SECURITY: Avoid listUsers() - fetches ALL auth users (DoS vector)
+        // Instead, find by email in profiles table (unique index)
+        const { data: existingProfileByEmail } = await supabase
+          .from("profiles")
+          .select("id")
+          .eq("email", emailLower)
+          .maybeSingle();
+        if (!existingProfileByEmail) {
           return NextResponse.json({ created: false, error: authError.message });
         }
-        userId = authUser.id;
+        userId = existingProfileByEmail.id;
       } else {
         return NextResponse.json({ created: false, error: authError.message });
       }
@@ -84,7 +136,7 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({ created: true });
-  } catch (error) {
+  } catch {
     return NextResponse.json({ created: false });
   }
 }

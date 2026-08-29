@@ -3,8 +3,17 @@ import { NextResponse } from "next/server";
 import { messages } from "@/lib/messages";
 import { sendWelcomeEmail } from "@/lib/services/email/email.service";
 import { randomBytes } from "crypto";
+import { sanitizeOrFilter } from "@/lib/utils/sanitize";
+import { applyRateLimit } from "@/lib/middleware/rate-limit";
 
 export async function POST(request: Request) {
+  const rateLimitResponse = await applyRateLimit(request, {
+    max: 5,
+    windowMs: 20 * 60 * 1000,
+    prefix: "auth",
+  });
+  if (rateLimitResponse) return rateLimitResponse;
+  
   try {
     const { nombreCompleto, whatsapp, correo, password, selectedNombre } = await request.json();
 
@@ -58,14 +67,9 @@ export async function POST(request: Request) {
     let migracionRecords;
 
     if (words.length > 0) {
-      const conditions: string[] = [];
-      for (const w of words) {
-        conditions.push(`nombre.ilike.%${w}%`);
-        if (w.length > 3) {
-          conditions.push(`nombre.ilike.%${w.slice(0, -1)}%`);
-        }
-      }
-      const orFilter = conditions.join(",");
+      // SECURITY: Sanitize input for PostgREST .or() to prevent injection
+      const orFilter = sanitizeOrFilter(words);
+      
       const { data, error: migracionError } = await supabase
         .from("migracion")
         .select("*")
@@ -90,7 +94,7 @@ export async function POST(request: Request) {
 
       // Only keep records that exactly match the selected name (no cross-name contamination)
       const exactMatchName = searchName.trim().toUpperCase();
-      migracionRecords = data.filter((r: any) => r.nombre.toUpperCase() === exactMatchName);
+      migracionRecords = data.filter((r) => r.nombre.toUpperCase() === exactMatchName);
 
       if (migracionRecords.length === 0) {
         // Check if exact name exists but already migrated
@@ -111,7 +115,7 @@ export async function POST(request: Request) {
     }
 
     // Update whatsapp and correo in migracion records for matched name
-    const matchedIds = migracionRecords.map((r: any) => r.id);
+    const matchedIds = migracionRecords.map((r) => r.id);
     await supabase
       .from("migracion")
       .update({ whatsapp, correo: email })
@@ -119,7 +123,7 @@ export async function POST(request: Request) {
 
     // Only process records with estado "pagado" or "suspendido" (skip "debe")
     const migrablesRecords = migracionRecords.filter(
-      (r: any) => r.estado === "pagado" || r.estado === "suspendido"
+      (r) => r.estado === "pagado" || r.estado === "suspendido"
     );
 
     let userId: string;
@@ -132,11 +136,11 @@ export async function POST(request: Request) {
       .maybeSingle();
 
     // Calculate fecha_inscripcion from first pagado record
-    const sortedForInsc = [...migrablesRecords].sort((a: any, b: any) => {
+    const sortedForInsc = [...migrablesRecords].sort((a, b) => {
       if (a.anio_pagar !== b.anio_pagar) return a.anio_pagar - b.anio_pagar;
       return a.mes_pagar - b.mes_pagar;
     });
-    const firstPagadoInsc = sortedForInsc.find((r: any) => r.estado === "pagado");
+    const firstPagadoInsc = sortedForInsc.find((r) => r.estado === "pagado");
     const fechaInscripcionCalc = firstPagadoInsc
       ? `${firstPagadoInsc.anio_pagar}-${String(firstPagadoInsc.mes_pagar).padStart(2, "0")}-01`
       : `${new Date().getFullYear()}-01-01`;
@@ -231,7 +235,7 @@ export async function POST(request: Request) {
     let pagosActualizados = 0;
 
     // Sort records by year and month
-    const sortedRecords = [...migrablesRecords].sort((a: any, b: any) => {
+    const sortedRecords = [...migrablesRecords].sort((a, b) => {
       if (a.anio_pagar !== b.anio_pagar) return a.anio_pagar - b.anio_pagar;
       return a.mes_pagar - b.mes_pagar;
     });
@@ -241,7 +245,7 @@ export async function POST(request: Request) {
     // - "suspendido" records that come AFTER the first "pagado" → suspendido
     // - "suspendido" records BEFORE the first "pagado" → skip (consecutive suspended at start)
     let foundFirstPagado = false;
-    const recordsToProcess: any[] = [];
+    const recordsToProcess = [];
     for (const record of sortedRecords) {
       if (record.estado === "pagado") {
         foundFirstPagado = true;
@@ -371,7 +375,7 @@ export async function POST(request: Request) {
     await supabase
       .from("migracion")
       .update({ migrado: "si" })
-      .in("id", migrablesRecords.map((r: any) => r.id));
+      .in("id", migrablesRecords.map((r) => r.id));
 
     const hasMigratedPayments = pagosCreados > 0 || pagosActualizados > 0;
 

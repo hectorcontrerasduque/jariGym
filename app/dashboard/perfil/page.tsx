@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, Suspense } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,10 +17,9 @@ import {
   ArrowLeft,
   Save,
   Mail,
-  Phone,
   CreditCard,
-  Clock,
   CheckCircle,
+  Clock,
 } from "lucide-react";
 import type { Profile } from "@/lib/types";
 import Link from "next/link";
@@ -59,56 +58,58 @@ function PerfilContent() {
     currentPassword: "",
   });
 
-  const loadProfile = useCallback(async () => {
-    try {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        router.push("/login");
-        return;
-      }
-
-      const { data: currentProfile } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", user.id)
-        .single();
-      setCurrentUserRole(currentProfile?.role || "");
-
-      const isSuperAdmin = currentProfile?.role === "super_admin";
-      const profileUserId = isSuperAdmin && targetUserId ? targetUserId : user.id;
-
-      const { data } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", profileUserId)
-        .single();
-      if (data) {
-        setProfile(data);
-        setFormData({
-          nombre_completo: data.nombre_completo || "",
-          email: data.email || "",
-          whatsapp: data.whatsapp || "",
-          cedula: data.cedula || "",
-          horario_entreno: data.horario_entreno || "",
-          hora_llegada: data.hora_llegada || "--:--",
-          hora_salida: data.hora_salida || "--:--",
-          role: data.role,
-          notas_admin: data.notas_admin || "",
-          password: "",
-          currentPassword: "",
-        });
-      }
-    } catch (err) {
-      showToast(messages.toast.errorCargaDatos, "error");
-    } finally {
-      setLoading(false);
-    }
-  }, [targetUserId, router]);
-
   useEffect(() => {
+    let cancelled = false;
+    const loadProfile = async () => {
+      try {
+        const supabase = createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          router.push("/login");
+          return;
+        }
+
+        const { data: currentProfile } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", user.id)
+          .single();
+        if (!cancelled) setCurrentUserRole(currentProfile?.role || "");
+
+        const isSuperAdmin = currentProfile?.role === "super_admin";
+        const profileUserId = isSuperAdmin && targetUserId ? targetUserId : user.id;
+
+        const { data } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", profileUserId)
+          .single();
+        if (!cancelled && data) {
+          setProfile(data);
+          setFormData({
+            nombre_completo: data.nombre_completo || "",
+            email: data.email || "",
+            whatsapp: data.whatsapp || "",
+            cedula: data.cedula || "",
+            horario_entreno: data.horario_entreno || "",
+            hora_llegada: data.hora_llegada || "--:--",
+            hora_salida: data.hora_salida || "--:--",
+            role: data.role,
+            notas_admin: data.notas_admin || "",
+            password: "",
+            currentPassword: "",
+          });
+        }
+      } catch {
+        if (!cancelled) showToast(messages.toast.errorCargaDatos, "error");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
     loadProfile();
-  }, [loadProfile]);
+    return () => { cancelled = true; };
+   
+  }, [targetUserId, router]);
 
   const handleSave = async () => {
     if (!formData.email.trim()) {
@@ -166,7 +167,7 @@ function PerfilContent() {
 
   if (!profile) return null;
 
-  const isAdmin = profile.role === "super_admin" || profile.role === "admin";
+  const isAdmin = profile.role === "super_admin";
 
   return (
     <div className="max-w-2xl mx-auto space-y-6 animate-fadeIn relative">
@@ -195,7 +196,7 @@ function PerfilContent() {
               <h3 className="text-lg font-semibold text-gym-text">{profile.nombre_completo || "Sin nombre"}</h3>
               <p className="text-sm text-gym-muted">{profile.email}</p>
               <Badge variant={isAdmin ? "primary" : "secondary"}>
-                {profile.role === "super_admin" ? "Super Admin" : profile.role === "admin" ? "Admin" : "Miembro"}
+                {profile.role === "super_admin" ? "Super Admin" : "Miembro"}
               </Badge>
             </div>
           </div>

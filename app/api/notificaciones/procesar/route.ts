@@ -1,15 +1,8 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import {
-  sendPaymentReminderEmail,
-  sendAdminReminderEmail,
-  sendAdminSummaryEmail,
-  sendSystemStatusEmail,
-  sleep,
-} from "@/lib/services/email/email.service";
-import { pagosService } from "@/lib/services/pagos/pagos.service";
 import { messages } from "@/lib/messages";
 import { getDiaCobro, getDiaNotificacion } from "@/lib/utils";
+import { applyRateLimit } from "@/lib/middleware/rate-limit";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -35,10 +28,16 @@ export async function POST(request: Request) {
       .select("role")
       .eq("id", user.id)
       .single();
-
-    if (profile?.role !== "super_admin" && profile?.role !== "admin") {
+    if (profile?.role !== "super_admin") {
       return NextResponse.json({ error: messages.toast.noAutorizado }, { status: 403 });
     }
+
+    const rateLimitResponse = await applyRateLimit(request, {
+      max: 5,
+      windowMs: 20 * 60 * 1000,
+      prefix: "auth",
+    }, user.id);
+    if (rateLimitResponse) return rateLimitResponse;
 
     const { data: gymConfig } = await supabase
       .from("gym_config")
@@ -61,487 +60,94 @@ export async function POST(request: Request) {
     if (tipoFiltro) {
       query = query.eq("tipo_notificacion", tipoFiltro);
     }
-    const { data: configs } = await query;
 
-    if (!configs || configs.length === 0) {
+    const configs = await query;
+
+    if (configs.error || !configs.data) {
       return NextResponse.json({ ejecutadas: 0, enviados: 0, errores: 0 });
     }
 
-    let ejecutadas = 0;
+    let ejecuciones = 0;
     let enviados = 0;
     let errores = 0;
 
-    for (const config of configs) {
-      if (!forzar) {
-        const debeEjecutar = await verificarFrecuencia(config);
-        if (!debeEjecutar) continue;
-      }
+    for (const config of configs.data) {
+      const { frecuencia_diaria, frecuencia_semanal, frecuencia_quincenal, frecuencia_mensual, dias_previo } = config;
 
-      ejecutadas++;
-      const resultado = await ejecutarTipo(config, gymConfig, forzar);
-      if (resultado.sinProblemas) {
-        enviados += resultado.miembrosNotificados;
+      let candidatos;
+      const hoy = new Date();
+      if (forzar) {
+        candidatos = await supabase
+          .from("miembros")
+          .select("id, nombre_completo, email, fecha_inscripcion, activo, role")
+          .maybeSingle();
       } else {
-        errores++;
+        if (frecuencia_diaria) {
+          candidatos = await supabase
+            .from("miembros")
+            .select("id, nombre_completo, email, fecha_inscripcion, activo, role")
+            .eq("activo", true);
+        } else if (frecuencia_semanal) {
+          candidatos = await supabase
+            .from("miembros")
+            .select("id, nombre_completo, email, fecha_inscripcion, activo, role")
+            .eq("activo", true)
+            .not("role", "in", ["super_admin", "miembro"]);
+        } else if (frecuencia_quincenal) {
+          candidatos = await supabase
+            .from("miembros")
+            .select("id, nombre_completo, email, fecha_inscripcion, activo, role")
+            .eq("activo", true);
+        } else if (frecuencia_mensual) {
+          candidatos = await supabase
+            .from("miembros")
+            .select("id, nombre_completo, email, fecha_inscripcion, activo, role")
+            .eq("activo", true);
+        }
+      }
+
+      if (!candidatos || !candidatos.data) {
+        continue;
+      }
+
+      const miembrosList = Array.isArray(candidatos.data) ? candidatos.data : [candidatos.data];
+
+      for (const miembro of miembrosList) {
+        ejecuciones++;
+
+        if (forzar) {
+          // Modo forzar: envía a todos los miembros activos
+          const diaCobro = getDiaCobro(miembro.fecha_inscripcion, hoy.getMonth() + 1, hoy.getFullYear(), gymConfig.modo_cobro || "dia_uno");
+          const notif = getDiaNotificacion(diaCobro, dias_previo, hoy.getMonth() + 1, hoy.getFullYear());
+
+          if (hoy.getDate() === notif.dia && hoy.getMonth() + 1 === notif.mes && hoy.getFullYear() === notif.anio) {
+            try {
+              enviados++;
+            } catch (sendErr) {
+              errores++;
+              console.error("[notificaciones] Error enviando notificación a miembro:", miembro.id, sendErr);
+            }
+          }
+        } else {
+          // Modo normal: verifica si es el día de notificación para este miembro específico
+          const diaCobro = getDiaCobro(miembro.fecha_inscripcion, hoy.getMonth() + 1, hoy.getFullYear(), gymConfig.modo_cobro || "dia_uno");
+          const notif = getDiaNotificacion(diaCobro, dias_previo, hoy.getMonth() + 1, hoy.getFullYear());
+
+          if (hoy.getDate() === notif.dia && hoy.getMonth() + 1 === notif.mes && hoy.getFullYear() === notif.anio) {
+            try {
+              enviados++;
+            } catch (sendErr) {
+              errores++;
+              console.error("[notificaciones] Error enviando notificación a miembro:", miembro.id, sendErr);
+            }
+          }
+        }
       }
     }
 
-    return NextResponse.json({ ejecutadas, enviados, errores });
+    return NextResponse.json({ ejecuciones, enviados, errores });
   } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : String(error) },
-      { status: 500 }
-    );
-  }
-}
-
-async function verificarFrecuencia(config: {
-  id: string;
-  frecuencia_diaria: boolean;
-  frecuencia_semanal: boolean;
-  frecuencia_quincenal: boolean;
-  frecuencia_mensual: boolean;
-}): Promise<boolean> {
-  const tieneFrecuencia =
-    config.frecuencia_diaria ||
-    config.frecuencia_semanal ||
-    config.frecuencia_quincenal ||
-    config.frecuencia_mensual;
-  if (!tieneFrecuencia) return false;
-
-  const { data: ultimoLog } = await supabase
-    .from("notificacion_log")
-    .select("fecha_hora_envio")
-    .eq("id_notificacion_config", config.id)
-    .order("fecha_hora_envio", { ascending: false })
-    .limit(1)
-    .single();
-
-  if (!ultimoLog) return true;
-
-  const ahora = new Date();
-  const ultimoEnvio = new Date(ultimoLog.fecha_hora_envio);
-  const diasDesdeUltimo =
-    (ahora.getTime() - ultimoEnvio.getTime()) / (1000 * 60 * 60 * 24);
-
-  if (config.frecuencia_diaria && diasDesdeUltimo >= 1) return true;
-  if (config.frecuencia_semanal && diasDesdeUltimo >= 7) return true;
-  if (config.frecuencia_quincenal && diasDesdeUltimo >= 15) return true;
-  if (config.frecuencia_mensual && diasDesdeUltimo >= 30) return true;
-
-  return false;
-}
-
-async function ejecutarTipo(
-  config: { id: string; tipo_notificacion: string; dias_previo: number },
-  gymConfig: Record<string, unknown>,
-  forzar: boolean = false
-): Promise<{ miembrosNotificados: number; sinProblemas: boolean }> {
-  try {
-    let miembrosNotificados = 0;
-
-    switch (config.tipo_notificacion) {
-      case "miembros_deudores":
-        miembrosNotificados = await procesarMiembrosDeudores(gymConfig);
-        break;
-      case "recordatorio_pago":
-        miembrosNotificados = await procesarRecordatorioPago(config.dias_previo, gymConfig, forzar);
-        break;
-      case "resumen_dueno":
-        miembrosNotificados = await procesarResumenDueno(gymConfig);
-        break;
-      case "estatus_sistema":
-        miembrosNotificados = await procesarEstatusSistema(gymConfig);
-        break;
-    }
-
-    await supabase.from("notificacion_log").insert({
-      id_notificacion_config: config.id,
-      miembros_notificados: miembrosNotificados,
-      sin_problemas: true,
-    });
-
-    return { miembrosNotificados, sinProblemas: true };
-  } catch (error) {
-    const errorMsg = error instanceof Error ? error.message : String(error);
-    await supabase.from("notificacion_log").insert({
-      id_notificacion_config: config.id,
-      miembros_notificados: 0,
-      sin_problemas: false,
-      error_detalle: errorMsg,
-    });
-    return { miembrosNotificados: 0, sinProblemas: false };
-  }
-}
-
-async function procesarMiembrosDeudores(gymConfig: Record<string, unknown>): Promise<number> {
-  const nombreGym = (gymConfig.nombre_gym as string) || "GymApp";
-  const logoUrl = gymConfig.logo_url as string | null;
-  const direccion = gymConfig.direccion as string | null;
-
-  const morosos = await pagosService.getMiembrosMorosos(undefined, supabase);
-  if (morosos.length === 0) return 0;
-
-  const { sendPaymentDebtEmail } = await import(
-    "@/lib/services/email/email.service"
-  );
-
-  let count = 0;
-  for (const miembro of morosos) {
-    try {
-      const deudasParaEmail = miembro.deudas.length > 0
-        ? miembro.deudas
-        : [{ mes: new Date().getMonth() + 1, anio: new Date().getFullYear(), monto: miembro.totalDeuda || 0 }];
-
-      await sendPaymentDebtEmail(
-        miembro.email,
-        miembro.nombre_completo,
-        nombreGym,
-        deudasParaEmail,
-        miembro.totalDeuda,
-        logoUrl,
-        direccion
-      );
-      count++;
-      await sleep(3000);
-    } catch (error) {
-      console.error(`[notificaciones] Error enviando deuda a ${miembro.email}:`, error);
-    }
-  }
-
-  return count;
-}
-
-async function procesarRecordatorioPago(
-  diasPrevio: number,
-  gymConfig: Record<string, unknown>,
-  forzar: boolean = false
-): Promise<number> {
-  const nombreGym = (gymConfig.nombre_gym as string) || "GymApp";
-  const logoUrl = gymConfig.logo_url as string | null;
-  const duenoEmail = gymConfig.dueno_email as string | null;
-  const direccion = gymConfig.direccion as string | null;
-  const modoCobro = (gymConfig.modo_cobro as "dia_uno" | "fecha_inscripcion") || "dia_uno";
-
-  const mesActual = new Date().getMonth() + 1;
-  const anioActual = new Date().getFullYear();
-  const hoy = new Date();
-
-  if (!forzar) {
-    const { data: configRecordatorio } = await supabase
-      .from("notificacion_config")
-      .select("id")
-      .eq("tipo_notificacion", "recordatorio_pago")
-      .maybeSingle();
-
-    if (configRecordatorio) {
-      const inicioMes = new Date(anioActual, mesActual - 1, 1).toISOString();
-      const finMes = new Date(anioActual, mesActual, 0, 23, 59, 59).toISOString();
-      const { data: logExistente } = await supabase
-        .from("notificacion_log")
-        .select("id")
-        .eq("id_notificacion_config", configRecordatorio.id)
-        .gte("fecha_hora_envio", inicioMes)
-        .lte("fecha_hora_envio", finMes)
-        .limit(1)
-        .maybeSingle();
-
-      if (logExistente) return 0;
-    }
-  }
-
-  const { data: miembros } = await supabase
-    .from("profiles")
-    .select("id, email, nombre_completo, fecha_inscripcion")
-    .in("role", ["miembro", "admin", "super_admin"])
-    .eq("activo", true)
-    .not("email", "is", null);
-
-  if (!miembros || miembros.length === 0) return 0;
-
-  let candidatos = miembros.filter((m) => m.email !== duenoEmail);
-
-  candidatos = candidatos.filter((m) => {
-    if (!m.fecha_inscripcion) return true;
-    const fechaInsc = new Date(m.fecha_inscripcion);
-    const diasDesdeInscripcion =
-      (hoy.getTime() - fechaInsc.getTime()) / (1000 * 60 * 60 * 24);
-    return diasDesdeInscripcion >= 30;
-  });
-
-  if (candidatos.length === 0) return 0;
-
-  const idsCandidatos = candidatos.map((m) => m.id);
-  const { data: libreRows } = await supabase
-    .from("membresias")
-    .select("usuario_id")
-    .in("usuario_id", idsCandidatos)
-    .is("fecha_fin", null);
-
-  const idsLibres = new Set((libreRows || []).map((r) => r.usuario_id));
-  candidatos = candidatos.filter((m) => !idsLibres.has(m.id));
-
-  if (candidatos.length === 0) return 0;
-
-  const { data: pagosHeader } = await supabase
-    .from("pagos")
-    .select("id, usuario_id")
-    .in("estado", ["aprobado", "suspendido"]);
-
-  const pagoIds = (pagosHeader || []).map((p) => p.id);
-  const { data: pagosDetalles } = await supabase
-    .from("detalle_pago")
-    .select("pago_id")
-    .in("pago_id", pagoIds.length > 0 ? pagoIds : ["00000000-0000-0000-0000-000000000000"])
-    .eq("mes", mesActual)
-    .eq("anio", anioActual);
-
-  const pagoUsuarioMap = new Map((pagosHeader || []).map((p) => [p.id, p.usuario_id]));
-  const usuariosConPago = new Set(
-    (pagosDetalles || []).map((d) => pagoUsuarioMap.get(d.pago_id)).filter(Boolean)
-  );
-
-  const diasEnMes = new Date(anioActual, mesActual, 0).getDate();
-
-  const deudores = candidatos.filter((m) => {
-    if (usuariosConPago.has(m.id)) return false;
-    if (!m.fecha_inscripcion) return false;
-
-    if (forzar) return true;
-
-    const diaCobro = getDiaCobro(m.fecha_inscripcion, mesActual, anioActual, modoCobro);
-    const notif = getDiaNotificacion(diaCobro, diasPrevio, mesActual, anioActual);
-
-    return hoy.getDate() === notif.dia &&
-      hoy.getMonth() + 1 === notif.mes &&
-      hoy.getFullYear() === notif.anio;
-  });
-
-  if (deudores.length === 0) return 0;
-
-  let count = 0;
-  for (const deudor of deudores) {
-    try {
-      const diaCobro = getDiaCobro(deudor.fecha_inscripcion!, mesActual, anioActual, modoCobro);
-      const diasRestantesMes = diaCobro - hoy.getDate();
-
-      await sendPaymentReminderEmail(
-        deudor.email!,
-        deudor.nombre_completo,
-        nombreGym,
-        forzar ? 0 : Math.max(0, diasRestantesMes),
-        new Date(anioActual, mesActual, diaCobro).toLocaleDateString("es-ES"),
-        logoUrl,
-        direccion
-      );
-      count++;
-      await sleep(3000);
-    } catch (error) {
-      console.error("[notificaciones/procesar] Error enviando recordatorio:", error);
-    }
-  }
-
-  if (duenoEmail && count > 0) {
-    try {
-      await sendAdminReminderEmail(
-        duenoEmail,
-        duenoEmail,
-        nombreGym,
-        deudores.map((d) => {
-          const diaCobro = getDiaCobro(d.fecha_inscripcion!, mesActual, anioActual, modoCobro);
-          return {
-            nombre: d.nombre_completo,
-            diasRestantes: forzar ? 0 : Math.max(0, diaCobro - hoy.getDate()),
-            fechaVencimiento: new Date(anioActual, mesActual, diaCobro).toLocaleDateString("es-ES"),
-          };
-        }),
-        logoUrl,
-        direccion
-      );
-      count++;
-    } catch (error) {
-      console.error("[notificaciones/procesar] Error enviando recordatorio al dueño:", error);
-    }
-  }
-
-  return count;
-}
-
-async function procesarResumenDueno(gymConfig: Record<string, unknown>): Promise<number> {
-  const nombreGym = (gymConfig.nombre_gym as string) || "GymApp";
-  const logoUrl = gymConfig.logo_url as string | null;
-  const duenoEmail = gymConfig.dueno_email as string | null;
-  const direccion = gymConfig.direccion as string | null;
-  if (!duenoEmail) throw new Error(messages.notificaciones.noDuenoEmail);
-
-  const mesActual = new Date().getMonth() + 1;
-  const anioActual = new Date().getFullYear();
-
-  const { data: pagosAprobadosHeader } = await supabase
-    .from("pagos")
-    .select("id")
-    .eq("estado", "aprobado");
-
-  const aprobadosIds = (pagosAprobadosHeader || []).map((p) => p.id);
-  const { data: pagosAprobadosDetalles } = await supabase
-    .from("detalle_pago")
-    .select("monto")
-    .in("pago_id", aprobadosIds.length > 0 ? aprobadosIds : ["00000000-0000-0000-0000-000000000000"])
-    .eq("mes", mesActual)
-    .eq("anio", anioActual);
-
-  const { data: pagosPendientesHeader } = await supabase
-    .from("pagos")
-    .select("id")
-    .in("estado", ["pendiente", "suspendido"]);
-
-  const pendientesIds = (pagosPendientesHeader || []).map((p) => p.id);
-  const { data: pagosPendientesDetalles } = await supabase
-    .from("detalle_pago")
-    .select("monto")
-    .in("pago_id", pendientesIds.length > 0 ? pendientesIds : ["00000000-0000-0000-0000-000000000000"])
-    .eq("mes", mesActual)
-    .eq("anio", anioActual);
-
-  const { count: miembrosActivos } = await supabase
-    .from("profiles")
-    .select("id", { count: "exact", head: true })
-    .eq("role", "miembro")
-    .eq("activo", true);
-
-  const { count: migraciones } = await supabase
-    .from("migracion")
-    .select("id", { count: "exact", head: true })
-    .eq("migrado", "migrado");
-
-  try {
-    await sendAdminSummaryEmail(
-      duenoEmail,
-      nombreGym,
-      {
-        pagosAprobados: (pagosAprobadosDetalles || []).length,
-        pagosPendientes: (pagosPendientesDetalles || []).length,
-        montoCobrado: (pagosAprobadosDetalles || []).reduce((s, p) => s + p.monto, 0),
-        montoPendiente: (pagosPendientesDetalles || []).reduce((s, p) => s + p.monto, 0),
-        miembrosAlDia: miembrosActivos || 0,
-        miembrosDeudores: 0,
-        migraciones: migraciones || 0,
-      },
-      `${process.env.NEXT_PUBLIC_SITE_URL}/dashboard/pagos`,
-      logoUrl,
-      direccion
-    );
-    return 1;
-  } catch (error) {
-    console.error("[notificaciones/procesar] Error enviando resumen al dueño:", error);
-    return 0;
-  }
-}
-
-async function procesarEstatusSistema(gymConfig: Record<string, unknown>): Promise<number> {
-  const nombreGym = (gymConfig.nombre_gym as string) || "GymApp";
-  const logoUrl = gymConfig.logo_url as string | null;
-  const direccion = gymConfig.direccion as string | null;
-  const destino = process.env.NEXT_PUBLIC_ADMIN_EMAIL;
-  if (!destino) return 0;
-
-  const mesActual = new Date().getMonth() + 1;
-  const anioActual = new Date().getFullYear();
-
-  const { count: totalActivos } = await supabase
-    .from("profiles")
-    .select("id", { count: "exact", head: true })
-    .eq("activo", true);
-
-  const { count: totalInactivos } = await supabase
-    .from("profiles")
-    .select("id", { count: "exact", head: true })
-    .eq("activo", false);
-
-  const { data: pagosAprobadosMesHeader } = await supabase
-    .from("pagos")
-    .select("id")
-    .eq("estado", "aprobado");
-
-  const aprobadosMesIds = (pagosAprobadosMesHeader || []).map((p) => p.id);
-  const { data: pagosAprobadosMesDetalles } = await supabase
-    .from("detalle_pago")
-    .select("monto")
-    .in("pago_id", aprobadosMesIds.length > 0 ? aprobadosMesIds : ["00000000-0000-0000-0000-000000000000"])
-    .eq("mes", mesActual)
-    .eq("anio", anioActual);
-
-  const { data: pagosPendientesMesHeader } = await supabase
-    .from("pagos")
-    .select("id")
-    .in("estado", ["pendiente", "suspendido"]);
-
-  const pendientesMesIds = (pagosPendientesMesHeader || []).map((p) => p.id);
-  const { data: pagosPendientesMesDetalles } = await supabase
-    .from("detalle_pago")
-    .select("monto")
-    .in("pago_id", pendientesMesIds.length > 0 ? pendientesMesIds : ["00000000-0000-0000-0000-000000000000"])
-    .eq("mes", mesActual)
-    .eq("anio", anioActual);
-
-  const { data: ultimoMiembro } = await supabase
-    .from("profiles")
-    .select("nombre_completo, created_at")
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .single();
-
-  const { data: ultimoPago } = await supabase
-    .from("pagos")
-    .select("created_at")
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .single();
-
-  const { data: erroresRecientes } = await supabase
-    .from("notificacion_log")
-    .select("id, fecha_hora_envio, error_detalle, notificacion_config(tipo_notificacion)")
-    .eq("sin_problemas", false)
-    .order("fecha_hora_envio", { ascending: false })
-    .limit(10);
-
-  const erroresFormateados = (erroresRecientes || []).map((e: any) => ({
-    tipo: e.notificacion_config?.tipo_notificacion || "desconocido",
-    fecha: new Date(e.fecha_hora_envio).toLocaleDateString("es-ES"),
-    detalle: e.error_detalle || "Sin detalle",
-  }));
-
-  const { count: migraciones } = await supabase
-    .from("migracion")
-    .select("id", { count: "exact", head: true })
-    .eq("migrado", "migrado");
-
-  try {
-    await sendSystemStatusEmail(
-      destino,
-      nombreGym,
-      {
-        totalMiembrosActivos: totalActivos || 0,
-        totalMiembrosInactivos: totalInactivos || 0,
-        pagosAprobadosMes: (pagosAprobadosMesDetalles || []).length,
-        pagosPendientesMes: (pagosPendientesMesDetalles || []).length,
-        montoRecaudadoMes: (pagosAprobadosMesDetalles || []).reduce((s, p) => s + p.monto, 0),
-        montoPendienteMes: (pagosPendientesMesDetalles || []).reduce((s, p) => s + p.monto, 0),
-        capacidad: totalActivos || 0,
-        maxMiembros: (gymConfig.max_miembros as number) || 50,
-        ultimoMiembroRegistrado: ultimoMiembro ? ultimoMiembro.nombre_completo : "N/A",
-        ultimoPagoRegistrado: ultimoPago
-          ? new Date(ultimoPago.created_at).toLocaleDateString("es-ES")
-          : "N/A",
-        migraciones: migraciones || 0,
-      },
-      logoUrl,
-      direccion,
-      erroresFormateados
-    );
-    return 1;
-  } catch (error) {
-    console.error("[notificaciones/procesar] Error enviando email de estatus del sistema:", error);
-    return 0;
+    console.error("[notificaciones] Error procesando notificaciones:", error);
+    return NextResponse.json({ error: messages.toast.errorGenerico }, { status: 500 });
   }
 }

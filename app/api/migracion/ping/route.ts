@@ -1,6 +1,5 @@
-import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
-import { messages } from "@/lib/messages";
+import { createClient } from "@supabase/supabase-js";
 
 export async function GET(request: Request) {
   try {
@@ -41,7 +40,7 @@ export async function GET(request: Request) {
       alreadyMigrated: !!migrated,
       nombre: data?.nombre_completo || null,
     });
-  } catch (error) {
+  } catch {
     return NextResponse.json({ exists: false });
   }
 }

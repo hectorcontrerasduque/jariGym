@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
@@ -15,13 +15,11 @@ import { showToast } from "@/components/ui/toast";
 import { messages } from "@/lib/messages";
 import {
   Users,
-  CreditCard,
   CheckCircle,
   Clock,
   AlertTriangle,
   UserCheck,
   Gift,
-  BarChart3,
   FileText,
   Calendar,
   ChevronDown,
@@ -41,8 +39,25 @@ interface MonthlyStat {
 }
 
 export default function DashboardPage() {
-  const [stats, setStats] = useState<any>(null);
-  const [pagosRecientes, setPagosRecientes] = useState<any[]>([]);
+  const [stats, setStats] = useState<{
+    totalMiembros: number;
+    miembrosActivos: number;
+    inscritosPagados: number;
+    inscritosPendientes: number;
+    deudoresTotal: number;
+    deudoresInscripcion: number;
+    deudoresMensualidad: number;
+    alDiaMensualidad: number;
+    montoDeuda: number;
+    montoDeudaInscripcion: number;
+    montoDeudaMensualidad: number;
+    montoPagado: number;
+    membresiaLibre: number;
+    pagosConfirmados: number;
+    pagosPendientes: number;
+    ingresosMes: number;
+  } | null>(null);
+  const [pagosRecientes, setPagosRecientes] = useState<Pago[]>([]);
   const [anios, setAnios] = useState<number[]>([]);
   const [anioSeleccionado, setAnioSeleccionado] = useState(new Date().getFullYear());
   const [loading, setLoading] = useState(true);
@@ -64,42 +79,45 @@ export default function DashboardPage() {
     }
   }, [isSuperAdmin]);
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data: profile } = await supabase
-          .from("profiles")
-          .select("role")
-          .eq("id", user.id)
-          .single();
-        if (profile?.role === "super_admin") setIsSuperAdmin(true);
-      }
-
-      const [statsResult, pagosResult, aniosResult, monthlyResult, miembrosResult] = await Promise.allSettled([
-        pagosService.stats(anioSeleccionado),
-        pagosService.pagosRecientesAprobados(anioSeleccionado),
-        pagosService.aniosConPagos(),
-        pagosService.monthlyStats(anioSeleccionado),
-        miembrosService.listarMiembros(),
-      ]);
-      if (statsResult.status === "fulfilled") setStats(statsResult.value);
-      if (pagosResult.status === "fulfilled") setPagosRecientes(pagosResult.value.slice(0, 5));
-      if (aniosResult.status === "fulfilled") setAnios(aniosResult.value);
-      if (monthlyResult.status === "fulfilled") setMonthlyStats(monthlyResult.value);
-      if (miembrosResult.status === "fulfilled") setMiembros(miembrosResult.value);
-    } catch (error) {
-      showToast(messages.toast.errorCargaDatos, "error");
-    } finally {
-      setLoading(false);
-    }
-  }, [anioSeleccionado]);
-
   useEffect(() => {
+    let cancelled = false;
+    const loadData = async () => {
+      setLoading(true);
+      try {
+        const supabase = createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("role")
+            .eq("id", user.id)
+            .single();
+          if (!cancelled && profile?.role === "super_admin") setIsSuperAdmin(true);
+        }
+
+        const [statsResult, pagosResult, aniosResult, monthlyResult, miembrosResult] = await Promise.allSettled([
+          pagosService.stats(anioSeleccionado),
+          pagosService.pagosRecientesAprobados(anioSeleccionado),
+          pagosService.aniosConPagos(),
+          pagosService.monthlyStats(anioSeleccionado),
+          miembrosService.listarMiembros(),
+        ]);
+        if (!cancelled) {
+          if (statsResult.status === "fulfilled") setStats(statsResult.value);
+          if (pagosResult.status === "fulfilled") setPagosRecientes(pagosResult.value.slice(0, 5));
+          if (aniosResult.status === "fulfilled") setAnios(aniosResult.value);
+          if (monthlyResult.status === "fulfilled") setMonthlyStats(monthlyResult.value);
+          if (miembrosResult.status === "fulfilled") setMiembros(miembrosResult.value);
+        }
+      } catch {
+        if (!cancelled) showToast(messages.toast.errorCargaDatos, "error");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
     loadData();
-  }, [loadData]);
+    return () => { cancelled = true; };
+  }, [anioSeleccionado]);
 
   useEffect(() => {
     if (!isSuperAdmin) return;
@@ -140,6 +158,7 @@ export default function DashboardPage() {
       if (!isNaN(startH) && !isNaN(endH)) {
         for (let h = startH; h <= endH; h++) {
           const key = `${String(h).padStart(2, "0")}:00`;
+          // eslint-disable-next-line security/detect-object-injection
           hourCounts[key] = (hourCounts[key] || 0) + 1;
         }
       }
@@ -184,7 +203,8 @@ export default function DashboardPage() {
         .select("pago_id")
         .in("pago_id", pagoIds.length > 0 ? pagoIds : ["00000000-0000-0000-0000-000000000000"])
         .eq("mes", mesActual)
-        .eq("anio", anioActual);
+        .eq("anio", anioActual)
+        .eq("tipo_pago", "mensualidad");
 
       const pagoUsuarioMap = new Map((pagosHeader || []).map((p) => [p.id, p.usuario_id]));
       const idsAlDia = Array.from(new Set(
@@ -312,11 +332,11 @@ export default function DashboardPage() {
               </div>
             </div>
             <div className="mt-3 space-y-1 text-xs">
-              {stats?.deudoresInscripcion > 0 && (
-                <p className="text-gym-warning">{stats.deudoresInscripcion} inscripciones</p>
+              {(stats?.deudoresInscripcion ?? 0) > 0 && (
+                <p className="text-gym-warning">{stats!.deudoresInscripcion} inscripciones</p>
               )}
-              {stats?.deudoresMensualidad > 0 && (
-                <p className="text-gym-danger">{stats.deudoresMensualidad} mensualidades</p>
+              {(stats?.deudoresMensualidad ?? 0) > 0 && (
+                <p className="text-gym-danger">{stats!.deudoresMensualidad} mensualidades</p>
               )}
               <p className="text-gym-muted font-medium">{formatCurrency(stats?.montoDeuda || 0)} en deuda</p>
             </div>

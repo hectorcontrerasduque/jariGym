@@ -45,7 +45,6 @@ export class AuthService {
   async signOut() {
     const { error } = await this.supabase.auth.signOut();
     if (error) throw error;
-    window.location.href = "/login";
   }
 
   async resetPassword(email: string) {

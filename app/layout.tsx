@@ -1,5 +1,16 @@
 import type { Metadata } from "next";
+import { Inter, Space_Grotesk } from "next/font/google";
 import "./globals.css";
+
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-inter",
+});
+
+const spaceGrotesk = Space_Grotesk({
+  subsets: ["latin"],
+  variable: "--font-space-grotesk",
+});
 
 export const metadata: Metadata = {
   title: "GymApp - Gestión de Gym",
@@ -12,8 +23,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="es">
-      <body className="min-h-screen bg-gym-bg antialiased">{children}</body>
+    <html lang="es" className={`${inter.variable} ${spaceGrotesk.variable}`}>
+      <body className="min-h-screen bg-gym-bg text-gym-text font-sans antialiased">{children}</body>
     </html>
   );
 }

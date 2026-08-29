@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { User } from "lucide-react";
@@ -15,7 +14,6 @@ interface AvatarProps {
 export function Avatar({ src, alt = "", size = "md", className }: AvatarProps) {
   const supabase = createClient();
 
-  // getPublicUrl is synchronous, so compute imageUrl directly
   const imageUrl =
     src && src.startsWith("avatars/")
       ? supabase.storage.from("avatars").getPublicUrl(src).data.publicUrl
@@ -37,23 +35,20 @@ export function Avatar({ src, alt = "", size = "md", className }: AvatarProps) {
     <div
       className={cn(
         "relative inline-flex items-center justify-center rounded-full bg-gym-surface border-2 border-gym-primary overflow-hidden",
-        // eslint-disable-next-line security/detect-object-injection
         sizeClasses[size],
         className
       )}
     >
       {imageUrl ? (
-        <Image
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
           src={imageUrl}
           alt={alt}
-          width={size === "lg" ? 16 : size === "md" ? 10 : 8}
-          height={size === "lg" ? 16 : size === "md" ? 10 : 8}
           className="w-full h-full object-cover"
           loading="lazy"
         />
       ) : (
-        <User className={cn("text-gym-muted", // eslint-disable-next-line security/detect-object-injection
-        iconSizes[size])} />
+        <User className={cn("text-gym-muted", iconSizes[size])} />
       )}
     </div>
   );

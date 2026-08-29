@@ -12,10 +12,10 @@ import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { messages } from "@/lib/messages";
 import type { GymConfig, MetodoPago, MetodoPagoConfig } from "@/lib/types";
 
-const metodoLabels: Record<MetodoPago, { label: string; icon: string; alwaysOn?: boolean }> = {
+const metodoLabels: Record<MetodoPago, { label: string; icon: string; alwaysOn?: boolean; locked?: boolean }> = {
   efectivo: { label: "Efectivo", icon: "💵", alwaysOn: true },
-  bs: { label: "Bolívares", icon: "🇻🇪" },
-  binance: { label: "Binance USDT", icon: "🟡" },
+  bs: { label: "Bolívares", icon: "🇻🇪", locked: true },
+  binance: { label: "Binance USDT", icon: "🟡", locked: true },
 };
 
 function buildMetodosState(dbRecords: MetodoPagoConfig[]): MetodoPagoConfig[] {
@@ -106,7 +106,8 @@ export default function ConfiguracionPage() {
 
   const handleToggleMetodo = (metodoPago: MetodoPago) => {
     // eslint-disable-next-line security/detect-object-injection
-    if (metodoLabels[metodoPago]?.alwaysOn) return;
+    const info = metodoLabels[metodoPago];
+    if (info?.alwaysOn || info?.locked) return;
     setMetodos((prev) =>
       prev.map((m) =>
         m.metodo_pago === metodoPago ? { ...m, habilitado: !m.habilitado } : m
@@ -282,10 +283,16 @@ export default function ConfiguracionPage() {
           {metodos.map((metodo) => {
             const info = metodoLabels[metodo.metodo_pago];
             const isAlwaysOn = info?.alwaysOn;
+            const isLocked = info?.locked;
+            const isDisabled = isAlwaysOn || isLocked;
             return (
               <div
                 key={metodo.metodo_pago}
-                className={`p-4 rounded-xl border transition-all ${metodo.habilitado ? "bg-gym-bg border-gym-border/50" : "bg-gym-bg/30 border-gym-border/20 opacity-60"}`}
+                className={`p-4 rounded-xl border transition-all ${
+                  metodo.habilitado
+                    ? "bg-gym-bg border-gym-border/50"
+                    : "bg-gym-bg/30 border-gym-border/30"
+                } ${isLocked ? "opacity-50" : ""}`}
               >
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-3">
@@ -293,17 +300,18 @@ export default function ConfiguracionPage() {
                     <div>
                       <p className="font-medium text-gym-text">{info?.label}</p>
                       {isAlwaysOn && <p className="text-xs text-gym-muted">Siempre habilitado</p>}
+                      {isLocked && <p className="text-xs text-gym-muted">Próximamente</p>}
                     </div>
                   </div>
                   <button
                     type="button"
-                    disabled={isAlwaysOn}
+                    disabled={isDisabled}
                     onClick={() => handleToggleMetodo(metodo.metodo_pago)}
                     className={`w-11 h-6 rounded-full flex items-center px-1 transition-all ${
-                      metodo.habilitado ? "bg-gym-primary justify-end" : "bg-gym-surface justify-start"
-                    } ${isAlwaysOn ? "cursor-not-allowed opacity-70" : "cursor-pointer"}`}
+                      metodo.habilitado ? "bg-gym-primary justify-end" : "bg-gym-border justify-start"
+                    } ${isDisabled ? "cursor-not-allowed opacity-50" : "cursor-pointer hover:opacity-90"}`}
                   >
-                    <div className={`w-5 h-5 rounded-full transition-all ${metodo.habilitado ? "bg-white" : "bg-gym-border"}`} />
+                    <div className={`w-5 h-5 rounded-full transition-all ${metodo.habilitado ? "bg-white" : "bg-gym-muted"}`} />
                   </button>
                 </div>
                 {metodo.habilitado && (

@@ -285,7 +285,7 @@ async function procesarRecordatorioPago(
 
   const { data: miembros } = await supabase
     .from("profiles")
-    .select("id, email, nombre_completo, fecha_inscripcion")
+    .select("id, email, nombre_completo, fecha_inicio")
     .in("role", ["miembro", "super_admin"])
     .eq("activo", true)
     .not("email", "is", null);
@@ -295,8 +295,8 @@ async function procesarRecordatorioPago(
   let candidatos = miembros.filter((m) => m.email !== duenoEmail);
 
   candidatos = candidatos.filter((m) => {
-    if (!m.fecha_inscripcion) return true;
-    const fechaInsc = new Date(m.fecha_inscripcion);
+    if (!m.fecha_inicio) return true;
+    const fechaInsc = new Date(m.fecha_inicio);
     const diasDesdeInscripcion =
       (hoy.getTime() - fechaInsc.getTime()) / (1000 * 60 * 60 * 24);
     return diasDesdeInscripcion >= 30;
@@ -336,11 +336,11 @@ async function procesarRecordatorioPago(
 
   const deudores = candidatos.filter((m) => {
     if (usuariosConPago.has(m.id)) return false;
-    if (!m.fecha_inscripcion) return false;
+    if (!m.fecha_inicio) return false;
 
     if (forzar) return true;
 
-    const diaCobro = getDiaCobro(m.fecha_inscripcion, mesActual, anioActual, modoCobro);
+    const diaCobro = getDiaCobro(m.fecha_inicio, mesActual, anioActual, modoCobro);
     const notif = getDiaNotificacion(diaCobro, diasPrevio, mesActual, anioActual);
 
     return hoy.getDate() === notif.dia &&
@@ -353,7 +353,7 @@ async function procesarRecordatorioPago(
   let count = 0;
   for (const deudor of deudores) {
     try {
-      const diaCobro = getDiaCobro(deudor.fecha_inscripcion!, mesActual, anioActual, modoCobro);
+      const diaCobro = getDiaCobro(deudor.fecha_inicio!, mesActual, anioActual, modoCobro);
       const diasRestantesMes = diaCobro - hoy.getDate();
 
       const { sendPaymentReminderEmail } = await import(
@@ -385,7 +385,7 @@ async function procesarRecordatorioPago(
         duenoEmail,
         nombreGym,
         deudores.map((d) => {
-          const diaCobro = getDiaCobro(d.fecha_inscripcion!, mesActual, anioActual, modoCobro);
+          const diaCobro = getDiaCobro(d.fecha_inicio!, mesActual, anioActual, modoCobro);
           return {
             nombre: d.nombre_completo,
             diasRestantes: forzar ? 0 : Math.max(0, diaCobro - hoy.getDate()),

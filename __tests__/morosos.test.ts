@@ -11,7 +11,7 @@ interface Moroso {
 }
 
 function simulateGetMorosos(params: {
-  miembros: Array<{ id: string; email: string; nombre_completo: string; inscripcion_pagada: boolean; activo: boolean | null; role: string; fecha_inscripcion?: string }>;
+  miembros: Array<{ id: string; email: string; nombre_completo: string; inscripcion_pagada: boolean; activo: boolean | null; role: string; fecha_inicio?: string }>;
   pagos: Array<{ usuario_id: string; mes_pagar: number; anio_pagar: number; estado: string; notas?: string }>;
   libresIds: Set<string>;
   membresias?: Array<{ usuario_id: string; fecha_inicio?: string }>;
@@ -48,7 +48,7 @@ function simulateGetMorosos(params: {
 
     const debeInscripcion = !miembrosConInscripcionPagada.has(miembro.id);
 
-    const fechaInicioStr = fechaInicioMap.get(miembro.id) || miembro.fecha_inscripcion;
+    const fechaInicioStr = fechaInicioMap.get(miembro.id) || miembro.fecha_inicio;
     let primerMesDeuda = 1;
     if (fechaInicioStr) {
       const parts = fechaInicioStr.split("-").map(Number);
@@ -406,9 +406,9 @@ describe("Morosos detection logic", () => {
     expect(result[0].totalDeuda).toBe(60);
   });
 
-  it("member with fecha_inscripcion in profile (no membresia) owes from that month", () => {
+  it("member with fecha_inicio in profile (no membresia) owes from that month", () => {
     const result = simulateGetMorosos({
-      miembros: [{ ...baseMiembro, id: "m1", nombre_completo: "Test", fecha_inscripcion: "2026-06-01" }],
+      miembros: [{ ...baseMiembro, id: "m1", nombre_completo: "Test", fecha_inicio: "2026-06-01" }],
       pagos: [],
       libresIds: new Set(),
       ownerEmail,
@@ -423,9 +423,9 @@ describe("Morosos detection logic", () => {
     expect(result[0].totalDeuda).toBe(30);
   });
 
-  it("membresia fecha_inicio takes precedence over profile fecha_inscripcion", () => {
+  it("membresia fecha_inicio takes precedence over profile fecha_inicio", () => {
     const result = simulateGetMorosos({
-      miembros: [{ ...baseMiembro, id: "m1", nombre_completo: "Test", fecha_inscripcion: "2026-01-01" }],
+      miembros: [{ ...baseMiembro, id: "m1", nombre_completo: "Test", fecha_inicio: "2026-01-01" }],
       pagos: [],
       libresIds: new Set(),
       membresias: [{ usuario_id: "m1", fecha_inicio: "2026-05-01" }],
@@ -475,7 +475,7 @@ describe("Morosos detection logic", () => {
     expect(result).toHaveLength(0);
   });
 
-  it("member with no membresia and no fecha_inscripcion still owes from Jan (backwards compat)", () => {
+  it("member with no membresia and no fecha_inicio still owes from Jan (backwards compat)", () => {
     const result = simulateGetMorosos({
       miembros: [{ ...baseMiembro, id: "m1", nombre_completo: "Test" }],
       pagos: [],

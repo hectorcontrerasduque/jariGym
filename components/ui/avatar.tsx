@@ -34,7 +34,7 @@ export function Avatar({ src, alt = "", size = "md", className }: AvatarProps) {
   return (
     <div
       className={cn(
-        "relative inline-flex items-center justify-center rounded-full bg-gym-surface border-2 border-gym-primary overflow-hidden",
+        "relative inline-flex items-center justify-center rounded-full bg-gym-surface border border-gym-border overflow-hidden",
         // eslint-disable-next-line security/detect-object-injection
         sizeClasses[size],
         className

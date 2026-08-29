@@ -136,13 +136,13 @@ export async function POST(request: Request) {
       .eq("email", email)
       .maybeSingle();
 
-    // Calculate fecha_inscripcion from first pagado record
+    // Calculate fecha_inicio from first pagado record
     const sortedForInsc = [...migrablesRecords].sort((a, b) => {
       if (a.anio_pagar !== b.anio_pagar) return a.anio_pagar - b.anio_pagar;
       return a.mes_pagar - b.mes_pagar;
     });
     const firstPagadoInsc = sortedForInsc.find((r) => r.estado === "pagado");
-    const fechaInscripcionCalc = firstPagadoInsc
+    const fechaInicioCalc = firstPagadoInsc
       ? `${firstPagadoInsc.anio_pagar}-${String(firstPagadoInsc.mes_pagar).padStart(2, "0")}-01`
       : `${new Date().getFullYear()}-01-01`;
 
@@ -157,7 +157,7 @@ export async function POST(request: Request) {
           email,
           registered: true,
           activo: true,
-          fecha_inscripcion: fechaInscripcionCalc,
+          fecha_inicio: fechaInicioCalc,
         })
         .eq("id", userId);
     } else {
@@ -178,7 +178,7 @@ export async function POST(request: Request) {
           role: "miembro",
           activo: true,
           registered: true,
-          fecha_inscripcion: fechaInscripcionCalc,
+          fecha_inicio: fechaInicioCalc,
           inscripcion_pagada: false,
         });
         isNewUser = true;
@@ -214,7 +214,7 @@ export async function POST(request: Request) {
           role: "miembro" as const,
           activo: true,
           registered: true,
-          fecha_inscripcion: fechaInscripcionCalc,
+          fecha_inicio: fechaInicioCalc,
           inscripcion_pagada: false,
         };
 

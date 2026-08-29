@@ -590,7 +590,7 @@ export class PagosService {
     const [allProfiles, libres, configResult, ownerResult] = await Promise.all([
       supabase
         .from("profiles")
-        .select("id, inscripcion_pagada, fecha_inscripcion, activo, role, email")
+        .select("id, inscripcion_pagada, fecha_inicio, activo, role, email")
         .in("role", ["miembro", "super_admin"]),
       supabase
         .from("membresias")
@@ -714,7 +714,7 @@ export class PagosService {
     const [miembrosResult, configResult, libresResult, ownerResult] = await Promise.all([
       supabase
         .from("profiles")
-        .select("id, email, nombre_completo, inscripcion_pagada, activo, fecha_inscripcion")
+        .select("id, email, nombre_completo, inscripcion_pagada, activo, fecha_inicio")
         .in("role", ["miembro", "super_admin"])
         .not("email", "is", null),
       supabase
@@ -800,7 +800,7 @@ export class PagosService {
       const debeInscripcion = !miembrosConInscripcionPagada.has(miembro.id);
 
       const fechaInicioMembresia = fechaInicioMap.get(miembro.id);
-      const fechaInscripcion = miembro.fecha_inscripcion;
+      const fechaInscripcion = miembro.fecha_inicio;
       const fechaInicioStr = fechaInicioMembresia || fechaInscripcion;
       let primerMesDeuda = 1;
       if (fechaInicioStr) {
@@ -907,7 +907,7 @@ export class PagosService {
 
     const { data: allProfiles } = await supabase
       .from("profiles")
-      .select("id, fecha_inscripcion, role, email, activo")
+      .select("id, fecha_inicio, role, email, activo")
       .in("role", ["miembro", "super_admin"]);
 
     const profiles = (allProfiles || []).filter(
@@ -927,7 +927,7 @@ export class PagosService {
         const finMes = new Date(m.anio, m.mes, 0);
 
         const miembrosMes = profiles.filter((p) => {
-          const fechaInsc = p.fecha_inscripcion ? new Date(p.fecha_inscripcion) : null;
+          const fechaInsc = p.fecha_inicio ? new Date(p.fecha_inicio) : null;
           if (fechaInsc && fechaInsc > finMes) return false;
           return true;
         });

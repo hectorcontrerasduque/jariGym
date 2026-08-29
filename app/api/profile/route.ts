@@ -44,7 +44,7 @@ export async function PUT(request: Request) {
 
     const { data: currentData } = await serviceSupabase
       .from("profiles")
-      .select("nombre_completo, email, whatsapp, cedula, horario_entreno, hora_llegada, hora_salida, notas_admin")
+      .select("nombre_completo, email, whatsapp, cedula, horario_entreno, hora_llegada, hora_salida, inscripcion_nota_admin")
       .eq("id", targetUserId)
       .single();
 
@@ -59,7 +59,7 @@ export async function PUT(request: Request) {
     };
     if (isAdmin) {
       profileUpdates.role = updates.role;
-      profileUpdates.notas_admin = updates.notas_admin ?? currentData?.notas_admin;
+      profileUpdates.inscripcion_nota_admin = updates.inscripcion_nota_admin ?? currentData?.inscripcion_nota_admin;
     }
 
     const { data, error: profileError } = await serviceSupabase

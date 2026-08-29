@@ -170,7 +170,7 @@ export default function MiembrosPage() {
     setPagoInscripcion(null);
     setIsMembresiaLibre(false);
     setIsSuperAdmin(miembro.role === "super_admin");
-    setNotasAdmin(miembro.notas_admin || "");
+    setNotasAdmin(miembro.inscripcion_nota_admin || "");
     try {
       const supabase = createClient();
 
@@ -253,7 +253,7 @@ export default function MiembrosPage() {
           user_id: miembro.id,
           updates: {
             role: newRole,
-            notas_admin: newRole === "super_admin" ? notasAdmin || null : null,
+            inscripcion_nota_admin: newRole === "super_admin" ? notasAdmin || null : null,
           },
         }),
       });
@@ -276,7 +276,7 @@ export default function MiembrosPage() {
         body: JSON.stringify({
           user_id: miembro.id,
           updates: {
-            notas_admin: notasAdmin || null,
+            inscripcion_nota_admin: notasAdmin || null,
           },
         }),
       });
@@ -390,7 +390,7 @@ export default function MiembrosPage() {
                         {miembro.activo !== false ? "Activo" : "Inactivo"}
                       </Badge>
                     </td>
-                    <td className="px-4 py-3 text-xs text-gym-muted">{formatDate(miembro.fecha_inscripcion || miembro.created_at)}</td>
+                    <td className="px-4 py-3 text-xs text-gym-muted">{formatDate(miembro.fecha_inicio || miembro.created_at)}</td>
                     <td className="px-4 py-3 text-xs text-gym-muted">{miembro.whatsapp || "—"}</td>
                     <td className="px-4 py-3">
                       <div className="flex gap-1">
@@ -440,7 +440,7 @@ export default function MiembrosPage() {
               </div>
               <div className="flex items-center gap-4 text-xs text-gym-muted mb-3">
                 <span>{miembro.role === "super_admin" ? "Super Admin" : "Miembro"}</span>
-                <span>{formatDate(miembro.fecha_inscripcion || miembro.created_at)}</span>
+                <span>{formatDate(miembro.fecha_inicio || miembro.created_at)}</span>
               </div>
               <div className="flex gap-2">
                 <Link href={`/dashboard/perfil?user_id=${miembro.id}`} className="flex-1">
@@ -519,7 +519,7 @@ export default function MiembrosPage() {
               </div>
               <div>
                 <p className="text-gym-muted">Registro</p>
-                <p className="text-gym-text">{formatDate(selectedMiembro.fecha_inscripcion || selectedMiembro.created_at)}</p>
+                <p className="text-gym-text">{formatDate(selectedMiembro.fecha_inicio || selectedMiembro.created_at)}</p>
               </div>
             </div>
 

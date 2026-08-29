@@ -83,7 +83,7 @@ export async function GET(request: Request) {
                 role: "super_admin",
                 activo: true,
                 registered: true,
-                fecha_inscripcion: new Date().toISOString().split("T")[0],
+                fecha_inicio: new Date().toISOString().split("T")[0],
                 inscripcion_pagada: isGymOwner,
                 inscripcion_fecha: isGymOwner ? new Date().toISOString().split("T")[0] : null,
               });

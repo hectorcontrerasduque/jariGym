@@ -119,7 +119,7 @@ export async function POST(request: NextRequest) {
         role: "super_admin",
         activo: true,
         registered: true,
-        fecha_inscripcion: new Date().toISOString().split("T")[0],
+        fecha_inicio: new Date().toISOString().split("T")[0],
         inscripcion_pagada: isOwner,
         inscripcion_fecha: isOwner ? new Date().toISOString().split("T")[0] : null,
       });

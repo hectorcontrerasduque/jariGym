@@ -11,11 +11,11 @@ export interface Profile {
   role: "super_admin" | "miembro";
   /** null = active (legacy profiles), false = inactive, true = explicitly active. Always use `activo !== false` to check active status. */
   activo: boolean | null;
-  fecha_inscripcion: string;
+  fecha_inicio: string;
   monto_inscripcion_pagado: number;
   inscripcion_pagada: boolean;
   inscripcion_fecha: string | null;
-  notas_admin: string | null;
+  inscripcion_nota_admin: string | null;
   created_at: string;
   updated_at: string;
 }

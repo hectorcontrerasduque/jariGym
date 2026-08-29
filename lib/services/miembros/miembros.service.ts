@@ -8,8 +8,8 @@ export class MiembrosService {
   async listarMiembros(): Promise<Profile[]> {
     const { data, error } = await this.supabase
       .from("profiles")
-      .select("id, nombre_completo, email, avatar_url, activo, role, fecha_inscripcion, notas_admin, inscripcion_pagada, hora_llegada, hora_salida")
-      .order("fecha_inscripcion", { ascending: false });
+      .select("id, nombre_completo, email, avatar_url, activo, role, fecha_inicio, inscripcion_nota_admin, inscripcion_pagada, hora_llegada, hora_salida")
+      .order("fecha_inicio", { ascending: false });
 
     if (error) throw error;
     return (data || []) as Profile[];
@@ -45,7 +45,7 @@ export class MiembrosService {
     if (!user) throw new Error(messages.toast.noAutenticado);
 
     const allowedFields: Record<string, unknown> = {};
-    const allowedKeys = ["nombre_completo", "email", "whatsapp", "cedula", "horario_entreno", "activo", "notas_admin", "inscripcion_pagada", "inscripcion_fecha", "monto_inscripcion_pagado", "membresia_libre"];
+    const allowedKeys = ["nombre_completo", "email", "whatsapp", "cedula", "horario_entreno", "activo", "inscripcion_nota_admin", "inscripcion_pagada", "inscripcion_fecha", "monto_inscripcion_pagado", "membresia_libre"];
     for (const key of allowedKeys) {
       if (key in updates) {
         // eslint-disable-next-line security/detect-object-injection

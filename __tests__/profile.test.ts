@@ -12,11 +12,11 @@ function createMockProfile(overrides: Partial<Profile> = {}): Profile {
     horario_entreno: null,
     role: "miembro",
     activo: true,
-    fecha_inscripcion: new Date().toISOString(),
+    fecha_inicio: new Date().toISOString(),
     monto_inscripcion_pagado: 0,
     inscripcion_pagada: false,
     inscripcion_fecha: null,
-    notas_admin: null,
+    inscripcion_nota_admin: null,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
     ...overrides,
@@ -52,14 +52,14 @@ describe("Profile type", () => {
       cedula: null,
       horario_entreno: null,
       avatar_url: null,
-      notas_admin: null,
-      inscripcion_fecha: null,
+    inscripcion_nota_admin: null,
+    inscripcion_fecha: null,
     });
 
     expect(profile.cedula).toBeNull();
     expect(profile.horario_entreno).toBeNull();
     expect(profile.avatar_url).toBeNull();
-    expect(profile.notas_admin).toBeNull();
+    expect(profile.inscripcion_nota_admin).toBeNull();
     expect(profile.inscripcion_fecha).toBeNull();
   });
 

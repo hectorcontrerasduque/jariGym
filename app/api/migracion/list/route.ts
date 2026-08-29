@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import { messages } from "@/lib/messages";
 import { applyRateLimit } from "@/lib/middleware/rate-limit";
 
 export async function GET(request: Request) {
@@ -22,7 +23,7 @@ export async function GET(request: Request) {
       .order("nombre", { ascending: true });
 
     if (error) {
-      return NextResponse.json({ error: "Error al cargar registros" }, { status: 500 });
+      return NextResponse.json({ error: messages.migracion.error }, { status: 500 });
     }
 
     // Deduplicate: one entry per unique nombre, with all associated emails
@@ -45,6 +46,6 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ records: Array.from(nameMap.values()) });
   } catch {
-    return NextResponse.json({ error: "Error del servidor" }, { status: 500 });
+    return NextResponse.json({ error: messages.migracion.errorServidor }, { status: 500 });
   }
 }

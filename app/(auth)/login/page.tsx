@@ -14,6 +14,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Dumbbell, CheckCircle, Mail } from "lucide-react";
 import { configService } from "@/lib/services/config/config.service";
 import { messages } from "@/lib/messages";
+import { showToast } from "@/components/ui/toast";
 import { AuthFooter } from "@/components/auth-footer";
 
 export default function LoginPage() {
@@ -109,10 +110,10 @@ function LoginForm() {
   // Load all migration records when modal opens
   useEffect(() => {
     if (!showMigrateForm) return;
-    migracionService.listAll().then(setAllRecords).catch(() => {});
+    migracionService.listAll()
+      .then((records) => setAllRecords(records))
+      .catch(() => showToast(messages.migracion.error, "error"));
   }, [showMigrateForm]);
-
-  // Debounced search for migration name (client-side: name OR email)
   useEffect(() => {
     if (migNombre.length < 2 || selectedNombre) {
       setSearchResults([]); // eslint-disable-line react-hooks/set-state-in-effect
@@ -303,16 +304,16 @@ function LoginForm() {
 
     // Validations
     if (!migNombre.trim() || migNombre.trim().split(" ").length < 2) {
-      setMigrateError("Nombre y apellido son requeridos");
+      setMigrateError(messages.migracion.nombreRequerido);
       return;
     }
     if (!selectedNombre) {
-      setMigrateError("Seleccione su nombre de la lista de resultados");
+      setMigrateError(messages.migracion.seleccioneNombre);
       return;
     }
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(migCorreo)) {
-      setMigrateError("Correo con formato inválido");
+      setMigrateError(messages.migracion.correoFormatoInvalido);
       return;
     }
     const isGmail = migCorreo.toLowerCase().endsWith("@gmail.com");
@@ -597,7 +598,7 @@ function LoginForm() {
                       suffix={selectedNombre ? <span className="text-gym-success">✓</span> : undefined}
                       required
                     />
-                    {showDropdown && searchResults.length > 0 && (
+{showDropdown && searchResults.length > 0 && (
                       <div className="absolute z-50 w-full mt-1 bg-gym-surface border border-gym-border rounded-xl shadow-lg max-h-48 overflow-y-auto">
                         {searchResults.map((name) => {
                           const record = allRecords.find((r) => r.nombre === name);
@@ -638,7 +639,7 @@ function LoginForm() {
                   {selectedNombre && (
                     <p className="text-xs text-gym-success flex items-center gap-1">
                       <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
-                      Registro seleccionado: {selectedNombre}
+                      {messages.migracion.registroSeleccionado} {selectedNombre}
                     </p>
                   )}
                   <div>

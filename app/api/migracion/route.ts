@@ -33,6 +33,7 @@ export async function POST(request: Request) {
     const nombre = nombreCompleto.trim().toUpperCase();
     const email = correo.toLowerCase().trim();
     const profileNombre = selectedNombre ? selectedNombre.trim().toUpperCase() : nombre;
+    const whatsappFormatted = whatsapp && !whatsapp.startsWith("+") ? `+58${whatsapp}` : whatsapp;
 
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -118,7 +119,7 @@ export async function POST(request: Request) {
     const matchedIds = migracionRecords.map((r) => r.id);
     await supabase
       .from("migracion")
-      .update({ whatsapp, correo: email })
+      .update({ whatsapp: whatsappFormatted, correo: email })
       .in("id", matchedIds);
 
     // Only process records with estado "pagado" or "suspendido" (skip "debe")
@@ -152,7 +153,7 @@ export async function POST(request: Request) {
         .from("profiles")
         .update({
           nombre_completo: profileNombre,
-          whatsapp,
+          whatsapp: whatsappFormatted,
           email,
           registered: true,
           activo: true,
@@ -173,7 +174,7 @@ export async function POST(request: Request) {
           id: userId,
           email,
           nombre_completo: profileNombre,
-          whatsapp,
+          whatsapp: whatsappFormatted,
           role: "miembro",
           activo: true,
           registered: true,
@@ -209,7 +210,7 @@ export async function POST(request: Request) {
         const profileFields = {
           email,
           nombre_completo: profileNombre,
-          whatsapp,
+          whatsapp: whatsappFormatted,
           role: "miembro" as const,
           activo: true,
           registered: true,

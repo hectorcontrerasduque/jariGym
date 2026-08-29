@@ -30,7 +30,6 @@ function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
   const [resetSent, setResetSent] = useState(false);
   const [showResetForm, setShowResetForm] = useState(false);
   const [resetEmail, setResetEmail] = useState("");
@@ -57,7 +56,14 @@ function LoginForm() {
 
   // Initialize state from searchParams using useMemo to avoid useEffect
   const initialError = useMemo(() => {
-    const err = searchParams.get("error");
+    let err = searchParams.get("error");
+    if (!err && typeof window !== "undefined" && window.location.hash) {
+      const hash = new URLSearchParams(window.location.hash.substring(1));
+      err = hash.get("error_description") || hash.get("error");
+      if (err) {
+        window.history.replaceState(null, "", window.location.pathname);
+      }
+    }
     return err ? decodeURIComponent(err) : "";
   }, [searchParams]);
 
@@ -65,16 +71,6 @@ function LoginForm() {
 
   // Handle URL params and hash errors - run once on mount
   useEffect(() => {
-    // Handle hash fragment errors from Supabase auth (e.g. expired magic links)
-    if (typeof window !== "undefined" && window.location.hash) {
-      const hash = new URLSearchParams(window.location.hash.substring(1));
-      const hashError = hash.get("error_description") || hash.get("error");
-      if (hashError) {
-        setError(decodeURIComponent(hashError));
-        window.history.replaceState(null, "", window.location.pathname);
-      }
-    }
-
     // Handle confirmation token as query param — redirect to confirm-email route
     const tokenParam = searchParams.get("token");
     if (tokenParam) {
@@ -111,12 +107,12 @@ function LoginForm() {
 
   // Debounced search for migration name
   useEffect(() => {
-    if (migNombre.length < 2 || selectedNombre) {
-      setSearchResults([]);
-      setShowDropdown(false);
-      return;
-    }
     const timeout = setTimeout(async () => {
+      if (migNombre.length < 2 || selectedNombre) {
+        setSearchResults([]);
+        setShowDropdown(false);
+        return;
+      }
       try {
         const results = await migracionService.searchByName(migNombre);
         setSearchResults(results);
@@ -131,17 +127,17 @@ function LoginForm() {
 
   // Debounced email validation
   useEffect(() => {
-    if (!migCorreo || migCorreo.length < 5) {
-      setMigEmailStatus("idle");
-      return;
-    }
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(migCorreo)) {
-      setMigEmailStatus("invalid");
-      return;
-    }
-    setMigEmailStatus("checking");
     const timeout = setTimeout(async () => {
+      if (!migCorreo || migCorreo.length < 5) {
+        setMigEmailStatus("idle");
+        return;
+      }
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(migCorreo)) {
+        setMigEmailStatus("invalid");
+        return;
+      }
+      setMigEmailStatus("checking");
       try {
         const result = await migracionService.pingEmail(migCorreo);
         if (result.alreadyMigrated) {

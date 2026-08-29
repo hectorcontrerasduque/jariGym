@@ -14,12 +14,10 @@ import { showToast } from "@/components/ui/toast";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { messages } from "@/lib/messages";
 import {
-  ArrowLeft,
   Save,
   Mail,
-  CreditCard,
-  CheckCircle,
   Clock,
+  CheckCircle,
 } from "lucide-react";
 import type { Profile } from "@/lib/types";
 import Link from "next/link";
@@ -53,7 +51,7 @@ function PerfilContent() {
     hora_llegada: "--:--",
     hora_salida: "--:--",
     role: "" as Profile["role"],
-    notas_admin: "",
+    inscripcion_nota_admin: "",
     password: "",
     currentPassword: "",
   });
@@ -69,36 +67,56 @@ function PerfilContent() {
           return;
         }
 
-        const { data: currentProfile } = await supabase
-          .from("profiles")
-          .select("role")
-          .eq("id", user.id)
-          .single();
-        if (!cancelled) setCurrentUserRole(currentProfile?.role || "");
-
-        const isSuperAdmin = currentProfile?.role === "super_admin";
-        const profileUserId = isSuperAdmin && targetUserId ? targetUserId : user.id;
-
+        const profileUserId = user.id;
         const { data } = await supabase
           .from("profiles")
           .select("*")
           .eq("id", profileUserId)
           .single();
+
         if (!cancelled && data) {
-          setProfile(data);
-          setFormData({
-            nombre_completo: data.nombre_completo || "",
-            email: data.email || "",
-            whatsapp: data.whatsapp || "",
-            cedula: data.cedula || "",
-            horario_entreno: data.horario_entreno || "",
-            hora_llegada: data.hora_llegada || "--:--",
-            hora_salida: data.hora_salida || "--:--",
-            role: data.role,
-            notas_admin: data.notas_admin || "",
-            password: "",
-            currentPassword: "",
-          });
+          setCurrentUserRole(data.role || "");
+          const isSuperAdmin = data.role === "super_admin";
+          const targetId = isSuperAdmin && targetUserId ? targetUserId : profileUserId;
+
+          if (targetId !== profileUserId) {
+            const { data: targetData } = await supabase
+              .from("profiles")
+              .select("*")
+              .eq("id", targetId)
+              .single();
+            if (!cancelled && targetData) {
+              setProfile(targetData);
+              setFormData({
+                nombre_completo: targetData.nombre_completo || "",
+                email: targetData.email || "",
+                whatsapp: targetData.whatsapp || "",
+                cedula: targetData.cedula || "",
+                horario_entreno: targetData.horario_entreno || "",
+                hora_llegada: targetData.hora_llegada || "--:--",
+                hora_salida: targetData.hora_salida || "--:--",
+                role: targetData.role,
+                inscripcion_nota_admin: targetData.inscripcion_nota_admin || "",
+                password: "",
+                currentPassword: "",
+              });
+            }
+          } else {
+            setProfile(data);
+            setFormData({
+              nombre_completo: data.nombre_completo || "",
+              email: data.email || "",
+              whatsapp: data.whatsapp || "",
+              cedula: data.cedula || "",
+              horario_entreno: data.horario_entreno || "",
+              hora_llegada: data.hora_llegada || "--:--",
+              hora_salida: data.hora_salida || "--:--",
+              role: data.role,
+              inscripcion_nota_admin: data.inscripcion_nota_admin || "",
+              password: "",
+              currentPassword: "",
+            });
+          }
         }
       } catch {
         if (!cancelled) showToast(messages.toast.errorCargaDatos, "error");
@@ -121,6 +139,17 @@ function PerfilContent() {
       showToast("Formato de correo inválido", "error");
       return;
     }
+
+    let cedulaToSend = formData.cedula || null;
+    if (cedulaToSend && !cedulaToSend.startsWith("V-") && !cedulaToSend.startsWith("E-")) {
+      cedulaToSend = `V-${cedulaToSend}`;
+    }
+
+    let whatsappToSend = formData.whatsapp || "";
+    if (whatsappToSend && !whatsappToSend.startsWith("+")) {
+      whatsappToSend = `+58${whatsappToSend}`;
+    }
+
     setSaving(true);
     try {
       const res = await fetch("/api/profile", {
@@ -131,13 +160,13 @@ function PerfilContent() {
           updates: {
             nombre_completo: formData.nombre_completo || profile!.nombre_completo || "Sin nombre",
             email: formData.email,
-            whatsapp: formData.whatsapp,
-            cedula: formData.cedula || null,
+            whatsapp: whatsappToSend,
+            cedula: cedulaToSend,
             horario_entreno: formData.horario_entreno || null,
             hora_llegada: formData.hora_llegada || null,
             hora_salida: formData.hora_salida || null,
             role: currentUserRole === "super_admin" ? formData.role : undefined,
-            notas_admin: currentUserRole === "super_admin" ? formData.notas_admin || null : undefined,
+            inscripcion_nota_admin: currentUserRole === "super_admin" ? formData.inscripcion_nota_admin || null : undefined,
           },
           password: formData.password || undefined,
           currentPassword: formData.currentPassword || undefined,
@@ -173,31 +202,37 @@ function PerfilContent() {
     <div className="max-w-2xl mx-auto space-y-6 animate-fadeIn relative">
       <LoadingOverlay show={saving} message={messages.common.guardando} />
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 relative z-10">
-        <div className="flex items-center gap-3">
-          <Link href={targetUserId ? "/dashboard/miembros" : "/dashboard/mis-pagos"} className="p-2 hover:bg-gym-bg/50 rounded-xl transition-colors">
-            <ArrowLeft className="w-5 h-5 text-gym-muted" />
-          </Link>
-          <div>
-            <h1 className="text-2xl font-display font-bold text-gym-text neon-text">Mi Perfil</h1>
-            <p className="text-gym-muted text-sm">Edita tu información personal</p>
-          </div>
+        <div>
+          <h1 className="text-2xl font-display font-bold text-gym-text neon-text">Mi Perfil</h1>
+          <p className="text-gym-muted text-sm">Edita tu información personal</p>
         </div>
         <Button onClick={handleSave} loading={saving} className="hidden sm:flex">
           <Save className="w-4 h-4 mr-2" /> Guardar
         </Button>
       </div>
 
-      {/* Avatar + role */}
+      {/* Avatar + role + inscription status */}
       <Card className="neon-card">
         <CardContent className="p-6">
           <div className="flex items-center gap-4">
             <Avatar src={profile.avatar_url} alt={profile.nombre_completo} size="lg" />
-            <div>
+            <div className="flex-1">
               <h3 className="text-lg font-semibold text-gym-text">{profile.nombre_completo || "Sin nombre"}</h3>
               <p className="text-sm text-gym-muted">{profile.email}</p>
-              <Badge variant={isAdmin ? "primary" : "secondary"}>
-                {profile.role === "super_admin" ? "Super Admin" : "Miembro"}
-              </Badge>
+              <div className="flex items-center gap-2 mt-1 flex-wrap">
+                <Badge variant={isAdmin ? "primary" : "secondary"}>
+                  {profile.role === "super_admin" ? "Super Admin" : "Miembro"}
+                </Badge>
+                {profile.inscripcion_pagada ? (
+                  <Badge variant="success" className="flex items-center gap-1">
+                    <CheckCircle className="w-3 h-3" /> Inscripción pagada
+                  </Badge>
+                ) : (
+                  <Badge variant="warning" className="flex items-center gap-1">
+                    <Clock className="w-3 h-3" /> Inscripción pendiente
+                  </Badge>
+                )}
+              </div>
             </div>
           </div>
         </CardContent>
@@ -230,6 +265,26 @@ function PerfilContent() {
               required
             />
           </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-xs text-gym-muted mb-1 block">Hora llegada (opcional solo referencial, hora militar)</label>
+              <input
+                type="time"
+                value={formData.hora_llegada === "--:--" ? "" : formData.hora_llegada}
+                onChange={(e) => setFormData({ ...formData, hora_llegada: e.target.value || "--:--" })}
+                className="w-full px-3 py-2 rounded-xl border border-gym-border bg-gym-surface text-gym-text text-sm focus:outline-none focus:ring-2 focus:ring-gym-primary/50"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-gym-muted mb-1 block">Hora salida (opcional solo referencial, hora militar)</label>
+              <input
+                type="time"
+                value={formData.hora_salida === "--:--" ? "" : formData.hora_salida}
+                onChange={(e) => setFormData({ ...formData, hora_salida: e.target.value || "--:--" })}
+                className="w-full px-3 py-2 rounded-xl border border-gym-border bg-gym-surface text-gym-text text-sm focus:outline-none focus:ring-2 focus:ring-gym-primary/50"
+              />
+            </div>
+          </div>
           {!targetUserId && (
             <PasswordInput
               label="Contraseña actual (requerida para cambiar contraseña)"
@@ -245,7 +300,7 @@ function PerfilContent() {
             onChange={(e) => setFormData({ ...formData, password: e.target.value })}
           />
           <div>
-            <label className="text-xs text-gym-muted mb-1 block">WhatsApp</label>
+            <label className="text-xs text-gym-muted mb-1 block">WhatsApp (opcional)</label>
             <Input
               value={formData.whatsapp}
               onChange={(e) => setFormData({ ...formData, whatsapp: e.target.value })}
@@ -260,69 +315,46 @@ function PerfilContent() {
               placeholder="V-12345678"
             />
           </div>
-          {profile?.fecha_inscripcion && (
+          {isAdmin && (
             <div>
-              <label className="text-xs text-gym-muted mb-1 block">Fecha de inscripción</label>
-              <Input
-                value={formatDate(profile.fecha_inscripcion)}
-                readOnly
-                className="bg-gym-bg/50 cursor-not-allowed"
+              <label className="text-xs text-gym-muted mb-1 block">Nota de inscripción (admin)</label>
+              <textarea
+                value={formData.inscripcion_nota_admin}
+                onChange={(e) => setFormData({ ...formData, inscripcion_nota_admin: e.target.value })}
+                placeholder="Notas internas sobre inscripción..."
+                rows={2}
+                className="w-full px-3 py-2 bg-gym-surface border border-gym-border rounded-xl text-sm text-gym-text focus:outline-none focus:ring-2 focus:ring-gym-primary/50 resize-none"
               />
             </div>
           )}
-          <div className="grid grid-cols-2 gap-4">
+        </CardContent>
+      </Card>
+
+      {/* Audit info */}
+      <Card className="neon-card">
+        <CardHeader>
+          <CardTitle className="text-sm text-gym-muted">Información de auditoría</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 gap-4 text-sm">
             <div>
-              <label className="text-xs text-gym-muted mb-1 block">Hora llegada</label>
-              <input
-                type="time"
-                value={formData.hora_llegada === "--:--" ? "" : formData.hora_llegada}
-                onChange={(e) => setFormData({ ...formData, hora_llegada: e.target.value || "--:--" })}
-                className="w-full px-3 py-2 rounded-xl border border-gym-border bg-gym-surface text-gym-text text-sm focus:outline-none focus:ring-2 focus:ring-gym-primary/50"
-              />
+              <p className="text-gym-muted">Creado</p>
+              <p className="text-gym-text">{profile.created_at ? formatDateTime(profile.created_at) : "—"}</p>
             </div>
             <div>
-              <label className="text-xs text-gym-muted mb-1 block">Hora salida</label>
-              <input
-                type="time"
-                value={formData.hora_salida === "--:--" ? "" : formData.hora_salida}
-                onChange={(e) => setFormData({ ...formData, hora_salida: e.target.value || "--:--" })}
-                className="w-full px-3 py-2 rounded-xl border border-gym-border bg-gym-surface text-gym-text text-sm focus:outline-none focus:ring-2 focus:ring-gym-primary/50"
-              />
+              <p className="text-gym-muted">Actualizado</p>
+              <p className="text-gym-text">{profile.updated_at ? formatDateTime(profile.updated_at) : "—"}</p>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Inscription */}
-      <Card className="neon-card">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <CreditCard className="w-5 h-5 text-gym-primary" />
-            Inscripción
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center gap-3">
-            {profile.inscripcion_pagada ? (
-              <>
-                <CheckCircle className="w-5 h-5 text-gym-success flex-shrink-0" />
-                <div>
-                  <p className="text-sm text-gym-success font-medium">Pagada</p>
-                  <p className="text-xs text-gym-muted">
-                    {profile.inscripcion_fecha ? formatDate(profile.inscripcion_fecha) : ""}
-                    {profile.monto_inscripcion_pagado > 0 && ` — ${formatCurrency(profile.monto_inscripcion_pagado)}`}
-                  </p>
-                </div>
-              </>
-            ) : (
-              <>
-                <Clock className="w-5 h-5 text-gym-warning flex-shrink-0" />
-                <p className="text-sm text-gym-warning font-medium">Pendiente</p>
-              </>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+      {/* PC save button at bottom */}
+      <div className="hidden sm:flex justify-end">
+        <Button onClick={handleSave} loading={saving}>
+          <Save className="w-4 h-4 mr-2" /> Guardar
+        </Button>
+      </div>
 
       {/* Mobile floating save button */}
       <button
@@ -338,4 +370,19 @@ function PerfilContent() {
       </button>
     </div>
   );
+}
+
+function formatDateTime(dateStr: string): string {
+  try {
+    const d = new Date(dateStr);
+    return d.toLocaleDateString("es-ES", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return dateStr;
+  }
 }

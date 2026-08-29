@@ -15,6 +15,9 @@ const spaceGrotesk = Space_Grotesk({
 export const metadata: Metadata = {
   title: "GymApp - Gestión de Gym",
   description: "Sistema de gestión de pagos y miembros para gimnasios",
+  icons: {
+    icon: "/favicon.svg",
+  },
 };
 
 export default function RootLayout({

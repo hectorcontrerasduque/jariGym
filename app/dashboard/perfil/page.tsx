@@ -9,7 +9,6 @@ import { PasswordInput } from "@/components/ui/password-input";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { createClient } from "@/lib/supabase/client";
-import { formatDate, formatCurrency } from "@/lib/utils";
 import { showToast } from "@/components/ui/toast";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { messages } from "@/lib/messages";
@@ -20,7 +19,6 @@ import {
   CheckCircle,
 } from "lucide-react";
 import type { Profile } from "@/lib/types";
-import Link from "next/link";
 
 export default function PerfilPage() {
   return (

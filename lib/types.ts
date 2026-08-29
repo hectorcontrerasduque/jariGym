@@ -176,11 +176,7 @@ export type EstadoPagoMigracion = "pagado" | "suspendido" | "debe";
 export interface MigracionRecord {
   id: number;
   nombre: string;
-  whatsapp: string | null;
-  correo: string | null;
-  mes_pagar: number;
-  anio_pagar: number;
-  estado: EstadoPagoMigracion;
+  correos: string[];
   migrado: "si" | "no";
   created_at: string;
 }

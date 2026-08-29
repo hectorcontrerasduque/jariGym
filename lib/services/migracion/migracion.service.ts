@@ -1,6 +1,19 @@
 import { messages } from "@/lib/messages";
 
+export interface MigracionRecord {
+  nombre: string;
+  correos: string[];
+  migrado: string;
+}
+
 export class MigracionService {
+  async listAll(): Promise<MigracionRecord[]> {
+    const res = await fetch("/api/migracion/list");
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || messages.migracion.error);
+    return data.records || [];
+  }
+
   async searchByName(nombreCompleto: string): Promise<string[]> {
     const res = await fetch("/api/migracion/search", {
       method: "POST",

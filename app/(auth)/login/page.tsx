@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { authService } from "@/lib/services/auth/auth.service";
-import { migracionService } from "@/lib/services/migracion/migracion.service";
+import { migracionService, type MigracionRecord } from "@/lib/services/migracion/migracion.service";
 import { createClient } from "@/lib/supabase/client";
 import { Dumbbell, CheckCircle, Mail } from "lucide-react";
 import { configService } from "@/lib/services/config/config.service";
@@ -53,6 +53,7 @@ function LoginForm() {
   const [migEmailStatus, setMigEmailStatus] = useState<"idle" | "checking" | "valid" | "exists" | "invalid">("idle");
   const [hasPendingMigration, setHasPendingMigration] = useState(true);
   const [migIsExistingUser, setMigIsExistingUser] = useState(false);
+  const [allRecords, setAllRecords] = useState<MigracionRecord[]>([]);
 
   // Initialize state from searchParams using useMemo to avoid useEffect
   const initialError = useMemo(() => {
@@ -105,40 +106,62 @@ function LoginForm() {
     };
   }, [showMigrateForm]);
 
-  // Debounced search for migration name
+  // Load all migration records when modal opens
   useEffect(() => {
-    const timeout = setTimeout(async () => {
-      if (migNombre.length < 2 || selectedNombre) {
-        setSearchResults([]);
-        setShowDropdown(false);
-        return;
-      }
-      try {
-        const results = await migracionService.searchByName(migNombre);
-        setSearchResults(results);
-        setShowDropdown(results.length > 0);
-      } catch {
-        setSearchResults([]);
-        setShowDropdown(false);
-      }
-    }, 300);
-    return () => clearTimeout(timeout);
-  }, [migNombre, selectedNombre]);
+    if (!showMigrateForm) return;
+    migracionService.listAll().then(setAllRecords).catch(() => {});
+  }, [showMigrateForm]);
 
-  // Debounced email validation
+  // Debounced search for migration name (client-side: name OR email)
   useEffect(() => {
+    if (migNombre.length < 2 || selectedNombre) {
+      setSearchResults([]); // eslint-disable-line react-hooks/set-state-in-effect
+      setShowDropdown(false);
+      return;
+    }
+    const timeout = setTimeout(() => {
+      const query = migNombre.trim().toUpperCase();
+      const words = query.split(/\s+/).filter((w) => w.length >= 1);
+
+      // Search by name: all words must appear in the nombre
+      const nameMatches = allRecords.filter((r) => {
+        const nombreUpper = r.nombre.toUpperCase();
+        return words.every((w) => nombreUpper.includes(w));
+      });
+
+      // Search by email: query matches any email
+      const emailMatches = allRecords.filter((r) => {
+        return r.correos.some((c) => c.toLowerCase().includes(query.toLowerCase()));
+      });
+
+      // Merge and deduplicate
+      const merged = new Map<string, MigracionRecord>();
+      for (const r of nameMatches) merged.set(r.nombre, r);
+      for (const r of emailMatches) merged.set(r.nombre, r);
+
+      const results = Array.from(merged.values()).slice(0, 10);
+
+      setSearchResults(results.map((r) => r.nombre));
+      setShowDropdown(results.length > 0);
+    }, 200);
+    return () => clearTimeout(timeout);
+  }, [migNombre, selectedNombre, allRecords]);
+
+  // Debounced email validation + auto-fill from migracion
+  useEffect(() => {
+    if (!migCorreo || migCorreo.length < 5) {
+      setMigEmailStatus("idle"); // eslint-disable-line react-hooks/set-state-in-effect
+      return;
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(migCorreo)) {
+      setMigEmailStatus("invalid");
+      return;
+    }
+    setMigEmailStatus("checking");
     const timeout = setTimeout(async () => {
-      if (!migCorreo || migCorreo.length < 5) {
-        setMigEmailStatus("idle");
-        return;
-      }
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(migCorreo)) {
-        setMigEmailStatus("invalid");
-        return;
-      }
-      setMigEmailStatus("checking");
       try {
+        // Check if email exists in profiles (already has account)
         const result = await migracionService.pingEmail(migCorreo);
         if (result.alreadyMigrated) {
           const nombre = result.nombre || migCorreo;
@@ -148,6 +171,15 @@ function LoginForm() {
           setMigEmailStatus("exists");
           setMigEmailExists(true);
         } else {
+          // Check if email exists in migracion (not yet migrated) → auto-fill name
+          const query = migCorreo.toLowerCase().trim();
+          const match = allRecords.find((r) =>
+            r.correos.some((c) => c.toLowerCase() === query) && r.migrado === "no"
+          );
+          if (match) {
+            setMigNombre(match.nombre);
+            setSelectedNombre(match.nombre);
+          }
           setMigEmailStatus("valid");
           setMigEmailExists(false);
           setMigrateError("");
@@ -157,7 +189,7 @@ function LoginForm() {
       }
     }, 500);
     return () => clearTimeout(timeout);
-  }, [migCorreo]);
+  }, [migCorreo, allRecords]);
 
   const isAuthorizedUser = async (userEmail: string, userId: string): Promise<boolean> => {
     const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL;
@@ -567,21 +599,39 @@ function LoginForm() {
                     />
                     {showDropdown && searchResults.length > 0 && (
                       <div className="absolute z-50 w-full mt-1 bg-gym-surface border border-gym-border rounded-xl shadow-lg max-h-48 overflow-y-auto">
-                        {searchResults.map((name) => (
-                          <button
-                            key={name}
-                            type="button"
-                            className="w-full text-left px-4 py-2.5 text-sm text-gym-text hover:bg-gym-primary/10 transition-colors first:rounded-t-xl last:rounded-b-xl"
-                            onMouseDown={(e) => {
-                              e.preventDefault();
-                              setMigNombre(name);
-                              setSelectedNombre(name);
-                              setShowDropdown(false);
-                            }}
-                          >
-                            {name}
-                          </button>
-                        ))}
+                        {searchResults.map((name) => {
+                          const record = allRecords.find((r) => r.nombre === name);
+                          return (
+                            <button
+                              key={name}
+                              type="button"
+                              className="w-full text-left px-4 py-2.5 text-sm text-gym-text hover:bg-gym-primary/10 transition-colors first:rounded-t-xl last:rounded-b-xl"
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                // Check if this name has migrado=si
+                                if (record && record.migrado === "si") {
+                                  setMigrateError(messages.migracion.yaMigrado);
+                                  setMigNombre("");
+                                  setSelectedNombre(null);
+                                  setShowDropdown(false);
+                                  return;
+                                }
+                                setMigNombre(name);
+                                setSelectedNombre(name);
+                                setShowDropdown(false);
+                                // Auto-fill email if record has one
+                                if (record && record.correos.length > 0) {
+                                  setMigCorreo(record.correos[0]);
+                                }
+                              }}
+                            >
+                              <span className="block">{name}</span>
+                              {record && record.correos.length > 0 && (
+                                <span className="block text-[10px] text-gym-muted">{record.correos[0]}</span>
+                              )}
+                            </button>
+                          );
+                        })}
                       </div>
                     )}
                   </div>

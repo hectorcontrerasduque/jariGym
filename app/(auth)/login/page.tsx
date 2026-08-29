@@ -124,10 +124,10 @@ function LoginForm() {
       const query = migNombre.trim().toUpperCase();
       const words = query.split(/\s+/).filter((w) => w.length >= 1);
 
-      // Search by name: all words must appear in the nombre
+      // Search by name: any word must appear in the nombre
       const nameMatches = allRecords.filter((r) => {
         const nombreUpper = r.nombre.toUpperCase();
-        return words.every((w) => nombreUpper.includes(w));
+        return words.some((w) => nombreUpper.includes(w));
       });
 
       // Search by email: query matches any email

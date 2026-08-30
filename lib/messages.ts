@@ -348,6 +348,7 @@ export const messages = {
     successMessage: "Se envió un correo de bienvenida a",
     successCredentials: "Contiene tu usuario, contraseña y un link de validación de correo",
     successNote: "Confirma tu correo para activar tu cuenta",
+    emailNoEnviado: "El correo de bienvenida no pudo enviarse. Contacte al administrador.",
     existingUserTitle: "¡Datos migrados!",
     existingUserMessage: "Tu correo ya estaba registrado. Se agregaron los pagos a tu cuenta existente.",
     existingUserNote: "Inicia sesión con tu contraseña actual",

@@ -379,6 +379,7 @@ export async function POST(request: Request) {
       .in("id", migrablesRecords.map((r) => r.id));
 
     const hasMigratedPayments = pagosCreados > 0 || pagosActualizados > 0;
+    let welcomeEmailSent = false;
 
     if (isNewUser || hasMigratedPayments) {
       let gymName = "GymApp";
@@ -415,11 +416,10 @@ export async function POST(request: Request) {
 
         try {
           await sendWelcomeEmail(email, email, password, gymName, gymLogo, confirmLink || undefined);
+          welcomeEmailSent = true;
         } catch {
           // silent
         }
-      } else {
-        // Existing user: no email needed, they already have an account
       }
     }
 
@@ -429,6 +429,7 @@ export async function POST(request: Request) {
       existingUser: !isNewUser,
       pagosCreados,
       pagosActualizados,
+      welcomeEmailSent,
     });
   } catch {
     return NextResponse.json({ error: messages.migracion.errorServidor }, { status: 500 });

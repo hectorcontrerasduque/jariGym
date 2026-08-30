@@ -51,6 +51,7 @@ function LoginForm() {
   const [migEmailStatus, setMigEmailStatus] = useState<"idle" | "checking" | "valid" | "exists" | "invalid">("idle");
   const [hasPendingMigration, setHasPendingMigration] = useState(true);
   const [migIsExistingUser, setMigIsExistingUser] = useState(false);
+  const [migWelcomeEmailSent, setMigWelcomeEmailSent] = useState(true);
   const [allRecords, setAllRecords] = useState<MigracionRecord[]>([]);
 
   // Computed: filter records client-side (no DB query, just filters allRecords)
@@ -78,8 +79,6 @@ function LoginForm() {
     return err ? decodeURIComponent(err) : "";
   }, [searchParams]);
 
-  const [error, setError] = useState(initialError);
-
   // Handle URL params and hash errors - run once on mount
   useEffect(() => {
     // Handle confirmation token as query param — redirect to confirm-email route
@@ -87,6 +86,10 @@ function LoginForm() {
     if (tokenParam) {
       router.push(`/api/auth/confirm-email?token=${tokenParam}`);
       return;
+    }
+
+    if (initialError) {
+      showToast(initialError, "error");
     }
 
     configService.getConfig().then((config) => {
@@ -100,7 +103,7 @@ function LoginForm() {
       .then((res) => res.json())
       .then(({ pending }) => setHasPendingMigration(pending))
       .catch(() => setHasPendingMigration(false));
-  }, [router, searchParams, setError]); // Run once on mount
+  }, [router, searchParams, initialError]); // Run once on mount
 
   // Handle browser back button to close migration modal
   useEffect(() => {
@@ -210,11 +213,10 @@ function LoginForm() {
 
   const handleGoogleLogin = async () => {
     setLoading(true);
-    setError("");
     try {
       await authService.signInWithGoogle();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : messages.auth.googleLoginError);
+      showToast(err instanceof Error ? err.message : messages.auth.googleLoginError, "error");
       setLoading(false);
     }
   };
@@ -232,7 +234,6 @@ function LoginForm() {
   const handleEmailLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
-    setError("");
     try {
       const result = await authService.signInWithEmail(email, password);
       const userId = result.user?.id;
@@ -241,7 +242,7 @@ function LoginForm() {
         if (!authorized) {
           const supabase = createClient();
           await supabase.auth.signOut();
-          setError(messages.auth.userNotRegistered);
+          showToast(messages.auth.userNotRegistered, "error");
           setLoading(false);
           return;
         }
@@ -251,7 +252,7 @@ function LoginForm() {
         router.push(isAdmin ? "/dashboard" : "/dashboard/mis-pagos");
       }
     } catch (err) {
-      setError(mapAuthError(err instanceof Error ? err.message : String(err)));
+      showToast(mapAuthError(err instanceof Error ? err.message : String(err)), "error");
       setLoading(false);
     }
   };
@@ -259,12 +260,11 @@ function LoginForm() {
   const handleResetPassword = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setResetLoading(true);
-    setError("");
     try {
       await authService.resetPassword(resetEmail);
       setResetSent(true);
     } catch {
-      setError(messages.auth.resetPasswordError);
+      showToast(messages.auth.resetPasswordError, "error");
     } finally {
       setResetLoading(false);
     }
@@ -338,6 +338,7 @@ function LoginForm() {
         selectedNombre,
       });
       setMigIsExistingUser(!!result.existingUser);
+      setMigWelcomeEmailSent(result.welcomeEmailSent !== false);
       setMigrateStep("success");
     } catch (err) {
       const msg = err instanceof Error ? err.message : messages.migracion.error;
@@ -427,7 +428,6 @@ function LoginForm() {
                 {messages.auth.forgotPassword}
               </button>
             </div>
-            {error && <p className="text-sm text-gym-danger text-center bg-gym-danger/10 p-2 rounded-xl">{error}</p>}
             <Button type="submit" className="w-full" loading={loading}>
               {messages.auth.loginButton}
             </Button>
@@ -504,13 +504,12 @@ function LoginForm() {
                     onChange={(e) => setResetEmail(e.target.value)}
                     required
                   />
-                  {error && <p className="text-sm text-gym-danger text-center bg-gym-danger/10 p-2 rounded-xl">{error}</p>}
                   <div className="flex gap-2">
                     <Button
                       type="button"
                       variant="secondary"
                       className="flex-1"
-                      onClick={() => { setShowResetForm(false); setError(""); }}
+                      onClick={() => { setShowResetForm(false); }}
                     >
                       {messages.auth.resetPasswordCancelButton}
                     </Button>
@@ -686,6 +685,11 @@ function LoginForm() {
                     {!migIsExistingUser && (
                       <p className="text-xs text-gym-muted">
                         {messages.migracion.successNote}
+                      </p>
+                    )}
+                    {!migIsExistingUser && !migWelcomeEmailSent && (
+                      <p className="text-xs text-gym-danger bg-gym-danger/10 p-2 rounded-lg">
+                        {messages.migracion.emailNoEnviado}
                       </p>
                     )}
                   </div>

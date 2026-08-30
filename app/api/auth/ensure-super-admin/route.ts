@@ -10,31 +10,22 @@ export async function POST(request: NextRequest) {
     prefix: "auth",
   });
   if (rateLimitResponse) return rateLimitResponse;
-  
-  // SECURITY: Require authentication - either CRON_SECRET or super_admin JWT
-  const authHeader = request.headers.get("authorization");
-  const cronSecret = process.env.CRON_SECRET;
 
-  if (!cronSecret) {
-    console.error("[ensure-super-admin] CRON_SECRET not configured");
-    return NextResponse.json({ error: "Server misconfiguration" }, { status: 500 });
-  }
+  const authHeader = request.headers.get("authorization");
+  const token = authHeader?.startsWith("Bearer ") ? authHeader.replace("Bearer ", "") : null;
+
+  const serviceSupabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
 
   let isAuthorized = false;
 
-  // Option 1: CRON_SECRET (for automated jobs/scripts)
-  if (authHeader === `Bearer ${cronSecret}`) {
-    isAuthorized = true;
-  } else if (authHeader?.startsWith("Bearer ")) {
-    // Option 2: Validate JWT and check super_admin role
-    const token = authHeader.replace("Bearer ", "");
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+  // Option 1: Validate JWT and check super_admin role
+  if (token) {
+    const { data: { user }, error: authError } = await serviceSupabase.auth.getUser(token);
     if (!authError && user) {
-      const { data: profile } = await supabase
+      const { data: profile } = await serviceSupabase
         .from("profiles")
         .select("role")
         .eq("id", user.id)
@@ -42,6 +33,14 @@ export async function POST(request: NextRequest) {
       if (profile?.role === "super_admin") {
         isAuthorized = true;
       }
+    }
+  }
+
+  // Option 2: CRON_SECRET (fallback for automated jobs/scripts)
+  if (!isAuthorized) {
+    const cronSecret = process.env.CRON_SECRET;
+    if (cronSecret && token === cronSecret) {
+      isAuthorized = true;
     }
   }
 
@@ -55,33 +54,43 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ created: false });
     }
 
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
-
     const emailLower = email.toLowerCase().trim();
     const nombreCompleto = (nombre && typeof nombre === "string" && nombre.trim()) || emailLower.split("@")[0];
     const isOwner = inscription_paid === true;
 
-    const { data: existingProfile } = await supabase
+    const { data: existingProfile } = await serviceSupabase
       .from("profiles")
-      .select("id, role")
+      .select("id, role, email, full_name")
       .eq("email", emailLower)
       .maybeSingle();
 
     if (existingProfile) {
       if (existingProfile.role !== "super_admin") {
-        await supabase
+        await serviceSupabase
           .from("profiles")
           .update({ role: "super_admin", activo: true, registered: true, full_name: nombreCompleto })
           .eq("id", existingProfile.id);
       }
+
+      // Sync name/email to auth.users
+      const authUpdates: { email?: string; user_metadata?: Record<string, string>; email_confirm?: boolean } = {};
+      if (nombreCompleto && nombreCompleto !== existingProfile.full_name) {
+        authUpdates.user_metadata = { full_name: nombreCompleto };
+      }
+      if (emailLower !== existingProfile.email) {
+        authUpdates.email = emailLower;
+        authUpdates.email_confirm = true;
+      }
+      if (authUpdates.email || authUpdates.user_metadata) {
+        await serviceSupabase.auth.admin.updateUserById(existingProfile.id, authUpdates);
+      }
+
       return NextResponse.json({ created: false, promoted: true });
     }
 
+    // Profile doesn't exist — create auth user + profile
     const randomPassword = Math.random().toString(36).slice(-12) + "A1!";
-    const { data: newUser, error: authError } = await supabase.auth.admin.createUser({
+    const { data: newUser, error: authError } = await serviceSupabase.auth.admin.createUser({
       email: emailLower,
       password: randomPassword,
       email_confirm: true,
@@ -92,9 +101,7 @@ export async function POST(request: NextRequest) {
 
     if (authError) {
       if (authError.message?.includes("already") || authError.message?.includes("exists")) {
-        // SECURITY: Avoid listUsers() - fetches ALL auth users (DoS vector)
-        // Instead, find by email in profiles table (unique index)
-        const { data: existingProfileByEmail } = await supabase
+        const { data: existingProfileByEmail } = await serviceSupabase
           .from("profiles")
           .select("id")
           .eq("email", emailLower)
@@ -110,7 +117,7 @@ export async function POST(request: NextRequest) {
       userId = newUser!.user!.id;
     }
 
-    const { error: profileError } = await supabase
+    const { error: profileError } = await serviceSupabase
       .from("profiles")
       .insert({
         id: userId,
@@ -126,7 +133,7 @@ export async function POST(request: NextRequest) {
 
     if (profileError) {
       if (profileError.code === "23505") {
-        await supabase
+        await serviceSupabase
           .from("profiles")
           .update({ role: "super_admin", activo: true, registered: true, full_name: nombreCompleto })
           .eq("email", emailLower);

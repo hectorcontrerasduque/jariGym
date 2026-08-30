@@ -27,6 +27,13 @@ const styles = {
 
 let toastListener: ((toast: Omit<Toast, "id">) => void) | null = null;
 
+const TOAST_DURATIONS: Record<ToastType, number> = {
+  success: 4000,
+  info: 4000,
+  error: 7000,
+  warning: 7000,
+};
+
 export function showToast(message: string, type: ToastType = "info") {
   toastListener?.({ message, type });
 }
@@ -40,7 +47,7 @@ export function ToastContainer() {
       setToasts((prev) => [...prev, { ...toast, id }]);
       setTimeout(() => {
         setToasts((prev) => prev.filter((t) => t.id !== id));
-      }, 4000);
+      }, TOAST_DURATIONS[toast.type]);
     };
     return () => { toastListener = null; };
   }, []);

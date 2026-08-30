@@ -70,31 +70,29 @@ export class ConfigService {
         }
       }
 
-      if (profileByEmail) {
-        // Profile existe — promover a super_admin
-        await this.supabase
-          .from("profiles")
-          .update({ activo: true, role: "super_admin", registered: true, full_name: updates.owner_name })
-          .eq("id", profileByEmail.id);
-      } else {
-        // Profile no existe — crear via ensure-super-admin con JWT
-        const { data: { session } } = await this.supabase.auth.getSession();
-        try {
-          await fetch("/api/auth/ensure-super-admin", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
-            },
-            body: JSON.stringify({
-              email: updates.owner_email,
-              nombre: updates.owner_name,
-              inscription_paid: true,
-            }),
-          });
-        } catch (error) {
-          console.error("[config] Error creando super_admin via ensure-super-admin:", error);
+      // Unificar: siempre llamar a ensure-super-admin para crear O promover + sync auth.users
+      const { data: { session } } = await this.supabase.auth.getSession();
+      try {
+        const res = await fetch("/api/auth/ensure-super-admin", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+          },
+          body: JSON.stringify({
+            email: updates.owner_email,
+            nombre: updates.owner_name,
+            inscription_paid: true,
+          }),
+        });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          console.error("[config] ensure-super-admin failed:", res.status, body);
+          throw new Error(body.error || "Error creando profile del propietario");
         }
+      } catch (error) {
+        console.error("[config] Error creando super_admin via ensure-super-admin:", error);
+        throw error;
       }
     } else if (emailChanged && (!updates.owner_name || !updates.owner_email)) {
       throw new Error(messages.configuracion.ownerRequired);

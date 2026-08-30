@@ -235,7 +235,7 @@ export default function ConfiguracionPage() {
             </div>
           </div>
 
-          <Input label={`${messages.configuracion.gymName} *`} placeholder="Mi Gym" value={config.gym_name || ""} onChange={(e) => setConfig({ ...config, gym_name: e.target.value })} required />
+          <Input label={messages.configuracion.gymName} placeholder="Mi Gym" value={config.gym_name || ""} onChange={(e) => setConfig({ ...config, gym_name: e.target.value })} />
           <Input label={messages.configuracion.maxMembers} type="number" placeholder="100" value={config.max_members || ""} onChange={(e) => setConfig({ ...config, max_members: parseInt(e.target.value) || 0 })} min="1" />
           <Input label={messages.configuracion.address} placeholder="" value={config.address || ""} onChange={(e) => setConfig({ ...config, address: e.target.value })} />
           <Input label={messages.configuracion.phoneNumber} placeholder="+584261234567" value={config.phone_number || ""} onChange={(e) => setConfig({ ...config, phone_number: e.target.value })} />

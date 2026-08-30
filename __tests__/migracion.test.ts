@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const mockSupabase = {
   from: vi.fn(),
+  rpc: vi.fn(),
   auth: {
     admin: {
       createUser: vi.fn(),
@@ -180,10 +181,12 @@ describe("Migración API", () => {
         { id: "m2", nombre: "HAIDEE", mes_pagar: 2, anio_pagar: 2026, estado: "pagado", migrado: "no" },
       ]);
       if (table === "profiles") return chainReturn(null);
-      if (table === "payments") return chainReturnOnInsert({ id: "pago-1", user_id: "user-1" });
-      if (table === "payment_detail") return chainReturn(null);
       if (table === "password_reset_tokens") return chainReturn(null);
       return chainReturn(null);
+    });
+    mockSupabase.rpc.mockResolvedValue({
+      data: { pagos_creados: 2, pagos_actualizados: 0 },
+      error: null,
     });
     mockSupabase.auth.admin.createUser.mockResolvedValue({
       data: { user: { id: "user-1" } },
@@ -212,10 +215,12 @@ describe("Migración API", () => {
         { id: "m1", nombre: "HAIDEE LOPEZ", mes_pagar: 1, anio_pagar: 2026, estado: "pagado", migrado: "no" },
       ]);
       if (table === "profiles") return chainReturn(null);
-      if (table === "payments") return chainReturnOnInsert({ id: "pago-1", user_id: "user-1" });
-      if (table === "payment_detail") return chainReturn(null);
       if (table === "password_reset_tokens") return chainReturn(null);
       return chainReturn(null);
+    });
+    mockSupabase.rpc.mockResolvedValue({
+      data: { pagos_creados: 1, pagos_actualizados: 0 },
+      error: null,
     });
     mockSupabase.auth.admin.createUser.mockResolvedValue({
       data: { user: { id: "user-1" } },
@@ -243,10 +248,12 @@ describe("Migración API", () => {
         { id: "m1", nombre: "HAIDEE", mes_pagar: 1, anio_pagar: 2026, estado: "pagado", migrado: "no" },
       ]);
       if (table === "profiles") return chainReturn({ id: "existing-user" });
-      if (table === "payments") return chainReturnOnInsert({ id: "pago-1", user_id: "existing-user" });
-      if (table === "payment_detail") return chainReturn(null);
       if (table === "password_reset_tokens") return chainReturn(null);
       return chainReturn(null);
+    });
+    mockSupabase.rpc.mockResolvedValue({
+      data: { pagos_creados: 1, pagos_actualizados: 0 },
+      error: null,
     });
 
     const req = makeReq(baseBody);
@@ -260,7 +267,6 @@ describe("Migración API", () => {
   });
 
   it("solo procesa registros pagado y suspendido, no debe", async () => {
-    let pagoIdCounter = 0;
     mockSupabase.from.mockImplementation((table: string) => {
       if (table === "gym_config") return chainReturn({ id: "1" });
       if (table === "gym_config_payment_methods") return chainReturn({ amount_monthly: 10, amount_inscription: 0 });
@@ -270,10 +276,12 @@ describe("Migración API", () => {
         { id: "m3", nombre: "HAIDEE", mes_pagar: 3, anio_pagar: 2026, estado: "suspendido", migrado: "no" },
       ]);
       if (table === "profiles") return chainReturn(null);
-      if (table === "payments") return chainReturnOnInsert({ id: `pago-${++pagoIdCounter}`, user_id: "user-1" });
-      if (table === "payment_detail") return chainReturn(null);
       if (table === "password_reset_tokens") return chainReturn(null);
       return chainReturn(null);
+    });
+    mockSupabase.rpc.mockResolvedValue({
+      data: { pagos_creados: 2, pagos_actualizados: 0 },
+      error: null,
     });
     mockSupabase.auth.admin.createUser.mockResolvedValue({
       data: { user: { id: "user-1" } },

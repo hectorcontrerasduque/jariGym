@@ -232,9 +232,6 @@ export async function POST(request: Request) {
       }
     }
 
-    let pagosCreados = 0;
-    let pagosActualizados = 0;
-
     // Sort records by year and month
     const sortedRecords = [...migrablesRecords].sort((a, b) => {
       if (a.anio_pagar !== b.anio_pagar) return a.anio_pagar - b.anio_pagar;
@@ -244,7 +241,7 @@ export async function POST(request: Request) {
     // Determine which records to process:
     // - All "pagado" records → aprobado
     // - "suspendido" records that come AFTER the first "pagado" → suspendido
-    // - "suspendido" records BEFORE the first "pagado" → skip (consecutive suspended at start)
+    // - "suspendido" records BEFORE the first "pagado" → skip
     let foundFirstPagado = false;
     const recordsToProcess = [];
     for (const record of sortedRecords) {
@@ -254,129 +251,33 @@ export async function POST(request: Request) {
       } else if (record.estado === "suspendido" && foundFirstPagado) {
         recordsToProcess.push(record);
       }
-      // If suspendido and !foundFirstPagado → skip (consecutive suspended at start)
     }
 
-    for (const record of recordsToProcess) {
-      const pagoEstado = record.estado === "pagado" ? "aprobado" : "suspendido";
+    // Build pago records for RPC transaction
+    const pagoRecords = recordsToProcess.map((record) => ({
+      mes: record.mes_pagar,
+      anio: record.anio_pagar,
+      estado: record.estado,
+    }));
 
-      const { data: existingPago } = await supabase
-        .from("payments")
-        .select("id, estado")
-        .eq("usuario_id", userId)
-        .maybeSingle();
+    const migracionIds = migrablesRecords.map((r) => r.id);
 
-      const { data: existingDetalle } = existingPago
-        ? await supabase
-            .from("payment_detail")
-            .select("payment_id")
-            .eq("payment_id", existingPago.id)
-            .eq("month_number", record.mes_pagar)
-            .eq("year_number", record.anio_pagar)
-            .maybeSingle()
-        : { data: null };
+    // Execute payment creation + inscription + migration marking in a single transaction
+    const { data: rpcResult, error: rpcError } = await supabase.rpc("migrar_miembro_pago", {
+      p_user_id: userId,
+      p_pago_records: pagoRecords,
+      p_monto_mensual: montoMensual,
+      p_monto_inscripcion: montoInscripcion,
+      p_migracion_ids: migracionIds,
+      p_fecha_inicio: fechaInicioCalc,
+    });
 
-      if (existingDetalle) {
-        if (existingPago?.estado === "pendiente" || existingPago?.estado === "suspendido") {
-          const { error } = await supabase
-            .from("payments")
-            .update({
-              estado: pagoEstado,
-              notas: "Actualizado por migración de data",
-              approved_at: pagoEstado === "aprobado" ? new Date().toISOString() : null,
-            })
-            .eq("id", existingPago.id);
-          if (!error) {
-            await supabase
-              .from("payment_detail")
-              .update({ payment_amount: montoMensual })
-              .eq("payment_id", existingDetalle.payment_id);
-            pagosActualizados++;
-          }
-        }
-      } else {
-        const { data: nuevoPago, error: pagoError } = await supabase
-          .from("payments")
-          .insert({
-            usuario_id: userId,
-            estado: pagoEstado,
-            metodo_pago: "efectivo",
-            notas: "Registro por migración de data",
-            approved_at: pagoEstado === "aprobado" ? new Date().toISOString() : null,
-          })
-          .select()
-          .single();
-
-        if (!pagoError && nuevoPago) {
-          await supabase
-            .from("payment_detail")
-            .insert({
-              payment_id: nuevoPago.id,
-              month_number: record.mes_pagar,
-              year_number: record.anio_pagar,
-              payment_type: "mensualidad",
-              payment_amount: montoMensual,
-            });
-          pagosCreados++;
-        }
-      }
+    if (rpcError) {
+      return NextResponse.json({ error: messages.migracion.errorServidor }, { status: 500 });
     }
 
-    const { data: primerPagoUsuario } = await supabase
-      .from("payments")
-      .select("id")
-      .eq("usuario_id", userId)
-      .limit(1)
-      .maybeSingle();
-
-    const pagoIdParaInscripcion = primerPagoUsuario?.id || "00000000-0000-0000-0000-000000000000";
-
-    const { data: inscripcionExistente } = await supabase
-      .from("payment_detail")
-      .select("id")
-      .eq("payment_type", "inscripcion")
-      .eq("payment_id", pagoIdParaInscripcion)
-      .maybeSingle();
-
-    if (!inscripcionExistente) {
-      if (montoInscripcion > 0) {
-        const { data: inscPago, error: inscPagoError } = await supabase
-          .from("payments")
-          .insert({
-            usuario_id: userId,
-            estado: "aprobado",
-            metodo_pago: "efectivo",
-            notas: "Inscripción - Registro por migración de data",
-            approved_at: new Date().toISOString(),
-          })
-          .select()
-          .single();
-
-        if (!inscPagoError && inscPago) {
-          await supabase
-            .from("payment_detail")
-            .insert({
-              payment_id: inscPago.id,
-              month_number: migrablesRecords[0]?.mes_pagar || 1,
-              year_number: migrablesRecords[0]?.anio_pagar || new Date().getFullYear(),
-              payment_type: "inscripcion",
-              payment_amount: montoInscripcion,
-            });
-        }
-      }
-      await supabase
-        .from("profiles")
-        .update({
-          inscription_paid: true,
-          inscription_date: new Date().toISOString().split("T")[0],
-        })
-        .eq("id", userId);
-    }
-
-    await supabase
-      .from("migracion")
-      .update({ migrado: "si" })
-      .in("id", migrablesRecords.map((r) => r.id));
+    const pagosCreados = rpcResult?.pagos_creados || 0;
+    const pagosActualizados = rpcResult?.pagos_actualizados || 0;
 
     const hasMigratedPayments = pagosCreados > 0 || pagosActualizados > 0;
     let welcomeEmailSent = false;

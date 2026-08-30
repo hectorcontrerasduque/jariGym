@@ -10,7 +10,7 @@ import { miembrosService } from "@/lib/services/miembros/miembros.service";
 import { notificacionesService } from "@/lib/services/notificaciones/notificaciones.service";
 import { configService } from "@/lib/services/config/config.service";
 import { formatCurrency, getMonthName } from "@/lib/utils";
-import type { Pago, Profile } from "@/lib/types";
+import type { Payment, Profile } from "@/lib/types";
 import { showToast } from "@/components/ui/toast";
 import { messages } from "@/lib/messages";
 import {
@@ -27,8 +27,8 @@ import {
 } from "lucide-react";
 
 interface MonthlyStat {
-  mes: number;
-  anio: number;
+  month_number: number;
+  year_number: number;
   nombre: string;
   pagados: number;
   pendientes: number;
@@ -57,7 +57,7 @@ export default function DashboardPage() {
     pagosPendientes: number;
     ingresosMes: number;
   } | null>(null);
-  const [pagosRecientes, setPagosRecientes] = useState<Pago[]>([]);
+  const [pagosRecientes, setPagosRecientes] = useState<Payment[]>([]);
   const [anios, setAnios] = useState<number[]>([]);
   const [anioSeleccionado, setAnioSeleccionado] = useState(new Date().getFullYear());
   const [loading, setLoading] = useState(true);
@@ -134,9 +134,9 @@ export default function DashboardPage() {
     triggerNotificaciones();
   }, [isSuperAdmin]);
 
-  const getNombreMiembro = (pago: Pago): string => {
+  const getNombreMiembro = (pago: Payment): string => {
     if (pago.profile?.full_name) return pago.profile.full_name;
-    const miembro = miembros.find((m) => m.id === pago.usuario_id);
+    const miembro = miembros.find((m) => m.id === pago.user_id);
     return miembro?.full_name || "Desconocido";
   };
 
@@ -193,22 +193,22 @@ export default function DashboardPage() {
       const mesActual = new Date().getMonth() + 1;
       const anioActual = new Date().getFullYear();
       const { data: pagosHeader } = await supabase
-        .from("pagos")
-        .select("id, usuario_id")
-        .eq("estado", "aprobado");
+        .from("payments")
+        .select("id, user_id")
+        .eq("status", "aprobado");
 
       const pagoIds = (pagosHeader || []).map((p) => p.id);
       const { data: pagosDetalles } = await supabase
-        .from("detalle_pago")
-        .select("pago_id")
-        .in("pago_id", pagoIds.length > 0 ? pagoIds : ["00000000-0000-0000-0000-000000000000"])
-        .eq("mes", mesActual)
-        .eq("anio", anioActual)
-        .eq("tipo_pago", "mensualidad");
+        .from("payment_detail")
+        .select("payment_id")
+        .in("payment_id", pagoIds.length > 0 ? pagoIds : ["00000000-0000-0000-0000-000000000000"])
+        .eq("month_number", mesActual)
+        .eq("year_number", anioActual)
+        .eq("payment_type", "mensualidad");
 
-      const pagoUsuarioMap = new Map((pagosHeader || []).map((p) => [p.id, p.usuario_id]));
+      const pagoUsuarioMap = new Map((pagosHeader || []).map((p) => [p.id, p.user_id]));
       const idsAlDia = Array.from(new Set(
-        (pagosDetalles || []).map((d) => pagoUsuarioMap.get(d.pago_id)).filter(Boolean)
+        (pagosDetalles || []).map((d) => pagoUsuarioMap.get(d.payment_id)).filter(Boolean)
       ));
       const alDia = miembros.filter((m) => idsAlDia.includes(m.id));
       setModalData({
@@ -228,9 +228,9 @@ export default function DashboardPage() {
       const supabase = createClient();
       const { data: libres } = await supabase
         .from("membresias")
-        .select("usuario_id")
+        .select("user_id")
         .is("fecha_fin", null);
-      const libresIds = new Set((libres || []).map((l) => l.usuario_id));
+      const libresIds = new Set((libres || []).map((l) => l.user_id));
       const libresList = miembros.filter((m) => libresIds.has(m.id));
       setModalData({
         title: "Membresía Libre",
@@ -396,9 +396,9 @@ export default function DashboardPage() {
                 const libresWidth = total > 0 ? (m.libres / maxMiembros) * 100 : 0;
 
                 return (
-                  <div key={`${m.anio}-${m.mes}`} className="space-y-2">
+                  <div key={`${m.year_number}-${m.month_number}`} className="space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-gym-text">{m.nombre} {m.anio}</span>
+                      <span className="text-sm font-medium text-gym-text">{m.nombre} {m.year_number}</span>
                       <div className="flex items-center gap-4 text-xs">
                         <span className="flex items-center gap-1">
                           <span className="w-3 h-3 rounded-sm bg-gym-success" />
@@ -487,8 +487,8 @@ export default function DashboardPage() {
             <p className="text-center text-gym-muted py-8">{messages.dashboard.noPagosRegistrados}</p>
           ) : (
             <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
-              {pagosRecientes.map((pago: Pago) => {
-                const isInscripcion = pago.detalle?.some(d => d.tipo_pago === "inscripcion");
+              {pagosRecientes.map((pago: Payment) => {
+                const isInscripcion = pago.detail?.some(d => d.payment_type === "inscripcion");
                 return (
                   <div key={pago.id} className="flex items-center justify-between p-3 bg-gym-bg rounded-xl hover:bg-gym-surface transition-colors">
                     <div className="flex items-center gap-3 min-w-0">
@@ -504,12 +504,12 @@ export default function DashboardPage() {
                           {getNombreMiembro(pago)}
                         </p>
                         <p className="text-xs text-gym-muted">
-                          {isInscripcion ? "Inscripción" : pago.detalle?.[0]?.mes ? `${getMonthName(pago.detalle[0].mes)} ${pago.detalle[0].anio}` : "—"}
+                          {isInscripcion ? "Inscripción" : pago.detail?.[0]?.month_number ? `${getMonthName(pago.detail[0].month_number)} ${pago.detail[0].year_number}` : "—"}
                         </p>
                       </div>
                     </div>
                     <div className="flex items-center gap-3 flex-shrink-0">
-                      <p className="font-semibold text-gym-text text-sm">{formatCurrency(pago.detalle?.reduce((s, d) => s + d.monto, 0) || 0)}</p>
+                      <p className="font-semibold text-gym-text text-sm">{formatCurrency(pago.detail?.reduce((s, d) => s + d.payment_amount, 0) || 0)}</p>
                       <Badge variant="success">
                         <CheckCircle className="w-3 h-3 mr-1" /> ✓
                       </Badge>

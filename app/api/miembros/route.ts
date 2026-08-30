@@ -164,9 +164,9 @@ export async function DELETE(request: Request) {
     );
 
     const { count } = await serviceSupabase
-      .from("pagos")
+      .from("payments")
       .select("id", { count: "exact", head: true })
-      .eq("usuario_id", memberId);
+      .eq("user_id", memberId);
 
     if (count && count > 0) {
       return NextResponse.json({ error: messages.miembros.tienePagosNoEliminar }, { status: 409 });

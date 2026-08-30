@@ -14,7 +14,7 @@ import { showToast } from "@/components/ui/toast";
 import { messages } from "@/lib/messages";
 import { Avatar } from "@/components/ui/avatar";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
-import type { Pago, Profile, MetodoPago, PaymentMethod, GymConfig } from "@/lib/types";
+import type { Payment, Profile, MetodoPago, PaymentMethod, GymConfig } from "@/lib/types";
 
 const metodoLabels: Record<MetodoPago, string> = {
   efectivo: "Efectivo",
@@ -22,22 +22,22 @@ const metodoLabels: Record<MetodoPago, string> = {
   binance: "Binance",
 };
 
-function getPagoLabel(pago: Pago): string {
-  const det = pago.detalle?.[0];
-  if (det?.tipo_pago === "inscripcion") return "Inscripción";
-  if (det?.mes && det?.anio) return `${getMonthName(det.mes)} ${det.anio}`;
+function getPagoLabel(pago: Payment): string {
+  const det = pago.detail?.[0];
+  if (det?.payment_type === "inscripcion") return "Inscripción";
+  if (det?.month_number && det?.year_number) return `${getMonthName(det.month_number)} ${det.year_number}`;
   return "Pago";
 }
 
-function getPagoIcon(pago: Pago) {
-  const det = pago.detalle?.[0];
-  if (det?.tipo_pago === "inscripcion") return <FileText className="w-5 h-5 text-gym-primary" />;
+function getPagoIcon(pago: Payment) {
+  const det = pago.detail?.[0];
+  if (det?.payment_type === "inscripcion") return <FileText className="w-5 h-5 text-gym-primary" />;
   return <Calendar className="w-5 h-5 text-gym-secondary" />;
 }
 
 export default function MisPagosPage() {
   const router = useRouter();
-  const [pagos, setPagos] = useState<Pago[]>([]);
+  const [pagos, setPagos] = useState<Payment[]>([]);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState<string | null>(null);
@@ -57,7 +57,7 @@ export default function MisPagosPage() {
   // Payment form
   const [showForm, setShowForm] = useState(true);
   const [metodosPago, setMetodosPago] = useState<PaymentMethod[]>([]);
-  const [mesesPendientes, setMesesPendientes] = useState<{ mes: number; anio: number }[]>([]);
+  const [mesesPendientes, setMesesPendientes] = useState<{ month_number: number; year_number: number }[]>([]);
   const [inscripcionPagada, setInscripcionPagada] = useState(false);
   const [inscripcionPendiente, setInscripcionPendiente] = useState(false);
   const [membresiaLibre, setMembresiaLibre] = useState(false);
@@ -68,7 +68,7 @@ export default function MisPagosPage() {
   const msgMesesRef = useRef<HTMLDivElement>(null);
 
   const [formData, setFormData] = useState({
-    meses: [] as { mes: number; anio: number }[],
+    meses: [] as { month_number: number; year_number: number }[],
     metodo_pago: "efectivo" as MetodoPago,
     codigo_billete: "",
     notas: "",
@@ -198,19 +198,19 @@ setMembresiaLibre(!!libre.data);
     setFormData({ meses: [], metodo_pago: "efectivo", codigo_billete: "", notas: "", pagar_inscripcion: false, pagar_mensualidad: false, solicitar_suspension: false, fecha_pago: new Date().toISOString().split("T")[0] });
   };
 
-  const toggleMonth = (mes: number, anio: number) => {
+  const toggleMonth = (month_number: number, year_number: number) => {
     setFormData(prev => {
-      const existe = prev.meses.some(m => m.mes === mes && m.anio === anio);
+      const existe = prev.meses.some(m => m.month_number === month_number && m.year_number === year_number);
       const source = prev.solicitar_suspension ? mesesParaSuspender : mesesDisponiblesParaPagar;
       if (existe) {
-        const idx = source.findIndex(m => m.mes === mes && m.anio === anio);
+        const idx = source.findIndex(m => m.month_number === month_number && m.year_number === year_number);
         const nuevosMeses = prev.meses.filter(m => {
-          const mIdx = source.findIndex(sp => sp.mes === m.mes && sp.anio === m.anio);
+          const mIdx = source.findIndex(sp => sp.month_number === m.month_number && sp.year_number === m.year_number);
           return mIdx < idx;
         });
         return { ...prev, meses: nuevosMeses, pagar_mensualidad: nuevosMeses.length > 0 };
       } else {
-        const idx = source.findIndex(m => m.mes === mes && m.anio === anio);
+        const idx = source.findIndex(m => m.month_number === month_number && m.year_number === year_number);
         const nuevosMeses = source.slice(0, idx + 1);
         return { ...prev, meses: nuevosMeses, pagar_mensualidad: !prev.solicitar_suspension && nuevosMeses.length > 0 };
       }
@@ -256,12 +256,12 @@ setMembresiaLibre(!!libre.data);
     const nombreMiembro = miembroSeleccionado?.full_name || profile?.full_name || "tu cuenta";
     const acciones: string[] = [];
     if (formData.solicitar_suspension) {
-      const mesesStr = formData.meses.map(m => `${getMonthName(m.mes)} ${m.anio}`).join(", ");
+      const mesesStr = formData.meses.map(m => `${getMonthName(m.month_number)} ${m.year_number}`).join(", ");
       acciones.push(`Solicitar suspensión de: ${mesesStr}`);
     } else {
       if (formData.pagar_inscripcion) acciones.push(`Inscripción: ${formatCurrency(getMontoByMetodo(formData.metodo_pago, "inscripcion"))}`);
       if (formData.pagar_mensualidad && formData.meses.length > 0) {
-        const mesesStr = formData.meses.map(m => `${getMonthName(m.mes)} ${m.anio}`).join(", ");
+        const mesesStr = formData.meses.map(m => `${getMonthName(m.month_number)} ${m.year_number}`).join(", ");
         acciones.push(`Mensualidad (${formData.meses.length} mes(es)): ${mesesStr} — Total: ${formatCurrency(montoTotal)}`);
       }
     }
@@ -309,24 +309,24 @@ setMembresiaLibre(!!libre.data);
 
       const useAutoApprove = isSelf && isAdmin;
 
-      const detalles: Array<{ mes: number | null; anio: number | null; tipo_pago: "mensualidad" | "inscripcion"; monto: number }> = [];
+      const detalles: Array<{ month_number: number | null; year_number: number | null; payment_type: "mensualidad" | "inscripcion"; payment_amount: number }> = [];
 
       if (formData.pagar_inscripcion && !inscripcionPagada && getMontoByMetodo(formData.metodo_pago, "inscripcion") > 0) {
         detalles.push({
-          mes: new Date().getMonth() + 1,
-          anio: new Date().getFullYear(),
-          tipo_pago: "inscripcion",
-          monto: getMontoByMetodo(formData.metodo_pago, "inscripcion"),
+          month_number: new Date().getMonth() + 1,
+          year_number: new Date().getFullYear(),
+          payment_type: "inscripcion",
+          payment_amount: getMontoByMetodo(formData.metodo_pago, "inscripcion"),
         });
       }
 
       if (formData.pagar_mensualidad && formData.meses.length > 0) {
-        for (const { mes, anio } of formData.meses) {
+        for (const { month_number, year_number } of formData.meses) {
           detalles.push({
-            mes,
-            anio,
-            tipo_pago: "mensualidad",
-            monto: getMontoByMetodo(formData.metodo_pago, "mensual"),
+            month_number,
+            year_number,
+            payment_type: "mensualidad",
+            payment_amount: getMontoByMetodo(formData.metodo_pago, "mensual"),
           });
         }
       }
@@ -336,11 +336,11 @@ setMembresiaLibre(!!libre.data);
       }
 
       const pagoInput = {
-        usuario_id: targetId,
-        metodo_pago: formData.metodo_pago,
-        comprobante_url: comprobanteUrl || undefined,
-        codigo_billete: formData.codigo_billete || undefined,
-        notas: formData.pagar_inscripcion && !inscripcionPagada ? "Inscripción" : formData.notas || undefined,
+        user_id: targetId,
+        payment_method: formData.metodo_pago,
+        receipt_url: comprobanteUrl || undefined,
+        bill_code: formData.codigo_billete || undefined,
+        payment_note: formData.pagar_inscripcion && !inscripcionPagada ? "Inscripción" : formData.notas || undefined,
         detalles,
       };
 
@@ -399,10 +399,10 @@ setMembresiaLibre(!!libre.data);
     }
   };
 
-  const aprobados = pagos.filter(p => p.estado === "aprobado");
-  const pendientes = pagos.filter(p => p.estado === "pendiente");
-  const montoAprobado = aprobados.reduce((sum, p) => sum + (p.detalle?.reduce((s, d) => s + d.monto, 0) || 0), 0);
-  const montoPendiente = pendientes.reduce((sum, p) => sum + (p.detalle?.reduce((s, d) => s + d.monto, 0) || 0), 0);
+  const aprobados = pagos.filter(p => p.status === "aprobado");
+  const pendientes = pagos.filter(p => p.status === "pendiente");
+  const montoAprobado = aprobados.reduce((sum, p) => sum + (p.detail?.reduce((s, d) => s + d.payment_amount, 0) || 0), 0);
+  const montoPendiente = pendientes.reduce((sum, p) => sum + (p.detail?.reduce((s, d) => s + d.payment_amount, 0) || 0), 0);
 
   const filteredMiembros = miembros.filter(m => {
     const s = miembroSearch.toLowerCase();
@@ -416,17 +416,17 @@ setMembresiaLibre(!!libre.data);
       pagos
         .filter(p => {
           if (isSuperAdmin && miembroSeleccionado) {
-            return p.estado === "pendiente" || p.estado === "aprobado" || p.estado === "suspendido";
+            return p.status === "pendiente" || p.status === "aprobado" || p.status === "suspendido";
           }
-          return p.estado === "pendiente" || p.estado === "aprobado";
+          return p.status === "pendiente" || p.status === "aprobado";
         })
-        .flatMap(p => (p.detalle || []).map(d => d.mes && d.anio ? `${d.anio}-${d.mes}` : null))
+        .flatMap(p => (p.detail || []).map(d => d.month_number && d.year_number ? `${d.year_number}-${d.month_number}` : null))
         .filter(Boolean)
     );
-    return mesesPendientes.filter(m => !mesesConPago.has(`${m.anio}-${m.mes}`));
+    return mesesPendientes.filter(m => !mesesConPago.has(`${m.year_number}-${m.month_number}`));
   })();
 
-  const mesesParaSuspender = [...mesesDisponiblesParaPagar].sort((a, b) => a.anio - b.anio || a.mes - b.mes);
+  const mesesParaSuspender = [...mesesDisponiblesParaPagar].sort((a, b) => a.year_number - b.year_number || a.month_number - b.month_number);
 
   if (loading) {
     return (
@@ -631,13 +631,13 @@ setMembresiaLibre(!!libre.data);
                       </div>
                     ) : (
                       <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                        {(formData.solicitar_suspension ? mesesParaSuspender : mesesDisponiblesParaPagar).map(({ mes, anio }) => {
-                          const seleccionado = formData.meses.some(m => m.mes === mes && m.anio === anio);
+                        {(formData.solicitar_suspension ? mesesParaSuspender : mesesDisponiblesParaPagar).map(({ month_number, year_number }) => {
+                          const seleccionado = formData.meses.some(m => m.month_number === month_number && m.year_number === year_number);
                           return (
                             <button
-                              key={`${anio}-${mes}`}
+                              key={`${year_number}-${month_number}`}
                               type="button"
-                              onClick={() => toggleMonth(mes, anio)}
+                              onClick={() => toggleMonth(month_number, year_number)}
                               className={`p-2 rounded-xl text-sm font-medium transition-all ${
                                 seleccionado
                                   ? "bg-gym-primary text-gym-bg glow-primary"
@@ -645,8 +645,8 @@ setMembresiaLibre(!!libre.data);
                               }`}
                             >
                               <div className="text-center">
-                                <div className="font-semibold">{getMonthName(mes).slice(0, 3)}</div>
-                                <div className="text-xs opacity-75">{anio}</div>
+                                <div className="font-semibold">{getMonthName(month_number).slice(0, 3)}</div>
+                                <div className="text-xs opacity-75">{year_number}</div>
                               </div>
                             </button>
                           );
@@ -832,31 +832,31 @@ setMembresiaLibre(!!libre.data);
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-medium text-gym-text truncate">{getPagoLabel(pago)}</span>
                         <Badge
-                          variant={pago.estado === "aprobado" ? "success" : pago.estado === "rechazado" ? "danger" : "warning"}
+                          variant={pago.status === "aprobado" ? "success" : pago.status === "rechazado" ? "danger" : "warning"}
                           className="text-[10px] px-1.5 py-0 flex-shrink-0"
                         >
-                          {pago.estado === "aprobado" ? "Aprobado" : pago.estado === "rechazado" ? "Rechazado" : pago.estado === "suspendido" ? "Suspendido" : "Pendiente"}
+                          {pago.status === "aprobado" ? "Aprobado" : pago.status === "rechazado" ? "Rechazado" : pago.status === "suspendido" ? "Suspendido" : "Pendiente"}
                         </Badge>
                       </div>
                       <div className="flex items-center gap-2 text-[11px] text-gym-muted">
-                        <span>{(pago.detalle?.reduce((s, d) => s + d.monto, 0) || 0) > 0 ? formatCurrency(pago.detalle?.reduce((s, d) => s + d.monto, 0) || 0) : "Gratis"}</span>
-                        {pago.codigo_billete && (
+                        <span>{(pago.detail?.reduce((s, d) => s + d.payment_amount, 0) || 0) > 0 ? formatCurrency(pago.detail?.reduce((s, d) => s + d.payment_amount, 0) || 0) : "Gratis"}</span>
+                        {pago.bill_code && (
                           <>
                             <span>·</span>
-                            <span className="font-mono">{pago.codigo_billete}</span>
+                            <span className="font-mono">{pago.bill_code}</span>
                           </>
                         )}
                       </div>
-                      {pago.estado === "aprobado" && pago.approved_by_profile && (
+                      {pago.status === "aprobado" && pago.approved_by_profile && (
                         <p className="text-[10px] text-gym-success/80 mt-0.5">
                           Aprobado por {pago.approved_by_profile.full_name}{pago.approved_at ? ` · ${new Date(pago.approved_at).toLocaleDateString("es-ES")}` : ""}
                         </p>
                       )}
-                      {pago.notas && (
-                        <p className="text-[10px] text-gym-muted/70 truncate mt-0.5">{pago.notas}</p>
+                      {pago.payment_note && (
+                        <p className="text-[10px] text-gym-muted/70 truncate mt-0.5">{pago.payment_note}</p>
                       )}
                     </div>
-                    {(pago.estado === "pendiente") && (
+                    {(pago.status === "pendiente") && (
                       <button
                         onClick={() => handleDelete(pago.id)}
                         disabled={deleting === pago.id}

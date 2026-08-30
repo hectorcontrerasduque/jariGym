@@ -47,14 +47,14 @@ function ReportarPagoForm() {
   const [miembroSeleccionado, setMiembroSeleccionado] = useState<string>(memberParam || "");
   const [inscripcionPagada, setInscripcionPagada] = useState(false);
   const [inscripcionPendiente, setInscripcionPendiente] = useState(false);
-  const [mesesPendientes, setMesesPendientes] = useState<{ mes: number; anio: number }[]>([]);
+  const [mesesPendientes, setMesesPendientes] = useState<{ month_number: number; year_number: number }[]>([]);
   const [membresiaLibreInfo, setMembresiaLibreInfo] = useState<MembresiaLibreInfo | null>(null);
 
   const [formData, setFormData] = useState({
-    meses: [] as { mes: number; anio: number }[],
+    meses: [] as { month_number: number; year_number: number }[],
     metodo_pago: "efectivo" as MetodoPago,
     codigo_billete: "",
-    notas: "",
+    payment_note: "",
     pagar_inscripcion: false,
     pagar_mensualidad: false,
     estado_pago: "aprobado" as "pendiente" | "aprobado",
@@ -161,12 +161,12 @@ function ReportarPagoForm() {
     return () => { cancelled = true; };
   }, [miembroSeleccionado, isAdmin]);
 
-  const toggleMonth = (mes: number, anio: number) => {
+  const toggleMonth = (month_number: number, year_number: number) => {
     setFormData((prev) => {
-      const existe = prev.meses.some((m) => m.mes === mes && m.anio === anio);
+      const existe = prev.meses.some((m) => m.month_number === month_number && m.year_number === year_number);
       const meses = existe
-        ? prev.meses.filter((m) => !(m.mes === mes && m.anio === anio))
-        : [...prev.meses, { mes, anio }];
+        ? prev.meses.filter((m) => !(m.month_number === month_number && m.year_number === year_number))
+        : [...prev.meses, { month_number, year_number }];
       return { ...prev, meses, pagar_mensualidad: meses.length > 0 ? true : prev.pagar_mensualidad };
     });
   };
@@ -224,24 +224,24 @@ function ReportarPagoForm() {
         comprobanteUrl = urlData.publicUrl;
       }
 
-      const detalles: Array<{ mes: number | null; anio: number | null; tipo_pago: "mensualidad" | "inscripcion"; monto: number }> = [];
+      const detalles: Array<{ month_number: number | null; year_number: number | null; payment_type: "mensualidad" | "inscripcion"; payment_amount: number }> = [];
 
       if (formData.pagar_inscripcion && !inscripcionPagada && getMontoByMetodo(formData.metodo_pago, "inscripcion") > 0) {
         detalles.push({
-          mes: new Date().getMonth() + 1,
-          anio: new Date().getFullYear(),
-          tipo_pago: "inscripcion",
-          monto: getMontoByMetodo(formData.metodo_pago, "inscripcion"),
+          month_number: new Date().getMonth() + 1,
+          year_number: new Date().getFullYear(),
+          payment_type: "inscripcion",
+          payment_amount: getMontoByMetodo(formData.metodo_pago, "inscripcion"),
         });
       }
 
       if (formData.pagar_mensualidad && formData.meses.length > 0) {
-        for (const { mes, anio } of formData.meses) {
+        for (const { month_number, year_number } of formData.meses) {
           detalles.push({
-            mes,
-            anio,
-            tipo_pago: "mensualidad",
-            monto: getMontoByMetodo(formData.metodo_pago, "mensual"),
+            month_number,
+            year_number,
+            payment_type: "mensualidad",
+            payment_amount: getMontoByMetodo(formData.metodo_pago, "mensual"),
           });
         }
       }
@@ -251,15 +251,15 @@ function ReportarPagoForm() {
       }
 
       const notasPago = formData.pagar_inscripcion && !inscripcionPagada
-        ? `Inscripción - ${formData.notas || ""}`
-        : formData.notas || undefined;
+        ? `Inscripción - ${formData.payment_note || ""}`
+        : formData.payment_note || undefined;
 
       const pago = await pagosService.crearPago({
-        usuario_id: targetUserId,
-        metodo_pago: formData.metodo_pago,
-        comprobante_url: comprobanteUrl || undefined,
-        codigo_billete: formData.metodo_pago === "efectivo" ? formData.codigo_billete : undefined,
-        notas: notasPago,
+        user_id: targetUserId,
+        payment_method: formData.metodo_pago,
+        receipt_url: comprobanteUrl || undefined,
+        bill_code: formData.metodo_pago === "efectivo" ? formData.codigo_billete : undefined,
+        payment_note: notasPago,
         detalles,
       });
 
@@ -464,13 +464,13 @@ function ReportarPagoForm() {
                   </div>
                 ) : (
                   <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                    {mesesPendientes.map(({ mes, anio }) => {
-                      const seleccionado = formData.meses.some((m) => m.mes === mes && m.anio === anio);
+                    {mesesPendientes.map(({ month_number, year_number }) => {
+                      const seleccionado = formData.meses.some((m) => m.month_number === month_number && m.year_number === year_number);
                       return (
                         <button
-                          key={`${anio}-${mes}`}
+                          key={`${year_number}-${month_number}`}
                           type="button"
-                          onClick={() => toggleMonth(mes, anio)}
+                          onClick={() => toggleMonth(month_number, year_number)}
                           className={`p-2 rounded-xl text-sm font-medium transition-all ${
                             seleccionado
                               ? "bg-gym-primary text-gym-bg glow-primary"
@@ -478,8 +478,8 @@ function ReportarPagoForm() {
                           }`}
                         >
                           <div className="text-center">
-                            <div className="font-semibold">{getMonthName(mes).slice(0, 3)}</div>
-                            <div className="text-xs opacity-75">{anio}</div>
+                            <div className="font-semibold">{getMonthName(month_number).slice(0, 3)}</div>
+                            <div className="text-xs opacity-75">{year_number}</div>
                           </div>
                         </button>
                       );
@@ -610,8 +610,8 @@ function ReportarPagoForm() {
               <label className="block text-sm font-medium text-gym-muted mb-2">Notas (opcional)</label>
               <textarea
                 placeholder="Algún comentario..."
-                value={formData.notas}
-                onChange={(e) => setFormData({ ...formData, notas: e.target.value })}
+                value={formData.payment_note}
+                onChange={(e) => setFormData({ ...formData, payment_note: e.target.value })}
                 className="w-full px-4 py-2.5 bg-gym-bg border border-gym-border rounded-xl text-gym-text placeholder:text-gym-muted focus:outline-none focus:ring-2 focus:ring-gym-primary resize-none h-20"
               />
             </div>

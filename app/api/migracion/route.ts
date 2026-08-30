@@ -261,25 +261,25 @@ export async function POST(request: Request) {
       const pagoEstado = record.estado === "pagado" ? "aprobado" : "suspendido";
 
       const { data: existingPago } = await supabase
-        .from("pagos")
+        .from("payments")
         .select("id, estado")
         .eq("usuario_id", userId)
         .maybeSingle();
 
       const { data: existingDetalle } = existingPago
         ? await supabase
-            .from("detalle_pago")
-            .select("pago_id")
-            .eq("pago_id", existingPago.id)
-            .eq("mes", record.mes_pagar)
-            .eq("anio", record.anio_pagar)
+            .from("payment_detail")
+            .select("payment_id")
+            .eq("payment_id", existingPago.id)
+            .eq("month_number", record.mes_pagar)
+            .eq("year_number", record.anio_pagar)
             .maybeSingle()
         : { data: null };
 
       if (existingDetalle) {
         if (existingPago?.estado === "pendiente" || existingPago?.estado === "suspendido") {
           const { error } = await supabase
-            .from("pagos")
+            .from("payments")
             .update({
               estado: pagoEstado,
               notas: "Actualizado por migración de data",
@@ -288,15 +288,15 @@ export async function POST(request: Request) {
             .eq("id", existingPago.id);
           if (!error) {
             await supabase
-              .from("detalle_pago")
-              .update({ monto: montoMensual })
-              .eq("pago_id", existingDetalle.pago_id);
+              .from("payment_detail")
+              .update({ payment_amount: montoMensual })
+              .eq("payment_id", existingDetalle.payment_id);
             pagosActualizados++;
           }
         }
       } else {
         const { data: nuevoPago, error: pagoError } = await supabase
-          .from("pagos")
+          .from("payments")
           .insert({
             usuario_id: userId,
             estado: pagoEstado,
@@ -309,13 +309,13 @@ export async function POST(request: Request) {
 
         if (!pagoError && nuevoPago) {
           await supabase
-            .from("detalle_pago")
+            .from("payment_detail")
             .insert({
-              pago_id: nuevoPago.id,
-              mes: record.mes_pagar,
-              anio: record.anio_pagar,
-              tipo_pago: "mensualidad",
-              monto: montoMensual,
+              payment_id: nuevoPago.id,
+              month_number: record.mes_pagar,
+              year_number: record.anio_pagar,
+              payment_type: "mensualidad",
+              payment_amount: montoMensual,
             });
           pagosCreados++;
         }
@@ -323,7 +323,7 @@ export async function POST(request: Request) {
     }
 
     const { data: primerPagoUsuario } = await supabase
-      .from("pagos")
+      .from("payments")
       .select("id")
       .eq("usuario_id", userId)
       .limit(1)
@@ -332,16 +332,16 @@ export async function POST(request: Request) {
     const pagoIdParaInscripcion = primerPagoUsuario?.id || "00000000-0000-0000-0000-000000000000";
 
     const { data: inscripcionExistente } = await supabase
-      .from("detalle_pago")
+      .from("payment_detail")
       .select("id")
-      .eq("tipo_pago", "inscripcion")
-      .eq("pago_id", pagoIdParaInscripcion)
+      .eq("payment_type", "inscripcion")
+      .eq("payment_id", pagoIdParaInscripcion)
       .maybeSingle();
 
     if (!inscripcionExistente) {
       if (montoInscripcion > 0) {
         const { data: inscPago, error: inscPagoError } = await supabase
-          .from("pagos")
+          .from("payments")
           .insert({
             usuario_id: userId,
             estado: "aprobado",
@@ -354,13 +354,13 @@ export async function POST(request: Request) {
 
         if (!inscPagoError && inscPago) {
           await supabase
-            .from("detalle_pago")
+            .from("payment_detail")
             .insert({
-              pago_id: inscPago.id,
-              mes: migrablesRecords[0]?.mes_pagar || 1,
-              anio: migrablesRecords[0]?.anio_pagar || new Date().getFullYear(),
-              tipo_pago: "inscripcion",
-              monto: montoInscripcion,
+              payment_id: inscPago.id,
+              month_number: migrablesRecords[0]?.mes_pagar || 1,
+              year_number: migrablesRecords[0]?.anio_pagar || new Date().getFullYear(),
+              payment_type: "inscripcion",
+              payment_amount: montoInscripcion,
             });
         }
       }

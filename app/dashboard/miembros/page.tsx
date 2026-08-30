@@ -15,7 +15,7 @@ import { Users, Search, Plus, Eye, UserX, UserCheck, Settings, Save, Pencil, Tra
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { showToast } from "@/components/ui/toast";
 import { messages } from "@/lib/messages";
-import type { Profile, Pago } from "@/lib/types";
+import type { Profile, Payment } from "@/lib/types";
 import Link from "next/link";
 
 export default function MiembrosPage() {
@@ -33,7 +33,7 @@ export default function MiembrosPage() {
   const [nuevoPassword, setNuevoPassword] = useState("");
   const [emailError, setEmailError] = useState("");
   const [passwordError, setPasswordError] = useState("");
-  const [pagoInscripcion, setPagoInscripcion] = useState<Pago | null>(null);
+  const [pagoInscripcion, setPagoInscripcion] = useState<Payment | null>(null);
   const [isMembresiaLibre, setIsMembresiaLibre] = useState(false);
   const [currentUser, setCurrentUser] = useState<Profile | null>(null);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
@@ -175,24 +175,24 @@ export default function MiembrosPage() {
       const supabase = createClient();
 
       const { data: inscPago } = await supabase
-        .from("pagos")
+        .from("payments")
         .select("id")
-        .eq("usuario_id", miembro.id)
+        .eq("user_id", miembro.id)
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
 
-      let pagoInsc: Pago | null = null;
+      let pagoInsc: Payment | null = null;
       if (inscPago) {
         const { data: detInsc } = await supabase
-          .from("detalle_pago")
-          .select("pago_id")
-          .eq("pago_id", inscPago.id)
-          .eq("tipo_pago", "inscripcion")
+          .from("payment_detail")
+          .select("payment_id")
+          .eq("payment_id", inscPago.id)
+          .eq("payment_type", "inscripcion")
           .maybeSingle();
         if (detInsc) {
           const { data: pagoFull } = await supabase
-            .from("pagos")
+            .from("payments")
             .select("*")
             .eq("id", inscPago.id)
             .single();
@@ -203,7 +203,7 @@ export default function MiembrosPage() {
       const { data: libreData } = await supabase
         .from("membresias")
         .select("id, fecha_fin")
-        .eq("usuario_id", miembro.id)
+        .eq("user_id", miembro.id)
         .is("fecha_fin", null)
         .limit(1)
         .maybeSingle();
@@ -553,7 +553,7 @@ export default function MiembrosPage() {
                 <div>
                   <div className="flex items-center justify-between">
                     <Badge variant="success">Pagada</Badge>
-                    <span className="text-lg font-bold text-gym-text neon-text">{formatCurrency(pagoInscripcion.detalle?.reduce((s, d) => s + d.monto, 0) || 0)}</span>
+                    <span className="text-lg font-bold text-gym-text neon-text">{formatCurrency(pagoInscripcion.detail?.reduce((s, d) => s + d.payment_amount, 0) || 0)}</span>
                   </div>
                   <p className="text-xs text-gym-muted mt-1">
                     Pago: {formatDateTime(pagoInscripcion.created_at)}

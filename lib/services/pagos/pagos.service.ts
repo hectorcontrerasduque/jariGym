@@ -17,42 +17,42 @@ import type { Pago, MetodoPago, TipoPago, Profile, DetallePago } from "@/lib/typ
  * 
  * Otherwise RLS will block queries (runs as anonymous anon key).
  */
-export interface DetallePagoInput {
-  mes: number | null;
-  anio: number | null;
-  tipo_pago: TipoPago;
-  monto: number;
+export interface PaymentDetailInput {
+  month_number: number | null;
+  year_number: number | null;
+  payment_type: TipoPago;
+  payment_amount: number;
 }
 
-export interface CreatePagoInput {
-  usuario_id: string;
-  metodo_pago: MetodoPago;
-  comprobante_url?: string;
-  codigo_billete?: string;
-  notas?: string;
-  detalles: DetallePagoInput[];
+export interface CreatePaymentInput {
+  user_id: string;
+  payment_method: MetodoPago;
+  receipt_url?: string;
+  bill_code?: string;
+  payment_note?: string;
+  detalles: PaymentDetailInput[];
 }
 
 export class PagosService {
   private supabase = createClient();
 
-  async crearPago(input: CreatePagoInput): Promise<Pago> {
+  async crearPago(input: CreatePaymentInput): Promise<Pago> {
     const {
       data: { user },
     } = await this.supabase.auth.getUser();
     if (!user) throw new Error(messages.toast.noAutenticado);
 
-    const comprobanteUrl = input.metodo_pago === "efectivo" ? null : (input.comprobante_url || null);
+    const receiptUrl = input.payment_method === "efectivo" ? null : (input.receipt_url || null);
 
     const { data: pago, error: pagoError } = await this.supabase
-      .from("pagos")
+      .from("payments")
       .insert({
-        usuario_id: input.usuario_id,
-        estado: "pendiente",
-        metodo_pago: input.metodo_pago,
-        codigo_billete: input.codigo_billete || null,
-        comprobante_url: comprobanteUrl,
-        notas: input.notas || null,
+        user_id: input.user_id,
+        status: "pendiente",
+        payment_method: input.payment_method,
+        bill_code: input.bill_code || null,
+        receipt_url: receiptUrl,
+        payment_note: input.payment_note || null,
         created_by: user.id,
       })
       .select()
@@ -66,23 +66,23 @@ export class PagosService {
     }
 
     const detalles = input.detalles.map((d) => ({
-      pago_id: pago.id,
-      mes: d.mes,
-      anio: d.anio,
-      tipo_pago: d.tipo_pago,
-      monto: d.monto,
+      payment_id: pago.id,
+      month_number: d.month_number,
+      year_number: d.year_number,
+      payment_type: d.payment_type,
+      payment_amount: d.payment_amount,
     }));
 
     const { error: detalleError } = await this.supabase
-      .from("detalle_pago")
+      .from("payment_detail")
       .insert(detalles);
 
     if (detalleError) {
-      await this.supabase.from("pagos").delete().eq("id", pago.id);
+      await this.supabase.from("payments").delete().eq("id", pago.id);
       throw new Error(messages.toast.pagoError);
     }
 
-    return { ...pago, detalle: detalles as DetallePago[] };
+    return { ...pago, detail: detalles as DetallePago[] };
   }
 
   async aprobarPago(pagoId: string): Promise<Pago> {
@@ -101,17 +101,17 @@ export class PagosService {
     }
 
     const { data: pagoActual } = await this.supabase
-      .from("pagos")
-      .select("estado")
+      .from("payments")
+      .select("status")
       .eq("id", pagoId)
       .single();
 
-    const nuevoEstado = pagoActual?.estado === "suspendido" ? "suspendido" : "aprobado";
+    const newStatus = pagoActual?.status === "suspendido" ? "suspendido" : "aprobado";
 
     const { data, error } = await this.supabase
-      .from("pagos")
+      .from("payments")
       .update({
-        estado: nuevoEstado,
+        status: newStatus,
         approved_by: user.id,
         approved_at: new Date().toISOString(),
       })
@@ -122,11 +122,11 @@ export class PagosService {
     if (error) throw error;
 
     const { data: detalles } = await this.supabase
-      .from("detalle_pago")
-      .select("tipo_pago")
-      .eq("pago_id", pagoId);
+      .from("payment_detail")
+      .select("payment_type")
+      .eq("payment_id", pagoId);
 
-    const tieneInscripcion = detalles?.some((d) => d.tipo_pago === "inscripcion");
+    const tieneInscripcion = detalles?.some((d) => d.payment_type === "inscripcion");
     if (tieneInscripcion) {
       await this.supabase
         .from("profiles")
@@ -134,7 +134,7 @@ export class PagosService {
           inscription_paid: true,
           inscription_date: new Date().toISOString().split("T")[0],
         })
-        .eq("id", data.usuario_id);
+        .eq("id", data.user_id);
     }
 
     return data as Pago;
@@ -156,15 +156,15 @@ export class PagosService {
     }
 
     const { data, error } = await this.supabase
-      .from("pagos")
+      .from("payments")
       .update({
-        estado: "rechazado",
-        notas: notas || "Pago rechazado",
+        status: "rechazado",
+        payment_note: notas || "Pago rechazado",
         approved_by: user.id,
         approved_at: new Date().toISOString(),
       })
       .eq("id", pagoId)
-      .eq("estado", "pendiente")
+      .eq("status", "pendiente")
       .select()
       .single();
 
@@ -185,12 +185,12 @@ export class PagosService {
       .single();
     const isAdmin = profile?.role === "super_admin";
 
-    const query = this.supabase.from("pagos").delete().eq("id", pagoId);
+    const query = this.supabase.from("payments").delete().eq("id", pagoId);
 
     if (isAdmin) {
-      query.eq("estado", "pendiente");
+      query.eq("status", "pendiente");
     } else {
-      query.eq("usuario_id", user.id).eq("estado", "pendiente");
+      query.eq("user_id", user.id).eq("status", "pendiente");
     }
 
     const { error } = await query;
@@ -205,27 +205,27 @@ export class PagosService {
     if (!user) throw new Error(messages.toast.noAutenticado);
 
     let query = supabase
-      .from("pagos")
-      .select("*, detalle:detalle_pago(*), profile:profiles!pagos_usuario_id_fkey(full_name, avatar_url, email)")
-      .eq("usuario_id", user.id)
+      .from("payments")
+      .select("*, detail:payment_detail(*), profile:profiles(full_name, avatar_url, email)")
+      .eq("user_id", user.id)
       .order("created_at", { ascending: false });
 
     if (anio || mes) {
       const { data: detalleMatches } = await supabase
-        .from("detalle_pago")
-        .select("pago_id")
-        .eq("anio", anio || new Date().getFullYear())
-        .eq("mes", mes || 0);
+        .from("payment_detail")
+        .select("payment_id")
+        .eq("year_number", anio || new Date().getFullYear())
+        .eq("month_number", mes || 0);
 
       if (mes && detalleMatches && detalleMatches.length > 0) {
-        const pagoIds = Array.from(new Set(detalleMatches.map((d) => d.pago_id)));
+        const pagoIds = Array.from(new Set(detalleMatches.map((d) => d.payment_id)));
         query = query.in("id", pagoIds);
       } else if (anio && !mes) {
         const { data: detalleAnio } = await supabase
-          .from("detalle_pago")
-          .select("pago_id")
-          .eq("anio", anio);
-        const pagoIds = Array.from(new Set((detalleAnio || []).map((d) => d.pago_id)));
+          .from("payment_detail")
+          .select("payment_id")
+          .eq("year_number", anio);
+        const pagoIds = Array.from(new Set((detalleAnio || []).map((d) => d.payment_id)));
         if (pagoIds.length > 0) {
           query = query.in("id", pagoIds);
         } else {
@@ -242,17 +242,17 @@ export class PagosService {
   async listarPagosUsuario(usuarioId: string, anio?: number, supabaseClient?: ReturnType<typeof createClient>): Promise<Pago[]> {
     const supabase = supabaseClient || this.supabase;
     let query = supabase
-      .from("pagos")
-      .select("*, detalle:detalle_pago(*), profile:profiles!pagos_usuario_id_fkey(full_name, avatar_url, email)")
-      .eq("usuario_id", usuarioId)
+      .from("payments")
+      .select("*, detail:payment_detail(*), profile:profiles(full_name, avatar_url, email)")
+      .eq("user_id", usuarioId)
       .order("created_at", { ascending: false });
 
     if (anio) {
       const { data: detalleAnio } = await supabase
-        .from("detalle_pago")
-        .select("pago_id")
-        .eq("anio", anio);
-        const pagoIds = Array.from(new Set((detalleAnio || []).map((d) => d.pago_id)));
+        .from("payment_detail")
+        .select("payment_id")
+        .eq("year_number", anio);
+        const pagoIds = Array.from(new Set((detalleAnio || []).map((d) => d.payment_id)));
         if (pagoIds.length > 0) {
           query = query.in("id", pagoIds);
         } else {
@@ -282,7 +282,7 @@ export class PagosService {
     return pagos;
   }
 
-  async crearPagoAprobado(input: CreatePagoInput): Promise<Pago> {
+  async crearPagoAprobado(input: CreatePaymentInput): Promise<Pago> {
     const {
       data: { user },
     } = await this.supabase.auth.getUser();
@@ -297,17 +297,17 @@ export class PagosService {
       throw new Error(messages.toast.noAutorizado);
     }
 
-    const comprobanteUrl = input.metodo_pago === "efectivo" ? null : (input.comprobante_url || null);
+    const receiptUrl = input.payment_method === "efectivo" ? null : (input.receipt_url || null);
 
     const { data: pago, error: pagoError } = await this.supabase
-      .from("pagos")
+      .from("payments")
       .insert({
-        usuario_id: input.usuario_id,
-        estado: "aprobado",
-        metodo_pago: input.metodo_pago,
-        codigo_billete: input.codigo_billete || null,
-        comprobante_url: comprobanteUrl,
-        notas: input.notas || null,
+        user_id: input.user_id,
+        status: "aprobado",
+        payment_method: input.payment_method,
+        bill_code: input.bill_code || null,
+        receipt_url: receiptUrl,
+        payment_note: input.payment_note || null,
         created_by: user.id,
         approved_by: user.id,
         approved_at: new Date().toISOString(),
@@ -323,23 +323,23 @@ export class PagosService {
     }
 
     const detalles = input.detalles.map((d) => ({
-      pago_id: pago.id,
-      mes: d.mes,
-      anio: d.anio,
-      tipo_pago: d.tipo_pago,
-      monto: d.monto,
+      payment_id: pago.id,
+      month_number: d.month_number,
+      year_number: d.year_number,
+      payment_type: d.payment_type,
+      payment_amount: d.payment_amount,
     }));
 
     const { error: detalleError } = await this.supabase
-      .from("detalle_pago")
+      .from("payment_detail")
       .insert(detalles);
 
     if (detalleError) {
-      await this.supabase.from("pagos").delete().eq("id", pago.id);
+      await this.supabase.from("payments").delete().eq("id", pago.id);
       throw new Error(messages.toast.pagoError);
     }
 
-    const tieneInscripcion = detalles.some((d) => d.tipo_pago === "inscripcion");
+    const tieneInscripcion = detalles.some((d) => d.payment_type === "inscripcion");
     if (tieneInscripcion) {
       await this.supabase
         .from("profiles")
@@ -347,13 +347,13 @@ export class PagosService {
           inscription_paid: true,
           inscription_date: new Date().toISOString().split("T")[0],
         })
-        .eq("id", input.usuario_id);
+        .eq("id", input.user_id);
     }
 
-    return { ...pago, detalle: detalles as DetallePago[] };
+    return { ...pago, detail: detalles as DetallePago[] };
   }
 
-  async crearPagoSuspendido(usuarioId: string, meses: { mes: number; anio: number }[], motivo?: string): Promise<number> {
+  async crearPagoSuspendido(usuarioId: string, meses: { month_number: number; year_number: number }[], motivo?: string): Promise<number> {
     const {
       data: { user },
     } = await this.supabase.auth.getUser();
@@ -361,35 +361,35 @@ export class PagosService {
 
     let count = 0;
 
-    for (const { mes, anio } of meses) {
+    for (const { month_number: mes, year_number: anio } of meses) {
       const { data: detalleExistente } = await this.supabase
-        .from("detalle_pago")
-        .select("pago_id, pagos!inner(id, estado)")
-        .eq("mes", mes)
-        .eq("anio", anio)
-        .eq("pagos.usuario_id", usuarioId)
-        .eq("pagos.estado", "pendiente")
+        .from("payment_detail")
+        .select("payment_id, payments!inner(id, status)")
+        .eq("month_number", mes)
+        .eq("year_number", anio)
+        .eq("payments.user_id", usuarioId)
+        .eq("payments.status", "pendiente")
         .maybeSingle();
 
       if (detalleExistente) {
         const { error } = await this.supabase
-          .from("pagos")
+          .from("payments")
           .update({
-            estado: "pendiente",
-            metodo_pago: "efectivo",
-            notas: motivo || "Solicitud de suspensión",
+            status: "pendiente",
+            payment_method: "efectivo",
+            payment_note: motivo || "Solicitud de suspensión",
             approved_by: null,
             approved_at: null,
           })
-          .eq("id", detalleExistente.pago_id);
+          .eq("id", detalleExistente.payment_id);
         if (!error) count++;
       } else {
         const { data: nuevoPago, error: pagoError } = await this.supabase
-          .from("pagos")
+          .from("payments")
           .insert({
-            usuario_id: usuarioId,
-            metodo_pago: "efectivo",
-            notas: motivo || "Solicitud de suspensión",
+            user_id: usuarioId,
+            payment_method: "efectivo",
+            payment_note: motivo || "Solicitud de suspensión",
             created_by: user.id,
           })
           .select()
@@ -397,13 +397,13 @@ export class PagosService {
 
         if (!pagoError && nuevoPago) {
           const { error: detError } = await this.supabase
-            .from("detalle_pago")
+            .from("payment_detail")
             .insert({
-              pago_id: nuevoPago.id,
-              mes,
-              anio,
-              tipo_pago: "mensualidad",
-              monto: 0,
+              payment_id: nuevoPago.id,
+              month_number: mes,
+              year_number: anio,
+              payment_type: "mensualidad",
+              payment_amount: 0,
             });
           if (!detError) count++;
         }
@@ -416,20 +416,20 @@ export class PagosService {
   async listarPagos(estado?: string, anio?: number, mes?: number, supabaseClient?: ReturnType<typeof createClient>): Promise<Pago[]> {
     const supabase = supabaseClient || this.supabase;
     let query = supabase
-      .from("pagos")
-      .select("*, detalle:detalle_pago(*), profile:profiles!pagos_usuario_id_fkey(full_name, avatar_url, email)")
+      .from("payments")
+      .select("*, detail:payment_detail(*), profile:profiles(full_name, avatar_url, email)")
       .order("created_at", { ascending: false });
 
     if (estado) {
-      query = query.eq("estado", estado);
+      query = query.eq("status", estado);
     }
 
     if (anio || mes) {
-      let detalleQuery = supabase.from("detalle_pago").select("pago_id");
-      if (anio) detalleQuery = detalleQuery.eq("anio", anio);
-      if (mes) detalleQuery = detalleQuery.eq("mes", mes);
+      let detalleQuery = supabase.from("payment_detail").select("payment_id");
+      if (anio) detalleQuery = detalleQuery.eq("year_number", anio);
+      if (mes) detalleQuery = detalleQuery.eq("month_number", mes);
       const { data: detalleMatches } = await detalleQuery;
-      const pagoIds = Array.from(new Set((detalleMatches || []).map((d) => d.pago_id)));
+      const pagoIds = Array.from(new Set((detalleMatches || []).map((d) => d.payment_id)));
       if (pagoIds.length > 0) {
         query = query.in("id", pagoIds);
       } else {
@@ -462,13 +462,13 @@ export class PagosService {
     return this.listarPagos("pendiente", undefined, undefined, supabaseClient);
   }
 
-  async mesesPendientes(usuarioId: string, anio?: number, supabaseClient?: ReturnType<typeof createClient>): Promise<{ mes: number; anio: number }[]> {
+  async mesesPendientes(usuarioId: string, anio?: number, supabaseClient?: ReturnType<typeof createClient>): Promise<{ month_number: number; year_number: number }[]> {
     const supabase = supabaseClient || this.supabase;
     const { data: pagos, error } = await supabase
-      .from("pagos")
-      .select("id, estado")
-      .eq("usuario_id", usuarioId)
-      .in("estado", ["aprobado", "pendiente"]);
+      .from("payments")
+      .select("id, status")
+      .eq("user_id", usuarioId)
+      .in("status", ["aprobado", "pendiente"]);
 
     if (error || !pagos) return [];
 
@@ -476,50 +476,50 @@ export class PagosService {
     if (pagoIds.length === 0) return [];
 
     const { data: detalles } = await supabase
-      .from("detalle_pago")
-      .select("mes, anio, pago_id")
-      .in("pago_id", pagoIds)
-      .not("mes", "is", null);
+      .from("payment_detail")
+      .select("month_number, year_number, payment_id")
+      .in("payment_id", pagoIds)
+      .not("month_number", "is", null);
 
     const anioFiltro = anio || new Date().getFullYear();
 
     const mesesConPago = new Set<string>();
     for (const d of detalles || []) {
-      if (d.anio === anioFiltro && d.mes) {
-        mesesConPago.add(`${d.mes}-${d.anio}`);
+      if (d.year_number === anioFiltro && d.month_number) {
+        mesesConPago.add(`${d.month_number}-${d.year_number}`);
       }
     }
 
-    const mesesPendientes: { mes: number; anio: number }[] = [];
+    const mesesPendientes: { month_number: number; year_number: number }[] = [];
     for (let mes = 12; mes >= 1; mes--) {
       if (!mesesConPago.has(`${mes}-${anioFiltro}`)) {
-        mesesPendientes.push({ mes, anio: anioFiltro });
+        mesesPendientes.push({ month_number: mes, year_number: anioFiltro });
       }
     }
 
     return mesesPendientes.reverse();
   }
 
-  async mesesPendientesAdmin(usuarioId: string, anio?: number, supabaseClient?: ReturnType<typeof createClient>): Promise<{ mes: number; anio: number }[]> {
+  async mesesPendientesAdmin(usuarioId: string, anio?: number, supabaseClient?: ReturnType<typeof createClient>): Promise<{ month_number: number; year_number: number }[]> {
     return this.mesesPendientes(usuarioId, anio, supabaseClient);
   }
 
   async tieneInscripcionPendiente(usuarioId: string, supabaseClient?: ReturnType<typeof createClient>): Promise<boolean> {
     const supabase = supabaseClient || this.supabase;
     const { data: pagos } = await supabase
-      .from("pagos")
+      .from("payments")
       .select("id")
-      .eq("usuario_id", usuarioId)
-      .in("estado", ["pendiente", "aprobado"])
+      .eq("user_id", usuarioId)
+      .in("status", ["pendiente", "aprobado"])
       .limit(1);
 
     if (!pagos || pagos.length === 0) return false;
 
     const { data: detalles } = await supabase
-      .from("detalle_pago")
+      .from("payment_detail")
       .select("id")
-      .eq("pago_id", pagos[0].id)
-      .eq("tipo_pago", "inscripcion")
+      .eq("payment_id", pagos[0].id)
+      .eq("payment_type", "inscripcion")
       .limit(1);
 
     return !!detalles && detalles.length > 0;
@@ -533,17 +533,17 @@ export class PagosService {
     if (!user) throw new Error(messages.toast.noAutenticado);
 
     let query = supabase
-      .from("pagos")
-      .select("*, detalle:detalle_pago(*)")
-      .eq("estado", "aprobado")
+      .from("payments")
+      .select("*, detail:payment_detail(*)")
+      .eq("status", "aprobado")
       .order("created_at", { ascending: false });
 
     if (anio) {
       const { data: detalleAnio } = await supabase
-        .from("detalle_pago")
-        .select("pago_id")
-        .eq("anio", anio);
-      const pagoIds = Array.from(new Set((detalleAnio || []).map((d) => d.pago_id)));
+        .from("payment_detail")
+        .select("payment_id")
+        .eq("year_number", anio);
+      const pagoIds = Array.from(new Set((detalleAnio || []).map((d) => d.payment_id)));
       if (pagoIds.length > 0) {
         query = query.in("id", pagoIds);
       } else {
@@ -559,22 +559,22 @@ export class PagosService {
   async aniosConPagos(usuarioId?: string, supabaseClient?: ReturnType<typeof createClient>): Promise<number[]> {
     const supabase = supabaseClient || this.supabase;
     let query = supabase
-      .from("pagos")
+      .from("payments")
       .select("id");
 
     if (usuarioId) {
-      query = query.eq("usuario_id", usuarioId);
+      query = query.eq("user_id", usuarioId);
     }
 
     const { data: pagos } = await query;
     if (!pagos || pagos.length === 0) return [new Date().getFullYear()];
 
     const { data: detalles } = await supabase
-      .from("detalle_pago")
-      .select("anio, pago_id")
-      .in("pago_id", pagos.map((p) => p.id));
+      .from("payment_detail")
+      .select("year_number, payment_id")
+      .in("payment_id", pagos.map((p) => p.id));
 
-    const anios = Array.from(new Set((detalles || []).map((d) => d.anio).filter(Boolean))) as number[];
+    const anios = Array.from(new Set((detalles || []).map((d) => d.year_number).filter(Boolean))) as number[];
     if (!anios.includes(new Date().getFullYear())) {
       anios.push(new Date().getFullYear());
     }
@@ -618,32 +618,32 @@ export class PagosService {
     const montoInscripcion = config?.amount_inscription || 0;
 
     const { data: pagosAnio } = await supabase
-      .from("pagos")
-      .select("id, usuario_id, estado, notas")
-      .in("estado", ["aprobado", "pendiente"]);
+      .from("payments")
+      .select("id, user_id, status, payment_note")
+      .in("status", ["aprobado", "pendiente"]);
 
     const pagosIds = (pagosAnio || []).map((p) => p.id);
 
     const { data: detallesAnio } = await supabase
-      .from("detalle_pago")
-      .select("pago_id, mes, anio, monto, tipo_pago")
-      .in("pago_id", pagosIds.length > 0 ? pagosIds : ["00000000-0000-0000-0000-000000000000"])
-      .eq("anio", anioConsulta);
+      .from("payment_detail")
+      .select("payment_id, month_number, year_number, payment_amount, payment_type")
+      .in("payment_id", pagosIds.length > 0 ? pagosIds : ["00000000-0000-0000-0000-000000000000"])
+      .eq("year_number", anioConsulta);
 
     const pagoMap = new Map((pagosAnio || []).map((p) => [p.id, p]));
 
     const pagosConDetalle = (detallesAnio || []).map((d) => ({
       ...d,
-      estado: pagoMap.get(d.pago_id)?.estado || "pendiente",
-      usuario_id: pagoMap.get(d.pago_id)?.usuario_id || "",
-      notas: pagoMap.get(d.pago_id)?.notas || null,
+      status: pagoMap.get(d.payment_id)?.status || "pendiente",
+      user_id: pagoMap.get(d.payment_id)?.user_id || "",
+      payment_note: pagoMap.get(d.payment_id)?.payment_note || null,
     }));
 
-    const todosPagosAprobados = pagosConDetalle.filter((p) => p.estado === "aprobado");
+    const todosPagosAprobados = pagosConDetalle.filter((p) => p.status === "aprobado");
     const miembrosConInscripcionPagada = new Set<string>();
     for (const pago of todosPagosAprobados) {
-      if (pago.tipo_pago === "inscripcion") {
-        miembrosConInscripcionPagada.add(pago.usuario_id);
+      if (pago.payment_type === "inscripcion") {
+        miembrosConInscripcionPagada.add(pago.user_id);
       }
     }
 
@@ -665,15 +665,15 @@ export class PagosService {
     const montoDeuda = montoDeudaInscripcion + montoDeudaMensualidad;
 
     const pagosMesActual = pagosConDetalle.filter(
-      (p) => p.estado === "aprobado" && p.mes === mesActual && p.anio === anioConsulta && p.tipo_pago === "mensualidad"
+      (p) => p.status === "aprobado" && p.month_number === mesActual && p.year_number === anioConsulta && p.payment_type === "mensualidad"
     );
     const usuariosAlDia = new Set(
-      pagosMesActual.filter((p) => miembrosConInscripcionPagada.has(p.usuario_id)).map((p) => p.usuario_id)
+      pagosMesActual.filter((p) => miembrosConInscripcionPagada.has(p.user_id)).map((p) => p.user_id)
     );
     const alDiaMensualidad = usuariosAlDia.size;
     const montoPagado = pagosMesActual
-      .filter((p) => usuariosAlDia.has(p.usuario_id))
-      .reduce((sum, p) => sum + (p.monto || 0), 0);
+      .filter((p) => usuariosAlDia.has(p.user_id))
+      .reduce((sum, p) => sum + (p.payment_amount || 0), 0);
 
     return {
       totalMiembros: miembrosActivos.length,
@@ -690,7 +690,7 @@ export class PagosService {
       montoPagado,
       membresiaLibre: miembrosLibresIds.size,
       pagosConfirmados: todosPagosAprobados.length,
-      pagosPendientes: pagosConDetalle.filter((p) => p.estado === "pendiente").length,
+      pagosPendientes: pagosConDetalle.filter((p) => p.status === "pendiente").length,
       ingresosMes: montoPagado,
     };
   }
@@ -700,7 +700,7 @@ export class PagosService {
       id: string;
       email: string;
       full_name: string;
-      deudas: Array<{ mes: number; anio: number; monto: number }>;
+      deudas: Array<{ month_number: number; year_number: number; payment_amount: number }>;
       totalDeuda: number;
       debeInscripcion: boolean;
       mesesDeuda: number[];
@@ -748,35 +748,35 @@ export class PagosService {
     const modoCobro = (ownerResult.data?.billing_mode as "dia_uno" | "fecha_inscripcion") || "dia_uno";
 
     const { data: todosPagosHeader } = await supabase
-      .from("pagos")
-      .select("id, usuario_id, estado, notas");
+      .from("payments")
+      .select("id, user_id, status, payment_note");
 
     const pagoIds = (todosPagosHeader || []).map((p) => p.id);
     const { data: todosDetalles } = await supabase
-      .from("detalle_pago")
-      .select("pago_id, mes, anio, monto, tipo_pago")
-      .in("pago_id", pagoIds.length > 0 ? pagoIds : ["00000000-0000-0000-0000-000000000000"])
-      .eq("anio", anioConsulta);
+      .from("payment_detail")
+      .select("payment_id, month_number, year_number, payment_amount, payment_type")
+      .in("payment_id", pagoIds.length > 0 ? pagoIds : ["00000000-0000-0000-0000-000000000000"])
+      .eq("year_number", anioConsulta);
 
     const pagoHeaderMap = new Map((todosPagosHeader || []).map((p) => [p.id, p]));
 
     const todosPagos = (todosDetalles || []).map((d) => ({
-      usuario_id: pagoHeaderMap.get(d.pago_id)?.usuario_id || "",
-      mes_pagar: d.mes,
-      anio_pagar: d.anio,
-      monto: d.monto,
-      estado: pagoHeaderMap.get(d.pago_id)?.estado || "pendiente",
-      notas: pagoHeaderMap.get(d.pago_id)?.notas || null,
-      tipo_pago: d.tipo_pago,
+      user_id: pagoHeaderMap.get(d.payment_id)?.user_id || "",
+      month_number: d.month_number,
+      year_number: d.year_number,
+      payment_amount: d.payment_amount,
+      status: pagoHeaderMap.get(d.payment_id)?.status || "pendiente",
+      payment_note: pagoHeaderMap.get(d.payment_id)?.payment_note || null,
+      payment_type: d.payment_type,
     }));
 
-    const pagosAprobados = todosPagos.filter((p) => p.estado === "aprobado");
-    const pagosQueCubrenMes = todosPagos.filter((p) => p.estado === "aprobado" || p.estado === "suspendido");
+    const pagosAprobados = todosPagos.filter((p) => p.status === "aprobado");
+    const pagosQueCubrenMes = todosPagos.filter((p) => p.status === "aprobado" || p.status === "suspendido");
 
     const miembrosConInscripcionPagada = new Set<string>();
     for (const pago of pagosAprobados) {
-      if (pago.tipo_pago === "inscripcion") {
-        miembrosConInscripcionPagada.add(pago.usuario_id);
+      if (pago.payment_type === "inscripcion") {
+        miembrosConInscripcionPagada.add(pago.user_id);
       }
     }
     for (const m of miembros) {
@@ -787,7 +787,7 @@ export class PagosService {
       id: string;
       email: string;
       full_name: string;
-      deudas: Array<{ mes: number; anio: number; monto: number }>;
+      deudas: Array<{ month_number: number; year_number: number; payment_amount: number }>;
       totalDeuda: number;
       debeInscripcion: boolean;
       mesesDeuda: number[];
@@ -821,8 +821,8 @@ export class PagosService {
         }
       }
 
-      const pagosMiembroQueCubren = pagosQueCubrenMes.filter((p) => p.usuario_id === miembro.id);
-      const mesesCubiertos = new Set(pagosMiembroQueCubren.map((p) => p.mes_pagar));
+      const pagosMiembroQueCubren = pagosQueCubrenMes.filter((p) => p.user_id === miembro.id);
+      const mesesCubiertos = new Set(pagosMiembroQueCubren.map((p) => p.month_number));
 
       const mesesDeuda: number[] = [];
       for (let mes = primerMesDeuda; mes <= mesActual; mes++) {
@@ -838,19 +838,19 @@ export class PagosService {
       if (!debeInscripcion && mesesDeuda.length === 0) continue;
 
       const pagosPendientes = todosPagos.filter(
-        (p) => p.usuario_id === miembro.id && p.anio_pagar === anioConsulta &&
-          p.tipo_pago === "mensualidad" &&
-          ["pendiente", "rechazado"].includes(p.estado)
+        (p) => p.user_id === miembro.id && p.year_number === anioConsulta &&
+          p.payment_type === "mensualidad" &&
+          ["pendiente", "rechazado"].includes(p.status)
       );
       const montoByMes = new Map<number, number>();
       for (const p of pagosPendientes) {
-        if (!montoByMes.has(p.mes_pagar!)) montoByMes.set(p.mes_pagar!, p.monto);
+        if (!montoByMes.has(p.month_number!)) montoByMes.set(p.month_number!, p.payment_amount);
       }
 
       const deudas = mesesDeuda.map((mes) => ({
-        mes,
-        anio: anioConsulta,
-        monto: montoByMes.get(mes) || montoMensual,
+        month_number: mes,
+        year_number: anioConsulta,
+        payment_amount: montoByMes.get(mes) || montoMensual,
       }));
 
       const totalDeuda = mesesDeuda.length * montoMensual + (debeInscripcion ? montoInscripcion : 0);
@@ -940,40 +940,40 @@ export class PagosService {
     );
 
     const { data: pagosHeader } = await supabase
-      .from("pagos")
-      .select("id, usuario_id, estado")
-      .in("estado", ["aprobado", "pendiente", "suspendido"]);
+      .from("payments")
+      .select("id, user_id, status")
+      .in("status", ["aprobado", "pendiente", "suspendido"]);
 
     const pagoIds = (pagosHeader || []).map((p) => p.id);
     const { data: allDetalles } = await supabase
-      .from("detalle_pago")
-      .select("pago_id, mes, anio, monto")
-      .in("pago_id", pagoIds.length > 0 ? pagoIds : ["00000000-0000-0000-0000-000000000000"])
-      .eq("anio", anioConsulta);
+      .from("payment_detail")
+      .select("payment_id, month_number, year_number, payment_amount")
+      .in("payment_id", pagoIds.length > 0 ? pagoIds : ["00000000-0000-0000-0000-000000000000"])
+      .eq("year_number", anioConsulta);
 
-    const pagoEstadoMap = new Map((pagosHeader || []).map((p) => [p.id, { estado: p.estado, usuario_id: p.usuario_id }]));
+    const pagoEstadoMap = new Map((pagosHeader || []).map((p) => [p.id, { status: p.status, user_id: p.user_id }]));
 
     const pagosAll = (allDetalles || []).map((d) => {
-      const header = pagoEstadoMap.get(d.pago_id);
+      const header = pagoEstadoMap.get(d.payment_id);
       return {
-        usuario_id: header?.usuario_id || "",
-        estado: header?.estado || "pendiente",
-        monto: d.monto,
-        mes_pagar: d.mes,
-        anio_pagar: d.anio,
+        user_id: header?.user_id || "",
+        status: header?.status || "pendiente",
+        payment_amount: d.payment_amount,
+        month_number: d.month_number,
+        year_number: d.year_number,
       };
     });
 
     const mesesFinal = statsMeses.map((m) => {
-      const pagosMes = pagosAll.filter((p) => p.mes_pagar === m.mes && p.anio_pagar === m.anio);
+      const pagosMes = pagosAll.filter((p) => p.month_number === m.mes && p.year_number === m.anio);
 
       const pagados = new Set(
-        pagosMes.filter((p) => (p.estado === "aprobado" || p.estado === "suspendido") && m.idsMes.has(p.usuario_id)).map((p) => p.usuario_id)
+        pagosMes.filter((p) => (p.status === "aprobado" || p.status === "suspendido") && m.idsMes.has(p.user_id)).map((p) => p.user_id)
       ).size;
 
       const montoAcumulado = pagosMes
-        .filter((p) => p.estado === "aprobado")
-        .reduce((sum, p) => sum + (p.monto || 0), 0);
+        .filter((p) => p.status === "aprobado")
+        .reduce((sum, p) => sum + (p.payment_amount || 0), 0);
 
       const libresMes = profiles.filter((p) => m.idsMes.has(p.id) && libresIds.has(p.id)).length;
 
@@ -981,8 +981,8 @@ export class PagosService {
       const montoAdeudado = sinPago * montoMensual;
 
       return {
-        mes: m.mes,
-        anio: m.anio,
+        month_number: m.mes,
+        year_number: m.anio,
         nombre: m.nombre,
         pagados,
         pendientes: 0,
@@ -998,3 +998,7 @@ export class PagosService {
 }
 
 export const pagosService = new PagosService();
+
+// Backward compatibility aliases
+export type DetallePagoInput = PaymentDetailInput;
+export type CreatePagoInput = CreatePaymentInput;

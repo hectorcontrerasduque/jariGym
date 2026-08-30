@@ -11,7 +11,7 @@ import { formatCurrency, getMonthName } from "@/lib/utils";
 import { Check, X, Eye, CreditCard, Clock, CheckCircle, AlertTriangle, Bell, Search, Plus } from "lucide-react";
 import { showToast } from "@/components/ui/toast";
 import { messages } from "@/lib/messages";
-import type { Pago, MetodoPago, Profile } from "@/lib/types";
+import type { Payment, MetodoPago, Profile } from "@/lib/types";
 import Link from "next/link";
 
 const metodoLabels: Record<MetodoPago, string> = {
@@ -20,23 +20,23 @@ const metodoLabels: Record<MetodoPago, string> = {
   binance: "🟡 Binance",
 };
 
-function isInscripcion(pago: Pago): boolean {
-  return pago.detalle?.some(d => d.tipo_pago === "inscripcion") || false;
+function isInscripcion(pago: Payment): boolean {
+  return pago.detail?.some(d => d.payment_type === "inscripcion") || false;
 }
 
-function getTipoLabel(pago: Pago): string {
+function getTipoLabel(pago: Payment): string {
   return isInscripcion(pago) ? "Inscripción" : "Mensualidad";
 }
 
-function getTotalMonto(pago: Pago): number {
-  return pago.detalle?.reduce((sum, d) => sum + d.monto, 0) || 0;
+function getTotalMonto(pago: Payment): number {
+  return pago.detail?.reduce((sum, d) => sum + d.payment_amount, 0) || 0;
 }
 
 export default function PagosPage() {
-  const [pagos, setPagos] = useState<Pago[]>([]);
+  const [pagos, setPagos] = useState<Payment[]>([]);
   const [filtro, setFiltro] = useState<string>("todos");
   const [loading, setLoading] = useState(true);
-  const [selectedPago, setSelectedPago] = useState<Pago | null>(null);
+  const [selectedPago, setSelectedPago] = useState<Payment | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [anios, setAnios] = useState<number[]>([]);
   const [anioSeleccionado, setAnioSeleccionado] = useState(new Date().getFullYear());
@@ -114,17 +114,17 @@ export default function PagosPage() {
     let result = filtro === "todos"
       ? pagos
       : filtro === "rechazados_suspendidos"
-      ? pagos.filter((p) => p.estado === "rechazado" || p.estado === "suspendido")
-      : pagos.filter((p) => p.estado === filtro);
+      ? pagos.filter((p) => p.status === "rechazado" || p.status === "suspendido")
+      : pagos.filter((p) => p.status === filtro);
     if (busquedaMiembro) {
       const q = busquedaMiembro.toLowerCase();
       const matchedMiembroIds = miembros
         .filter((m) => m.full_name.toLowerCase().includes(q) || (m.email && m.email.toLowerCase().includes(q)))
         .map((m) => m.id);
-      result = result.filter((p) => matchedMiembroIds.includes(p.usuario_id));
+      result = result.filter((p) => matchedMiembroIds.includes(p.user_id));
     }
     if (miembroSeleccionado) {
-      result = result.filter((p) => p.usuario_id === miembroSeleccionado);
+      result = result.filter((p) => p.user_id === miembroSeleccionado);
     }
     return result;
   })();
@@ -132,14 +132,14 @@ export default function PagosPage() {
   const selectedMiembroData = miembros.find((m) => m.id === miembroSeleccionado);
   const isActive = selectedMiembroData?.activo !== false;
 
-  const aprobados = pagosFiltrados.filter((p) => p.estado === "aprobado");
-  const pendientes = pagosFiltrados.filter((p) => p.estado === "pendiente");
+  const aprobados = pagosFiltrados.filter((p) => p.status === "aprobado");
+  const pendientes = pagosFiltrados.filter((p) => p.status === "pendiente");
   const montoAprobado = aprobados.reduce((sum, p) => sum + getTotalMonto(p), 0);
   const montoPendiente = pendientes.reduce((sum, p) => sum + getTotalMonto(p), 0);
 
-  const getNombreMiembro = (pago: Pago): string => {
+  const getNombreMiembro = (pago: Payment): string => {
     if (pago.profile?.full_name) return pago.profile.full_name;
-    const miembro = miembros.find((m) => m.id === pago.usuario_id);
+    const miembro = miembros.find((m) => m.id === pago.user_id);
     return miembro?.full_name || "—";
   };
 
@@ -302,7 +302,7 @@ export default function PagosPage() {
                         {getNombreMiembro(pago)}
                       </p>
                       <div className="flex items-center gap-2 mt-0.5">
-                        <span className="text-xs text-gym-muted">{pago.detalle?.[0]?.mes ? `${getMonthName(pago.detalle[0].mes)} ${pago.detalle[0].anio}` : "—"}</span>
+                        <span className="text-xs text-gym-muted">{pago.detail?.[0]?.month_number ? `${getMonthName(pago.detail[0].month_number)} ${pago.detail[0].year_number}` : "—"}</span>
                         <span className="text-xs text-gym-muted">·</span>
                         <span className={`text-xs ${isInscripcion(pago) ? "text-gym-primary" : "text-gym-secondary"}`}>
                           {getTipoLabel(pago)}
@@ -310,19 +310,19 @@ export default function PagosPage() {
                         <span className="text-xs text-gym-muted">·</span>
                         <Badge
                           variant={
-                            pago.estado === "aprobado"
+                            pago.status === "aprobado"
                               ? "success"
-                              : pago.estado === "rechazado"
+                              : pago.status === "rechazado"
                               ? "danger"
                               : "warning"
                           }
                           className="text-[10px] px-1.5 py-0"
                         >
-                          {pago.estado === "aprobado"
+                          {pago.status === "aprobado"
                             ? "Aprobado"
-                            : pago.estado === "rechazado"
+                            : pago.status === "rechazado"
                             ? "Rechazado"
-                            : pago.estado === "suspendido"
+                            : pago.status === "suspendido"
                             ? "Suspendido"
                             : "Pendiente"}
                         </Badge>
@@ -358,7 +358,7 @@ export default function PagosPage() {
             </div>
             <div>
               <p className="text-sm text-gym-muted">Concepto</p>
-              <p className="text-gym-text font-medium">{selectedPago.detalle?.[0]?.mes ? `${getMonthName(selectedPago.detalle[0].mes)} ${selectedPago.detalle[0].anio}` : isInscripcion(selectedPago) ? "Inscripción" : "—"}</p>
+              <p className="text-gym-text font-medium">{selectedPago.detail?.[0]?.month_number ? `${getMonthName(selectedPago.detail[0].month_number)} ${selectedPago.detail[0].year_number}` : isInscripcion(selectedPago) ? "Inscripción" : "—"}</p>
             </div>
             <div>
               <p className="text-sm text-gym-muted">Tipo</p>
@@ -370,27 +370,27 @@ export default function PagosPage() {
             </div>
             <div>
               <p className="text-sm text-gym-muted">Método</p>
-              <p className="text-gym-text">{metodoLabels[selectedPago.metodo_pago]}</p>
+              <p className="text-gym-text">{metodoLabels[selectedPago.payment_method]}</p>
             </div>
-            {selectedPago.codigo_billete && selectedPago.metodo_pago === "efectivo" && (
+            {selectedPago.bill_code && selectedPago.payment_method === "efectivo" && (
               <div>
                 <p className="text-sm text-gym-muted">Código billete</p>
-                <p className="text-gym-text font-mono">{selectedPago.codigo_billete}</p>
+                <p className="text-gym-text font-mono">{selectedPago.bill_code}</p>
               </div>
             )}
-            {selectedPago.comprobante_url && (
+            {selectedPago.receipt_url && (
               <div>
                 <p className="text-sm text-gym-muted mb-2">Comprobante</p>
-                <a href={selectedPago.comprobante_url} target="_blank" rel="noopener noreferrer" className="text-gym-primary hover:underline">
+                <a href={selectedPago.receipt_url} target="_blank" rel="noopener noreferrer" className="text-gym-primary hover:underline">
                   Ver comprobante
                 </a>
               </div>
             )}
             <div>
               <p className="text-sm text-gym-muted">Notas</p>
-              <p className="text-gym-text">{selectedPago.notas || "—"}</p>
+              <p className="text-gym-text">{selectedPago.payment_note || "—"}</p>
             </div>
-            {(selectedPago.estado === "pendiente") && (
+            {(selectedPago.status === "pendiente") && (
               <div className="flex gap-2 pt-4">
                 <Button className="flex-1 glow-success" onClick={() => handleAprobar(selectedPago.id)}>
                   <Check className="w-4 h-4 mr-2" /> Aprobar

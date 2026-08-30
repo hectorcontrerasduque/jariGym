@@ -225,7 +225,7 @@ async function procesarMiembrosDeudores(gymConfig: {
     try {
       const deudasParaEmail = miembro.deudas.length > 0
         ? miembro.deudas
-        : [{ mes: new Date().getMonth() + 1, anio: new Date().getFullYear(), monto: miembro.totalDeuda || 0 }];
+        : [{ month_number: new Date().getMonth() + 1, year_number: new Date().getFullYear(), payment_amount: miembro.totalDeuda || 0 }];
 
       await sendPaymentDebtEmail(
         miembro.email,
@@ -307,31 +307,31 @@ async function procesarRecordatorioPago(
   const idsCandidatos = candidatos.map((m) => m.id);
   const { data: libreRows } = await supabase
     .from("membresias")
-    .select("usuario_id")
-    .in("usuario_id", idsCandidatos)
+    .select("user_id")
+    .in("user_id", idsCandidatos)
     .is("fecha_fin", null);
 
-  const idsLibres = new Set((libreRows || []).map((r) => r.usuario_id));
+  const idsLibres = new Set((libreRows || []).map((r) => r.user_id));
   candidatos = candidatos.filter((m) => !idsLibres.has(m.id));
 
   if (candidatos.length === 0) return 0;
 
   const { data: pagosHeader } = await supabase
-    .from("pagos")
-    .select("id, usuario_id")
-    .in("estado", ["aprobado", "suspendido"]);
+    .from("payments")
+    .select("id, user_id")
+    .in("status", ["aprobado", "suspendido"]);
 
   const pagoIds = (pagosHeader || []).map((p) => p.id);
   const { data: pagosDetalles } = await supabase
-    .from("detalle_pago")
-    .select("pago_id")
-    .in("pago_id", pagoIds.length > 0 ? pagoIds : ["00000000-0000-0000-0000-000000000000"])
-    .eq("mes", mesActual)
-    .eq("anio", anioActual);
+    .from("payment_detail")
+    .select("payment_id, payment_amount")
+    .in("payment_id", pagoIds.length > 0 ? pagoIds : ["00000000-0000-0000-0000-000000000000"])
+    .eq("month_number", mesActual)
+    .eq("year_number", anioActual);
 
-  const pagoUsuarioMap = new Map((pagosHeader || []).map((p) => [p.id, p.usuario_id]));
+  const pagoUsuarioMap = new Map((pagosHeader || []).map((p) => [p.id, p.user_id]));
   const usuariosConPago = new Set(
-    (pagosDetalles || []).map((d) => pagoUsuarioMap.get(d.pago_id)).filter(Boolean)
+    (pagosDetalles || []).map((d) => pagoUsuarioMap.get(d.payment_id)).filter(Boolean)
   );
 
   const deudores = candidatos.filter((m) => {
@@ -411,30 +411,30 @@ async function procesarResumenDueno(gymConfig: Record<string, unknown>): Promise
   const anioActual = new Date().getFullYear();
 
   const { data: pagosAprobadosHeader } = await supabase
-    .from("pagos")
+    .from("payments")
     .select("id")
-    .eq("estado", "aprobado");
+    .eq("status", "aprobado");
 
   const aprobadosIds = (pagosAprobadosHeader || []).map((p) => p.id);
   const { data: pagosAprobadosDetalles } = await supabase
-    .from("detalle_pago")
-    .select("monto")
-    .in("pago_id", aprobadosIds.length > 0 ? aprobadosIds : ["00000000-0000-0000-0000-000000000000"])
-    .eq("mes", mesActual)
-    .eq("anio", anioActual);
+    .from("payment_detail")
+    .select("payment_amount")
+    .in("payment_id", aprobadosIds.length > 0 ? aprobadosIds : ["00000000-0000-0000-0000-000000000000"])
+    .eq("month_number", mesActual)
+    .eq("year_number", anioActual);
 
   const { data: pagosPendientesHeader } = await supabase
-    .from("pagos")
+    .from("payments")
     .select("id")
-    .in("estado", ["pendiente", "suspendido"]);
+    .in("status", ["pendiente", "suspendido"]);
 
   const pendientesIds = (pagosPendientesHeader || []).map((p) => p.id);
   const { data: pagosPendientesDetalles } = await supabase
-    .from("detalle_pago")
-    .select("monto")
-    .in("pago_id", pendientesIds.length > 0 ? pendientesIds : ["00000000-0000-0000-0000-000000000000"])
-    .eq("mes", mesActual)
-    .eq("anio", anioActual);
+    .from("payment_detail")
+    .select("payment_amount")
+    .in("payment_id", pendientesIds.length > 0 ? pendientesIds : ["00000000-0000-0000-0000-000000000000"])
+    .eq("month_number", mesActual)
+    .eq("year_number", anioActual);
 
   const { count: miembrosActivos } = await supabase
     .from("profiles")
@@ -458,11 +458,11 @@ async function procesarResumenDueno(gymConfig: Record<string, unknown>): Promise
         pagosAprobados: (pagosAprobadosDetalles || []).length,
         pagosPendientes: (pagosPendientesDetalles || []).length,
         montoCobrado: (pagosAprobadosDetalles || []).reduce(
-          (sum, p) => sum + p.monto,
+          (sum, p) => sum + p.payment_amount,
           0
         ),
         montoPendiente: (pagosPendientesDetalles || []).reduce(
-          (sum, p) => sum + p.monto,
+          (sum, p) => sum + p.payment_amount,
           0
         ),
         miembrosAlDia: miembrosActivos || 0,
@@ -496,30 +496,30 @@ async function procesarEstatusSistema(gymConfig: Record<string, unknown>): Promi
     .eq("activo", false);
 
   const { data: pagosAprobadosMesHeader } = await supabase
-    .from("pagos")
+    .from("payments")
     .select("id")
-    .eq("estado", "aprobado");
+    .eq("status", "aprobado");
 
   const aprobadosMesIds = (pagosAprobadosMesHeader || []).map((p) => p.id);
   const { data: pagosAprobadosMesDetalles } = await supabase
-    .from("detalle_pago")
-    .select("monto")
-    .in("pago_id", aprobadosMesIds.length > 0 ? aprobadosMesIds : ["00000000-0000-0000-0000-000000000000"])
-    .eq("mes", mesActual)
-    .eq("anio", anioActual);
+    .from("payment_detail")
+    .select("payment_amount")
+    .in("payment_id", aprobadosMesIds.length > 0 ? aprobadosMesIds : ["00000000-0000-0000-0000-000000000000"])
+    .eq("month_number", mesActual)
+    .eq("year_number", anioActual);
 
   const { data: pagosPendientesMesHeader } = await supabase
-    .from("pagos")
+    .from("payments")
     .select("id")
-    .in("estado", ["pendiente", "suspendido"]);
+    .in("status", ["pendiente", "suspendido"]);
 
   const pendientesMesIds = (pagosPendientesMesHeader || []).map((p) => p.id);
   const { data: pagosPendientesMesDetalles } = await supabase
-    .from("detalle_pago")
-    .select("monto")
-    .in("pago_id", pendientesMesIds.length > 0 ? pendientesMesIds : ["00000000-0000-0000-0000-000000000000"])
-    .eq("mes", mesActual)
-    .eq("anio", anioActual);
+    .from("payment_detail")
+    .select("payment_amount")
+    .in("payment_id", pendientesMesIds.length > 0 ? pendientesMesIds : ["00000000-0000-0000-0000-000000000000"])
+    .eq("month_number", mesActual)
+    .eq("year_number", anioActual);
 
   const { data: ultimoMiembro } = await supabase
     .from("profiles")
@@ -529,7 +529,7 @@ async function procesarEstatusSistema(gymConfig: Record<string, unknown>): Promi
     .single();
 
   const { data: ultimoPago } = await supabase
-    .from("pagos")
+    .from("payments")
     .select("created_at")
     .order("created_at", { ascending: false })
     .limit(1)
@@ -566,11 +566,11 @@ async function procesarEstatusSistema(gymConfig: Record<string, unknown>): Promi
         pagosAprobadosMes: (pagosAprobadosMesDetalles || []).length,
         pagosPendientesMes: (pagosPendientesMesDetalles || []).length,
         montoRecaudadoMes: (pagosAprobadosMesDetalles || []).reduce(
-          (s, p) => s + p.monto,
+          (s, p) => s + p.payment_amount,
           0
         ),
         montoPendienteMes: (pagosPendientesMesDetalles || []).reduce(
-          (s, p) => s + p.monto,
+          (s, p) => s + p.payment_amount,
           0
         ),
         capacidad: totalActivos || 0,

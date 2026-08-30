@@ -1,7 +1,7 @@
 export function deudasPendientesTemplate(
   memberName: string,
   gymName: string,
-  deudas: Array<{ mes: number; anio: number; monto: number }>,
+  deudas: Array<{ month_number: number; year_number: number; payment_amount: number }>,
   totalDeuda: number,
   gymLogo?: string | null
 ): string {
@@ -29,10 +29,10 @@ export function deudasPendientesTemplate(
       (d) => `
     <tr>
       <td style="padding:12px;border-bottom:1px solid #e2e8f0;color:#1e293b;font-size:14px;">
-        ${mesesNombres[d.mes - 1]} ${d.anio}
+        ${mesesNombres[d.month_number - 1]} ${d.year_number}
       </td>
       <td style="padding:12px;border-bottom:1px solid #e2e8f0;color:#1e293b;font-size:14px;text-align:right;font-weight:bold;">
-        $${d.monto.toFixed(2)}
+        $${d.payment_amount.toFixed(2)}
       </td>
     </tr>`
     )

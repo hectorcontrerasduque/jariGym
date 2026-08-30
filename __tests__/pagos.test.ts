@@ -1,17 +1,17 @@
 import { describe, it, expect } from "vitest";
-import type { Pago, CreatePagoInput } from "@/lib/types";
+import type { Payment, CreatePagoInput } from "@/lib/types";
 import { getMonthName, formatCurrency } from "@/lib/utils";
 
-function createMockPago(overrides: Partial<Pago> = {}): Pago {
+function createMockPago(overrides: Partial<Payment> = {}): Payment {
   return {
     id: "test-pago-id",
-    usuario_id: "test-user-id",
-    monto: 25.0,
-    comprobante_url: null,
-    estado: "pendiente",
-    metodo_pago: "efectivo",
-    codigo_billete: null,
-    notas: null,
+    user_id: "test-user-id",
+    payment_amount: 25.0,
+    receipt_url: null,
+    status: "pendiente",
+    payment_method: "efectivo",
+    bill_code: null,
+    payment_note: null,
     approved_by: null,
     approved_at: null,
     fecha_pago_real: null,
@@ -27,10 +27,10 @@ describe("Pago type", () => {
   it("should have required fields", () => {
     const pago = createMockPago();
     expect(pago.id).toBeDefined();
-    expect(pago.usuario_id).toBeDefined();
-    expect(pago.monto).toBeTypeOf("number");
-    expect(pago.estado).toBeDefined();
-    expect(pago.metodo_pago).toBeDefined();
+    expect(pago.user_id).toBeDefined();
+    expect(pago.payment_amount).toBeTypeOf("number");
+    expect(pago.status).toBeDefined();
+    expect(pago.payment_method).toBeDefined();
     expect(pago.mes_pagar).toBeTypeOf("number");
     expect(pago.anio_pagar).toBeTypeOf("number");
   });
@@ -75,20 +75,18 @@ describe("Pago type", () => {
 
   it("should have nullable optional fields", () => {
     const pago = createMockPago({
-      comprobante_url: null,
-      codigo_billete: null,
-      notas: null,
+      receipt_url: null,
+      bill_code: null,
+      payment_note: null,
       approved_by: null,
       approved_at: null,
-      fecha_pago_real: null,
     });
 
-    expect(pago.comprobante_url).toBeNull();
-    expect(pago.codigo_billete).toBeNull();
-    expect(pago.notas).toBeNull();
+    expect(pago.receipt_url).toBeNull();
+    expect(pago.bill_code).toBeNull();
+    expect(pago.payment_note).toBeNull();
     expect(pago.approved_by).toBeNull();
     expect(pago.approved_at).toBeNull();
-    expect(pago.fecha_pago_real).toBeNull();
   });
 
   it("should support tipo_pago field", () => {
@@ -100,34 +98,34 @@ describe("Pago type", () => {
 
   it("should default estado to pendiente", () => {
     const pago = createMockPago();
-    expect(pago.estado).toBe("pendiente");
+    expect(pago.status).toBe("pendiente");
   });
 });
 
 describe("Pago label helpers", () => {
-  function getPagoLabel(pago: Pago): string {
-    const isInscripcion = pago.notas?.toLowerCase().includes("inscripción") || pago.notas?.toLowerCase().includes("inscripcion");
+  function getPagoLabel(pago: Payment): string {
+    const isInscripcion = pago.payment_note?.toLowerCase().includes("inscripción") || pago.payment_note?.toLowerCase().includes("inscripcion");
     if (isInscripcion) return "Inscripción";
     return `${getMonthName(pago.mes_pagar)} ${pago.anio_pagar}`;
   }
 
   it("should return Inscripción for inscripcion pagos", () => {
-    const pago = createMockPago({ notas: "Inscripción - pago inicial" });
+    const pago = createMockPago({ payment_note: "Inscripción - pago inicial" });
     expect(getPagoLabel(pago)).toBe("Inscripción");
   });
 
   it("should return Inscripción for inscripcion with accent", () => {
-    const pago = createMockPago({ notas: "INSCRIPCIÓN" });
+    const pago = createMockPago({ payment_note: "INSCRIPCIÓN" });
     expect(getPagoLabel(pago)).toBe("Inscripción");
   });
 
   it("should return month name for mensualidad pagos", () => {
-    const pago = createMockPago({ mes_pagar: 3, anio_pagar: 2026, notas: null });
+    const pago = createMockPago({ mes_pagar: 3, anio_pagar: 2026, payment_note: null });
     expect(getPagoLabel(pago)).toBe("Marzo 2026");
   });
 
   it("should return month name for pagos with other notes", () => {
-    const pago = createMockPago({ mes_pagar: 12, anio_pagar: 2025, notas: "Pago regular" });
+    const pago = createMockPago({ mes_pagar: 12, anio_pagar: 2025, payment_note: "Pago regular" });
     expect(getPagoLabel(pago)).toBe("Diciembre 2025");
   });
 });
@@ -135,56 +133,54 @@ describe("Pago label helpers", () => {
 describe("Pago creation input", () => {
   it("should accept all required fields", () => {
     const input: CreatePagoInput = {
-      usuario_id: "user-123",
-      monto: 30,
+      user_id: "user-123",
+      payment_amount: 30,
       mes_pagar: 8,
       anio_pagar: 2026,
-      metodo_pago: "efectivo",
+      payment_method: "efectivo",
     };
 
-    expect(input.usuario_id).toBe("user-123");
-    expect(input.monto).toBe(30);
-    expect(input.metodo_pago).toBe("efectivo");
+    expect(input.user_id).toBe("user-123");
+    expect(input.payment_amount).toBe(30);
+    expect(input.payment_method).toBe("efectivo");
   });
 
   it("should accept optional fields", () => {
     const input: CreatePagoInput = {
-      usuario_id: "user-123",
-      monto: 30,
+      user_id: "user-123",
+      payment_amount: 30,
       mes_pagar: 8,
       anio_pagar: 2026,
-      metodo_pago: "bs",
-      comprobante_url: "https://example.com/comprobante.jpg",
-      codigo_billete: "ABC12",
-      notas: "Pago de agosto",
-      fecha_pago_real: "2026-08-15",
+      payment_method: "bs",
+      receipt_url: "https://example.com/comprobante.jpg",
+      bill_code: "ABC12",
+      payment_note: "Pago de agosto",
     };
 
-    expect(input.comprobante_url).toBe("https://example.com/comprobante.jpg");
-    expect(input.codigo_billete).toBe("ABC12");
-    expect(input.fecha_pago_real).toBe("2026-08-15");
+    expect(input.receipt_url).toBe("https://example.com/comprobante.jpg");
+    expect(input.bill_code).toBe("ABC12");
   });
 
-  it("should require fecha_pago_real as optional string", () => {
-    const inputWithDate: CreatePagoInput = {
-      usuario_id: "user-123",
-      monto: 30,
+  it("should require payment_note as optional string", () => {
+    const inputWithNote: CreatePagoInput = {
+      user_id: "user-123",
+      payment_amount: 30,
       mes_pagar: 8,
       anio_pagar: 2026,
-      metodo_pago: "efectivo",
-      fecha_pago_real: "2026-08-15",
+      payment_method: "efectivo",
+      payment_note: "Pago de agosto",
     };
 
-    const inputWithoutDate: CreatePagoInput = {
-      usuario_id: "user-123",
-      monto: 30,
+    const inputWithoutNote: CreatePagoInput = {
+      user_id: "user-123",
+      payment_amount: 30,
       mes_pagar: 8,
       anio_pagar: 2026,
-      metodo_pago: "efectivo",
+      payment_method: "efectivo",
     };
 
-    expect(inputWithDate.fecha_pago_real).toBe("2026-08-15");
-    expect(inputWithoutDate.fecha_pago_real).toBeUndefined();
+    expect(inputWithNote.payment_note).toBe("Pago de agosto");
+    expect(inputWithoutNote.payment_note).toBeUndefined();
   });
 });
 

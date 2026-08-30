@@ -180,8 +180,8 @@ describe("Migración API", () => {
         { id: "m2", nombre: "HAIDEE", mes_pagar: 2, anio_pagar: 2026, estado: "pagado", migrado: "no" },
       ]);
       if (table === "profiles") return chainReturn(null);
-      if (table === "pagos") return chainReturnOnInsert({ id: "pago-1", usuario_id: "user-1" });
-      if (table === "detalle_pago") return chainReturn(null);
+      if (table === "payments") return chainReturnOnInsert({ id: "pago-1", user_id: "user-1" });
+      if (table === "payment_detail") return chainReturn(null);
       if (table === "password_reset_tokens") return chainReturn(null);
       return chainReturn(null);
     });
@@ -212,8 +212,8 @@ describe("Migración API", () => {
         { id: "m1", nombre: "HAIDEE LOPEZ", mes_pagar: 1, anio_pagar: 2026, estado: "pagado", migrado: "no" },
       ]);
       if (table === "profiles") return chainReturn(null);
-      if (table === "pagos") return chainReturnOnInsert({ id: "pago-1", usuario_id: "user-1" });
-      if (table === "detalle_pago") return chainReturn(null);
+      if (table === "payments") return chainReturnOnInsert({ id: "pago-1", user_id: "user-1" });
+      if (table === "payment_detail") return chainReturn(null);
       if (table === "password_reset_tokens") return chainReturn(null);
       return chainReturn(null);
     });
@@ -243,8 +243,8 @@ describe("Migración API", () => {
         { id: "m1", nombre: "HAIDEE", mes_pagar: 1, anio_pagar: 2026, estado: "pagado", migrado: "no" },
       ]);
       if (table === "profiles") return chainReturn({ id: "existing-user" });
-      if (table === "pagos") return chainReturnOnInsert({ id: "pago-1", usuario_id: "existing-user" });
-      if (table === "detalle_pago") return chainReturn(null);
+      if (table === "payments") return chainReturnOnInsert({ id: "pago-1", user_id: "existing-user" });
+      if (table === "payment_detail") return chainReturn(null);
       if (table === "password_reset_tokens") return chainReturn(null);
       return chainReturn(null);
     });
@@ -270,8 +270,8 @@ describe("Migración API", () => {
         { id: "m3", nombre: "HAIDEE", mes_pagar: 3, anio_pagar: 2026, estado: "suspendido", migrado: "no" },
       ]);
       if (table === "profiles") return chainReturn(null);
-      if (table === "pagos") return chainReturnOnInsert({ id: `pago-${++pagoIdCounter}`, usuario_id: "user-1" });
-      if (table === "detalle_pago") return chainReturn(null);
+      if (table === "payments") return chainReturnOnInsert({ id: `pago-${++pagoIdCounter}`, user_id: "user-1" });
+      if (table === "payment_detail") return chainReturn(null);
       if (table === "password_reset_tokens") return chainReturn(null);
       return chainReturn(null);
     });

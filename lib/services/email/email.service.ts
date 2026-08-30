@@ -153,7 +153,7 @@ export async function sendPaymentDebtEmail(
   to: string,
   memberName: string,
   gymName: string,
-  deudas: Array<{ mes: number; anio: number; monto: number }>,
+  deudas: Array<{ month_number: number; year_number: number; payment_amount: number }>,
   totalDeuda: number,
   gymLogo?: string | null,
   direccion?: string | null

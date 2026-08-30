@@ -12,7 +12,7 @@ interface Moroso {
 
 function simulateGetMorosos(params: {
   miembros: Array<{ id: string; email: string; full_name: string; inscription_paid: boolean; activo: boolean | null; role: string; start_date?: string }>;
-  pagos: Array<{ usuario_id: string; mes_pagar: number; anio_pagar: number; estado: string; notas?: string }>;
+  pagos: Array<{ usuario_id: string; mes_pagar: number; anio_pagar: number; estado: string; payment_note?: string }>;
   libresIds: Set<string>;
   membresias?: Array<{ usuario_id: string; start_date?: string }>;
   ownerEmail: string;
@@ -32,7 +32,7 @@ function simulateGetMorosos(params: {
 
   const miembrosConInscripcionPagada = new Set<string>();
   for (const pago of pagosAprobados) {
-    const isInscripcion = pago.notas?.toLowerCase().includes("inscripción") || pago.notas?.toLowerCase().includes("inscripcion");
+    const isInscripcion = pago.payment_note?.toLowerCase().includes("inscripción") || pago.payment_note?.toLowerCase().includes("inscripcion");
     if (isInscripcion) miembrosConInscripcionPagada.add(pago.usuario_id);
   }
   for (const m of miembros) {
@@ -342,7 +342,7 @@ describe("Morosos detection logic", () => {
     const result = simulateGetMorosos({
       miembros: [{ ...baseMiembro, id: "m1", full_name: "Test", inscription_paid: false }],
       pagos: [
-        { usuario_id: "m1", mes_pagar: 1, anio_pagar: 2026, estado: "aprobado", notas: "Inscripción - pago inicial" },
+        { usuario_id: "m1", mes_pagar: 1, anio_pagar: 2026, estado: "aprobado", payment_note: "Inscripción - pago inicial" },
         ...[1, 2, 3].map((mes) => ({
           usuario_id: "m1", mes_pagar: mes, anio_pagar: 2026, estado: "aprobado" as const,
         })),

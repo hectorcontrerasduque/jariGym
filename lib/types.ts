@@ -37,40 +37,46 @@ export type MetodoPago = "efectivo" | "bs" | "binance";
 
 export type TipoPago = "mensualidad" | "inscripcion";
 
-// Pago = cabecera del pago (tabla pagos)
-export interface Pago {
+// Payment = cabecera del pago (tabla payments)
+export interface Payment {
   id: string;
-  usuario_id: string;
-  estado: "pendiente" | "aprobado" | "rechazado" | "suspendido";
-  metodo_pago: MetodoPago;
-  codigo_billete: string | null;
-  comprobante_url: string | null;
-  notas: string | null;
+  user_id: string;
+  status: "pendiente" | "aprobado" | "rechazado" | "suspendido";
+  payment_method: MetodoPago;
+  bill_code: string | null;
+  receipt_url: string | null;
+  payment_note: string | null;
   approved_by: string | null;
   approved_at: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
+  updated_by: string | null;
   profile?: Profile;
   approved_by_profile?: Profile;
   created_by_profile?: Profile;
-  detalle?: DetallePago[];
+  detail?: PaymentDetail[];
 }
 
-// DetallePago = detalle por mes o inscripcion (tabla detalle_pago)
-export interface DetallePago {
+// PaymentDetail = detalle por mes o inscripcion (tabla payment_detail)
+export interface PaymentDetail {
   id: string;
-  pago_id: string;
-  mes: number | null;
-  anio: number | null;
-  tipo_pago: TipoPago;
-  monto: number;
+  payment_id: string;
+  month_number: number | null;
+  year_number: number | null;
+  payment_type: TipoPago;
+  payment_amount: number;
 }
 
-// PagoConDetalle = cabecera con detalle incluido (para queries con JOIN)
-export interface PagoConDetalle extends Pago {
-  detalle: DetallePago[];
+// PaymentWithDetail = cabecera con detalle incluido (para queries con JOIN)
+export interface PaymentWithDetail extends Payment {
+  detail: PaymentDetail[];
 }
+
+// Backward compatibility aliases
+export type Pago = Payment;
+export type DetallePago = PaymentDetail;
+export type PagoConDetalle = PaymentWithDetail;
 
 export type TipoMovimiento = "inscripcion" | "mensualidad" | "otros";
 
@@ -78,16 +84,16 @@ export type ModoCobro = "dia_uno" | "fecha_inscripcion";
 
 export interface Movimiento {
   id: string;
-  usuario_id: string;
+  user_id: string;
   tipo: TipoMovimiento;
-  monto: number;
-  metodo_pago: MetodoPago;
-  comprobante_url: string | null;
-  codigo_billete: string | null;
-  notas: string | null;
-  mes: number | null;
-  anio: number | null;
-  estado: "pendiente" | "aprobado" | "rechazado" | "suspendido";
+  payment_amount: number;
+  payment_method: MetodoPago;
+  receipt_url: string | null;
+  bill_code: string | null;
+  payment_note: string | null;
+  month_number: number | null;
+  year_number: number | null;
+  status: "pendiente" | "aprobado" | "rechazado" | "suspendido";
   activo: boolean | null;
   approved_by: string | null;
   approved_at: string | null;

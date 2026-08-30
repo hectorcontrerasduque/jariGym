@@ -125,7 +125,7 @@ export async function POST(request: Request) {
 
     // 7. Pagos pendientes
     const { count: pagosPendientes } = await supabase
-      .from("pagos")
+      .from("payments")
       .select("id", { count: "exact", head: true })
       .in("estado", ["pendiente", "suspendido"]);
     resultados.push({

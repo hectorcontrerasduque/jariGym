@@ -229,7 +229,7 @@ async function procesarMiembrosDeudores(gymConfig: {
 
       await sendPaymentDebtEmail(
         miembro.email,
-        miembro.nombre_completo,
+        miembro.full_name,
         (gymConfig.nombre_gym as string) || "GymApp",
         deudasParaEmail,
         miembro.totalDeuda,
@@ -285,7 +285,7 @@ async function procesarRecordatorioPago(
 
   const { data: miembros } = await supabase
     .from("profiles")
-    .select("id, email, nombre_completo, fecha_inicio")
+    .select("id, email, full_name, start_date")
     .in("role", ["miembro", "super_admin"])
     .eq("activo", true)
     .not("email", "is", null);
@@ -295,8 +295,8 @@ async function procesarRecordatorioPago(
   let candidatos = miembros.filter((m) => m.email !== duenoEmail);
 
   candidatos = candidatos.filter((m) => {
-    if (!m.fecha_inicio) return true;
-    const fechaInsc = new Date(m.fecha_inicio);
+    if (!m.start_date) return true;
+    const fechaInsc = new Date(m.start_date);
     const diasDesdeInscripcion =
       (hoy.getTime() - fechaInsc.getTime()) / (1000 * 60 * 60 * 24);
     return diasDesdeInscripcion >= 30;
@@ -336,11 +336,11 @@ async function procesarRecordatorioPago(
 
   const deudores = candidatos.filter((m) => {
     if (usuariosConPago.has(m.id)) return false;
-    if (!m.fecha_inicio) return false;
+    if (!m.start_date) return false;
 
     if (forzar) return true;
 
-    const diaCobro = getDiaCobro(m.fecha_inicio, mesActual, anioActual, modoCobro);
+    const diaCobro = getDiaCobro(m.start_date, mesActual, anioActual, modoCobro);
     const notif = getDiaNotificacion(diaCobro, diasPrevio, mesActual, anioActual);
 
     return hoy.getDate() === notif.dia &&
@@ -353,7 +353,7 @@ async function procesarRecordatorioPago(
   let count = 0;
   for (const deudor of deudores) {
     try {
-      const diaCobro = getDiaCobro(deudor.fecha_inicio!, mesActual, anioActual, modoCobro);
+      const diaCobro = getDiaCobro(deudor.start_date!, mesActual, anioActual, modoCobro);
       const diasRestantesMes = diaCobro - hoy.getDate();
 
       const { sendPaymentReminderEmail } = await import(
@@ -361,7 +361,7 @@ async function procesarRecordatorioPago(
       );
       await sendPaymentReminderEmail(
         deudor.email!,
-        deudor.nombre_completo,
+        deudor.full_name,
         nombreGym,
         forzar ? 0 : Math.max(0, diasRestantesMes),
         new Date(anioActual, mesActual, diaCobro).toLocaleDateString("es-ES"),
@@ -385,9 +385,9 @@ async function procesarRecordatorioPago(
         duenoEmail,
         nombreGym,
         deudores.map((d) => {
-          const diaCobro = getDiaCobro(d.fecha_inicio!, mesActual, anioActual, modoCobro);
+          const diaCobro = getDiaCobro(d.start_date!, mesActual, anioActual, modoCobro);
           return {
-            nombre: d.nombre_completo,
+            nombre: d.full_name,
             diasRestantes: forzar ? 0 : Math.max(0, diaCobro - hoy.getDate()),
             fechaVencimiento: new Date(anioActual, mesActual, diaCobro).toLocaleDateString("es-ES"),
           };
@@ -524,7 +524,7 @@ async function procesarEstatusSistema(gymConfig: Record<string, unknown>): Promi
 
   const { data: ultimoMiembro } = await supabase
     .from("profiles")
-    .select("nombre_completo, created_at")
+    .select("full_name, created_at")
     .order("created_at", { ascending: false })
     .limit(1)
     .single();
@@ -577,7 +577,7 @@ async function procesarEstatusSistema(gymConfig: Record<string, unknown>): Promi
         capacidad: totalActivos || 0,
         maxMiembros: gymConfig.max_miembros as number,
         ultimoMiembroRegistrado: ultimoMiembro
-          ? ultimoMiembro.nombre_completo
+          ? ultimoMiembro.full_name
           : "N/A",
         ultimoPagoRegistrado: ultimoPago
           ? new Date(ultimoPago.created_at).toLocaleDateString("es-ES")

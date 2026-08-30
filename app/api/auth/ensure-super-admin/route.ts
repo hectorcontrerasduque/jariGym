@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const { email, nombre, inscripcion_pagada } = await request.json();
+    const { email, nombre, inscription_paid } = await request.json();
     if (!email || typeof email !== "string") {
       return NextResponse.json({ created: false });
     }
@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
 
     const emailLower = email.toLowerCase().trim();
     const nombreCompleto = (nombre && typeof nombre === "string" && nombre.trim()) || emailLower.split("@")[0];
-    const isOwner = inscripcion_pagada === true;
+    const isOwner = inscription_paid === true;
 
     const { data: existingProfile } = await supabase
       .from("profiles")
@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
       if (existingProfile.role !== "super_admin") {
         await supabase
           .from("profiles")
-          .update({ role: "super_admin", activo: true, registered: true, nombre_completo: nombreCompleto })
+          .update({ role: "super_admin", activo: true, registered: true, full_name: nombreCompleto })
           .eq("id", existingProfile.id);
       }
       return NextResponse.json({ created: false, promoted: true });
@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
       email: emailLower,
       password: randomPassword,
       email_confirm: true,
-      user_metadata: { nombre_completo: nombreCompleto },
+      user_metadata: { full_name: nombreCompleto },
     });
 
     let userId: string;
@@ -115,20 +115,20 @@ export async function POST(request: NextRequest) {
       .insert({
         id: userId,
         email: emailLower,
-        nombre_completo: nombreCompleto,
+        full_name: nombreCompleto,
         role: "super_admin",
         activo: true,
         registered: true,
-        fecha_inicio: new Date().toISOString().split("T")[0],
-        inscripcion_pagada: isOwner,
-        inscripcion_fecha: isOwner ? new Date().toISOString().split("T")[0] : null,
+        start_date: new Date().toISOString().split("T")[0],
+        inscription_paid: isOwner,
+        inscription_date: isOwner ? new Date().toISOString().split("T")[0] : null,
       });
 
     if (profileError) {
       if (profileError.code === "23505") {
         await supabase
           .from("profiles")
-          .update({ role: "super_admin", activo: true, registered: true, nombre_completo: nombreCompleto })
+          .update({ role: "super_admin", activo: true, registered: true, full_name: nombreCompleto })
           .eq("email", emailLower);
         return NextResponse.json({ created: false, promoted: true });
       }

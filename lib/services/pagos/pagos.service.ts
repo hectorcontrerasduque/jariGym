@@ -131,8 +131,8 @@ export class PagosService {
       await this.supabase
         .from("profiles")
         .update({
-          inscripcion_pagada: true,
-          inscripcion_fecha: new Date().toISOString().split("T")[0],
+          inscription_paid: true,
+          inscription_date: new Date().toISOString().split("T")[0],
         })
         .eq("id", data.usuario_id);
     }
@@ -206,7 +206,7 @@ export class PagosService {
 
     let query = supabase
       .from("pagos")
-      .select("*, detalle:detalle_pago(*), profile:profiles!pagos_usuario_id_fkey(nombre_completo, avatar_url, email)")
+      .select("*, detalle:detalle_pago(*), profile:profiles!pagos_usuario_id_fkey(full_name, avatar_url, email)")
       .eq("usuario_id", user.id)
       .order("created_at", { ascending: false });
 
@@ -243,7 +243,7 @@ export class PagosService {
     const supabase = supabaseClient || this.supabase;
     let query = supabase
       .from("pagos")
-      .select("*, detalle:detalle_pago(*), profile:profiles!pagos_usuario_id_fkey(nombre_completo, avatar_url, email)")
+      .select("*, detalle:detalle_pago(*), profile:profiles!pagos_usuario_id_fkey(full_name, avatar_url, email)")
       .eq("usuario_id", usuarioId)
       .order("created_at", { ascending: false });
 
@@ -269,12 +269,12 @@ export class PagosService {
     if (approvedIds.length > 0) {
       const { data: approvers } = await supabase
         .from("profiles")
-        .select("id, nombre_completo")
+        .select("id, full_name")
         .in("id", approvedIds);
-      const approverMap = new Map((approvers || []).map(a => [a.id, a.nombre_completo]));
+      const approverMap = new Map((approvers || []).map(a => [a.id, a.full_name]));
       for (const pago of pagos) {
         if (pago.approved_by) {
-          pago.approved_by_profile = { nombre_completo: approverMap.get(pago.approved_by) || "—" } as Profile;
+          pago.approved_by_profile = { full_name: approverMap.get(pago.approved_by) || "—" } as Profile;
         }
       }
     }
@@ -344,8 +344,8 @@ export class PagosService {
       await this.supabase
         .from("profiles")
         .update({
-          inscripcion_pagada: true,
-          inscripcion_fecha: new Date().toISOString().split("T")[0],
+          inscription_paid: true,
+          inscription_date: new Date().toISOString().split("T")[0],
         })
         .eq("id", input.usuario_id);
     }
@@ -417,7 +417,7 @@ export class PagosService {
     const supabase = supabaseClient || this.supabase;
     let query = supabase
       .from("pagos")
-      .select("*, detalle:detalle_pago(*), profile:profiles!pagos_usuario_id_fkey(nombre_completo, avatar_url, email)")
+      .select("*, detalle:detalle_pago(*), profile:profiles!pagos_usuario_id_fkey(full_name, avatar_url, email)")
       .order("created_at", { ascending: false });
 
     if (estado) {
@@ -445,12 +445,12 @@ export class PagosService {
     if (approvedIds.length > 0) {
       const { data: approvers } = await supabase
         .from("profiles")
-        .select("id, nombre_completo")
+        .select("id, full_name")
         .in("id", approvedIds);
-      const approverMap = new Map((approvers || []).map(a => [a.id, a.nombre_completo]));
+      const approverMap = new Map((approvers || []).map(a => [a.id, a.full_name]));
       for (const pago of pagos) {
         if (pago.approved_by) {
-          pago.approved_by_profile = { nombre_completo: approverMap.get(pago.approved_by) || "—" } as Profile;
+          pago.approved_by_profile = { full_name: approverMap.get(pago.approved_by) || "—" } as Profile;
         }
       }
     }
@@ -590,7 +590,7 @@ export class PagosService {
     const [allProfiles, libres, configResult, ownerResult] = await Promise.all([
       supabase
         .from("profiles")
-        .select("id, inscripcion_pagada, fecha_inicio, activo, role, email")
+        .select("id, inscription_paid, start_date, activo, role, email")
         .in("role", ["miembro", "super_admin"]),
       supabase
         .from("membresias")
@@ -648,7 +648,7 @@ export class PagosService {
     }
 
     for (const m of allMiembros) {
-      if (m.inscripcion_pagada) {
+      if (m.inscription_paid) {
         miembrosConInscripcionPagada.add(m.id);
       }
     }
@@ -699,7 +699,7 @@ export class PagosService {
     Array<{
       id: string;
       email: string;
-      nombre_completo: string;
+      full_name: string;
       deudas: Array<{ mes: number; anio: number; monto: number }>;
       totalDeuda: number;
       debeInscripcion: boolean;
@@ -714,7 +714,7 @@ export class PagosService {
     const [miembrosResult, configResult, libresResult, ownerResult] = await Promise.all([
       supabase
         .from("profiles")
-        .select("id, email, nombre_completo, inscripcion_pagada, activo, fecha_inicio")
+        .select("id, email, full_name, inscription_paid, activo, start_date")
         .in("role", ["miembro", "super_admin"])
         .not("email", "is", null),
       supabase
@@ -725,7 +725,7 @@ export class PagosService {
         .maybeSingle(),
       supabase
         .from("membresias")
-        .select("usuario_id, fecha_inicio")
+        .select("usuario_id, start_date")
         .is("fecha_fin", null),
       supabase
         .from("gym_config")
@@ -742,7 +742,7 @@ export class PagosService {
     const miembrosLibresIds = new Set((libresResult.data || []).map((l) => l.usuario_id));
     const fechaInicioMap = new Map<string, string>();
     for (const l of libresResult.data || []) {
-      if (l.fecha_inicio) fechaInicioMap.set(l.usuario_id, l.fecha_inicio);
+      if (l.start_date) fechaInicioMap.set(l.usuario_id, l.start_date);
     }
     const ownerEmail = ownerResult.data?.dueno_email?.toLowerCase() || "";
     const modoCobro = (ownerResult.data?.modo_cobro as "dia_uno" | "fecha_inscripcion") || "dia_uno";
@@ -780,13 +780,13 @@ export class PagosService {
       }
     }
     for (const m of miembros) {
-      if (m.inscripcion_pagada) miembrosConInscripcionPagada.add(m.id);
+      if (m.inscription_paid) miembrosConInscripcionPagada.add(m.id);
     }
 
     const morosos: Array<{
       id: string;
       email: string;
-      nombre_completo: string;
+      full_name: string;
       deudas: Array<{ mes: number; anio: number; monto: number }>;
       totalDeuda: number;
       debeInscripcion: boolean;
@@ -800,7 +800,7 @@ export class PagosService {
       const debeInscripcion = !miembrosConInscripcionPagada.has(miembro.id);
 
       const fechaInicioMembresia = fechaInicioMap.get(miembro.id);
-      const fechaInscripcion = miembro.fecha_inicio;
+      const fechaInscripcion = miembro.start_date;
       const fechaInicioStr = fechaInicioMembresia || fechaInscripcion;
       let primerMesDeuda = 1;
       if (fechaInicioStr) {
@@ -858,7 +858,7 @@ export class PagosService {
       morosos.push({
         id: miembro.id,
         email: miembro.email!,
-        nombre_completo: miembro.nombre_completo,
+        full_name: miembro.full_name,
         deudas,
         totalDeuda,
         debeInscripcion,
@@ -907,7 +907,7 @@ export class PagosService {
 
     const { data: allProfiles } = await supabase
       .from("profiles")
-      .select("id, fecha_inicio, role, email, activo")
+      .select("id, start_date, role, email, activo")
       .in("role", ["miembro", "super_admin"]);
 
     const profiles = (allProfiles || []).filter(
@@ -927,7 +927,7 @@ export class PagosService {
         const finMes = new Date(m.anio, m.mes, 0);
 
         const miembrosMes = profiles.filter((p) => {
-          const fechaInsc = p.fecha_inicio ? new Date(p.fecha_inicio) : null;
+          const fechaInsc = p.start_date ? new Date(p.start_date) : null;
           if (fechaInsc && fechaInsc > finMes) return false;
           return true;
         });

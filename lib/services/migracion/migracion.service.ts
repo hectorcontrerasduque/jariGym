@@ -34,7 +34,7 @@ export class MigracionService {
 
   async migrate(params: {
     nombreCompleto: string;
-    whatsapp: string;
+    phone_number: string;
     correo: string;
     password: string;
     selectedNombre?: string;

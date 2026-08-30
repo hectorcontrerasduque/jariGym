@@ -1,21 +1,23 @@
 export interface Profile {
   id: string;
-  email: string | null;
-  nombre_completo: string;
-  avatar_url: string | null;
-  whatsapp: string | null;
-  cedula: string | null;
-  horario_entreno: string | null;
-  hora_llegada: string | null;
-  hora_salida: string | null;
   role: "super_admin" | "miembro";
+  email: string | null;
+  document_id: string | null;
+  full_name: string;
+  start_date: string;
+  phone_number: string | null;
+  avatar_url: string | null;
+  arrival_time: string | null;
+  departure_time: string | null;
+  inscription_amount_paid: number;
+  inscription_paid: boolean;
+  inscription_date: string | null;
+  inscription_admin_note: string | null;
   /** null = active (legacy profiles), false = inactive, true = explicitly active. Always use `activo !== false` to check active status. */
   activo: boolean | null;
-  fecha_inicio: string;
-  monto_inscripcion_pagado: number;
-  inscripcion_pagada: boolean;
-  inscripcion_fecha: string | null;
-  inscripcion_nota_admin: string | null;
+  registered: boolean;
+  created_by: string | null;
+  updated_by: string | null;
   created_at: string;
   updated_at: string;
 }

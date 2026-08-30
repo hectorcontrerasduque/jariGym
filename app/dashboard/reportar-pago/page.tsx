@@ -18,7 +18,7 @@ import type { MetodoPago, GymConfig, MetodoPagoConfig, Profile } from "@/lib/typ
 import Link from "next/link";
 
 interface MembresiaLibreInfo {
-  fecha_inicio: string;
+  start_date: string;
   fecha_fin: string | null;
   asignado_por_nombre: string | null;
 }
@@ -75,13 +75,13 @@ function ReportarPagoForm() {
           if (!cancelled) setUserId(user.id);
           const { data: profile } = await supabase
             .from("profiles")
-            .select("role, inscripcion_pagada")
+            .select("role, inscription_paid")
             .eq("id", user.id)
             .single();
 
           if (!cancelled && profile) {
             setUserRole(profile.role);
-            setInscripcionPagada(profile.inscripcion_pagada);
+            setInscripcionPagada(profile.inscription_paid);
           }
 
           const currentIsAdmin = profile?.role === "super_admin";
@@ -101,7 +101,7 @@ function ReportarPagoForm() {
 
             const { data: libreData } = await supabase
               .from("membresias")
-              .select("fecha_inicio, fecha_fin, asignado_por_nombre")
+              .select("start_date, fecha_fin, asignado_por_nombre")
               .eq("usuario_id", user.id)
               .order("created_at", { ascending: false })
               .limit(1)
@@ -135,14 +135,14 @@ function ReportarPagoForm() {
       try {
         const [meses, profile, libreData, tienePendiente] = await Promise.all([
           pagosService.mesesPendientesAdmin(miembroId),
-          createClient().from("profiles").select("inscripcion_pagada").eq("id", miembroId).single(),
-          createClient().from("membresias").select("fecha_inicio, fecha_fin, asignado_por_nombre").eq("usuario_id", miembroId).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+          createClient().from("profiles").select("inscription_paid").eq("id", miembroId).single(),
+          createClient().from("membresias").select("start_date, fecha_fin, asignado_por_nombre").eq("usuario_id", miembroId).order("created_at", { ascending: false }).limit(1).maybeSingle(),
           pagosService.tieneInscripcionPendiente(miembroId),
         ]);
 
         if (!cancelled) {
           setMesesPendientes(meses);
-          if (profile.data) setInscripcionPagada(profile.data.inscripcion_pagada);
+          if (profile.data) setInscripcionPagada(profile.data.inscription_paid);
           setInscripcionPendiente(tienePendiente);
 
           if (libreData.data) {
@@ -318,7 +318,7 @@ function ReportarPagoForm() {
                 <p className="font-medium text-gym-text">Membresía Libre</p>
                 <div className="flex items-center gap-2 text-xs text-gym-muted">
                   <Calendar className="w-3 h-3" />
-                  <span>Desde: {new Date(membresiaLibreInfo!.fecha_inicio).toLocaleDateString("es-ES")}</span>
+                  <span>Desde: {new Date(membresiaLibreInfo!.start_date).toLocaleDateString("es-ES")}</span>
                 </div>
                 {membresiaLibreInfo!.asignado_por_nombre && (
                   <p className="text-xs text-gym-muted">
@@ -347,7 +347,7 @@ function ReportarPagoForm() {
               <option value="">-- Seleccionar miembro --</option>
               {miembros.map((m) => (
                 <option key={m.id} value={m.id}>
-                  {m.nombre_completo} ({m.email || "sin email"})
+                  {m.full_name} ({m.email || "sin email"})
                 </option>
               ))}
             </select>

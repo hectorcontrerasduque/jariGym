@@ -113,7 +113,7 @@ export default function MisPagosPage() {
         .select("*")
         .eq("activo", true)
         .eq("registered", true)
-        .order("nombre_completo");
+        .order("full_name");
       if (miembrosData) setMiembros(miembrosData);
     }
   }, [anioSeleccionado, miembroSeleccionado, isAdmin]);
@@ -139,12 +139,12 @@ export default function MisPagosPage() {
     try {
       const [meses, profile, libre, tienePendiente] = await Promise.all([
         pagosService.mesesPendientesAdmin(miembroId, anio),
-        createClient().from("profiles").select("inscripcion_pagada").eq("id", miembroId).single(),
+        createClient().from("profiles").select("inscription_paid").eq("id", miembroId).single(),
         createClient().from("membresias").select("id").eq("usuario_id", miembroId).is("fecha_fin", null).maybeSingle(),
         pagosService.tieneInscripcionPendiente(miembroId),
       ]);
       setMesesPendientes(meses);
-      if (profile.data) setInscripcionPagada(profile.data.inscripcion_pagada);
+      if (profile.data) setInscripcionPagada(profile.data.inscription_paid);
       setInscripcionPendiente(tienePendiente);
 setMembresiaLibre(!!libre.data);
       setFormData(prev => ({ ...prev, meses: [], pagar_inscripcion: false, pagar_mensualidad: false }));
@@ -159,12 +159,12 @@ setMembresiaLibre(!!libre.data);
     try {
       const [meses, profile, libre, tienePendiente] = await Promise.all([
         pagosService.mesesPendientes(userId, anio),
-        createClient().from("profiles").select("inscripcion_pagada").eq("id", userId).single(),
+        createClient().from("profiles").select("inscription_paid").eq("id", userId).single(),
         createClient().from("membresias").select("id").eq("usuario_id", userId).is("fecha_fin", null).maybeSingle(),
         pagosService.tieneInscripcionPendiente(userId),
       ]);
       setMesesPendientes(meses);
-      if (profile.data) setInscripcionPagada(profile.data.inscripcion_pagada);
+      if (profile.data) setInscripcionPagada(profile.data.inscription_paid);
       setInscripcionPendiente(tienePendiente);
 setMembresiaLibre(!!libre.data);
       setFormData(prev => ({ ...prev, meses: [], pagar_inscripcion: false, pagar_mensualidad: false }));
@@ -253,7 +253,7 @@ setMembresiaLibre(!!libre.data);
     }
     if (!formData.solicitar_suspension && montoTotal === 0) return;
 
-    const nombreMiembro = miembroSeleccionado?.nombre_completo || profile?.nombre_completo || "tu cuenta";
+    const nombreMiembro = miembroSeleccionado?.full_name || profile?.full_name || "tu cuenta";
     const acciones: string[] = [];
     if (formData.solicitar_suspension) {
       const mesesStr = formData.meses.map(m => `${getMonthName(m.mes)} ${m.anio}`).join(", ");
@@ -406,7 +406,7 @@ setMembresiaLibre(!!libre.data);
 
   const filteredMiembros = miembros.filter(m => {
     const s = miembroSearch.toLowerCase();
-    return m.nombre_completo?.toLowerCase().includes(s) || m.email?.toLowerCase().includes(s);
+    return m.full_name?.toLowerCase().includes(s) || m.email?.toLowerCase().includes(s);
   });
 
   const showInscriptionCheckbox = !inscripcionPagada && !inscripcionPendiente && gymConfig && getMontoByMetodo(formData.metodo_pago, "inscripcion") > 0;
@@ -444,7 +444,7 @@ setMembresiaLibre(!!libre.data);
         <div>
           <h1 className="text-2xl font-display font-bold text-gym-text neon-text">Mis Pagos</h1>
           <p className="text-gym-muted text-sm">
-            {miembroSeleccionado ? `Pagos de ${miembroSeleccionado.nombre_completo || miembroSeleccionado.email}` : "Historial y registro de pagos"}
+            {miembroSeleccionado ? `Pagos de ${miembroSeleccionado.full_name || miembroSeleccionado.email}` : "Historial y registro de pagos"}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -465,9 +465,9 @@ setMembresiaLibre(!!libre.data);
             <div className="flex items-center gap-3">
               {miembroSeleccionado ? (
                 <div className="flex items-center gap-3 flex-1 min-w-0">
-                  <Avatar src={miembroSeleccionado.avatar_url} alt={miembroSeleccionado.nombre_completo || ""} size="sm" />
+                  <Avatar src={miembroSeleccionado.avatar_url} alt={miembroSeleccionado.full_name || ""} size="sm" />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gym-text truncate">{miembroSeleccionado.nombre_completo || miembroSeleccionado.email}</p>
+                    <p className="text-sm font-medium text-gym-text truncate">{miembroSeleccionado.full_name || miembroSeleccionado.email}</p>
                     <p className="text-xs text-gym-muted truncate">{miembroSeleccionado.email}</p>
                   </div>
                   <button
@@ -500,9 +500,9 @@ setMembresiaLibre(!!libre.data);
                             onClick={() => { handleSelectMiembro(m); setShowSearch(false); }}
                             className="w-full text-left p-3 hover:bg-gym-surface transition-colors border-b border-gym-border/30 last:border-0 flex items-center gap-3"
                           >
-                            <Avatar src={m.avatar_url} alt={m.nombre_completo || ""} size="sm" />
+                            <Avatar src={m.avatar_url} alt={m.full_name || ""} size="sm" />
                             <div className="min-w-0">
-                              <p className="text-sm font-medium text-gym-text truncate">{m.nombre_completo || "Sin nombre"}</p>
+                              <p className="text-sm font-medium text-gym-text truncate">{m.full_name || "Sin nombre"}</p>
                               <p className="text-xs text-gym-muted truncate">{m.email}</p>
                             </div>
                           </button>
@@ -513,9 +513,9 @@ setMembresiaLibre(!!libre.data);
                 </div>
               ) : (
                 <div className="flex items-center gap-3 flex-1 min-w-0">
-                  <Avatar src={profile?.avatar_url} alt={profile?.nombre_completo || ""} size="sm" />
+                  <Avatar src={profile?.avatar_url} alt={profile?.full_name || ""} size="sm" />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gym-text truncate">{profile?.nombre_completo || "Miembro"}</p>
+                    <p className="text-sm font-medium text-gym-text truncate">{profile?.full_name || "Miembro"}</p>
                     <p className="text-xs text-gym-muted">Registrando pago para este usuario</p>
                   </div>
                   <button
@@ -537,7 +537,7 @@ setMembresiaLibre(!!libre.data);
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-base">
               <Plus className="w-5 h-5 text-gym-primary" />
-              {miembroSeleccionado ? `Pago para ${miembroSeleccionado.nombre_completo}` : "Guardar pago"}
+              {miembroSeleccionado ? `Pago para ${miembroSeleccionado.full_name}` : "Guardar pago"}
               {!miembroSeleccionado && isAdmin && <Badge variant="success" className="text-[10px] ml-1">Auto-aprobado</Badge>}
             </CardTitle>
           </CardHeader>
@@ -849,7 +849,7 @@ setMembresiaLibre(!!libre.data);
                       </div>
                       {pago.estado === "aprobado" && pago.approved_by_profile && (
                         <p className="text-[10px] text-gym-success/80 mt-0.5">
-                          Aprobado por {pago.approved_by_profile.nombre_completo}{pago.approved_at ? ` · ${new Date(pago.approved_at).toLocaleDateString("es-ES")}` : ""}
+                          Aprobado por {pago.approved_by_profile.full_name}{pago.approved_at ? ` · ${new Date(pago.approved_at).toLocaleDateString("es-ES")}` : ""}
                         </p>
                       )}
                       {pago.notas && (

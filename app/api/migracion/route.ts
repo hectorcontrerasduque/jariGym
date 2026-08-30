@@ -15,9 +15,9 @@ export async function POST(request: Request) {
   if (rateLimitResponse) return rateLimitResponse;
   
   try {
-    const { nombreCompleto, whatsapp, correo, password, selectedNombre } = await request.json();
+    const { nombreCompleto, phone_number, correo, password, selectedNombre } = await request.json();
 
-    if (!nombreCompleto || !whatsapp || !correo || !password) {
+    if (!nombreCompleto || !phone_number || !correo || !password) {
       return NextResponse.json({ error: messages.migracion.error }, { status: 400 });
     }
 
@@ -33,7 +33,7 @@ export async function POST(request: Request) {
     const nombre = nombreCompleto.trim().toUpperCase();
     const email = correo.toLowerCase().trim();
     const profileNombre = selectedNombre ? selectedNombre.trim().toUpperCase() : nombre;
-    const whatsappFormatted = whatsapp && !whatsapp.startsWith("+") ? `+58${whatsapp}` : whatsapp;
+    const whatsappFormatted = phone_number && !phone_number.startsWith("+") ? `+58${phone_number}` : phone_number;
 
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -152,12 +152,12 @@ export async function POST(request: Request) {
       await supabase
         .from("profiles")
         .update({
-          nombre_completo: profileNombre,
-          whatsapp: whatsappFormatted,
+          full_name: profileNombre,
+          phone_number: whatsappFormatted,
           email,
           registered: true,
           activo: true,
-          fecha_inicio: fechaInicioCalc,
+          start_date: fechaInicioCalc,
         })
         .eq("id", userId);
     } else {
@@ -173,13 +173,13 @@ export async function POST(request: Request) {
         await supabase.from("profiles").insert({
           id: userId,
           email,
-          nombre_completo: profileNombre,
-          whatsapp: whatsappFormatted,
+          full_name: profileNombre,
+          phone_number: whatsappFormatted,
           role: "miembro",
           activo: true,
           registered: true,
-          fecha_inicio: fechaInicioCalc,
-          inscripcion_pagada: false,
+          start_date: fechaInicioCalc,
+          inscription_paid: false,
         });
         isNewUser = true;
       } else {
@@ -188,7 +188,7 @@ export async function POST(request: Request) {
           email,
           password,
           email_confirm: false,
-          user_metadata: { nombre_completo: profileNombre },
+          user_metadata: { full_name: profileNombre },
         });
 
         if (authError) {
@@ -209,13 +209,13 @@ export async function POST(request: Request) {
 
         const profileFields = {
           email,
-          nombre_completo: profileNombre,
-          whatsapp: whatsappFormatted,
+          full_name: profileNombre,
+          phone_number: whatsappFormatted,
           role: "miembro" as const,
           activo: true,
           registered: true,
-          fecha_inicio: fechaInicioCalc,
-          inscripcion_pagada: false,
+          start_date: fechaInicioCalc,
+          inscription_paid: false,
         };
 
         if (triggeredProfile) {
@@ -367,8 +367,8 @@ export async function POST(request: Request) {
       await supabase
         .from("profiles")
         .update({
-          inscripcion_pagada: true,
-          inscripcion_fecha: new Date().toISOString().split("T")[0],
+          inscription_paid: true,
+          inscription_date: new Date().toISOString().split("T")[0],
         })
         .eq("id", userId);
     }

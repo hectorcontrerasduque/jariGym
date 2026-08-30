@@ -41,15 +41,14 @@ function PerfilContent() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [currentUserRole, setCurrentUserRole] = useState<string>("");
   const [formData, setFormData] = useState({
-    nombre_completo: "",
+    full_name: "",
     email: "",
-    whatsapp: "",
-    cedula: "",
-    horario_entreno: "",
-    hora_llegada: "--:--",
-    hora_salida: "--:--",
+    phone_number: "",
+    document_id: "",
+    arrival_time: "--:--",
+    departure_time: "--:--",
     role: "" as Profile["role"],
-    inscripcion_nota_admin: "",
+    inscription_admin_note: "",
     password: "",
     currentPassword: "",
   });
@@ -86,15 +85,14 @@ function PerfilContent() {
             if (!cancelled && targetData) {
               setProfile(targetData);
               setFormData({
-                nombre_completo: targetData.nombre_completo || "",
+                full_name: targetData.full_name || "",
                 email: targetData.email || "",
-                whatsapp: targetData.whatsapp || "",
-                cedula: targetData.cedula || "",
-                horario_entreno: targetData.horario_entreno || "",
-                hora_llegada: targetData.hora_llegada || "--:--",
-                hora_salida: targetData.hora_salida || "--:--",
+                phone_number: targetData.phone_number || "",
+                document_id: targetData.document_id || "",
+                arrival_time: targetData.arrival_time || "--:--",
+                departure_time: targetData.departure_time || "--:--",
                 role: targetData.role,
-                inscripcion_nota_admin: targetData.inscripcion_nota_admin || "",
+                inscription_admin_note: targetData.inscription_admin_note || "",
                 password: "",
                 currentPassword: "",
               });
@@ -102,15 +100,14 @@ function PerfilContent() {
           } else {
             setProfile(data);
             setFormData({
-              nombre_completo: data.nombre_completo || "",
+              full_name: data.full_name || "",
               email: data.email || "",
-              whatsapp: data.whatsapp || "",
-              cedula: data.cedula || "",
-              horario_entreno: data.horario_entreno || "",
-              hora_llegada: data.hora_llegada || "--:--",
-              hora_salida: data.hora_salida || "--:--",
+              phone_number: data.phone_number || "",
+              document_id: data.document_id || "",
+              arrival_time: data.arrival_time || "--:--",
+              departure_time: data.departure_time || "--:--",
               role: data.role,
-              inscripcion_nota_admin: data.inscripcion_nota_admin || "",
+              inscription_admin_note: data.inscription_admin_note || "",
               password: "",
               currentPassword: "",
             });
@@ -138,14 +135,14 @@ function PerfilContent() {
       return;
     }
 
-    let cedulaToSend = formData.cedula || null;
-    if (cedulaToSend && !cedulaToSend.startsWith("V-") && !cedulaToSend.startsWith("E-")) {
-      cedulaToSend = `V-${cedulaToSend}`;
+    let document_idToSend = formData.document_id || null;
+    if (document_idToSend && !document_idToSend.startsWith("V-") && !document_idToSend.startsWith("E-")) {
+      document_idToSend = `V-${document_idToSend}`;
     }
 
-    let whatsappToSend = formData.whatsapp || "";
-    if (whatsappToSend && !whatsappToSend.startsWith("+")) {
-      whatsappToSend = `+58${whatsappToSend}`;
+    let phone_numberToSend = formData.phone_number || "";
+    if (phone_numberToSend && !phone_numberToSend.startsWith("+")) {
+      phone_numberToSend = `+58${phone_numberToSend}`;
     }
 
     setSaving(true);
@@ -156,15 +153,14 @@ function PerfilContent() {
         body: JSON.stringify({
           user_id: targetUserId || undefined,
           updates: {
-            nombre_completo: formData.nombre_completo || profile!.nombre_completo || "Sin nombre",
+            full_name: formData.full_name || profile!.full_name || "Sin nombre",
             email: formData.email,
-            whatsapp: whatsappToSend,
-            cedula: cedulaToSend,
-            horario_entreno: formData.horario_entreno || null,
-            hora_llegada: formData.hora_llegada || null,
-            hora_salida: formData.hora_salida || null,
+            phone_number: phone_numberToSend,
+            document_id: document_idToSend,
+            arrival_time: formData.arrival_time || null,
+            departure_time: formData.departure_time || null,
             role: currentUserRole === "super_admin" ? formData.role : undefined,
-            inscripcion_nota_admin: currentUserRole === "super_admin" ? formData.inscripcion_nota_admin || null : undefined,
+            inscription_admin_note: currentUserRole === "super_admin" ? formData.inscription_admin_note || null : undefined,
           },
           password: formData.password || undefined,
           currentPassword: formData.currentPassword || undefined,
@@ -213,15 +209,15 @@ function PerfilContent() {
       <Card className="neon-card">
         <CardContent className="p-6">
           <div className="flex items-center gap-4">
-            <Avatar src={profile.avatar_url} alt={profile.nombre_completo} size="lg" />
+            <Avatar src={profile.avatar_url} alt={profile.full_name} size="lg" />
             <div className="flex-1">
-              <h3 className="text-lg font-semibold text-gym-text">{profile.nombre_completo || "Sin nombre"}</h3>
+              <h3 className="text-lg font-semibold text-gym-text">{profile.full_name || "Sin nombre"}</h3>
               <p className="text-sm text-gym-muted">{profile.email}</p>
               <div className="flex items-center gap-2 mt-1 flex-wrap">
                 <Badge variant={isAdmin ? "primary" : "secondary"}>
                   {profile.role === "super_admin" ? "Super Admin" : "Miembro"}
                 </Badge>
-                {profile.inscripcion_pagada ? (
+                {profile.inscription_paid ? (
                   <Badge variant="success" className="flex items-center gap-1">
                     <CheckCircle className="w-3 h-3" /> Inscripción pagada
                   </Badge>
@@ -248,8 +244,8 @@ function PerfilContent() {
           <div>
             <label className="text-xs text-gym-muted mb-1 block">Nombre completo (opcional)</label>
             <Input
-              value={formData.nombre_completo}
-              onChange={(e) => setFormData({ ...formData, nombre_completo: e.target.value })}
+              value={formData.full_name}
+              onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
               placeholder="Nombre completo"
             />
           </div>
@@ -268,8 +264,8 @@ function PerfilContent() {
               <label className="text-xs text-gym-muted mb-1 block">Hora llegada (opcional solo referencial, hora militar)</label>
               <input
                 type="time"
-                value={formData.hora_llegada === "--:--" ? "" : formData.hora_llegada}
-                onChange={(e) => setFormData({ ...formData, hora_llegada: e.target.value || "--:--" })}
+                value={formData.arrival_time === "--:--" ? "" : formData.arrival_time}
+                onChange={(e) => setFormData({ ...formData, arrival_time: e.target.value || "--:--" })}
                 className="w-full px-3 py-2 rounded-xl border border-gym-border bg-gym-surface text-gym-text text-sm focus:outline-none focus:ring-2 focus:ring-gym-primary/50"
               />
             </div>
@@ -277,8 +273,8 @@ function PerfilContent() {
               <label className="text-xs text-gym-muted mb-1 block">Hora salida (opcional solo referencial, hora militar)</label>
               <input
                 type="time"
-                value={formData.hora_salida === "--:--" ? "" : formData.hora_salida}
-                onChange={(e) => setFormData({ ...formData, hora_salida: e.target.value || "--:--" })}
+                value={formData.departure_time === "--:--" ? "" : formData.departure_time}
+                onChange={(e) => setFormData({ ...formData, departure_time: e.target.value || "--:--" })}
                 className="w-full px-3 py-2 rounded-xl border border-gym-border bg-gym-surface text-gym-text text-sm focus:outline-none focus:ring-2 focus:ring-gym-primary/50"
               />
             </div>
@@ -300,16 +296,16 @@ function PerfilContent() {
           <div>
             <label className="text-xs text-gym-muted mb-1 block">WhatsApp (opcional)</label>
             <Input
-              value={formData.whatsapp}
-              onChange={(e) => setFormData({ ...formData, whatsapp: e.target.value })}
+              value={formData.phone_number}
+              onChange={(e) => setFormData({ ...formData, phone_number: e.target.value })}
               placeholder="+58 412 1234567"
             />
           </div>
           <div>
             <label className="text-xs text-gym-muted mb-1 block">Cédula (opcional)</label>
             <Input
-              value={formData.cedula}
-              onChange={(e) => setFormData({ ...formData, cedula: e.target.value })}
+              value={formData.document_id}
+              onChange={(e) => setFormData({ ...formData, document_id: e.target.value })}
               placeholder="V-12345678"
             />
           </div>
@@ -317,8 +313,8 @@ function PerfilContent() {
             <div>
               <label className="text-xs text-gym-muted mb-1 block">Nota de inscripción (admin)</label>
               <textarea
-                value={formData.inscripcion_nota_admin}
-                onChange={(e) => setFormData({ ...formData, inscripcion_nota_admin: e.target.value })}
+                value={formData.inscription_admin_note}
+                onChange={(e) => setFormData({ ...formData, inscription_admin_note: e.target.value })}
                 placeholder="Notas internas sobre inscripción..."
                 rows={2}
                 className="w-full px-3 py-2 bg-gym-surface border border-gym-border rounded-xl text-sm text-gym-text focus:outline-none focus:ring-2 focus:ring-gym-primary/50 resize-none"

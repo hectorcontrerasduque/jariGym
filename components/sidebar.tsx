@@ -130,12 +130,12 @@ export function Sidebar() {
           <div className="flex items-center gap-3 min-w-0">
             <Link href="/dashboard/perfil">
               <div className={isSuperAdmin ? "neon-admin-ring rounded-full" : ""}>
-                <Avatar src={profile?.avatar_url} alt={profile?.nombre_completo || ""} size="sm" />
+                <Avatar src={profile?.avatar_url} alt={profile?.full_name || ""} size="sm" />
               </div>
             </Link>
             <div className="min-w-0">
               <p className={cn("text-sm font-medium text-gym-text truncate", isSuperAdmin && "neon-gold")}>
-                {profile?.nombre_completo || "Usuario"}
+                {profile?.full_name || "Usuario"}
               </p>
               <p className="text-[10px] text-gym-muted truncate">
                 {profile?.email || ""}
@@ -209,13 +209,13 @@ export function Sidebar() {
             <div className={isSuperAdmin ? "neon-admin-ring rounded-full" : ""}>
               <Avatar
                 src={profile?.avatar_url}
-                alt={profile?.nombre_completo || ""}
+                alt={profile?.full_name || ""}
                 size="sm"
               />
             </div>
             <div className="flex-1 min-w-0">
               <p className={cn("text-sm font-medium text-gym-text truncate", isSuperAdmin && "neon-gold")}>
-                {profile?.nombre_completo || "Usuario"}
+                {profile?.full_name || "Usuario"}
               </p>
               <p className="text-xs text-gym-muted truncate">
                 {profile?.email || ""}

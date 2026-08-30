@@ -43,7 +43,7 @@ serve(async (req) => {
 
     let query = supabase
       .from("pagos")
-      .select("*, profile:profiles(nombre_completo, avatar_url)")
+      .select("*, profile:profiles(full_name, avatar_url)")
       .order("created_at", { ascending: false });
 
     if (estado) {

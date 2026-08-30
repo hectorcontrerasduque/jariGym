@@ -89,7 +89,7 @@ function makeReq(body: Record<string, unknown>) {
 
 const baseBody = {
   nombreCompleto: "HAIDEE",
-  whatsapp: "1234",
+  phone_number: "1234",
   correo: "haidee@test.com",
   password: "123456",
 };

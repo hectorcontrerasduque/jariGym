@@ -75,7 +75,7 @@ export class ConfigService {
             await fetch("/api/auth/ensure-super-admin", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ email: updates.dueno_email, nombre: updates.dueno_nombre, inscripcion_pagada: true }),
+              body: JSON.stringify({ email: updates.dueno_email, nombre: updates.dueno_nombre, inscription_paid: true }),
             });
           } catch (error) {
             console.error("[config] Error creando super_admin via ensure-super-admin:", error);
@@ -102,7 +102,7 @@ export class ConfigService {
             await fetch("/api/auth/ensure-super-admin", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ email: updates.dueno_email, nombre: updates.dueno_nombre, inscripcion_pagada: true }),
+              body: JSON.stringify({ email: updates.dueno_email, nombre: updates.dueno_nombre, inscription_paid: true }),
             });
           } catch (error) {
             console.error("[config] Error creando super_admin via ensure-super-admin:", error);

@@ -181,7 +181,7 @@ function LoginForm() {
         await fetch("/api/auth/ensure-super-admin", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email: userEmail, inscripcion_pagada: true }),
+          body: JSON.stringify({ email: userEmail, inscription_paid: true }),
         });
         const { data: retry } = await supabase
           .from("profiles")
@@ -325,7 +325,7 @@ function LoginForm() {
         : migPassword;
       const result = await migracionService.migrate({
         nombreCompleto: migNombre,
-        whatsapp: migWhatsapp,
+        phone_number: migWhatsapp,
         correo: migCorreo,
         password: finalPassword,
         selectedNombre,
@@ -553,7 +553,7 @@ function LoginForm() {
                   </p>
                   <div className="relative">
                     <Input
-                      label={messages.migracion.nombreCompleto}
+                      label={messages.migracion.fullName}
                       placeholder={messages.migracion.nombrePlaceholder}
                       value={migNombre}
                       onChange={(e) => {
@@ -624,7 +624,7 @@ function LoginForm() {
                     )}
                   </div>
                     <Input
-                      label={messages.migracion.whatsapp}
+                      label={messages.migracion.phoneNumber}
                       placeholder="+584261234567"
                       value={migWhatsapp}
                       onChange={(e) => { const val = e.target.value.replace(/[^0-9]/g, ""); setMigWhatsapp(val); }}

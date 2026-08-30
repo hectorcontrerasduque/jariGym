@@ -44,22 +44,21 @@ export async function PUT(request: Request) {
 
     const { data: currentData } = await serviceSupabase
       .from("profiles")
-      .select("nombre_completo, email, whatsapp, cedula, horario_entreno, hora_llegada, hora_salida, inscripcion_nota_admin")
+      .select("full_name, email, phone_number, document_id, arrival_time, departure_time, inscription_admin_note")
       .eq("id", targetUserId)
       .single();
 
     const profileUpdates: Record<string, unknown> = {
-      nombre_completo: updates.nombre_completo ?? currentData?.nombre_completo,
+      full_name: updates.full_name ?? currentData?.full_name,
       email: updates.email ?? currentData?.email,
-      whatsapp: updates.whatsapp ?? currentData?.whatsapp,
-      cedula: updates.cedula ?? currentData?.cedula,
-      horario_entreno: updates.horario_entreno ?? currentData?.horario_entreno,
-      hora_llegada: updates.hora_llegada ?? currentData?.hora_llegada,
-      hora_salida: updates.hora_salida ?? currentData?.hora_salida,
+      phone_number: updates.phone_number ?? currentData?.phone_number,
+      document_id: updates.document_id ?? currentData?.document_id,
+      arrival_time: updates.arrival_time ?? currentData?.arrival_time,
+      departure_time: updates.departure_time ?? currentData?.departure_time,
     };
     if (isAdmin) {
       profileUpdates.role = updates.role;
-      profileUpdates.inscripcion_nota_admin = updates.inscripcion_nota_admin ?? currentData?.inscripcion_nota_admin;
+      profileUpdates.inscription_admin_note = updates.inscription_admin_note ?? currentData?.inscription_admin_note;
     }
 
     const { data, error: profileError } = await serviceSupabase

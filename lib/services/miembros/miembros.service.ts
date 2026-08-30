@@ -8,8 +8,8 @@ export class MiembrosService {
   async listarMiembros(): Promise<Profile[]> {
     const { data, error } = await this.supabase
       .from("profiles")
-      .select("id, nombre_completo, email, avatar_url, activo, role, fecha_inicio, inscripcion_nota_admin, inscripcion_pagada, hora_llegada, hora_salida")
-      .order("fecha_inicio", { ascending: false });
+      .select("id, full_name, email, avatar_url, activo, role, start_date, inscription_admin_note, inscription_paid, arrival_time, departure_time")
+      .order("start_date", { ascending: false });
 
     if (error) throw error;
     return (data || []) as Profile[];
@@ -19,8 +19,8 @@ export class MiembrosService {
     const { data, error } = await this.supabase
       .from("profiles")
       .select("*")
-      .or(`nombre_completo.ilike.%${busqueda}%,email.ilike.%${busqueda}%`)
-      .order("nombre_completo", { ascending: true })
+      .or(`full_name.ilike.%${busqueda}%,email.ilike.%${busqueda}%`)
+      .order("full_name", { ascending: true })
       .limit(10);
 
     if (error) throw error;
@@ -45,7 +45,7 @@ export class MiembrosService {
     if (!user) throw new Error(messages.toast.noAutenticado);
 
     const allowedFields: Record<string, unknown> = {};
-    const allowedKeys = ["nombre_completo", "email", "whatsapp", "cedula", "horario_entreno", "activo", "inscripcion_nota_admin", "inscripcion_pagada", "inscripcion_fecha", "monto_inscripcion_pagado", "membresia_libre"];
+    const allowedKeys = ["full_name", "email", "phone_number", "document_id", "activo", "inscription_admin_note", "inscription_paid", "inscription_date", "inscription_amount_paid", "membresia_libre"];
     for (const key of allowedKeys) {
       if (key in updates) {
         // eslint-disable-next-line security/detect-object-injection

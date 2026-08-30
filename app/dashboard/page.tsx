@@ -135,9 +135,9 @@ export default function DashboardPage() {
   }, [isSuperAdmin]);
 
   const getNombreMiembro = (pago: Pago): string => {
-    if (pago.profile?.nombre_completo) return pago.profile.nombre_completo;
+    if (pago.profile?.full_name) return pago.profile.full_name;
     const miembro = miembros.find((m) => m.id === pago.usuario_id);
-    return miembro?.nombre_completo || "Desconocido";
+    return miembro?.full_name || "Desconocido";
   };
 
   if (loading) {
@@ -152,9 +152,9 @@ export default function DashboardPage() {
 
   const hourCounts: Record<string, number> = {};
   for (const m of miembros) {
-    if (m.hora_llegada && m.hora_salida && m.hora_llegada !== "--:--" && m.hora_salida !== "--:--") {
-      const startH = parseInt(m.hora_llegada.split(":")[0], 10);
-      const endH = parseInt(m.hora_salida.split(":")[0], 10);
+    if (m.arrival_time && m.departure_time && m.arrival_time !== "--:--" && m.departure_time !== "--:--") {
+      const startH = parseInt(m.arrival_time.split(":")[0], 10);
+      const endH = parseInt(m.departure_time.split(":")[0], 10);
       if (!isNaN(startH) && !isNaN(endH)) {
         for (let h = startH; h <= endH; h++) {
           const key = `${String(h).padStart(2, "0")}:00`;
@@ -175,7 +175,7 @@ export default function DashboardPage() {
         title: "Morosos",
         members: morosos.map((m) => ({
           id: m.id,
-          nombre: m.nombre_completo,
+          nombre: m.full_name,
           detalle: `${m.mesesDeuda.length} mes(es) sin pago${m.debeInscripcion ? " + inscripción" : ""} — ${formatCurrency(m.totalDeuda)}`,
         })),
       });
@@ -213,7 +213,7 @@ export default function DashboardPage() {
       const alDia = miembros.filter((m) => idsAlDia.includes(m.id));
       setModalData({
         title: "Al día",
-        members: alDia.map((m) => ({ id: m.id, nombre: m.nombre_completo })),
+        members: alDia.map((m) => ({ id: m.id, nombre: m.full_name })),
       });
     } catch {
       showToast("Error al cargar datos", "error");
@@ -234,7 +234,7 @@ export default function DashboardPage() {
       const libresList = miembros.filter((m) => libresIds.has(m.id));
       setModalData({
         title: "Membresía Libre",
-        members: libresList.map((m) => ({ id: m.id, nombre: m.nombre_completo })),
+        members: libresList.map((m) => ({ id: m.id, nombre: m.full_name })),
       });
     } catch {
       showToast("Error al cargar datos", "error");
@@ -248,7 +248,7 @@ export default function DashboardPage() {
       title: "Miembros Activos",
       members: miembros.map((m) => ({
         id: m.id,
-        nombre: m.nombre_completo,
+        nombre: m.full_name,
         detalle: m.email || "",
       })),
     });

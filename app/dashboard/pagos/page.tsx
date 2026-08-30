@@ -119,7 +119,7 @@ export default function PagosPage() {
     if (busquedaMiembro) {
       const q = busquedaMiembro.toLowerCase();
       const matchedMiembroIds = miembros
-        .filter((m) => m.nombre_completo.toLowerCase().includes(q) || (m.email && m.email.toLowerCase().includes(q)))
+        .filter((m) => m.full_name.toLowerCase().includes(q) || (m.email && m.email.toLowerCase().includes(q)))
         .map((m) => m.id);
       result = result.filter((p) => matchedMiembroIds.includes(p.usuario_id));
     }
@@ -138,9 +138,9 @@ export default function PagosPage() {
   const montoPendiente = pendientes.reduce((sum, p) => sum + getTotalMonto(p), 0);
 
   const getNombreMiembro = (pago: Pago): string => {
-    if (pago.profile?.nombre_completo) return pago.profile.nombre_completo;
+    if (pago.profile?.full_name) return pago.profile.full_name;
     const miembro = miembros.find((m) => m.id === pago.usuario_id);
-    return miembro?.nombre_completo || "—";
+    return miembro?.full_name || "—";
   };
 
   if (loading) {

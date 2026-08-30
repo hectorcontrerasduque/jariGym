@@ -37,7 +37,7 @@ export class AuthService {
       password,
       options: {
         data: {
-          nombre_completo: nombre,
+          full_name: nombre,
         },
       },
     });

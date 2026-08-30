@@ -69,7 +69,7 @@ export async function GET(request: Request) {
             email: user.email!,
             password: randomPassword,
             email_confirm: true,
-            user_metadata: { nombre_completo: user.user_metadata?.full_name || user.email },
+            user_metadata: { full_name: user.user_metadata?.full_name || user.email },
           });
 
           if (newUser?.user?.id) {
@@ -78,14 +78,14 @@ export async function GET(request: Request) {
               .insert({
                 id: newUser.user.id,
                 email: user.email,
-                nombre_completo: user.user_metadata?.full_name || user.email,
+                full_name: user.user_metadata?.full_name || user.email,
                 avatar_url: avatarUrl,
                 role: "super_admin",
                 activo: true,
                 registered: true,
-                fecha_inicio: new Date().toISOString().split("T")[0],
-                inscripcion_pagada: isGymOwner,
-                inscripcion_fecha: isGymOwner ? new Date().toISOString().split("T")[0] : null,
+                start_date: new Date().toISOString().split("T")[0],
+                inscription_paid: isGymOwner,
+                inscription_date: isGymOwner ? new Date().toISOString().split("T")[0] : null,
               });
 
             const { data: retry } = await supabase
@@ -120,7 +120,7 @@ export async function GET(request: Request) {
       }
 
       if (profile) {
-        // Only update avatar and email, never overwrite nombre_completo on existing profiles
+        // Only update avatar and email, never overwrite full_name on existing profiles
         const updates: Record<string, unknown> = {};
         if (avatarUrl) updates.avatar_url = avatarUrl;
         if (email) updates.email = email;

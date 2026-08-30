@@ -170,7 +170,7 @@ export default function MiembrosPage() {
     setPagoInscripcion(null);
     setIsMembresiaLibre(false);
     setIsSuperAdmin(miembro.role === "super_admin");
-    setNotasAdmin(miembro.inscripcion_nota_admin || "");
+    setNotasAdmin(miembro.inscription_admin_note || "");
     try {
       const supabase = createClient();
 
@@ -218,7 +218,7 @@ export default function MiembrosPage() {
 
   const handleToggleStatus = async (miembro: Profile, activar: boolean) => {
     const accion = activar ? "activar" : (miembro.activo === false ? "activar" : "desactivar");
-    if (!confirm(`¿${accion.charAt(0).toUpperCase() + accion.slice(1)} a ${miembro.nombre_completo}?`)) return;
+    if (!confirm(`¿${accion.charAt(0).toUpperCase() + accion.slice(1)} a ${miembro.full_name}?`)) return;
     try {
       await miembrosService.actualizarEstado(miembro.id, activar);
       showToast(activar ? messages.toast.miembroActivado : messages.toast.miembroDesactivado, "success");
@@ -231,9 +231,9 @@ export default function MiembrosPage() {
   const handleToggleMembresiaLibre = async (miembro: Profile) => {
     if (!currentUser) return;
     const accion = isMembresiaLibre ? "remover membresía libre de" : "asignar membresía libre a";
-    if (!confirm(`¿${accion.charAt(0).toUpperCase() + accion.slice(1)} ${miembro.nombre_completo}?`)) return;
+    if (!confirm(`¿${accion.charAt(0).toUpperCase() + accion.slice(1)} ${miembro.full_name}?`)) return;
     try {
-      await miembrosService.toggleMembresiaLibre(miembro.id, currentUser.id, currentUser.nombre_completo);
+      await miembrosService.toggleMembresiaLibre(miembro.id, currentUser.id, currentUser.full_name);
       setIsMembresiaLibre(!isMembresiaLibre);
       await loadMiembros();
     } catch {
@@ -244,7 +244,7 @@ export default function MiembrosPage() {
   const handleToggleSuperAdmin = async (miembro: Profile) => {
     const newRole = isSuperAdmin ? "miembro" : "super_admin";
     const accion = isSuperAdmin ? "remover Super Admin de" : "asignar Super Admin a";
-    if (!confirm(`¿${accion.charAt(0).toUpperCase() + accion.slice(1)} ${miembro.nombre_completo}?`)) return;
+    if (!confirm(`¿${accion.charAt(0).toUpperCase() + accion.slice(1)} ${miembro.full_name}?`)) return;
     try {
       const res = await fetch("/api/profile", {
         method: "PUT",
@@ -253,7 +253,7 @@ export default function MiembrosPage() {
           user_id: miembro.id,
           updates: {
             role: newRole,
-            inscripcion_nota_admin: newRole === "super_admin" ? notasAdmin || null : null,
+            inscription_admin_note: newRole === "super_admin" ? notasAdmin || null : null,
           },
         }),
       });
@@ -276,7 +276,7 @@ export default function MiembrosPage() {
         body: JSON.stringify({
           user_id: miembro.id,
           updates: {
-            inscripcion_nota_admin: notasAdmin || null,
+            inscription_admin_note: notasAdmin || null,
           },
         }),
       });
@@ -290,7 +290,7 @@ export default function MiembrosPage() {
   };
 
   const miembrosFiltrados = miembros.filter((m) =>
-    m.nombre_completo.toLowerCase().includes(busqueda.toLowerCase()) ||
+    m.full_name.toLowerCase().includes(busqueda.toLowerCase()) ||
     (m.email && m.email.toLowerCase().includes(busqueda.toLowerCase()))
   );
 
@@ -373,9 +373,9 @@ export default function MiembrosPage() {
                   <tr key={miembro.id} className="hover:bg-gym-bg/50 transition-colors">
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
-                        <Avatar src={miembro.avatar_url} alt={miembro.nombre_completo} size="sm" />
+                        <Avatar src={miembro.avatar_url} alt={miembro.full_name} size="sm" />
                         <div>
-                          <p className="font-medium text-gym-text text-sm">{miembro.nombre_completo}</p>
+                          <p className="font-medium text-gym-text text-sm">{miembro.full_name}</p>
                           <p className="text-xs text-gym-muted">{miembro.email || "—"}</p>
                         </div>
                       </div>
@@ -390,8 +390,8 @@ export default function MiembrosPage() {
                         {miembro.activo !== false ? "Activo" : "Inactivo"}
                       </Badge>
                     </td>
-                    <td className="px-4 py-3 text-xs text-gym-muted">{formatDate(miembro.fecha_inicio || miembro.created_at)}</td>
-                    <td className="px-4 py-3 text-xs text-gym-muted">{miembro.whatsapp || "—"}</td>
+                    <td className="px-4 py-3 text-xs text-gym-muted">{formatDate(miembro.start_date || miembro.created_at)}</td>
+                    <td className="px-4 py-3 text-xs text-gym-muted">{miembro.phone_number || "—"}</td>
                     <td className="px-4 py-3">
                       <div className="flex gap-1">
                         <Link href={`/dashboard/perfil?user_id=${miembro.id}`}>
@@ -428,9 +428,9 @@ export default function MiembrosPage() {
             <CardContent className="p-4">
               <div className="flex items-start justify-between mb-2">
                 <div className="flex items-center gap-3 min-w-0">
-                  <Avatar src={miembro.avatar_url} alt={miembro.nombre_completo} size="md" />
+                  <Avatar src={miembro.avatar_url} alt={miembro.full_name} size="md" />
                   <div className="min-w-0">
-                    <p className="font-medium text-gym-text truncate">{miembro.nombre_completo}</p>
+                    <p className="font-medium text-gym-text truncate">{miembro.full_name}</p>
                     <p className="text-xs text-gym-muted">{miembro.email || "Sin email"}</p>
                   </div>
                 </div>
@@ -440,7 +440,7 @@ export default function MiembrosPage() {
               </div>
               <div className="flex items-center gap-4 text-xs text-gym-muted mb-3">
                 <span>{miembro.role === "super_admin" ? "Super Admin" : "Miembro"}</span>
-                <span>{formatDate(miembro.fecha_inicio || miembro.created_at)}</span>
+                <span>{formatDate(miembro.start_date || miembro.created_at)}</span>
               </div>
               <div className="flex gap-2">
                 <Link href={`/dashboard/perfil?user_id=${miembro.id}`} className="flex-1">
@@ -490,9 +490,9 @@ export default function MiembrosPage() {
               </Link>
             )}
             <div className="flex items-center gap-4">
-              <Avatar src={selectedMiembro.avatar_url} alt={selectedMiembro.nombre_completo} size="lg" />
+              <Avatar src={selectedMiembro.avatar_url} alt={selectedMiembro.full_name} size="lg" />
               <div>
-                <h3 className="font-semibold text-gym-text">{selectedMiembro.nombre_completo}</h3>
+                <h3 className="font-semibold text-gym-text">{selectedMiembro.full_name}</h3>
                 <p className="text-sm text-gym-muted">{selectedMiembro.email || "Sin email"}</p>
                 <div className="flex gap-2 mt-1">
                   <Badge variant={selectedMiembro.role === "super_admin" ? "primary" : "secondary"}>
@@ -507,19 +507,16 @@ export default function MiembrosPage() {
             <div className="grid grid-cols-2 gap-3 text-sm">
               <div>
                 <p className="text-gym-muted">Cédula</p>
-                <p className="text-gym-text">{selectedMiembro.cedula || "—"}</p>
+                <p className="text-gym-text">{selectedMiembro.document_id || "—"}</p>
               </div>
               <div>
                 <p className="text-gym-muted">WhatsApp</p>
-                <p className="text-gym-text">{selectedMiembro.whatsapp || "—"}</p>
+                <p className="text-gym-text">{selectedMiembro.phone_number || "—"}</p>
               </div>
-              <div>
-                <p className="text-gym-muted">Horario</p>
-                <p className="text-gym-text">{selectedMiembro.horario_entreno || "—"}</p>
-              </div>
+
               <div>
                 <p className="text-gym-muted">Registro</p>
-                <p className="text-gym-text">{formatDate(selectedMiembro.fecha_inicio || selectedMiembro.created_at)}</p>
+                <p className="text-gym-text">{formatDate(selectedMiembro.start_date || selectedMiembro.created_at)}</p>
               </div>
             </div>
 

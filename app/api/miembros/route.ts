@@ -74,7 +74,7 @@ export async function POST(request: Request) {
       email: email,
       email_confirm: true,
       password: userPassword,
-      user_metadata: { nombre_completo: nombre, display_email: email },
+      user_metadata: { full_name: nombre, display_email: email },
     });
 
     const userId = authUser?.user?.id;
@@ -103,7 +103,7 @@ export async function POST(request: Request) {
     try {
       const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
       const { error: inviteError } = await serviceSupabase.auth.admin.inviteUserByEmail(email, {
-        data: { nombre_completo: nombre },
+        data: { full_name: nombre },
         redirectTo: `${siteUrl}/login`,
       });
       if (!inviteError) {

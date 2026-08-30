@@ -52,7 +52,7 @@ serve(async (req) => {
       .from("pagos")
       .select(`
         *,
-        profile:profiles(nombre_completo, id),
+        profile:profiles(full_name, id),
         notificaciones_config:notificaciones_config(whatsapp_enabled, email_enabled, whatsapp_number)
       `)
       .eq("estado", "pendiente")

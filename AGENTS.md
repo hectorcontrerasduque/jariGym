@@ -201,7 +201,9 @@ hora_salida: string | null   // HH:MM format
 - `updateConfig()` strips read-only fields (`id`, `created_at`, `updated_at`, `created_by`, `updated_by`) before Supabase update
 - When `owner_email` changes, calls `ensure-super-admin` with JWT to create/promote super_admin + sync auth.users (name/email)
 - `saveMetodosPago()` deactivates all existing records first, then activates the selected one (radio behavior — 1 solo activo global)
-- Only 1 payment method active at a time (unique index `idx_one_active_payment_method`)
+- Only 1 payment method active at a time per type (unique index `idx_one_active_per_method ON gym_config_payment_methods (payment_method) WHERE is_active = true`)
+- Each payment method type (efectivo, bs, binance) has temporal versioning: old rows get `effective_to` set, new rows inserted with `effective_to=null`
+- `getMetodosPago()` returns only active records (filtered by `is_active=true`)
 - When gym_config is empty (first save), reloads page after save to sync sidebar state
 
 ### Member Creation

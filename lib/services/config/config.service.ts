@@ -124,6 +124,7 @@ export class ConfigService {
     const { data } = await this.supabase
       .from("gym_config_payment_methods")
       .select("*")
+      .eq("is_active", true)
       .order("payment_method");
 
     return data || [];
@@ -152,17 +153,14 @@ export class ConfigService {
     const existing = existingMap.get(activeMetodo.payment_method);
 
     if (existing) {
-      // Activar o actualizar el registro seleccionado
-      await this.supabase
-        .from("gym_config_payment_methods")
-        .update({
-          is_active: true,
-          amount_monthly: activeMetodo.amount_monthly,
-          amount_inscription: activeMetodo.amount_inscription,
-          effective_from: new Date().toISOString().split("T")[0],
-          effective_to: null,
-        })
-        .eq("id", existing.id);
+      // Siempre INSERT nueva fila (versionado temporal)
+      await this.supabase.from("gym_config_payment_methods").insert({
+        payment_method: activeMetodo.payment_method,
+        amount_monthly: activeMetodo.amount_monthly,
+        amount_inscription: activeMetodo.amount_inscription,
+        is_active: true,
+        effective_from: new Date().toISOString().split("T")[0],
+      });
     } else {
       await this.supabase.from("gym_config_payment_methods").insert({
         payment_method: activeMetodo.payment_method,

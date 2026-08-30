@@ -160,6 +160,8 @@ export const messages = {
     siempreHabilitado: "Siempre habilitado",
     mensualidad: "Mensualidad",
     inscripcion: "Inscripción",
+    metodoRequiereMonto: "Debes asignar un monto de mensualidad o inscripción al método de pago habilitado. Desplázate hacia abajo para configurarlo.",
+    ownerRequired: "Nombre y correo del propietario son obligatorios para crear el acceso.",
   },
   reportarPago: {
     title: "Reportar Pago",

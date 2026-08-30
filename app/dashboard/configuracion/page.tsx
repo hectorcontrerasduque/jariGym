@@ -43,6 +43,7 @@ export default function ConfiguracionPage() {
   const [saving, setSaving] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const logoInputRef = useRef<HTMLInputElement>(null);
+  const metodosRef = useRef<HTMLDivElement>(null);
 
   const loadData = async () => {
     try {
@@ -70,7 +71,8 @@ export default function ConfiguracionPage() {
       (m) => (m.amount_monthly > 0 || m.amount_inscription > 0)
     );
     if (!hasPositiveAmount) {
-      showToast("Al menos un método habilitado debe tener un monto mayor a cero", "error");
+      showToast(messages.configuracion.metodoRequiereMonto, "error");
+      metodosRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
 
@@ -258,7 +260,7 @@ export default function ConfiguracionPage() {
       </Card>
 
       {/* Métodos de Pago */}
-      <Card className="neon-card relative z-10">
+      <Card ref={metodosRef} className="neon-card relative z-10">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <CreditCard className="w-5 h-5 text-gym-secondary" /> {messages.configuracion.metodosPago}

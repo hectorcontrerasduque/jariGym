@@ -39,76 +39,65 @@ export class ConfigService {
       .limit(1)
       .single();
 
-    if (updates.owner_email) {
-      if (existing && updates.owner_email !== existing.owner_email) {
-        const { data: newOwnerProfile } = await this.supabase
+    const emailChanged = updates.owner_email && (
+      !existing || updates.owner_email !== existing.owner_email
+    );
+
+    if (emailChanged && updates.owner_name && updates.owner_email) {
+      const { data: profileByEmail } = await this.supabase
+        .from("profiles")
+        .select("id, activo, role")
+        .eq("email", updates.owner_email)
+        .maybeSingle();
+
+      // Si ya existe un profile activo con otro rol, no sobreescribir
+      if (profileByEmail && profileByEmail.activo === true && profileByEmail.role !== "super_admin") {
+        throw new Error(messages.notificaciones.emailYaRegistradoActivo);
+      }
+
+      // Desactivar owner anterior
+      if (existing?.owner_email) {
+        const { data: oldProfile } = await this.supabase
           .from("profiles")
-          .select("id, activo, role")
-          .eq("email", updates.owner_email)
+          .select("id")
+          .eq("email", existing.owner_email)
           .maybeSingle();
-
-        if (newOwnerProfile && newOwnerProfile.activo !== false && newOwnerProfile.role !== "super_admin") {
-          throw new Error(messages.notificaciones.emailYaRegistradoActivo);
-        }
-
-        if (existing.owner_email) {
-          const { data: oldOwnerProfile } = await this.supabase
-            .from("profiles")
-            .select("id")
-            .eq("email", existing.owner_email)
-            .maybeSingle();
-          if (oldOwnerProfile) {
-            await this.supabase
-              .from("profiles")
-              .update({ activo: false })
-              .eq("id", oldOwnerProfile.id);
-          }
-        }
-
-        if (newOwnerProfile && newOwnerProfile.activo === false) {
+        if (oldProfile) {
           await this.supabase
             .from("profiles")
-            .update({ activo: true, role: "super_admin", registered: true })
-            .eq("id", newOwnerProfile.id);
-        } else if (!newOwnerProfile) {
-          try {
-            await fetch("/api/auth/ensure-super-admin", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ email: updates.owner_email, nombre: updates.owner_name, inscription_paid: true }),
-            });
-          } catch (error) {
-            console.error("[config] Error creando super_admin via ensure-super-admin:", error);
-          }
-        }
-      } else if (!existing) {
-        const { data: existingProfile } = await this.supabase
-          .from("profiles")
-          .select("id, activo, role")
-          .eq("email", updates.owner_email)
-          .maybeSingle();
-
-        if (existingProfile && existingProfile.activo !== false && existingProfile.role !== "super_admin") {
-          throw new Error(messages.notificaciones.emailYaRegistradoActivo);
-        }
-
-        if (existingProfile && existingProfile.activo === false) {
-          await this.supabase
-            .from("profiles")
-            .update({ activo: true, role: "super_admin", registered: true })
-            .eq("id", existingProfile.id);
-        } else if (!existingProfile) {
-          try {
-            await fetch("/api/auth/ensure-super-admin", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ email: updates.owner_email, nombre: updates.owner_name, inscription_paid: true }),
-            });
-          } catch (error) {
-            console.error("[config] Error creando super_admin via ensure-super-admin:", error);
-          }
+            .update({ activo: false })
+            .eq("id", oldProfile.id);
         }
       }
+
+      if (profileByEmail) {
+        // Profile existe — promover a super_admin
+        await this.supabase
+          .from("profiles")
+          .update({ activo: true, role: "super_admin", registered: true, full_name: updates.owner_name })
+          .eq("id", profileByEmail.id);
+      } else {
+        // Profile no existe — crear via ensure-super-admin con JWT
+        const { data: { session } } = await this.supabase.auth.getSession();
+        try {
+          await fetch("/api/auth/ensure-super-admin", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+            },
+            body: JSON.stringify({
+              email: updates.owner_email,
+              nombre: updates.owner_name,
+              inscription_paid: true,
+            }),
+          });
+        } catch (error) {
+          console.error("[config] Error creando super_admin via ensure-super-admin:", error);
+        }
+      }
+    } else if (emailChanged && (!updates.owner_name || !updates.owner_email)) {
+      throw new Error(messages.configuracion.ownerRequired);
     }
 
     const { id, created_at, updated_at, created_by, updated_by, ...safeUpdates } = updates as GymConfig; // eslint-disable-line @typescript-eslint/no-unused-vars

@@ -6,11 +6,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { configService, METODOS_PAGO_DEFAULT } from "@/lib/services/config/config.service";
 import { createClient } from "@/lib/supabase/client";
-import { Save, Building2, User, CreditCard, Clock, Globe, Upload, Dumbbell, Trash2 } from "lucide-react";
+import { Save, Building2, User, CreditCard, Upload, Dumbbell, Trash2 } from "lucide-react";
 import { showToast } from "@/components/ui/toast";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { messages } from "@/lib/messages";
-import type { GymConfig, MetodoPago, MetodoPagoConfig } from "@/lib/types";
+import type { GymConfig, MetodoPago, PaymentMethod } from "@/lib/types";
 
 const metodoLabels: Record<MetodoPago, { label: string; icon: string; alwaysOn?: boolean; locked?: boolean }> = {
   efectivo: { label: "Efectivo", icon: "💵", alwaysOn: true },
@@ -18,16 +18,18 @@ const metodoLabels: Record<MetodoPago, { label: string; icon: string; alwaysOn?:
   binance: { label: "Binance USDT", icon: "🟡", locked: true },
 };
 
-function buildMetodosState(dbRecords: MetodoPagoConfig[]): MetodoPagoConfig[] {
-  const dbMap = new Map(dbRecords.map((r) => [r.metodo_pago, r]));
+function buildMetodosState(dbRecords: PaymentMethod[]): PaymentMethod[] {
+  const dbMap = new Map(dbRecords.map((r) => [r.payment_method, r]));
   return METODOS_PAGO_DEFAULT.map((mp) => {
     const existing = dbMap.get(mp);
     return existing || {
       id: "",
-      metodo_pago: mp,
-      monto_mensual: 0,
-      monto_inscripcion: 0,
-      habilitado: mp === "efectivo",
+      payment_method: mp,
+      amount_monthly: 0,
+      amount_inscription: 0,
+      is_active: mp === "efectivo",
+      effective_from: null,
+      effective_to: null,
       created_at: "",
       updated_at: "",
     };
@@ -36,29 +38,11 @@ function buildMetodosState(dbRecords: MetodoPagoConfig[]): MetodoPagoConfig[] {
 
 export default function ConfiguracionPage() {
   const [config, setConfig] = useState<Partial<GymConfig>>({});
-  const [metodos, setMetodos] = useState<MetodoPagoConfig[]>([]);
+  const [metodos, setMetodos] = useState<PaymentMethod[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [localTime, setLocalTime] = useState("");
-  const [localCountry, setLocalCountry] = useState("");
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const logoInputRef = useRef<HTMLInputElement>(null);
-
-  const detectDevice = () => {
-    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    const now = new Date();
-    const timeStr = now.toLocaleTimeString("es-ES", { hour: "2-digit", minute: "2-digit", timeZone: tz });
-    setLocalTime(timeStr);
-
-    try {
-      const locale = navigator.language || "es";
-      const region = new Intl.DateTimeFormat(locale, { timeZone: tz }).resolvedOptions().timeZone.split("/")[1] || "";
-      setLocalCountry(region.replace(/_/g, " "));
-    } catch {
-      // Non-critical: Intl fallback to raw timezone
-      setLocalCountry(tz.split("/")[1] || tz);
-    }
-  };
 
   const loadData = async () => {
     try {
@@ -78,13 +62,12 @@ export default function ConfiguracionPage() {
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     loadData();
-    detectDevice();
   }, []);
 
   const handleSaveConfig = async () => {
-    const enabledMetodos = metodos.filter((m) => m.habilitado);
+    const enabledMetodos = metodos.filter((m) => m.is_active);
     const hasPositiveAmount = enabledMetodos.some(
-      (m) => (m.monto_mensual > 0 || m.monto_inscripcion > 0)
+      (m) => (m.amount_monthly > 0 || m.amount_inscription > 0)
     );
     if (!hasPositiveAmount) {
       showToast("Al menos un método habilitado debe tener un monto mayor a cero", "error");
@@ -110,15 +93,15 @@ export default function ConfiguracionPage() {
     if (info?.alwaysOn || info?.locked) return;
     setMetodos((prev) =>
       prev.map((m) =>
-        m.metodo_pago === metodoPago ? { ...m, habilitado: !m.habilitado } : m
+        m.payment_method === metodoPago ? { ...m, is_active: !m.is_active } : m
       )
     );
   };
 
-  const handleUpdateMonto = (metodoPago: MetodoPago, field: "monto_mensual" | "monto_inscripcion", value: number) => {
+  const handleUpdateMonto = (metodoPago: MetodoPago, field: "amount_monthly" | "amount_inscription", value: number) => {
     setMetodos((prev) =>
       prev.map((m) =>
-        m.metodo_pago === metodoPago ? { ...m, [field]: value } : m
+        m.payment_method === metodoPago ? { ...m, [field]: value } : m
       )
     );
   };
@@ -248,11 +231,11 @@ export default function ConfiguracionPage() {
             </div>
           </div>
 
-          <Input label="Nombre del gym *" placeholder="Mi Gym" value={config.nombre_gym || ""} onChange={(e) => setConfig({ ...config, nombre_gym: e.target.value })} required />
-          <Input label="Dirección" placeholder="Calle Principal #123" value={config.direccion || ""} onChange={(e) => setConfig({ ...config, direccion: e.target.value })} />
-          <Input label="Teléfono" placeholder="+52 55 1234 5678" value={config.telefono || ""} onChange={(e) => setConfig({ ...config, telefono: e.target.value })} />
-          <Input label="Horario" placeholder="Lun-Vie 6am-10pm" value={config.horario || ""} onChange={(e) => setConfig({ ...config, horario: e.target.value })} />
-          <Input label="Máximo de miembros" type="number" placeholder="50" value={config.max_miembros || ""} onChange={(e) => setConfig({ ...config, max_miembros: parseInt(e.target.value) || 0 })} min="1" />
+          <Input label="Nombre del gym *" placeholder="Mi Gym" value={config.gym_name || ""} onChange={(e) => setConfig({ ...config, gym_name: e.target.value })} required />
+          <Input label="Dirección" placeholder="Calle Principal #123" value={config.address || ""} onChange={(e) => setConfig({ ...config, address: e.target.value })} />
+          <Input label="Teléfono" placeholder="+52 55 1234 5678" value={config.phone_number || ""} onChange={(e) => setConfig({ ...config, phone_number: e.target.value })} />
+          <Input label="Horario" placeholder="Lun-Vie 6am-10pm" value={config.schedule || ""} onChange={(e) => setConfig({ ...config, schedule: e.target.value })} />
+          <Input label="Máximo de miembros" type="number" placeholder="50" value={config.max_members || ""} onChange={(e) => setConfig({ ...config, max_members: parseInt(e.target.value) || 0 })} min="1" />
         </CardContent>
       </Card>
 
@@ -264,9 +247,9 @@ export default function ConfiguracionPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <Input label="Nombre del propietario *" placeholder="Tu nombre" value={config.dueno_nombre || ""} onChange={(e) => setConfig({ ...config, dueno_nombre: e.target.value })} required />
-          <Input label="Correo del propietario *" placeholder="tu@email.com" type="email" value={config.dueno_email || ""} onChange={(e) => setConfig({ ...config, dueno_email: e.target.value })} required />
-          <Input label="Teléfono" placeholder="+52 55 9876 5432" value={config.dueno_telefono || ""} onChange={(e) => setConfig({ ...config, dueno_telefono: e.target.value })} />
+          <Input label="Nombre del propietario *" placeholder="Tu nombre" value={config.owner_name || ""} onChange={(e) => setConfig({ ...config, owner_name: e.target.value })} required />
+          <Input label="Correo del propietario *" placeholder="tu@email.com" type="email" value={config.owner_email || ""} onChange={(e) => setConfig({ ...config, owner_email: e.target.value })} required />
+          <Input label="Teléfono" placeholder="+52 55 9876 5432" value={config.owner_phone || ""} onChange={(e) => setConfig({ ...config, owner_phone: e.target.value })} />
         </CardContent>
       </Card>
 
@@ -281,15 +264,15 @@ export default function ConfiguracionPage() {
           <p className="text-sm text-gym-muted">Configura los métodos de pago aceptados y sus montos.</p>
 
           {metodos.map((metodo) => {
-            const info = metodoLabels[metodo.metodo_pago];
+            const info = metodoLabels[metodo.payment_method];
             const isAlwaysOn = info?.alwaysOn;
             const isLocked = info?.locked;
             const isDisabled = isAlwaysOn || isLocked;
             return (
               <div
-                key={metodo.metodo_pago}
+                key={metodo.payment_method}
                 className={`p-4 rounded-xl border transition-all ${
-                  metodo.habilitado
+                  metodo.is_active
                     ? "bg-gym-bg border-gym-border/50"
                     : "bg-gym-bg/30 border-gym-border/30"
                 } ${isLocked ? "opacity-50" : ""}`}
@@ -306,22 +289,22 @@ export default function ConfiguracionPage() {
                   <button
                     type="button"
                     disabled={isDisabled}
-                    onClick={() => handleToggleMetodo(metodo.metodo_pago)}
+                    onClick={() => handleToggleMetodo(metodo.payment_method)}
                     className={`w-11 h-6 rounded-full flex items-center px-1 transition-all ${
-                      metodo.habilitado ? "bg-gym-primary justify-end" : "bg-gym-border justify-start"
+                      metodo.is_active ? "bg-gym-primary justify-end" : "bg-gym-border justify-start"
                     } ${isDisabled ? "cursor-not-allowed opacity-50" : "cursor-pointer hover:opacity-90"}`}
                   >
-                    <div className={`w-5 h-5 rounded-full transition-all ${metodo.habilitado ? "bg-white" : "bg-gym-muted"}`} />
+                    <div className={`w-5 h-5 rounded-full transition-all ${metodo.is_active ? "bg-white" : "bg-gym-muted"}`} />
                   </button>
                 </div>
-                {metodo.habilitado && (
+                {metodo.is_active && (
                   <div className="grid grid-cols-2 gap-3">
                     <Input
                       label="Mensualidad"
                       type="number"
                       placeholder="0"
-                      value={metodo.monto_mensual || ""}
-                      onChange={(e) => handleUpdateMonto(metodo.metodo_pago, "monto_mensual", parseFloat(e.target.value) || 0)}
+                      value={metodo.amount_monthly || ""}
+                      onChange={(e) => handleUpdateMonto(metodo.payment_method, "amount_monthly", parseFloat(e.target.value) || 0)}
                       min="0"
                       step="0.01"
                     />
@@ -329,8 +312,8 @@ export default function ConfiguracionPage() {
                       label="Inscripción"
                       type="number"
                       placeholder="0"
-                      value={metodo.monto_inscripcion || ""}
-                      onChange={(e) => handleUpdateMonto(metodo.metodo_pago, "monto_inscripcion", parseFloat(e.target.value) || 0)}
+                      value={metodo.amount_inscription || ""}
+                      onChange={(e) => handleUpdateMonto(metodo.payment_method, "amount_inscription", parseFloat(e.target.value) || 0)}
                       min="0"
                       step="0.01"
                     />
@@ -354,8 +337,8 @@ export default function ConfiguracionPage() {
                   type="radio"
                   name="modo_cobro"
                   value="dia_uno"
-                  checked={(config.modo_cobro || "dia_uno") === "dia_uno"}
-                  onChange={() => setConfig({ ...config, modo_cobro: "dia_uno" })}
+                  checked={(config.billing_mode || "dia_uno") === "dia_uno"}
+                  onChange={() => setConfig({ ...config, billing_mode: "dia_uno" })}
                   className="w-4 h-4 text-gym-primary focus:ring-gym-primary"
                 />
                 <span className="text-sm text-gym-text">{messages.notificaciones.modoCobroDiaUno}</span>
@@ -365,44 +348,12 @@ export default function ConfiguracionPage() {
                   type="radio"
                   name="modo_cobro"
                   value="fecha_inscripcion"
-                  checked={config.modo_cobro === "fecha_inscripcion"}
-                  onChange={() => setConfig({ ...config, modo_cobro: "fecha_inscripcion" })}
+                  checked={config.billing_mode === "fecha_inscripcion"}
+                  onChange={() => setConfig({ ...config, billing_mode: "fecha_inscripcion" })}
                   className="w-4 h-4 text-gym-primary focus:ring-gym-primary"
                 />
                 <span className="text-sm text-gym-text">{messages.notificaciones.modoCobroFechaInscripcion}</span>
               </label>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Zona Horaria y Moneda */}
-      <Card className="neon-card relative z-10">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Globe className="w-5 h-5 text-gym-warning" /> Zona Horaria y Moneda
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="p-4 bg-gym-bg rounded-xl">
-              <div className="flex items-center gap-2 mb-1">
-                <Clock className="w-4 h-4 text-gym-primary" />
-                <p className="text-xs text-gym-muted">Hora local</p>
-              </div>
-              <p className="text-lg font-semibold text-gym-text">{localTime}</p>
-              <p className="text-xs text-gym-muted">{localCountry}</p>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gym-muted mb-2">Moneda</label>
-              <select value={config.moneda || "USDT"} onChange={(e) => setConfig({ ...config, moneda: e.target.value })} className="w-full px-4 py-2.5 bg-gym-bg border border-gym-border rounded-xl text-gym-text focus:outline-none focus:ring-2 focus:ring-gym-primary">
-                <option value="USDT">USDT - Tether</option>
-                <option value="USD">USD - Dólar</option>
-                <option value="MXN">MXN - Peso Mexicano</option>
-                <option value="COP">COP - Peso Colombiano</option>
-                <option value="VES">VES - Bolívar</option>
-                <option value="EUR">EUR - Euro</option>
-              </select>
             </div>
           </div>
         </CardContent>

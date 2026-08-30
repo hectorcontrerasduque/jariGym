@@ -54,14 +54,14 @@ export async function POST(request: Request) {
     }
 
     const { data: metodoEfectivo } = await supabase
-      .from("gym_config_metodos_pago")
-      .select("monto_mensual, monto_inscripcion")
-      .eq("metodo_pago", "efectivo")
-      .eq("habilitado", true)
+      .from("gym_config_payment_methods")
+      .select("amount_monthly, amount_inscription")
+      .eq("payment_method", "efectivo")
+      .eq("is_active", true)
       .maybeSingle();
 
-    const montoMensual = metodoEfectivo?.monto_mensual || 0;
-    const montoInscripcion = metodoEfectivo?.monto_inscripcion || 0;
+    const montoMensual = metodoEfectivo?.amount_monthly || 0;
+    const montoInscripcion = metodoEfectivo?.amount_inscription || 0;
 
     const searchName = selectedNombre || nombre;
     const words = searchName.split(/\s+/).filter((w: string) => w.length >= 2);
@@ -386,9 +386,9 @@ export async function POST(request: Request) {
       try {
         const { data: config } = await supabase
           .from("gym_config")
-          .select("nombre_gym, logo_url")
+          .select("gym_name, logo_url")
           .maybeSingle();
-        if (config?.nombre_gym) gymName = config.nombre_gym;
+        if (config?.gym_name) gymName = config.gym_name;
         if (config?.logo_url) gymLogo = config.logo_url;
       } catch {
         console.error("[migracion] Error obteniendo config del gym, usando defaults");

@@ -87,11 +87,11 @@ export async function POST(request: Request) {
 
     const { data: gymConfig } = await supabase
       .from("gym_config")
-      .select("nombre_gym, logo_url")
+      .select("gym_name, logo_url")
       .limit(1)
       .single();
 
-    const gymName = gymConfig?.nombre_gym || "GymApp";
+    const gymName = gymConfig?.gym_name || "GymApp";
     const gymLogo = gymConfig?.logo_url || null;
 
     await sendPasswordResetEmail(email, resetLink, gymName, gymLogo);

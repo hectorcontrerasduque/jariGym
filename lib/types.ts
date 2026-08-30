@@ -98,30 +98,32 @@ export interface Movimiento {
 
 export interface GymConfig {
   id: string;
-  nombre_gym: string | null;
-  max_miembros: number;
   logo_url: string | null;
-  direccion: string | null;
-  telefono: string | null;
-  email_contacto: string | null;
-  horario: string | null;
-  dueno_nombre: string | null;
-  dueno_email: string | null;
-  dueno_telefono: string | null;
-  moneda: string;
-  timezone: string;
+  gym_name: string | null;
+  max_members: number;
+  address: string | null;
+  phone_number: string | null;
+  contact_email: string | null;
+  schedule: string | null;
+  owner_name: string | null;
+  owner_email: string | null;
+  owner_phone: string | null;
+  billing_mode: ModoCobro;
   notificaciones_enabled: boolean;
-  modo_cobro: ModoCobro;
   created_at: string;
   updated_at: string;
+  created_by: string | null;
+  updated_by: string | null;
 }
 
-export interface MetodoPagoConfig {
+export interface PaymentMethod {
   id: string;
-  metodo_pago: MetodoPago;
-  monto_mensual: number;
-  monto_inscripcion: number;
-  habilitado: boolean;
+  payment_method: MetodoPago;
+  amount_monthly: number;
+  amount_inscription: number;
+  is_active: boolean;
+  effective_from: string | null;
+  effective_to: string | null;
   created_at: string;
   updated_at: string;
 }

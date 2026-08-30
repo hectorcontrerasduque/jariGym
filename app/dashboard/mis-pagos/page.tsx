@@ -14,7 +14,7 @@ import { showToast } from "@/components/ui/toast";
 import { messages } from "@/lib/messages";
 import { Avatar } from "@/components/ui/avatar";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
-import type { Pago, Profile, MetodoPago, MetodoPagoConfig, GymConfig } from "@/lib/types";
+import type { Pago, Profile, MetodoPago, PaymentMethod, GymConfig } from "@/lib/types";
 
 const metodoLabels: Record<MetodoPago, string> = {
   efectivo: "Efectivo",
@@ -56,7 +56,7 @@ export default function MisPagosPage() {
 
   // Payment form
   const [showForm, setShowForm] = useState(true);
-  const [metodosPago, setMetodosPago] = useState<MetodoPagoConfig[]>([]);
+  const [metodosPago, setMetodosPago] = useState<PaymentMethod[]>([]);
   const [mesesPendientes, setMesesPendientes] = useState<{ mes: number; anio: number }[]>([]);
   const [inscripcionPagada, setInscripcionPagada] = useState(false);
   const [inscripcionPendiente, setInscripcionPendiente] = useState(false);
@@ -218,12 +218,12 @@ setMembresiaLibre(!!libre.data);
   };
 
   const getMontoByMetodo = useCallback((metodo: MetodoPago, tipo: "mensual" | "inscripcion"): number => {
-    const config = metodosPago.find(m => m.metodo_pago === metodo);
-    if (!config || !config.habilitado) {
-      const def = metodosPago.find(m => m.metodo_pago === "efectivo");
-      return tipo === "mensual" ? (def?.monto_mensual || 0) : (def?.monto_inscripcion || 0);
+    const config = metodosPago.find(m => m.payment_method === metodo);
+    if (!config || !config.is_active) {
+      const def = metodosPago.find(m => m.payment_method === "efectivo");
+      return tipo === "mensual" ? (def?.amount_monthly || 0) : (def?.amount_inscription || 0);
     }
-    return tipo === "mensual" ? config.monto_mensual : config.monto_inscripcion;
+    return tipo === "mensual" ? config.amount_monthly : config.amount_inscription;
   }, [metodosPago]);
 
   const montoTotal = useMemo(() => {
@@ -668,18 +668,18 @@ setMembresiaLibre(!!libre.data);
                   <div>
                     <label className="block text-sm font-medium text-gym-muted mb-2">Método de pago</label>
                     <div className="flex gap-2">
-                      {metodosPago.filter(m => m.habilitado || m.metodo_pago === "efectivo").map(m => (
+                      {metodosPago.filter(m => m.is_active || m.payment_method === "efectivo").map(m => (
                         <button
-                          key={m.metodo_pago}
+                          key={m.payment_method}
                           type="button"
-                          onClick={() => setFormData({ ...formData, metodo_pago: m.metodo_pago })}
+                          onClick={() => setFormData({ ...formData, metodo_pago: m.payment_method })}
                           className={`flex-1 p-2 rounded-xl text-sm font-medium transition-all ${
-                            formData.metodo_pago === m.metodo_pago
+                            formData.metodo_pago === m.payment_method
                               ? "bg-gym-primary text-white"
                               : "bg-gym-bg text-gym-muted border border-gym-border hover:border-gym-primary"
                           }`}
                         >
-                          {m.metodo_pago === "efectivo" ? "💵 Efectivo" : m.metodo_pago === "bs" ? "🇻🇪 Bs" : "🟡 Binance"}
+                          {m.payment_method === "efectivo" ? "💵 Efectivo" : m.payment_method === "bs" ? "🇻🇪 Bs" : "🟡 Binance"}
                         </button>
                       ))}
                     </div>

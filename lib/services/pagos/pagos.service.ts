@@ -597,25 +597,25 @@ export class PagosService {
         .select("usuario_id")
         .is("fecha_fin", null),
       supabase
-        .from("gym_config_metodos_pago")
-        .select("monto_mensual, monto_inscripcion")
-        .eq("habilitado", true)
+        .from("gym_config_payment_methods")
+        .select("amount_monthly, amount_inscription")
+        .eq("is_active", true)
         .limit(1)
         .maybeSingle(),
       supabase
         .from("gym_config")
-        .select("dueno_email")
+        .select("owner_email")
         .limit(1)
         .maybeSingle(),
     ]);
 
-    const ownerEmail = ownerResult.data?.dueno_email?.toLowerCase() || "";
+    const ownerEmail = ownerResult.data?.owner_email?.toLowerCase() || "";
     const config = configResult.data;
 
     const allMiembros = allProfiles.data || [];
     const miembrosLibresIds = new Set((libres.data || []).map((l) => l.usuario_id));
-    const montoMensual = config?.monto_mensual || 5;
-    const montoInscripcion = config?.monto_inscripcion || 0;
+    const montoMensual = config?.amount_monthly || 5;
+    const montoInscripcion = config?.amount_inscription || 0;
 
     const { data: pagosAnio } = await supabase
       .from("pagos")
@@ -718,9 +718,9 @@ export class PagosService {
         .in("role", ["miembro", "super_admin"])
         .not("email", "is", null),
       supabase
-        .from("gym_config_metodos_pago")
-        .select("monto_mensual, monto_inscripcion")
-        .eq("habilitado", true)
+        .from("gym_config_payment_methods")
+        .select("amount_monthly, amount_inscription")
+        .eq("is_active", true)
         .limit(1)
         .maybeSingle(),
       supabase
@@ -729,7 +729,7 @@ export class PagosService {
         .is("fecha_fin", null),
       supabase
         .from("gym_config")
-        .select("dueno_email, modo_cobro")
+        .select("owner_email, billing_mode")
         .limit(1)
         .maybeSingle(),
     ]);
@@ -737,15 +737,15 @@ export class PagosService {
     const miembros = (miembrosResult.data || []).filter((m) => m.activo !== false);
     if (miembros.length === 0) return [];
 
-    const montoMensual = configResult.data?.monto_mensual || 0;
-    const montoInscripcion = configResult.data?.monto_inscripcion || 0;
+    const montoMensual = configResult.data?.amount_monthly || 0;
+    const montoInscripcion = configResult.data?.amount_inscription || 0;
     const miembrosLibresIds = new Set((libresResult.data || []).map((l) => l.usuario_id));
     const fechaInicioMap = new Map<string, string>();
     for (const l of libresResult.data || []) {
       if (l.start_date) fechaInicioMap.set(l.usuario_id, l.start_date);
     }
-    const ownerEmail = ownerResult.data?.dueno_email?.toLowerCase() || "";
-    const modoCobro = (ownerResult.data?.modo_cobro as "dia_uno" | "fecha_inscripcion") || "dia_uno";
+    const ownerEmail = ownerResult.data?.owner_email?.toLowerCase() || "";
+    const modoCobro = (ownerResult.data?.billing_mode as "dia_uno" | "fecha_inscripcion") || "dia_uno";
 
     const { data: todosPagosHeader } = await supabase
       .from("pagos")
@@ -878,16 +878,16 @@ export class PagosService {
     let config = null;
     try {
       const { data } = await supabase
-        .from("gym_config_metodos_pago")
-        .select("monto_mensual")
-        .eq("habilitado", true)
+        .from("gym_config_payment_methods")
+        .select("amount_monthly")
+        .eq("is_active", true)
         .limit(1)
         .maybeSingle();
       config = data;
     } catch (_error /* eslint-disable-line @typescript-eslint/no-unused-vars */) {
       config = null;
     }
-    const montoMensual = config?.monto_mensual || 5;
+    const montoMensual = config?.amount_monthly || 5;
 
     const meses = [];
     for (let mes = 1; mes <= mesMaximo; mes++) {
@@ -900,10 +900,10 @@ export class PagosService {
 
     const { data: configData } = await supabase
       .from("gym_config")
-      .select("dueno_email")
+      .select("owner_email")
       .limit(1)
       .maybeSingle();
-    const ownerEmail = configData?.dueno_email?.toLowerCase() || "";
+    const ownerEmail = configData?.owner_email?.toLowerCase() || "";
 
     const { data: allProfiles } = await supabase
       .from("profiles")

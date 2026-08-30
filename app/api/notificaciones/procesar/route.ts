@@ -117,7 +117,7 @@ export async function POST(request: Request) {
 
         if (forzar) {
           // Modo forzar: envía a todos los miembros activos
-          const diaCobro = getDiaCobro(miembro.start_date, hoy.getMonth() + 1, hoy.getFullYear(), gymConfig.modo_cobro || "dia_uno");
+          const diaCobro = getDiaCobro(miembro.start_date, hoy.getMonth() + 1, hoy.getFullYear(), gymConfig.billing_mode || "dia_uno");
           const notif = getDiaNotificacion(diaCobro, dias_previo, hoy.getMonth() + 1, hoy.getFullYear());
 
           if (hoy.getDate() === notif.dia && hoy.getMonth() + 1 === notif.mes && hoy.getFullYear() === notif.anio) {
@@ -130,7 +130,7 @@ export async function POST(request: Request) {
           }
         } else {
           // Modo normal: verifica si es el día de notificación para este miembro específico
-          const diaCobro = getDiaCobro(miembro.start_date, hoy.getMonth() + 1, hoy.getFullYear(), gymConfig.modo_cobro || "dia_uno");
+          const diaCobro = getDiaCobro(miembro.start_date, hoy.getMonth() + 1, hoy.getFullYear(), gymConfig.billing_mode || "dia_uno");
           const notif = getDiaNotificacion(diaCobro, dias_previo, hoy.getMonth() + 1, hoy.getFullYear());
 
           if (hoy.getDate() === notif.dia && hoy.getMonth() + 1 === notif.mes && hoy.getFullYear() === notif.anio) {

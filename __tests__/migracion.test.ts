@@ -174,7 +174,7 @@ describe("Migración API", () => {
   it("exitoso: crea usuario + pagos + inscripcion", async () => {
     mockSupabase.from.mockImplementation((table: string) => {
       if (table === "gym_config") return chainReturn({ id: "1" });
-      if (table === "gym_config_metodos_pago") return chainReturn({ monto_mensual: 10, monto_inscripcion: 5 });
+      if (table === "gym_config_payment_methods") return chainReturn({ amount_monthly: 10, amount_inscription: 5 });
       if (table === "migracion") return chainReturn([
         { id: "m1", nombre: "HAIDEE", mes_pagar: 1, anio_pagar: 2026, estado: "pagado", migrado: "no" },
         { id: "m2", nombre: "HAIDEE", mes_pagar: 2, anio_pagar: 2026, estado: "pagado", migrado: "no" },
@@ -207,7 +207,7 @@ describe("Migración API", () => {
   it("exitoso con selectedNombre diferente", async () => {
     mockSupabase.from.mockImplementation((table: string) => {
       if (table === "gym_config") return chainReturn({ id: "1" });
-      if (table === "gym_config_metodos_pago") return chainReturn({ monto_mensual: 10, monto_inscripcion: 5 });
+      if (table === "gym_config_payment_methods") return chainReturn({ amount_monthly: 10, amount_inscription: 5 });
       if (table === "migracion") return chainReturn([
         { id: "m1", nombre: "HAIDEE LOPEZ", mes_pagar: 1, anio_pagar: 2026, estado: "pagado", migrado: "no" },
       ]);
@@ -238,7 +238,7 @@ describe("Migración API", () => {
   it("exitoso: usuario existente actualiza profile y pagos", async () => {
     mockSupabase.from.mockImplementation((table: string) => {
       if (table === "gym_config") return chainReturn({ id: "1" });
-      if (table === "gym_config_metodos_pago") return chainReturn({ monto_mensual: 10, monto_inscripcion: 5 });
+      if (table === "gym_config_payment_methods") return chainReturn({ amount_monthly: 10, amount_inscription: 5 });
       if (table === "migracion") return chainReturn([
         { id: "m1", nombre: "HAIDEE", mes_pagar: 1, anio_pagar: 2026, estado: "pagado", migrado: "no" },
       ]);
@@ -263,7 +263,7 @@ describe("Migración API", () => {
     let pagoIdCounter = 0;
     mockSupabase.from.mockImplementation((table: string) => {
       if (table === "gym_config") return chainReturn({ id: "1" });
-      if (table === "gym_config_metodos_pago") return chainReturn({ monto_mensual: 10, monto_inscripcion: 0 });
+      if (table === "gym_config_payment_methods") return chainReturn({ amount_monthly: 10, amount_inscription: 0 });
       if (table === "migracion") return chainReturn([
         { id: "m1", nombre: "HAIDEE", mes_pagar: 1, anio_pagar: 2026, estado: "pagado", migrado: "no" },
         { id: "m2", nombre: "HAIDEE", mes_pagar: 2, anio_pagar: 2026, estado: "debe", migrado: "no" },

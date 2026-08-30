@@ -16,7 +16,7 @@ DELETE FROM auth.users;
 DELETE FROM profiles;
 
 -- 3. Limpiar config y metodos de pago
-DELETE FROM gym_config_metodos_pago;
+DELETE FROM gym_config_payment_methods;
 DELETE FROM gym_config;
 
 -- 4. Resetear migracion para re-migrar

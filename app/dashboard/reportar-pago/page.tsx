@@ -14,7 +14,7 @@ import { getMonthName, formatCurrency } from "@/lib/utils";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { showToast } from "@/components/ui/toast";
 import { messages } from "@/lib/messages";
-import type { MetodoPago, GymConfig, MetodoPagoConfig, Profile } from "@/lib/types";
+import type { MetodoPago, GymConfig, PaymentMethod, Profile } from "@/lib/types";
 import Link from "next/link";
 
 interface MembresiaLibreInfo {
@@ -42,7 +42,7 @@ function ReportarPagoForm() {
   const [userRole, setUserRole] = useState<string>("");
   const [gymConfig, setGymConfig] = useState<GymConfig | null>(null);
   const [configLoading, setConfigLoading] = useState(true);
-  const [metodosPago, setMetodosPago] = useState<MetodoPagoConfig[]>([]);
+  const [metodosPago, setMetodosPago] = useState<PaymentMethod[]>([]);
   const [miembros, setMiembros] = useState<Profile[]>([]);
   const [miembroSeleccionado, setMiembroSeleccionado] = useState<string>(memberParam || "");
   const [inscripcionPagada, setInscripcionPagada] = useState(false);
@@ -176,12 +176,12 @@ function ReportarPagoForm() {
   };
 
   const getMontoByMetodo = useCallback((metodo: MetodoPago, tipo: "mensual" | "inscripcion"): number => {
-    const config = metodosPago.find((m) => m.metodo_pago === metodo);
-    if (!config || !config.habilitado) {
-      const defaultConfig = metodosPago.find((m) => m.metodo_pago === "efectivo");
-      return tipo === "mensual" ? (defaultConfig?.monto_mensual || 0) : (defaultConfig?.monto_inscripcion || 0);
+    const config = metodosPago.find((m) => m.payment_method === metodo);
+    if (!config || !config.is_active) {
+      const defaultConfig = metodosPago.find((m) => m.payment_method === "efectivo");
+      return tipo === "mensual" ? (defaultConfig?.amount_monthly || 0) : (defaultConfig?.amount_inscription || 0);
     }
-    return tipo === "mensual" ? config.monto_mensual : config.monto_inscripcion;
+    return tipo === "mensual" ? config.amount_monthly : config.amount_inscription;
   }, [metodosPago]);
 
   const montoTotal = useMemo(() => {
@@ -546,7 +546,7 @@ function ReportarPagoForm() {
                 >
                   💵 Efectivo
                 </button>
-                {metodosPago.find(m => m.metodo_pago === "bs")?.habilitado && (
+                {metodosPago.find(m => m.payment_method === "bs")?.is_active && (
                   <button
                     type="button"
                     onClick={() => setFormData({ ...formData, metodo_pago: "bs" })}
@@ -559,7 +559,7 @@ function ReportarPagoForm() {
                     🇻🇪 Bs
                   </button>
                 )}
-                {metodosPago.find(m => m.metodo_pago === "binance")?.habilitado && (
+                {metodosPago.find(m => m.payment_method === "binance")?.is_active && (
                   <button
                     type="button"
                     onClick={() => setFormData({ ...formData, metodo_pago: "binance" })}

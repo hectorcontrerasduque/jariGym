@@ -30,7 +30,7 @@ const [password, setPassword] = useState("");
 
   useEffect(() => {
     configService.getConfig().then((config) => {
-      if (config?.nombre_gym) setGymName(config.nombre_gym);
+      if (config?.gym_name) setGymName(config.gym_name);
       if (config?.logo_url) setGymLogo(config.logo_url);
     }).catch(() => {});
   }, []);

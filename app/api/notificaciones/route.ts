@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
   try {
     const { data: gymConfig } = await supabase
       .from("gym_config")
-      .select("notificaciones_enabled, nombre_gym, logo_url, dueno_email, max_miembros, direccion, modo_cobro")
+      .select("notificaciones_enabled, gym_name, logo_url, owner_email, max_members, address, billing_mode")
       .limit(1)
       .single();
 
@@ -159,11 +159,11 @@ async function ejecutarTipo(
     dias_previo: number;
   },
   gymConfig: {
-    nombre_gym: string | null;
+    gym_name: string | null;
     logo_url: string | null;
-    dueno_email: string | null;
-    max_miembros: number;
-    direccion: string | null;
+    owner_email: string | null;
+    max_members: number;
+    address: string | null;
   },
   forzar: boolean = false
 ): Promise<{ miembrosNotificados: number; sinProblemas: boolean }> {
@@ -209,9 +209,9 @@ async function ejecutarTipo(
 }
 
 async function procesarMiembrosDeudores(gymConfig: {
-  nombre_gym: string | null;
+  gym_name: string | null;
   logo_url: string | null;
-  direccion: string | null;
+  address: string | null;
 }): Promise<number> {
   const morosos = await pagosService.getMiembrosMorosos(undefined, supabase);
   if (morosos.length === 0) return 0;
@@ -230,11 +230,11 @@ async function procesarMiembrosDeudores(gymConfig: {
       await sendPaymentDebtEmail(
         miembro.email,
         miembro.full_name,
-        (gymConfig.nombre_gym as string) || "GymApp",
+        (gymConfig.gym_name as string) || "GymApp",
         deudasParaEmail,
         miembro.totalDeuda,
         gymConfig.logo_url as string | null,
-        gymConfig.direccion as string | null
+        gymConfig.address as string | null
       );
       count++;
     } catch (error) {
@@ -250,11 +250,11 @@ async function procesarRecordatorioPago(
   gymConfig: Record<string, unknown>,
   forzar: boolean = false
 ): Promise<number> {
-  const nombreGym = (gymConfig.nombre_gym as string) || "GymApp";
+  const nombreGym = (gymConfig.gym_name as string) || "GymApp";
   const logoUrl = gymConfig.logo_url as string | null;
-  const duenoEmail = gymConfig.dueno_email as string | null;
-  const direccion = gymConfig.direccion as string | null;
-  const modoCobro = (gymConfig.modo_cobro as "dia_uno" | "fecha_inscripcion") || "dia_uno";
+  const duenoEmail = gymConfig.owner_email as string | null;
+  const direccion = gymConfig.address as string | null;
+  const modoCobro = (gymConfig.billing_mode as "dia_uno" | "fecha_inscripcion") || "dia_uno";
 
   const mesActual = new Date().getMonth() + 1;
   const anioActual = new Date().getFullYear();
@@ -405,7 +405,7 @@ async function procesarRecordatorioPago(
 }
 
 async function procesarResumenDueno(gymConfig: Record<string, unknown>): Promise<number> {
-  if (!gymConfig.dueno_email) throw new Error(messages.notificaciones.noDuenoEmail);
+  if (!gymConfig.owner_email) throw new Error(messages.notificaciones.noDuenoEmail);
 
   const mesActual = new Date().getMonth() + 1;
   const anioActual = new Date().getFullYear();
@@ -452,8 +452,8 @@ async function procesarResumenDueno(gymConfig: Record<string, unknown>): Promise
       "@/lib/services/email/email.service"
     );
     await sendAdminSummaryEmail(
-      gymConfig.dueno_email as string,
-      (gymConfig.nombre_gym as string) || "GymApp",
+      gymConfig.owner_email as string,
+      (gymConfig.gym_name as string) || "GymApp",
       {
         pagosAprobados: (pagosAprobadosDetalles || []).length,
         pagosPendientes: (pagosPendientesDetalles || []).length,
@@ -560,7 +560,7 @@ async function procesarEstatusSistema(gymConfig: Record<string, unknown>): Promi
     );
     await sendSystemStatusEmail(
       destino,
-      (gymConfig.nombre_gym as string) || "GymApp",
+      (gymConfig.gym_name as string) || "GymApp",
       {
         totalMiembrosActivos: totalActivos || 0,
         totalMiembrosInactivos: totalInactivos || 0,
@@ -575,7 +575,7 @@ async function procesarEstatusSistema(gymConfig: Record<string, unknown>): Promi
           0
         ),
         capacidad: totalActivos || 0,
-        maxMiembros: gymConfig.max_miembros as number,
+        maxMiembros: gymConfig.max_members as number,
         ultimoMiembroRegistrado: ultimoMiembro
           ? ultimoMiembro.full_name
           : "N/A",

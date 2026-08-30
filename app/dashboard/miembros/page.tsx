@@ -54,10 +54,10 @@ export default function MiembrosPage() {
     const [data, statsData, configData] = await Promise.all([
       miembrosService.listarMiembros(),
       miembrosService.stats(),
-      supabase.from("gym_config").select("max_miembros").maybeSingle(),
+      supabase.from("gym_config").select("max_members").maybeSingle(),
     ]);
     setMiembros(data);
-    setStats({ ...statsData, maxMiembros: configData?.data?.max_miembros || 50 });
+    setStats({ ...statsData, maxMiembros: configData?.data?.max_members || 50 });
   };
 
   useEffect(() => {
@@ -78,11 +78,11 @@ export default function MiembrosPage() {
         const [data, statsData, configData] = await Promise.all([
           miembrosService.listarMiembros(),
           miembrosService.stats(),
-          supabase.from("gym_config").select("max_miembros").maybeSingle(),
+          supabase.from("gym_config").select("max_members").maybeSingle(),
         ]);
         if (!cancelled) {
           setMiembros(data);
-          setStats({ ...statsData, maxMiembros: configData?.data?.max_miembros || 50 });
+          setStats({ ...statsData, maxMiembros: configData?.data?.max_members || 50 });
         }
       } catch {
         if (!cancelled) showToast(messages.toast.errorCargaDatos, "error");

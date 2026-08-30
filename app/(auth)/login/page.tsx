@@ -91,8 +91,8 @@ function LoginForm() {
     }
 
     configService.getConfig().then((config) => {
-      if (config?.nombre_gym) setGymName(config.nombre_gym);
-      if (config?.dueno_email) setGymOwnerEmail(config.dueno_email);
+      if (config?.gym_name) setGymName(config.gym_name);
+      if (config?.owner_email) setGymOwnerEmail(config.owner_email);
       if (config?.logo_url) setGymLogo(config.logo_url);
     }).catch(() => {});
 

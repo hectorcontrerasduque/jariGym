@@ -67,7 +67,7 @@ export function Sidebar() {
         const config = await configService.getConfig();
         if (config) {
           setHasConfig(true);
-          if (config.nombre_gym) setGymName(config.nombre_gym);
+          if (config.gym_name) setGymName(config.gym_name);
           if (config.logo_url) setGymLogo(config.logo_url);
         } else {
           setHasConfig(false);

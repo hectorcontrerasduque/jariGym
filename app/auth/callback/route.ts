@@ -36,11 +36,11 @@ export async function GET(request: Request) {
 
       const { data: gymConfig } = await supabase
         .from("gym_config")
-        .select("dueno_email")
+        .select("owner_email")
         .limit(1)
         .single();
 
-      const isGymOwner = gymConfig?.dueno_email && user.email?.toLowerCase() === gymConfig.dueno_email.toLowerCase();
+      const isGymOwner = gymConfig?.owner_email && user.email?.toLowerCase() === gymConfig.owner_email.toLowerCase();
 
       const serviceSupabase = createServiceClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,

@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/client";
 import { messages } from "@/lib/messages";
-import type { GymConfig, MetodoPago, MetodoPagoConfig } from "@/lib/types";
+import type { GymConfig, MetodoPago, PaymentMethod } from "@/lib/types";
 
 export const METODOS_PAGO_DEFAULT: MetodoPago[] = ["efectivo", "bs", "binance"];
 
@@ -35,27 +35,27 @@ export class ConfigService {
 
     const { data: existing } = await this.supabase
       .from("gym_config")
-      .select("id, dueno_email")
+      .select("id, owner_email")
       .limit(1)
       .single();
 
-    if (updates.dueno_email) {
-      if (existing && updates.dueno_email !== existing.dueno_email) {
+    if (updates.owner_email) {
+      if (existing && updates.owner_email !== existing.owner_email) {
         const { data: newOwnerProfile } = await this.supabase
           .from("profiles")
           .select("id, activo, role")
-          .eq("email", updates.dueno_email)
+          .eq("email", updates.owner_email)
           .maybeSingle();
 
         if (newOwnerProfile && newOwnerProfile.activo !== false && newOwnerProfile.role !== "super_admin") {
           throw new Error(messages.notificaciones.emailYaRegistradoActivo);
         }
 
-        if (existing.dueno_email) {
+        if (existing.owner_email) {
           const { data: oldOwnerProfile } = await this.supabase
             .from("profiles")
             .select("id")
-            .eq("email", existing.dueno_email)
+            .eq("email", existing.owner_email)
             .maybeSingle();
           if (oldOwnerProfile) {
             await this.supabase
@@ -75,7 +75,7 @@ export class ConfigService {
             await fetch("/api/auth/ensure-super-admin", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ email: updates.dueno_email, nombre: updates.dueno_nombre, inscription_paid: true }),
+              body: JSON.stringify({ email: updates.owner_email, nombre: updates.owner_name, inscription_paid: true }),
             });
           } catch (error) {
             console.error("[config] Error creando super_admin via ensure-super-admin:", error);
@@ -85,7 +85,7 @@ export class ConfigService {
         const { data: existingProfile } = await this.supabase
           .from("profiles")
           .select("id, activo, role")
-          .eq("email", updates.dueno_email)
+          .eq("email", updates.owner_email)
           .maybeSingle();
 
         if (existingProfile && existingProfile.activo !== false && existingProfile.role !== "super_admin") {
@@ -102,7 +102,7 @@ export class ConfigService {
             await fetch("/api/auth/ensure-super-admin", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ email: updates.dueno_email, nombre: updates.dueno_nombre, inscription_paid: true }),
+              body: JSON.stringify({ email: updates.owner_email, nombre: updates.owner_name, inscription_paid: true }),
             });
           } catch (error) {
             console.error("[config] Error creando super_admin via ensure-super-admin:", error);
@@ -111,7 +111,7 @@ export class ConfigService {
       }
     }
 
-    const { id, created_at, updated_at, ...safeUpdates } = updates as GymConfig; // eslint-disable-line @typescript-eslint/no-unused-vars
+    const { id, created_at, updated_at, created_by, updated_by, ...safeUpdates } = updates as GymConfig; // eslint-disable-line @typescript-eslint/no-unused-vars
 
     if (existing) {
       const { data, error } = await this.supabase
@@ -135,62 +135,65 @@ export class ConfigService {
     }
   }
 
-  async getMetodosPago(): Promise<MetodoPagoConfig[]> {
+  async getMetodosPago(): Promise<PaymentMethod[]> {
     const { data } = await this.supabase
-      .from("gym_config_metodos_pago")
+      .from("gym_config_payment_methods")
       .select("*")
-      .eq("habilitado", true)
-      .order("metodo_pago");
+      .eq("is_active", true)
+      .order("payment_method");
 
     return data || [];
   }
 
-  async saveMetodosPago(metodos: MetodoPagoConfig[]): Promise<void> {
+  async saveMetodosPago(metodos: PaymentMethod[]): Promise<void> {
     const { data: existingRecords } = await this.supabase
-      .from("gym_config_metodos_pago")
+      .from("gym_config_payment_methods")
       .select("*")
-      .eq("habilitado", true);
+      .eq("is_active", true);
 
-    const existingMap = new Map((existingRecords || []).map((r) => [r.metodo_pago, r]));
+    const existingMap = new Map((existingRecords || []).map((r) => [r.payment_method, r]));
 
     for (const metodo of metodos) {
-      const existing = existingMap.get(metodo.metodo_pago);
+      const existing = existingMap.get(metodo.payment_method);
 
-      if (metodo.habilitado) {
+      if (metodo.is_active) {
         if (existing) {
-          if (existing.monto_mensual !== metodo.monto_mensual || existing.monto_inscripcion !== metodo.monto_inscripcion) {
-            await this.supabase.rpc("actualizar_metodo_pago_atomico", {
-              p_id: existing.id,
-              p_monto_mensual: metodo.monto_mensual,
-              p_monto_inscripcion: metodo.monto_inscripcion,
-              p_habilitado: true,
-            });
+          if (existing.amount_monthly !== metodo.amount_monthly || existing.amount_inscription !== metodo.amount_inscription) {
+            await this.supabase
+              .from("gym_config_payment_methods")
+              .update({
+                amount_monthly: metodo.amount_monthly,
+                amount_inscription: metodo.amount_inscription,
+                effective_from: metodo.effective_from || new Date().toISOString().split("T")[0],
+              })
+              .eq("id", existing.id);
           }
         } else {
-          await this.supabase.from("gym_config_metodos_pago").insert({
-            metodo_pago: metodo.metodo_pago,
-            monto_mensual: metodo.monto_mensual,
-            monto_inscripcion: metodo.monto_inscripcion,
-            habilitado: true,
+          await this.supabase.from("gym_config_payment_methods").insert({
+            payment_method: metodo.payment_method,
+            amount_monthly: metodo.amount_monthly,
+            amount_inscription: metodo.amount_inscription,
+            is_active: true,
+            effective_from: new Date().toISOString().split("T")[0],
           });
         }
       } else {
         if (existing) {
           await this.supabase
-            .from("gym_config_metodos_pago")
-            .delete()
+            .from("gym_config_payment_methods")
+            .update({ is_active: false, effective_to: new Date().toISOString().split("T")[0] })
             .eq("id", existing.id);
         }
       }
     }
   }
 
-  async getMetodoPago(metodo: MetodoPago): Promise<MetodoPagoConfig | null> {
+  async getMetodoPago(metodo: MetodoPago): Promise<PaymentMethod | null> {
     const { data, error } = await this.supabase
-      .from("gym_config_metodos_pago")
+      .from("gym_config_payment_methods")
       .select("*")
-      .eq("metodo_pago", metodo)
-      .eq("habilitado", true)
+      .eq("payment_method", metodo)
+      .eq("is_active", true)
       .limit(1)
       .maybeSingle();
 

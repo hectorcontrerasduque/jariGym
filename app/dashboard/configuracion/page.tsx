@@ -12,8 +12,8 @@ import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { messages } from "@/lib/messages";
 import type { GymConfig, MetodoPago, PaymentMethod } from "@/lib/types";
 
-const metodoLabels: Record<MetodoPago, { label: string; icon: string; alwaysOn?: boolean; locked?: boolean }> = {
-  efectivo: { label: "Efectivo", icon: "💵", alwaysOn: true },
+const metodoLabels: Record<MetodoPago, { label: string; icon: string; locked?: boolean }> = {
+  efectivo: { label: "Efectivo", icon: "💵" },
   bs: { label: "Bolívares", icon: "🇻🇪", locked: true },
   binance: { label: "Binance USDT", icon: "🟡", locked: true },
 };
@@ -90,10 +90,12 @@ export default function ConfiguracionPage() {
   const handleToggleMetodo = (metodoPago: MetodoPago) => {
     // eslint-disable-next-line security/detect-object-injection
     const info = metodoLabels[metodoPago];
-    if (info?.alwaysOn || info?.locked) return;
+    if (info?.locked) return;
     setMetodos((prev) =>
       prev.map((m) =>
-        m.payment_method === metodoPago ? { ...m, is_active: !m.is_active } : m
+        m.payment_method === metodoPago
+          ? { ...m, is_active: !m.is_active }
+          : { ...m, is_active: false }
       )
     );
   };
@@ -185,7 +187,7 @@ export default function ConfiguracionPage() {
       <Card className="neon-card relative z-10">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Building2 className="w-5 h-5 text-gym-primary" /> Datos del Gym
+            <Building2 className="w-5 h-5 text-gym-primary" /> {messages.configuracion.datosDelGym}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -231,25 +233,27 @@ export default function ConfiguracionPage() {
             </div>
           </div>
 
-          <Input label="Nombre del gym *" placeholder="Mi Gym" value={config.gym_name || ""} onChange={(e) => setConfig({ ...config, gym_name: e.target.value })} required />
-          <Input label="Dirección" placeholder="Calle Principal #123" value={config.address || ""} onChange={(e) => setConfig({ ...config, address: e.target.value })} />
-          <Input label="Teléfono" placeholder="+52 55 1234 5678" value={config.phone_number || ""} onChange={(e) => setConfig({ ...config, phone_number: e.target.value })} />
-          <Input label="Horario" placeholder="Lun-Vie 6am-10pm" value={config.schedule || ""} onChange={(e) => setConfig({ ...config, schedule: e.target.value })} />
-          <Input label="Máximo de miembros" type="number" placeholder="50" value={config.max_members || ""} onChange={(e) => setConfig({ ...config, max_members: parseInt(e.target.value) || 0 })} min="1" />
+          <Input label={`${messages.configuracion.gymName} *`} placeholder="Mi Gym" value={config.gym_name || ""} onChange={(e) => setConfig({ ...config, gym_name: e.target.value })} required />
+          <Input label={messages.configuracion.maxMembers} type="number" placeholder="100" value={config.max_members || ""} onChange={(e) => setConfig({ ...config, max_members: parseInt(e.target.value) || 0 })} min="1" />
+          <Input label={messages.configuracion.address} placeholder="" value={config.address || ""} onChange={(e) => setConfig({ ...config, address: e.target.value })} />
+          <Input label={messages.configuracion.phoneNumber} placeholder="+584261234567" value={config.phone_number || ""} onChange={(e) => setConfig({ ...config, phone_number: e.target.value })} />
+          <Input label={messages.configuracion.contactEmail} placeholder="gym@email.com" type="email" value={config.contact_email || ""} onChange={(e) => setConfig({ ...config, contact_email: e.target.value })} />
+          <Input label={messages.configuracion.schedule} placeholder="Lun-Vie 6am-10pm" value={config.schedule || ""} onChange={(e) => setConfig({ ...config, schedule: e.target.value })} />
         </CardContent>
       </Card>
 
-      {/* Datos del Dueño */}
+      {/* Datos del Propietario */}
       <Card className="neon-card relative z-10">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <User className="w-5 h-5 text-gym-secondary" /> Datos del Propietario
+            <User className="w-5 h-5 text-gym-secondary" /> {messages.configuracion.propietario}
           </CardTitle>
+          <p className="text-xs text-gym-muted -mt-2">{messages.configuracion.propietarioDesc}</p>
         </CardHeader>
         <CardContent className="space-y-4">
-          <Input label="Nombre del propietario *" placeholder="Tu nombre" value={config.owner_name || ""} onChange={(e) => setConfig({ ...config, owner_name: e.target.value })} required />
-          <Input label="Correo del propietario *" placeholder="tu@email.com" type="email" value={config.owner_email || ""} onChange={(e) => setConfig({ ...config, owner_email: e.target.value })} required />
-          <Input label="Teléfono" placeholder="+52 55 9876 5432" value={config.owner_phone || ""} onChange={(e) => setConfig({ ...config, owner_phone: e.target.value })} />
+          <Input label={`${messages.configuracion.ownerName} *`} placeholder="Tu nombre" value={config.owner_name || ""} onChange={(e) => setConfig({ ...config, owner_name: e.target.value })} required />
+          <Input label={`${messages.configuracion.ownerEmail} *`} placeholder="tu@email.com" type="email" value={config.owner_email || ""} onChange={(e) => setConfig({ ...config, owner_email: e.target.value })} required />
+          <Input label={messages.configuracion.ownerPhone} placeholder="+584261234567" value={config.owner_phone || ""} onChange={(e) => setConfig({ ...config, owner_phone: e.target.value })} />
         </CardContent>
       </Card>
 
@@ -257,17 +261,16 @@ export default function ConfiguracionPage() {
       <Card className="neon-card relative z-10">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <CreditCard className="w-5 h-5 text-gym-secondary" /> Métodos de Pago
+            <CreditCard className="w-5 h-5 text-gym-secondary" /> {messages.configuracion.metodosPago}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <p className="text-sm text-gym-muted">Configura los métodos de pago aceptados y sus montos.</p>
+          <p className="text-sm text-gym-muted">{messages.configuracion.configuraMetodos}</p>
 
           {metodos.map((metodo) => {
             const info = metodoLabels[metodo.payment_method];
-            const isAlwaysOn = info?.alwaysOn;
             const isLocked = info?.locked;
-            const isDisabled = isAlwaysOn || isLocked;
+            const isDisabled = isLocked;
             return (
               <div
                 key={metodo.payment_method}
@@ -282,7 +285,6 @@ export default function ConfiguracionPage() {
                     <span className="text-xl">{info?.icon}</span>
                     <div>
                       <p className="font-medium text-gym-text">{info?.label}</p>
-                      {isAlwaysOn && <p className="text-xs text-gym-muted">Siempre habilitado</p>}
                       {isLocked && <p className="text-xs text-gym-muted">Próximamente</p>}
                     </div>
                   </div>
@@ -358,6 +360,22 @@ export default function ConfiguracionPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Desktop bottom save button */}
+      <div className="hidden sm:flex justify-end">
+        <button
+          onClick={handleSaveConfig}
+          disabled={saving}
+          className="flex items-center gap-2 px-5 py-2.5 bg-gym-primary text-gym-bg rounded-xl font-medium hover:bg-gym-primary/90 transition-all disabled:opacity-50"
+        >
+          {saving ? (
+            <div className="w-4 h-4 border-2 border-gym-bg border-t-transparent rounded-full animate-spin" />
+          ) : (
+            <Save className="w-4 h-4" />
+          )}
+          Guardar
+        </button>
+      </div>
 
       {/* Mobile floating save button */}
       <button

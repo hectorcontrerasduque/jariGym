@@ -139,7 +139,6 @@ export class ConfigService {
     const { data } = await this.supabase
       .from("gym_config_payment_methods")
       .select("*")
-      .eq("is_active", true)
       .order("payment_method");
 
     return data || [];
@@ -148,43 +147,45 @@ export class ConfigService {
   async saveMetodosPago(metodos: PaymentMethod[]): Promise<void> {
     const { data: existingRecords } = await this.supabase
       .from("gym_config_payment_methods")
-      .select("*")
-      .eq("is_active", true);
+      .select("*");
 
     const existingMap = new Map((existingRecords || []).map((r) => [r.payment_method, r]));
+    const activeMetodo = metodos.find((m) => m.is_active);
 
-    for (const metodo of metodos) {
-      const existing = existingMap.get(metodo.payment_method);
-
-      if (metodo.is_active) {
-        if (existing) {
-          if (existing.amount_monthly !== metodo.amount_monthly || existing.amount_inscription !== metodo.amount_inscription) {
-            await this.supabase
-              .from("gym_config_payment_methods")
-              .update({
-                amount_monthly: metodo.amount_monthly,
-                amount_inscription: metodo.amount_inscription,
-                effective_from: metodo.effective_from || new Date().toISOString().split("T")[0],
-              })
-              .eq("id", existing.id);
-          }
-        } else {
-          await this.supabase.from("gym_config_payment_methods").insert({
-            payment_method: metodo.payment_method,
-            amount_monthly: metodo.amount_monthly,
-            amount_inscription: metodo.amount_inscription,
-            is_active: true,
-            effective_from: new Date().toISOString().split("T")[0],
-          });
-        }
-      } else {
-        if (existing) {
-          await this.supabase
-            .from("gym_config_payment_methods")
-            .update({ is_active: false, effective_to: new Date().toISOString().split("T")[0] })
-            .eq("id", existing.id);
-        }
+    // Desactivar todos los registros existentes primero
+    for (const existing of existingRecords || []) {
+      if (existing.is_active) {
+        await this.supabase
+          .from("gym_config_payment_methods")
+          .update({ is_active: false, effective_to: new Date().toISOString().split("T")[0] })
+          .eq("id", existing.id);
       }
+    }
+
+    if (!activeMetodo) return;
+
+    const existing = existingMap.get(activeMetodo.payment_method);
+
+    if (existing) {
+      // Activar o actualizar el registro seleccionado
+      await this.supabase
+        .from("gym_config_payment_methods")
+        .update({
+          is_active: true,
+          amount_monthly: activeMetodo.amount_monthly,
+          amount_inscription: activeMetodo.amount_inscription,
+          effective_from: new Date().toISOString().split("T")[0],
+          effective_to: null,
+        })
+        .eq("id", existing.id);
+    } else {
+      await this.supabase.from("gym_config_payment_methods").insert({
+        payment_method: activeMetodo.payment_method,
+        amount_monthly: activeMetodo.amount_monthly,
+        amount_inscription: activeMetodo.amount_inscription,
+        is_active: true,
+        effective_from: new Date().toISOString().split("T")[0],
+      });
     }
   }
 

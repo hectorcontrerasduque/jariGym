@@ -20,7 +20,7 @@ DELETE FROM gym_config_payment_methods;
 DELETE FROM gym_config;
 
 -- 4. Resetear migracion para re-migrar
-UPDATE migracion SET migrado = 'no', phone_number = null, correo = null;
+UPDATE migracion SET migrado = 'no';
 
 -- Verificar
 SELECT 'gym_config' as tabla, COUNT(*) as registros FROM gym_config

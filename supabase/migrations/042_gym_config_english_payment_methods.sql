@@ -109,9 +109,9 @@ CREATE TABLE gym_config_payment_methods (
   updated_at timestamptz DEFAULT now()
 );
 
--- 2.3 Index: solo 1 activo por payment_method
-CREATE UNIQUE INDEX idx_payment_methods_active
-  ON gym_config_payment_methods(payment_method) WHERE is_active = true;
+-- 2.3 Index: solo 1 activo en total (global, no por tipo)
+CREATE UNIQUE INDEX idx_one_active_payment_method
+  ON gym_config_payment_methods ((1)) WHERE is_active = true;
 
 -- 2.4 Trigger de updated_at
 CREATE TRIGGER trigger_payment_methods_updated
@@ -154,13 +154,13 @@ COMMENT ON COLUMN gym_config.updated_by IS 'UUID del ultimo usuario que modifico
 -- PARTE 4: Descripciones — gym_config_payment_methods
 -- ============================================================
 
-COMMENT ON TABLE gym_config_payment_methods IS 'Metodos de pago configurados con montos y vigencia. Solo 1 activo por metodo.';
+COMMENT ON TABLE gym_config_payment_methods IS 'Metodos de pago configurados con montos y vigencia. Solo 1 activo en total.';
 
 COMMENT ON COLUMN gym_config_payment_methods.id IS 'Identificador unico del metodo de pago';
 COMMENT ON COLUMN gym_config_payment_methods.payment_method IS 'Tipo de metodo de pago: efectivo, bs, binance';
 COMMENT ON COLUMN gym_config_payment_methods.amount_monthly IS 'Monto de la mensualidad en la moneda del metodo';
 COMMENT ON COLUMN gym_config_payment_methods.amount_inscription IS 'Monto de la inscripcion (pago unico de registro)';
-COMMENT ON COLUMN gym_config_payment_methods.is_active IS 'Si este metodo de pago esta habilitado. Solo puede haber 1 registro activo por payment_method';
+COMMENT ON COLUMN gym_config_payment_methods.is_active IS 'Si este metodo de pago esta habilitado. Solo puede haber 1 registro activo en total (no por tipo)';
 COMMENT ON COLUMN gym_config_payment_methods.effective_from IS 'Fecha de vigencia desde (dia en que aplica la tarifa)';
 COMMENT ON COLUMN gym_config_payment_methods.effective_to IS 'Fecha de vigencia hasta. NULL = vigente (aun activo)';
 COMMENT ON COLUMN gym_config_payment_methods.created_at IS 'Fecha y hora de creacion del registro';

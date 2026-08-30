@@ -95,28 +95,100 @@ export default function MisPagosPage() {
     const targetId = miembroSeleccionado?.id || user.id;
     const currentIsAdmin = profileData?.role === "super_admin";
 
-    const [pagosData, aniosData, config] = await Promise.all([
-      currentIsAdmin ? pagosService.listarPagosUsuario(targetId, anioSeleccionado) : pagosService.listarMisPagos(anioSeleccionado),
-      pagosService.aniosConPagos(targetId),
-      configService.getConfig(),
-    ]);
+    // Individual queries with error handling - avoid Promise.all that fails entire page load
+    let pagosData = [];
+    let aniosData = [new Date().getFullYear()];
+    let config: GymConfig | null = null;
+
+    // 1. Cargar pagos
+    try {
+      if (currentIsAdmin) {
+        const { data: pg, error: pgError } = await supabase
+          .from("payments")
+          .select("*, detail:payment_detail(*)")
+          .eq("user_id", targetId);
+        if (pgError) throw pgError;
+        pagosData = pg || [];
+      } else {
+        const { data: pg, error: pgError } = await supabase
+          .from("payments")
+          .select("*, detail:payment_detail(*)")
+          .eq("user_id", targetId)
+          .order("created_at", { ascending: false });
+        if (pgError) throw pgError;
+        pagosData = pg || [];
+      }
+    } catch (err) {
+      console.error("Error cargando pagos:", err);
+      showToast(messages.toast.errorCargaDatos, "error");
+    }
+
+    // 2. Cargar años
+    try {
+      const { data: ad, error: adError } = await supabase
+        .from("payments")
+        .select("id");
+      if (adError) throw adError;
+      if (ad && ad.length > 0) {
+        const { data: detalle } = await supabase
+          .from("payment_detail")
+          .select("year_number")
+          .in("payment_id", ad.map((p) => p.id));
+        const years = Array.from(new Set((detalle || []).map((d) => d.year_number).filter(Boolean)));
+        aniosData = years.length > 0 ? years : [new Date().getFullYear()];
+      }
+    } catch (err) {
+      console.error("Error cargando años:", err);
+      aniosData = [new Date().getFullYear()];
+    }
+
+    // 3. Cargar config
+    try {
+      const { data: cfg, error: cfgError } = await supabase
+        .from("gym_config")
+        .select("*")
+        .limit(1)
+        .single();
+      if (cfgError) {
+        // gym_config puede no existir aún - eso está bien
+        config = null;
+      } else {
+        config = cfg;
+      }
+    } catch (err) {
+      console.error("Error cargando config:", err);
+      config = null;
+    }
+
     setPagos(pagosData);
     setAnios(aniosData);
     setGymConfig(config);
 
-    const metodos = await configService.getMetodosPago();
-    setMetodosPago(metodos);
-
-    if (isAdmin) {
-      const { data: miembrosData } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("activo", true)
-        .eq("registered", true)
-        .order("full_name");
-      if (miembrosData) setMiembros(miembrosData);
+    // 4. Cargar métodos de pago
+    try {
+      const metodos = await configService.getMetodosPago();
+      setMetodosPago(metodos);
+    } catch (err) {
+      console.error("Error cargando métodos de pago:", err);
+      showToast(messages.toast.errorCargaDatos, "error");
+      setMetodosPago([]);
     }
-  }, [anioSeleccionado, miembroSeleccionado, isAdmin]);
+
+    // 5. Cargar miembros (solo super_admin)
+    if (isAdmin) {
+      try {
+        const { data: miembrosData } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("activo", true)
+          .eq("registered", true)
+          .order("full_name");
+        if (miembrosData) setMiembros(miembrosData);
+      } catch (err) {
+        console.error("Error cargando miembros:", err);
+      }
+    }
+  }, [miembroSeleccionado, isAdmin]);
 
   useEffect(() => {
     let cancelled = false;

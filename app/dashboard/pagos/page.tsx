@@ -61,18 +61,27 @@ export default function PagosPage() {
         const [pagosResult, aniosResult, miembrosResult] = await fetchAllData();
         if (!cancelled) {
           if (pagosResult.status === "fulfilled") setPagos(pagosResult.value);
-          if (aniosResult.status === "fulfilled") setAnios(aniosResult.value);
+          if (aniosResult.status === "fulfilled") {
+            setAnios(aniosResult.value);
+            // Auto-select a year that has payments if the current year has none
+            if (aniosResult.value.length > 0 && !aniosResult.value.includes(anioSeleccionado)) {
+              setAnioSeleccionado(aniosResult.value[0]);
+            }
+          }
           if (miembrosResult.status === "fulfilled") setMiembros(miembrosResult.value);
         }
-      } catch {
-        if (!cancelled) showToast(messages.toast.errorCargaDatos, "error");
+      } catch (err) {
+        if (!cancelled) {
+          console.error("Error cargando datos de pagos:", err);
+          showToast(messages.toast.errorCargaDatos, "error");
+        }
       } finally {
         if (!cancelled) setLoading(false);
       }
     };
     load();
     return () => { cancelled = true; };
-  }, [fetchAllData]);
+  }, [fetchAllData, anioSeleccionado]);
 
   const loadData = async () => {
     setLoading(true);

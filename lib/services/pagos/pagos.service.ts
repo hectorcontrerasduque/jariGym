@@ -206,7 +206,7 @@ export class PagosService {
 
     let query = supabase
       .from("payments")
-      .select("*, detail:payment_detail(*), profile:profiles(full_name, avatar_url, email)")
+      .select("*, detail:payment_detail(*)")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false });
 
@@ -243,7 +243,7 @@ export class PagosService {
     const supabase = supabaseClient || this.supabase;
     let query = supabase
       .from("payments")
-      .select("*, detail:payment_detail(*), profile:profiles(full_name, avatar_url, email)")
+      .select("*, detail:payment_detail(*)")
       .eq("user_id", usuarioId)
       .order("created_at", { ascending: false });
 
@@ -417,7 +417,7 @@ export class PagosService {
     const supabase = supabaseClient || this.supabase;
     let query = supabase
       .from("payments")
-      .select("*, detail:payment_detail(*), profile:profiles(full_name, avatar_url, email)")
+      .select("*, detail:payment_detail(*)")
       .order("created_at", { ascending: false });
 
     if (estado) {

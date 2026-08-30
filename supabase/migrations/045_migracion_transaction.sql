@@ -1,6 +1,9 @@
 -- 045: Función RPC migrar_miembro_pago con transacción
 -- Ejecuta todo el flujo de creación de pagos dentro de BEGIN/COMMIT
 -- Si falla algo, ROLLBACK revierte todo
+-- Idempotente: se puede ejecutar múltiples veces sin errores
+
+DROP FUNCTION IF EXISTS migrar_miembro_pago(uuid, jsonb, decimal, decimal, uuid[], date, text, text);
 
 CREATE OR REPLACE FUNCTION migrar_miembro_pago(
   p_user_id uuid,

@@ -114,39 +114,34 @@ function LoginForm() {
       .then((records) => setAllRecords(records))
       .catch(() => showToast(messages.migracion.error, "error"));
   }, [showMigrateForm]);
-  useEffect(() => {
-    if (migNombre.length < 2 || selectedNombre) {
-      setSearchResults([]); // eslint-disable-line react-hooks/set-state-in-effect
-      setShowDropdown(false);
-      return;
-    }
-    const timeout = setTimeout(() => {
+
+  // Filter records: hide migrado=si, filter by typed name
+useEffect(() => {
+    // Build filtered list: only records not yet migrated
+    let filtered = allRecords.filter((r) => r.migrado !== "si");
+
+    // Client-side filter by name if user typed enough chars
+    if (migNombre.length >= 2) {
       const query = migNombre.trim().toUpperCase();
       const words = query.split(/\s+/).filter((w) => w.length >= 1);
-
-      // Search by name: any word must appear in the nombre
-      const nameMatches = allRecords.filter((r) => {
+      filtered = filtered.filter((r) => {
         const nombreUpper = r.nombre.toUpperCase();
         return words.some((w) => nombreUpper.includes(w));
       });
+    }
 
-      // Search by email: query matches any email
-      const emailMatches = allRecords.filter((r) => {
-        return r.correos.some((c) => c.toLowerCase().includes(query.toLowerCase()));
-      });
+    setSearchResults(filtered.map((r) => r.nombre)); // eslint-disable-line react-hooks/set-state-in-effect
+    // Show dropdown only if there are results available
+    setShowDropdown(filtered.length > 0); // eslint-disable-line react-hooks/set-state-in-effect
+  }, [migNombre, allRecords]);
 
-      // Merge and deduplicate
-      const merged = new Map<string, MigracionRecord>();
-      for (const r of nameMatches) merged.set(r.nombre, r);
-      for (const r of emailMatches) merged.set(r.nombre, r);
-
-      const results = Array.from(merged.values()).slice(0, 10);
-
-      setSearchResults(results.map((r) => r.nombre));
-      setShowDropdown(results.length > 0);
-    }, 200);
-    return () => clearTimeout(timeout);
-  }, [migNombre, selectedNombre, allRecords]);
+  // When selection changes, clear search results
+  useEffect(() => {
+    if (selectedNombre) {
+      setSearchResults([]); // eslint-disable-line react-hooks/set-state-in-effect
+      setShowDropdown(false); // eslint-disable-line react-hooks/set-state-in-effect
+    }
+  }, [selectedNombre]);
 
   // Debounced email validation + auto-fill from migracion
   useEffect(() => {

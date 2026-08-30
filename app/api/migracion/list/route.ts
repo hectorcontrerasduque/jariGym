@@ -5,9 +5,9 @@ import { applyRateLimit } from "@/lib/middleware/rate-limit";
 
 export async function GET(request: Request) {
   const rateLimitResponse = await applyRateLimit(request, {
-    max: 10,
+    max: 30,
     windowMs: 60 * 60 * 1000,
-    prefix: "api",
+    prefix: "migracion-list",
   });
   if (rateLimitResponse) return rateLimitResponse;
 

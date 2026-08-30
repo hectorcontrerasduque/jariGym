@@ -263,7 +263,7 @@ export async function POST(request: Request) {
       estado: record.estado,
     }));
 
-    const migracionIds = migrablesRecords.map((r) => r.id);
+    const migracionIds = migrablesRecords.map((r) => Number(r.id));
 
     // Execute payment creation + inscription + migration marking in a single transaction
     const { data: rpcResult, error: rpcError } = await supabase.rpc("migrar_miembro_pago", {

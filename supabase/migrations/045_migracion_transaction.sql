@@ -7,7 +7,7 @@ CREATE OR REPLACE FUNCTION migrar_miembro_pago(
   p_pago_records jsonb,
   p_monto_mensual decimal,
   p_monto_inscripcion decimal,
-  p_migracion_ids uuid[],
+  p_migracion_ids bigint[],
   p_fecha_inicio date,
   p_whatsapp text DEFAULT NULL,
   p_correo text DEFAULT NULL

@@ -139,17 +139,14 @@ function LoginForm() {
     setMigEmailStatus("checking");
     const timeout = setTimeout(async () => {
       try {
-        // Check if email exists in profiles (already has account)
         const result = await migracionService.pingEmail(migCorreo);
         if (result.alreadyMigrated) {
-          const nombre = result.nombre || migCorreo;
-          setMigrateError(messages.migracion.correoYaMigrado(nombre));
           setMigEmailStatus("exists");
+          setMigEmailExists(true);
         } else if (result.exists) {
           setMigEmailStatus("exists");
           setMigEmailExists(true);
         } else {
-          // Check if email exists in migracion (not yet migrated) → auto-fill name
           const query = migCorreo.toLowerCase().trim();
           const match = allRecords.find((r) =>
             r.correos.some((c) => c.toLowerCase() === query) && r.migrado === "no"
@@ -160,7 +157,6 @@ function LoginForm() {
           }
           setMigEmailStatus("valid");
           setMigEmailExists(false);
-          setMigrateError("");
         }
       } catch {
         setMigEmailStatus("valid");
@@ -568,7 +564,7 @@ function LoginForm() {
                       required
                     />
                     {showDropdown && (
-                      <div className="absolute z-50 w-full mt-1 bg-gym-surface border border-gym-border rounded-xl shadow-lg max-h-48 overflow-y-auto">
+                      <div className="absolute z-50 w-full mt-1 bg-gym-border border border-gym-border rounded-xl shadow-lg max-h-48 overflow-y-auto">
                         {searchResults.length === 0 && (
                           <p className="p-2 text-center text-gym-muted text-xs">{messages.migracion.nombreNoEncontrado}</p>
                         )}
@@ -610,7 +606,7 @@ function LoginForm() {
                       type="email"
                       placeholder="tu@gmail.com"
                       value={migCorreo}
-                      onChange={(e) => { setMigCorreo(e.target.value); setMigEmailExists(false); setMigEmailStatus("idle"); setMigrateError(""); }}
+                      onChange={(e) => { setMigCorreo(e.target.value); }}
                       suffix={
                         migEmailStatus === "checking" ? <span className="text-gym-muted animate-pulse">⏳</span> :
                         migEmailStatus === "valid" ? <span className="text-gym-success">✓</span> :
@@ -621,18 +617,18 @@ function LoginForm() {
                       required
                     />
                     {migEmailStatus === "exists" && migEmailExists && (
-                      <p className="text-xs text-gym-warning mt-1">{messages.migracion.emailExistsInfo}</p>
+                      <p className="text-xs text-gym-muted mt-1">{messages.migracion.emailExistsInfo}</p>
                     )}
                     {migEmailStatus === "invalid" && migCorreo.length >= 5 && (
                       <p className="text-xs text-gym-danger mt-1">{messages.migracion.emailInvalidError}</p>
                     )}
                   </div>
-                  <Input
-                    label={messages.migracion.whatsapp}
-                    placeholder="5512345678"
-                    value={migWhatsapp}
-                    onChange={(e) => { const val = e.target.value.replace(/[^0-9]/g, ""); setMigWhatsapp(val); }}
-                  />
+                    <Input
+                      label={messages.migracion.whatsapp}
+                      placeholder="+584261234567"
+                      value={migWhatsapp}
+                      onChange={(e) => { const val = e.target.value.replace(/[^0-9]/g, ""); setMigWhatsapp(val); }}
+                    />
                   <PasswordInput
                     label={messages.migracion.password + (migCorreo && migCorreo.toLowerCase().endsWith("@gmail.com") ? " (opcional)" : " *")}
                     placeholder="••••••••"

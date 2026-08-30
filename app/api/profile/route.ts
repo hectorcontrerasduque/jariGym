@@ -61,6 +61,19 @@ export async function PUT(request: Request) {
       profileUpdates.inscription_admin_note = updates.inscription_admin_note ?? currentData?.inscription_admin_note;
     }
 
+    if (profileUpdates.email && currentData?.email && profileUpdates.email !== currentData.email) {
+      const { data: existingProfile } = await serviceSupabase
+        .from("profiles")
+        .select("id")
+        .ilike("email", profileUpdates.email as string)
+        .neq("id", targetUserId)
+        .maybeSingle();
+
+      if (existingProfile) {
+        return NextResponse.json({ error: messages.miembros.emailDuplicado }, { status: 409 });
+      }
+    }
+
     const { data, error: profileError } = await serviceSupabase
       .from("profiles")
       .update(profileUpdates)

@@ -11,7 +11,7 @@ import { Avatar } from "@/components/ui/avatar";
 import { miembrosService } from "@/lib/services/miembros/miembros.service";
 import { formatDate, formatCurrency, formatDateTime } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
-import { Users, Search, Plus, Eye, UserX, UserCheck, Settings, Save, Pencil } from "lucide-react";
+import { Users, Search, Plus, Eye, UserX, UserCheck, Settings, Save, Pencil, Trash2 } from "lucide-react";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { showToast } from "@/components/ui/toast";
 import { messages } from "@/lib/messages";
@@ -228,6 +228,22 @@ export default function MiembrosPage() {
     }
   };
 
+  const handleEliminar = async (miembro: Profile) => {
+    if (!confirm(messages.miembros.confirmarEliminar.replace("{nombre}", miembro.full_name))) return;
+    try {
+      const res = await fetch(`/api/miembros?id=${miembro.id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok) {
+        showToast(data.error || messages.miembros.miembroEliminadoError, "error");
+        return;
+      }
+      showToast(messages.miembros.miembroEliminado, "success");
+      await loadMiembros();
+    } catch {
+      showToast(messages.miembros.miembroEliminadoError, "error");
+    }
+  };
+
   const handleToggleMembresiaLibre = async (miembro: Profile) => {
     if (!currentUser) return;
     const accion = isMembresiaLibre ? "remover membresía libre de" : "asignar membresía libre a";
@@ -411,6 +427,11 @@ export default function MiembrosPage() {
                             <UserCheck className="w-4 h-4" />
                           </Button>
                         )}
+                        {currentUser?.role === "super_admin" && (
+                          <Button variant="ghost" size="sm" onClick={() => handleEliminar(miembro)} className="text-gym-danger hover:text-gym-danger" title={messages.miembros.eliminarMiembro}>
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -458,6 +479,11 @@ export default function MiembrosPage() {
                 ) : (
                   <Button variant="ghost" size="sm" onClick={() => handleToggleStatus(miembro, true)} className="text-gym-success">
                     <UserCheck className="w-4 h-4" />
+                  </Button>
+                )}
+                {currentUser?.role === "super_admin" && (
+                  <Button variant="ghost" size="sm" onClick={() => handleEliminar(miembro)} className="text-gym-danger">
+                    <Trash2 className="w-4 h-4" />
                   </Button>
                 )}
               </div>

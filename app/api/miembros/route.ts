@@ -131,3 +131,60 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: messages.toast.errorGenerico }, { status: 500 });
   }
 }
+
+export async function DELETE(request: Request) {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+      return NextResponse.json({ error: messages.toast.noAutenticado }, { status: 401 });
+    }
+
+    const { data: profileAdmin } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+
+    if (profileAdmin?.role !== "super_admin") {
+      return NextResponse.json({ error: messages.toast.noAutorizado }, { status: 403 });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const memberId = searchParams.get("id");
+
+    if (!memberId) {
+      return NextResponse.json({ error: messages.miembros.errorObtenerUsuario }, { status: 400 });
+    }
+
+    const serviceSupabase = createServiceClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+
+    const { count } = await serviceSupabase
+      .from("pagos")
+      .select("id", { count: "exact", head: true })
+      .eq("usuario_id", memberId);
+
+    if (count && count > 0) {
+      return NextResponse.json({ error: messages.miembros.tienePagosNoEliminar }, { status: 409 });
+    }
+
+    const { error: profileError } = await serviceSupabase
+      .from("profiles")
+      .delete()
+      .eq("id", memberId);
+
+    if (profileError) {
+      return NextResponse.json({ error: messages.miembros.miembroEliminadoError }, { status: 500 });
+    }
+
+    await serviceSupabase.auth.admin.deleteUser(memberId);
+
+    return NextResponse.json({ success: true });
+  } catch {
+    return NextResponse.json({ error: messages.toast.errorGenerico }, { status: 500 });
+  }
+}

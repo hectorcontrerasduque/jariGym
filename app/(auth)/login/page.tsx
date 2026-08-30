@@ -40,9 +40,8 @@ function LoginForm() {
   const [gymLogo, setGymLogo] = useState("");
 
   const [showMigrateForm, setShowMigrateForm] = useState(false);
-  const [migrateStep, setMigrateStep] = useState<"form" | "success" | "error" | "loading">("form");
+  const [migrateStep, setMigrateStep] = useState<"form" | "success" | "loading">("form");
   const [selectedNombre, setSelectedNombre] = useState<string | null>(null);
-  const [migrateError, setMigrateError] = useState("");
   const [migNombre, setMigNombre] = useState("");
   const [migWhatsapp, setMigWhatsapp] = useState("");
   const [migCorreo, setMigCorreo] = useState("");
@@ -273,39 +272,38 @@ function LoginForm() {
 
   const handleMigrateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setMigrateError("");
 
     // Validations
     if (!migNombre.trim() || migNombre.trim().split(" ").length < 2) {
-      setMigrateError(messages.migracion.nombreRequerido);
+      showToast(messages.migracion.nombreRequerido, "error");
       return;
     }
     if (!selectedNombre) {
-      setMigrateError(messages.migracion.seleccioneNombre);
+      showToast(messages.migracion.seleccioneNombre, "error");
       return;
     }
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(migCorreo)) {
-      setMigrateError(messages.migracion.correoFormatoInvalido);
+      showToast(messages.migracion.correoFormatoInvalido, "error");
       return;
     }
     const isGmail = migCorreo.toLowerCase().endsWith("@gmail.com");
     if (!isGmail) {
       if (!migPassword || migPassword.length < 6) {
-        setMigrateError(messages.migracion.passwordMinError);
+        showToast(messages.migracion.passwordMinError, "error");
         return;
       }
       if (migPassword !== migPasswordConfirm) {
-        setMigrateError(messages.migracion.passwordMismatchError);
+        showToast(messages.migracion.passwordMismatchError, "error");
         return;
       }
     } else if (migPassword || migPasswordConfirm) {
       if (!migPassword || migPassword.length < 6) {
-        setMigrateError(messages.migracion.passwordMinError);
+        showToast(messages.migracion.passwordMinError, "error");
         return;
       }
       if (migPassword !== migPasswordConfirm) {
-        setMigrateError(messages.migracion.passwordMismatchError);
+        showToast(messages.migracion.passwordMismatchError, "error");
         return;
       }
     }
@@ -315,7 +313,7 @@ function LoginForm() {
       const pingResult = await migracionService.pingEmail(migCorreo);
       if (pingResult.alreadyMigrated) {
         const nombre = pingResult.nombre || migCorreo;
-        setMigrateError(messages.migracion.correoYaMigrado(nombre));
+        showToast(messages.migracion.correoYaMigrado(nombre), "error");
         return;
       }
     } catch {
@@ -341,8 +339,9 @@ function LoginForm() {
       });
       setMigIsExistingUser(!!result.existingUser);
       setMigrateStep("success");
-    } catch {
-      showToast(messages.migracion.error, "error");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : messages.migracion.error;
+      showToast(msg, "error");
       setMigrateStep("form");
     }
   };
@@ -351,7 +350,6 @@ function LoginForm() {
     setShowMigrateForm(false);
     setMigrateStep("form");
     setSelectedNombre(null);
-    setMigrateError("");
     setMigNombre("");
     setMigWhatsapp("");
     setMigCorreo("");

@@ -18,7 +18,7 @@ export async function POST(request: Request) {
     const { nombreCompleto, phone_number, correo, password, selectedNombre } = await request.json();
 
     if (!nombreCompleto || !correo) {
-      return NextResponse.json({ error: messages.migracion.error }, { status: 400 });
+      return NextResponse.json({ error: messages.migracion.camposRequeridos }, { status: 400 });
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -430,8 +430,7 @@ export async function POST(request: Request) {
       pagosCreados,
       pagosActualizados,
     });
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : String(err);
-    return NextResponse.json({ error: `${messages.migracion.errorServidor}: ${msg}` }, { status: 500 });
+  } catch {
+    return NextResponse.json({ error: messages.migracion.errorServidor }, { status: 500 });
   }
 }

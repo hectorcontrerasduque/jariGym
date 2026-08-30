@@ -237,8 +237,8 @@ async function procesarMiembrosDeudores(gymConfig: {
         gymConfig.address as string | null
       );
       count++;
-    } catch (error) {
-      console.error(`[notificaciones] Error enviando deuda a ${miembro.email}:`, error);
+    } catch {
+      // silent
     }
   }
 
@@ -370,8 +370,8 @@ async function procesarRecordatorioPago(
       );
       count++;
       await sleep(3000);
-    } catch (error) {
-      console.error("[notificaciones] Error enviando recordatorio:", error);
+    } catch {
+      // silent
     }
   }
 
@@ -396,8 +396,8 @@ async function procesarRecordatorioPago(
         direccion
       );
       count++;
-    } catch (error) {
-      console.error("[notificaciones] Error enviando recordatorio al dueño:", error);
+    } catch {
+      // silent
     }
   }
 
@@ -473,8 +473,7 @@ async function procesarResumenDueno(gymConfig: Record<string, unknown>): Promise
       gymConfig.logo_url as string | null
     );
     return 1;
-  } catch (error) {
-    console.error("[notificaciones] Error enviando resumen al dueño:", error);
+  } catch {
     return 0;
   }
 }
@@ -589,8 +588,7 @@ async function procesarEstatusSistema(gymConfig: Record<string, unknown>): Promi
       erroresFormateados
     );
     return 1;
-  } catch (error) {
-    console.error("[notificaciones] Error enviando email de estatus del sistema:", error);
+  } catch {
     return 0;
   }
 }

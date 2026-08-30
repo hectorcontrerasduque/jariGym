@@ -117,8 +117,8 @@ export async function POST(request: Request) {
           welcomeEmailSent = true;
         }
       }
-    } catch (emailErr) {
-      console.error("[miembros] Error enviando email de bienvenida:", emailErr);
+    } catch {
+      // silent
     }
 
     return NextResponse.json({

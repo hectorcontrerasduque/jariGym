@@ -123,9 +123,8 @@ export async function POST(request: Request) {
           if (hoy.getDate() === notif.dia && hoy.getMonth() + 1 === notif.mes && hoy.getFullYear() === notif.anio) {
             try {
               enviados++;
-            } catch (sendErr) {
+            } catch {
               errores++;
-              console.error("[notificaciones] Error enviando notificación a miembro:", miembro.id, sendErr);
             }
           }
         } else {
@@ -136,9 +135,8 @@ export async function POST(request: Request) {
           if (hoy.getDate() === notif.dia && hoy.getMonth() + 1 === notif.mes && hoy.getFullYear() === notif.anio) {
             try {
               enviados++;
-            } catch (sendErr) {
+            } catch {
               errores++;
-              console.error("[notificaciones] Error enviando notificación a miembro:", miembro.id, sendErr);
             }
           }
         }
@@ -146,8 +144,7 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({ ejecuciones, enviados, errores });
-  } catch (error) {
-    console.error("[notificaciones] Error procesando notificaciones:", error);
+  } catch {
     return NextResponse.json({ error: messages.toast.errorGenerico }, { status: 500 });
   }
 }

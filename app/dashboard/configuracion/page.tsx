@@ -13,9 +13,9 @@ import { messages } from "@/lib/messages";
 import type { GymConfig, MetodoPago, PaymentMethod } from "@/lib/types";
 
 const metodoLabels: Record<MetodoPago, { label: string; icon: string; locked?: boolean }> = {
-  efectivo: { label: "Efectivo", icon: "💵" },
-  bs: { label: "Bolívares", icon: "🇻🇪", locked: true },
-  binance: { label: "Binance USDT", icon: "🟡", locked: true },
+  efectivo: { label: messages.configuracion.metodoEfectivo, icon: "💵" },
+  bs: { label: messages.configuracion.metodoBs, icon: "🇻🇪", locked: true },
+  binance: { label: messages.configuracion.metodoBinance, icon: "🟡", locked: true },
 };
 
 function buildMetodosState(dbRecords: PaymentMethod[]): PaymentMethod[] {
@@ -114,7 +114,7 @@ export default function ConfiguracionPage() {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith("image/")) {
-      showToast("Solo se permiten imágenes", "error");
+      showToast(messages.toast.soloImagenes, "error");
       return;
     }
     setUploadingLogo(true);
@@ -132,9 +132,9 @@ export default function ConfiguracionPage() {
       const logoUrl = `${urlData.publicUrl}?t=${Date.now()}`;
       setConfig({ ...config, logo_url: logoUrl });
       await configService.updateConfig({ logo_url: logoUrl });
-      showToast("Logo actualizado", "success");
+      showToast(messages.toast.logoActualizado, "success");
     } catch {
-      showToast("Error al subir logo", "error");
+      showToast(messages.toast.logoErrorSubir, "error");
     } finally {
       setUploadingLogo(false);
     }
@@ -147,9 +147,9 @@ export default function ConfiguracionPage() {
       await supabase.storage.from("logos").remove(["logo.jpg"]).catch(() => {});
       setConfig({ ...config, logo_url: "" });
       await configService.updateConfig({ logo_url: "" });
-      showToast("Logo eliminado", "success");
+      showToast(messages.toast.logoEliminado, "success");
     } catch {
-      showToast("Error al eliminar logo", "error");
+      showToast(messages.toast.logoErrorEliminar, "error");
     }
   };
 
@@ -168,8 +168,8 @@ export default function ConfiguracionPage() {
 
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 relative z-10">
         <div>
-          <h1 className="text-2xl font-display font-bold text-gym-text neon-text">Configuración</h1>
-          <p className="text-gym-muted text-sm">Ajustes generales del gym</p>
+          <h1 className="text-2xl font-display font-bold text-gym-text neon-text">{messages.configuracion.title}</h1>
+          <p className="text-gym-muted text-sm">{messages.configuracion.ajustesGenerales}</p>
         </div>
         <button
           onClick={handleSaveConfig}
@@ -181,7 +181,7 @@ export default function ConfiguracionPage() {
           ) : (
             <Save className="w-4 h-4" />
           )}
-          Guardar
+          {messages.configuracion.guardar}
         </button>
       </div>
 
@@ -212,7 +212,7 @@ export default function ConfiguracionPage() {
               )}
             </div>
             <div className="flex-1">
-              <label className="block text-sm font-medium text-gym-muted mb-2">Logo del Gym</label>
+              <label className="block text-sm font-medium text-gym-muted mb-2">{messages.configuracion.logoDelGym}</label>
               <input
                 ref={logoInputRef}
                 type="file"
@@ -230,7 +230,7 @@ export default function ConfiguracionPage() {
                 ) : (
                   <Upload className="w-4 h-4" />
                 )}
-                {config.logo_url ? "Cambiar" : "Subir logo"}
+                {config.logo_url ? messages.configuracion.cambiarLogo : messages.configuracion.subirLogo}
               </button>
             </div>
           </div>
@@ -287,7 +287,7 @@ export default function ConfiguracionPage() {
                     <span className="text-xl">{info?.icon}</span>
                     <div>
                       <p className="font-medium text-gym-text">{info?.label}</p>
-                      {isLocked && <p className="text-xs text-gym-muted">Próximamente</p>}
+                      {isLocked && <p className="text-xs text-gym-muted">{messages.configuracion.proximamente}</p>}
                     </div>
                   </div>
                   <button
@@ -304,7 +304,7 @@ export default function ConfiguracionPage() {
                 {metodo.is_active && (
                   <div className="grid grid-cols-2 gap-3">
                     <Input
-                      label="Mensualidad"
+                      label={messages.configuracion.mensualidad}
                       type="number"
                       placeholder="0"
                       value={metodo.amount_monthly || ""}
@@ -313,7 +313,7 @@ export default function ConfiguracionPage() {
                       step="0.01"
                     />
                     <Input
-                      label="Inscripción"
+                      label={messages.configuracion.inscripcion}
                       type="number"
                       placeholder="0"
                       value={metodo.amount_inscription || ""}
@@ -375,7 +375,7 @@ export default function ConfiguracionPage() {
           ) : (
             <Save className="w-4 h-4" />
           )}
-          Guardar
+          {messages.configuracion.guardar}
         </button>
       </div>
 

@@ -131,7 +131,7 @@ function PerfilContent() {
     }
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(formData.email)) {
-      showToast("Formato de correo inválido", "error");
+      showToast(messages.toast.correoFormatoInvalido, "error");
       return;
     }
 

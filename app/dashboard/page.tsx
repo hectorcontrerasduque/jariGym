@@ -180,7 +180,7 @@ export default function DashboardPage() {
         })),
       });
     } catch {
-      showToast("Error al cargar morosos", "error");
+      showToast(messages.toast.errorCargarMorosos, "error");
     } finally {
       setLoadingModal(false);
     }
@@ -216,7 +216,7 @@ export default function DashboardPage() {
         members: alDia.map((m) => ({ id: m.id, nombre: m.full_name })),
       });
     } catch {
-      showToast("Error al cargar datos", "error");
+      showToast(messages.toast.errorCargaDatos, "error");
     } finally {
       setLoadingModal(false);
     }
@@ -237,7 +237,7 @@ export default function DashboardPage() {
         members: libresList.map((m) => ({ id: m.id, nombre: m.full_name })),
       });
     } catch {
-      showToast("Error al cargar datos", "error");
+      showToast(messages.toast.errorCargaDatos, "error");
     } finally {
       setLoadingModal(false);
     }

@@ -17,7 +17,6 @@ export async function GET(request: NextRequest) {
   // SECURITY: Validate origin to prevent open redirect
   const allowedOrigin = process.env.NEXT_PUBLIC_SITE_URL;
   if (!allowedOrigin) {
-    console.error("[confirm-email] NEXT_PUBLIC_SITE_URL not configured");
     return NextResponse.redirect(`${origin}/login?error=Server+misconfiguration`);
   }
   if (origin !== allowedOrigin) {

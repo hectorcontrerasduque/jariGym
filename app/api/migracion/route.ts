@@ -391,7 +391,7 @@ export async function POST(request: Request) {
         if (config?.gym_name) gymName = config.gym_name;
         if (config?.logo_url) gymLogo = config.logo_url;
       } catch {
-        console.error("[migracion] Error obteniendo config del gym, usando defaults");
+        // silent
       }
 
       if (isNewUser) {
@@ -409,14 +409,14 @@ export async function POST(request: Request) {
           });
 
           confirmLink = `${siteUrl}/api/auth/confirm-email?token=${token}`;
-        } catch (error) {
-          console.error("[migracion] Error generando token de confirmación:", error);
+        } catch {
+          // silent
         }
 
         try {
           await sendWelcomeEmail(email, email, password, gymName, gymLogo, confirmLink || undefined);
         } catch {
-          console.error("[migracion] Error enviando email de bienvenida, migración exitosa");
+          // silent
         }
       } else {
         // Existing user: no email needed, they already have an account

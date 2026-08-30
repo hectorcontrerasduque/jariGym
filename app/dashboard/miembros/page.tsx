@@ -264,7 +264,7 @@ export default function MiembrosPage() {
       showToast(newRole === "super_admin" ? "Ahora es Super Admin" : "Rol cambiado a Miembro", "success");
       await loadMiembros();
     } catch {
-      showToast("Error al cambiar rol", "error");
+      showToast(messages.toast.errorCambiarRol, "error");
     }
   };
 
@@ -282,10 +282,10 @@ export default function MiembrosPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Error al guardar notas");
-      showToast("Notas actualizadas", "success");
+      showToast(messages.toast.notasGuardadas, "success");
       await loadMiembros();
     } catch {
-      showToast("Error al guardar notas", "error");
+      showToast(messages.toast.notasError, "error");
     }
   };
 

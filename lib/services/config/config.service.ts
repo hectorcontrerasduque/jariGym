@@ -87,11 +87,9 @@ export class ConfigService {
         });
         if (!res.ok) {
           const body = await res.json().catch(() => ({}));
-          console.error("[config] ensure-super-admin failed:", res.status, body);
           throw new Error(body.error || "Error creando profile del propietario");
         }
       } catch (error) {
-        console.error("[config] Error creando super_admin via ensure-super-admin:", error);
         throw error;
       }
     } else if (emailChanged && (!updates.owner_name || !updates.owner_email)) {

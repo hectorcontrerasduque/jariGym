@@ -8,7 +8,9 @@ CREATE OR REPLACE FUNCTION migrar_miembro_pago(
   p_monto_mensual decimal,
   p_monto_inscripcion decimal,
   p_migracion_ids uuid[],
-  p_fecha_inicio date
+  p_fecha_inicio date,
+  p_whatsapp text DEFAULT NULL,
+  p_correo text DEFAULT NULL
 )
 RETURNS jsonb
 LANGUAGE plpgsql
@@ -138,9 +140,11 @@ BEGIN
     WHERE id = p_user_id;
   END IF;
 
-  -- Marcar registros de migración como completados
+  -- Marcar registros de migración como completados + actualizar datos de contacto
   UPDATE migracion
-  SET migrado = 'si'
+  SET migrado = 'si',
+      whatsapp = COALESCE(p_whatsapp, whatsapp),
+      correo = COALESCE(p_correo, correo)
   WHERE id = ANY(p_migracion_ids);
 
   -- Retornar resultado

@@ -115,13 +115,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: messages.migracion.noResults }, { status: 404 });
     }
 
-    // Update whatsapp and correo in migracion records for matched name
-    const matchedIds = migracionRecords.map((r) => r.id);
-    await supabase
-      .from("migracion")
-      .update({ whatsapp: whatsappFormatted, correo: email })
-      .in("id", matchedIds);
-
     // Only process records with estado "pagado" or "suspendido" (skip "debe")
     const migrablesRecords = migracionRecords.filter(
       (r) => r.estado === "pagado" || r.estado === "suspendido"
@@ -148,8 +141,7 @@ export async function POST(request: Request) {
 
     if (existingProfile) {
       userId = existingProfile.id;
-      // Update existing profile with latest data from migration form
-      await supabase
+      const { error: profileError } = await supabase
         .from("profiles")
         .update({
           full_name: profileNombre,
@@ -160,6 +152,9 @@ export async function POST(request: Request) {
           start_date: fechaInicioCalc,
         })
         .eq("id", userId);
+      if (profileError) {
+        return NextResponse.json({ error: messages.migracion.errorServidor }, { status: 500 });
+      }
     } else {
       // Check if auth user already exists (profile may have been deleted)
       const { data: authUsers } = await supabase.auth.admin.listUsers();
@@ -168,9 +163,8 @@ export async function POST(request: Request) {
       );
 
       if (existingAuth) {
-        // Auth user exists but no profile — create profile
         userId = existingAuth.id;
-        await supabase.from("profiles").insert({
+        const { error: profileError } = await supabase.from("profiles").insert({
           id: userId,
           email,
           full_name: profileNombre,
@@ -181,6 +175,9 @@ export async function POST(request: Request) {
           start_date: fechaInicioCalc,
           inscription_paid: false,
         });
+        if (profileError) {
+          return NextResponse.json({ error: messages.migracion.errorServidor }, { status: 500 });
+        }
         isNewUser = true;
       } else {
         // Create new auth user
@@ -219,14 +216,20 @@ export async function POST(request: Request) {
         };
 
         if (triggeredProfile) {
-          await supabase
+          const { error: profileError } = await supabase
             .from("profiles")
             .update(profileFields)
             .eq("id", userId);
+          if (profileError) {
+            return NextResponse.json({ error: messages.migracion.errorServidor }, { status: 500 });
+          }
         } else {
-          await supabase
+          const { error: profileError } = await supabase
             .from("profiles")
             .insert({ id: userId, ...profileFields });
+          if (profileError) {
+            return NextResponse.json({ error: messages.migracion.errorServidor }, { status: 500 });
+          }
         }
         isNewUser = true;
       }
@@ -270,6 +273,8 @@ export async function POST(request: Request) {
       p_monto_inscripcion: montoInscripcion,
       p_migracion_ids: migracionIds,
       p_fecha_inicio: fechaInicioCalc,
+      p_whatsapp: whatsappFormatted,
+      p_correo: email,
     });
 
     if (rpcError) {

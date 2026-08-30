@@ -301,4 +301,46 @@ describe("Migración API", () => {
     // pagado → aprobado, suspendido after pagado → suspendido, debe → skipped
     expect(body.pagosCreados).toBe(2);
   });
+
+  it("RPC falla: migracion NO debe ser modificada", async () => {
+    const migracionUpdateSpy = vi.fn();
+    mockSupabase.from.mockImplementation((table: string) => {
+      if (table === "gym_config") return chainReturn({ id: "1" });
+      if (table === "gym_config_payment_methods") return chainReturn({ amount_monthly: 10, amount_inscription: 5 });
+      if (table === "migracion") {
+        const chain = chainReturn([
+          { id: "m1", nombre: "HAIDEE", mes_pagar: 1, anio_pagar: 2026, estado: "pagado", migrado: "no" },
+        ]);
+        const originalUpdate = chain.update;
+        chain.update = vi.fn((...args: unknown[]) => {
+          migracionUpdateSpy(...args);
+          return originalUpdate(...args);
+        });
+        return chain;
+      }
+      if (table === "profiles") return chainReturn(null);
+      return chainReturn(null);
+    });
+    mockSupabase.rpc.mockResolvedValue({
+      data: null,
+      error: { message: "function does not exist", code: "42883" },
+    });
+    mockSupabase.auth.admin.createUser.mockResolvedValue({
+      data: { user: { id: "user-1" } },
+      error: null,
+    });
+    mockSupabase.auth.admin.listUsers.mockResolvedValue({
+      data: { users: [] },
+      error: null,
+    });
+
+    const req = makeReq(baseBody);
+    const { POST } = await import("@/app/api/migracion/route");
+    const res = await POST(req);
+    const body = await res.json();
+
+    expect(res.status).toBe(500);
+    expect(migracionUpdateSpy).not.toHaveBeenCalled();
+    expect(body.error).toBeDefined();
+  });
 });

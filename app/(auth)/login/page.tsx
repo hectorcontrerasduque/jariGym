@@ -41,8 +41,6 @@ function LoginForm() {
 
   const [showMigrateForm, setShowMigrateForm] = useState(false);
   const [migrateStep, setMigrateStep] = useState<"form" | "success" | "error" | "loading">("form");
-  const [searchResults, setSearchResults] = useState<string[]>([]);
-  const [showDropdown, setShowDropdown] = useState(false);
   const [selectedNombre, setSelectedNombre] = useState<string | null>(null);
   const [migrateError, setMigrateError] = useState("");
   const [migNombre, setMigNombre] = useState("");
@@ -55,6 +53,18 @@ function LoginForm() {
   const [hasPendingMigration, setHasPendingMigration] = useState(true);
   const [migIsExistingUser, setMigIsExistingUser] = useState(false);
   const [allRecords, setAllRecords] = useState<MigracionRecord[]>([]);
+
+  // Computed: filter records client-side (no DB query, just filters allRecords)
+  const searchResults = useMemo(() => {
+    if (selectedNombre || migNombre.length < 2) return [];
+    const query = migNombre.trim().toUpperCase();
+    const words = query.split(/\s+/).filter((w) => w.length >= 1);
+    return allRecords
+      .filter((r) => r.migrado !== "si" && words.some((w) => r.nombre.toUpperCase().includes(w)))
+      .map((r) => r.nombre);
+  }, [migNombre, selectedNombre, allRecords]);
+
+  const showDropdown = !selectedNombre && migNombre.length >= 2;
 
   // Initialize state from searchParams using useMemo to avoid useEffect
   const initialError = useMemo(() => {
@@ -114,34 +124,6 @@ function LoginForm() {
       .then((records) => setAllRecords(records))
       .catch(() => showToast(messages.migracion.error, "error"));
   }, [showMigrateForm]);
-
-  // Filter records: hide migrado=si, filter by typed name
-useEffect(() => {
-    // Build filtered list: only records not yet migrated
-    let filtered = allRecords.filter((r) => r.migrado !== "si");
-
-    // Client-side filter by name if user typed enough chars
-    if (migNombre.length >= 2) {
-      const query = migNombre.trim().toUpperCase();
-      const words = query.split(/\s+/).filter((w) => w.length >= 1);
-      filtered = filtered.filter((r) => {
-        const nombreUpper = r.nombre.toUpperCase();
-        return words.some((w) => nombreUpper.includes(w));
-      });
-    }
-
-    setSearchResults(filtered.map((r) => r.nombre)); // eslint-disable-line react-hooks/set-state-in-effect
-    // Show dropdown only if there are results available
-    setShowDropdown(filtered.length > 0); // eslint-disable-line react-hooks/set-state-in-effect
-  }, [migNombre, allRecords]);
-
-  // When selection changes, clear search results
-  useEffect(() => {
-    if (selectedNombre) {
-      setSearchResults([]); // eslint-disable-line react-hooks/set-state-in-effect
-      setShowDropdown(false); // eslint-disable-line react-hooks/set-state-in-effect
-    }
-  }, [selectedNombre]);
 
   // Debounced email validation + auto-fill from migracion
   useEffect(() => {
@@ -363,8 +345,6 @@ useEffect(() => {
   const resetMigrateForm = () => {
     setShowMigrateForm(false);
     setMigrateStep("form");
-    setSearchResults([]);
-    setShowDropdown(false);
     setSelectedNombre(null);
     setMigrateError("");
     setMigNombre("");
@@ -584,17 +564,14 @@ useEffect(() => {
                         setMigNombre(e.target.value.toUpperCase());
                         setSelectedNombre(null);
                       }}
-                      onFocus={() => {
-                        if (searchResults.length > 0 && migNombre.length >= 2 && !selectedNombre) {
-                          setShowDropdown(true);
-                        }
-                      }}
-                      onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
                       suffix={selectedNombre ? <span className="text-gym-success">✓</span> : undefined}
                       required
                     />
-{showDropdown && searchResults.length > 0 && (
+                    {showDropdown && (
                       <div className="absolute z-50 w-full mt-1 bg-gym-surface border border-gym-border rounded-xl shadow-lg max-h-48 overflow-y-auto">
+                        {searchResults.length === 0 && (
+                          <p className="p-2 text-center text-gym-muted text-xs">{messages.migracion.nombreNoEncontrado}</p>
+                        )}
                         {searchResults.map((name) => {
                           const record = allRecords.find((r) => r.nombre === name);
                           return (
@@ -604,24 +581,14 @@ useEffect(() => {
                               className="w-full text-left px-4 py-2.5 text-sm text-gym-text hover:bg-gym-primary/10 transition-colors first:rounded-t-xl last:rounded-b-xl"
                               onMouseDown={(e) => {
                                 e.preventDefault();
-                                // Check if this name has migrado=si
-                                if (record && record.migrado === "si") {
-                                  setMigrateError(messages.migracion.yaMigrado);
-                                  setMigNombre("");
-                                  setSelectedNombre(null);
-                                  setShowDropdown(false);
-                                  return;
-                                }
                                 setMigNombre(name);
                                 setSelectedNombre(name);
-                                setShowDropdown(false);
-                                // Auto-fill email if record has one
                                 if (record && record.correos.length > 0) {
                                   setMigCorreo(record.correos[0]);
                                 }
                               }}
                             >
-                              <span className="block">{name}</span>
+                              <span className="block truncate">{name}</span>
                               {record && record.correos.length > 0 && (
                                 <span className="block text-[10px] text-gym-muted">{record.correos[0]}</span>
                               )}

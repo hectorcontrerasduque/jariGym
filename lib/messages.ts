@@ -313,6 +313,7 @@ export const messages = {
     noResults: "No se encontraron registros. Verifique el nombre e intente de nuevo.",
     selectFromList: "Seleccione su registro de la lista:",
     yaMigrado: "Este miembro ya fue migrado anteriormente.",
+    nombreNoEncontrado: "Su nombre no aparece en la lista de migrados. Comuníquese con el administrador.",
     correoYaMigrado: (nombre: string) => `El usuario ${nombre} ya fue migrado anteriormente. Inicie sesión con su contraseña existente.`,
     configFaltante: "Falta configuración del gym. Vaya a Configuración y guarde los datos antes de migrar.",
     crearUsuarioError: "Error al crear usuario",

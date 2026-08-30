@@ -122,20 +122,20 @@ Schema managed via numbered SQL files in `supabase/migrations/`. Run manually:
 1. Go to Supabase Dashboard → SQL Editor
 2. Paste migration content → Run
 
-Tables: `profiles`, `membresias`, `pagos` (header), `detalle_pago` (detail per month/inscription), `pagos_historial` (old data), `gym_config`, `gym_config_metodos_pago`, `migracion`, `notificacion_config`, `notificacion_log`, `password_reset_tokens`
+Tables: `profiles`, `membresias`, `pagos` (header), `detalle_pago` (detail per month/inscription), `pagos_historial` (old data), `gym_config`, `gym_config_payment_methods`, `migracion`, `notificacion_config`, `notificacion_log`, `password_reset_tokens`
 
 RLS uses helper functions (`get_user_role()`, `get_user_tenant_id()`) with `SECURITY DEFINER` to avoid infinite recursion. **Never create RLS policies that query the same table directly.**
 
 ## Auth Flow
 
-- **LOGIN RULE**: toda persona que haga login DEBE estar registrado en `profiles` con `registered: true` y `activo: true` (o `activo: null`). Excepciones: `NEXT_PUBLIC_ADMIN_EMAIL` y `gym_config.dueno_email` se auto-crean como `super_admin` si no existen.
+- **LOGIN RULE**: toda persona que haga login DEBE estar registrado en `profiles` con `registered: true` y `activo: true` (o `activo: null`). Excepciones: `NEXT_PUBLIC_ADMIN_EMAIL` y `gym_config.owner_email` se auto-crean como `super_admin` si no existen.
 - Trigger `handle_new_user` auto-creates `profiles` row on signup, pero con `registered: false` por defecto → no puede logearse
 - Middleware redirects unauthenticated users to `/login`
 - Google OAuth: Supabase → Google → `/auth/callback?code=...` → `exchangeCodeForSession` → verifica profile `registered: true` → redirect a `/dashboard`
 - Email/password via `signInWithEmail` → `isAuthorizedUser` verifica profile `registered: true`
 - Password reset: custom flow via `/api/auth/forgot-password` → token in `password_reset_tokens` → email via Gmail SMTP → `/reset-password?token=xxx` → validates token + sets new password
-- **Gym owner detection**: Si el email coincide con `gym_config.dueno_email`, se auto-crea profile `super_admin` con `registered: true`
-- **Email change**: Cuando se cambia `dueno_email` en Config, se desactiva profile anterior (`activo: false`) y se crea nuevo `super_admin` para el nuevo email
+- **Gym owner detection**: Si el email coincide con `gym_config.owner_email`, se auto-crea profile `super_admin` con `registered: true`
+- **Email change**: Cuando se cambia `owner_email` en Config, se desactiva profile anterior (`activo: false`) y se crea nuevo `super_admin` para el nuevo email via `ensure-super-admin` (sync auth.users)
 
 ## Super Admin (Dueño) — Gold Identity
 
@@ -191,16 +191,17 @@ hora_salida: string | null   // HH:MM format
 - **Pagos recientes**: Approved payments only, with fallback when profile join fails
 
 ### Miembros Stats
-- Total card shows `active/max` format (e.g. `11/80`) using `gym_config.max_miembros`
+- Total card shows `active/max` format (e.g. `11/80`) using `gym_config.max_members`
 
 ### Payment Approval
 - `aprobarPago()` now auto-updates `profiles.inscripcion_pagada = true` when approving inscription payments (checks `detalle_pago.tipo_pago`)
 - Super admin can approve payments (not just regular admin)
 
 ### Config Service
-- `updateConfig()` strips read-only fields (`id`, `created_at`, `updated_at`) before Supabase update
-- When `dueno_email` changes, auto-promotes new email's profile to `super_admin`
-- `saveMetodosPago()` handles create/update/delete of payment methods. Returns void, errors are NOT thrown (silent).
+- `updateConfig()` strips read-only fields (`id`, `created_at`, `updated_at`, `created_by`, `updated_by`) before Supabase update
+- When `owner_email` changes, calls `ensure-super-admin` with JWT to create/promote super_admin + sync auth.users (name/email)
+- `saveMetodosPago()` deactivates all existing records first, then activates the selected one (radio behavior — 1 solo activo global)
+- Only 1 payment method active at a time (unique index `idx_one_active_payment_method`)
 - When gym_config is empty (first save), reloads page after save to sync sidebar state
 
 ### Member Creation
@@ -240,9 +241,9 @@ hora_salida: string | null   // HH:MM format
 
 ### Code Quality
 - [x] **Hardcoded messages in API routes** — FIXED: `api/miembros/route.ts`, `api/profile/route.ts`, `lib/services/config/config.service.ts` now use `messages.ts`. Notification API routes also migrated.
-- [ ] **`ensure-super-admin` uses `listUsers()` to find one user** — fetches ALL auth users. Performance disaster. Should use filtered query.
-- [ ] **`saveMetodosPago` swallows all errors silently** — no error handling on RPC/insert/delete operations
-- [x] **14+ empty `catch {}` blocks** — FIXED: All silent catch blocks now log with `console.error` for production debugging.
+- [x] **`ensure-super-admin` uses `listUsers()` to find one user** — FIXED: Now uses filtered query by email.
+- [x] **`saveMetodosPago` swallows all errors silently** — FIXED: Now throws errors and uses radio behavior (1 solo activo global).
+- [x] **14+ empty `catch {}` blocks** — FIXED: All silent catch blocks removed, no console.error either (centralized in messages.ts).
 - [ ] **`migrateStep: "error"` state is dead code** in login page — never set, never reached
 - [ ] **`errorConfig` and `existingUserTitle` messages defined but unused** in messages.ts
 
@@ -259,19 +260,16 @@ hora_salida: string | null   // HH:MM format
 ## Recent Git History (newest first)
 
 ```
-85577de fix: getMiembrosMorosos usa service_role en API routes - corrige envio de correos a morosos
+e263c5e refactor: elimina console.* + centraliza strings en messages.ts para i18n
+9b11c5c fix: owner profile + toast duration + auth.users sync + label fix
+a404ecd feat: ajustes Config page + 1 solo método de pago activo
+11f06e6 feat: renombra gym_config a inglés + recrea gym_config_payment_methods (042)
+3ceaab4 feat: renombra profiles a inglés + audit fields (041)
+19d9cd6 fix: UI polish - contraste dropdown, WhatsApp placeholder, email no-flash
+93720e5 fix: rate limiting fail-open + sin rate limit en /api/migracion/list
+5b9a528 fix: dropdown migración con useMemo
+85577de fix: getMiembrosMorosos usa service_role en API routes
 75585b2 fix: boton ejecutar primary + rename Miembros Morosos + logging errores email + fallback deudas vacias
-1fcd567 fix: notificaciones test - import messages en vez de require
-b7fd848 fix: mensajes de error migración centralizados en messages.ts + sin console
-54f1b66 fix: inscripcion_pagada owner + prerequisito migración + mensajes error específicos
-786ca81 fix: inscripcion_pagada en migración + dueño + búsqueda fuzzy por nombre
-0e3725a fix: botón 'Generar pagos' con estilo primary como el resto
-96245ab fix: reload en config save solo en primer registro (sin config.id)
-8d9d73d feat: campo tipo_pago en pagos + fix migración estados + reload config save
-318dda1 fix: config save refactor - validación montos + ensure-super-admin usa nombre
-30c1097 fix: config save crea super_admin en primera vez + save resiliente
-bec76e1 fix: mover useEffect de redirect después de declarar isSuperAdmin
-171852d fix: sin config → super_admin solo ve Config, miembro ve mensaje
 ```
 
 ## Notifications System
@@ -282,7 +280,7 @@ bec76e1 fix: mover useEffect de redirect después de declarar isSuperAdmin
 - `notificaciones_enabled` in `gym_config` is the master toggle (shows/hides the section)
 - `frecuencia_diaria` = runs every day (requires daily cron trigger)
 
-### Billing Mode (`gym_config.modo_cobro`)
+### Billing Mode (`gym_config.billing_mode`)
 - `"dia_uno"` (default): all members billed on the 1st of each month
 - `"fecha_inscripcion"`: each member billed on their inscription day (adjusted for month length)
 - Affects: `getDiaCobro()`, `getMiembrosMorosos()`, `procesarRecordatorioPago()`

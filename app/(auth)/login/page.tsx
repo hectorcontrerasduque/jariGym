@@ -299,6 +299,15 @@ function LoginForm() {
         setMigrateError(messages.migracion.passwordMismatchError);
         return;
       }
+    } else if (migPassword || migPasswordConfirm) {
+      if (!migPassword || migPassword.length < 6) {
+        setMigrateError(messages.migracion.passwordMinError);
+        return;
+      }
+      if (migPassword !== migPasswordConfirm) {
+        setMigrateError(messages.migracion.passwordMismatchError);
+        return;
+      }
     }
 
     // Check if email already migrated before proceeding

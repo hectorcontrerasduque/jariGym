@@ -17,7 +17,7 @@ export async function POST(request: Request) {
   try {
     const { nombreCompleto, phone_number, correo, password, selectedNombre } = await request.json();
 
-    if (!nombreCompleto || !phone_number || !correo || !password) {
+    if (!nombreCompleto || !correo) {
       return NextResponse.json({ error: messages.migracion.error }, { status: 400 });
     }
 
@@ -26,7 +26,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: messages.migracion.emailInvalidError }, { status: 400 });
     }
 
-    if (typeof password !== "string" || password.length < 6) {
+    if (password && (typeof password !== "string" || password.length < 6)) {
       return NextResponse.json({ error: messages.migracion.passwordMinError }, { status: 400 });
     }
 

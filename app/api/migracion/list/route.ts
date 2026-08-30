@@ -1,16 +1,8 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { messages } from "@/lib/messages";
-import { applyRateLimit } from "@/lib/middleware/rate-limit";
 
-export async function GET(request: Request) {
-  const rateLimitResponse = await applyRateLimit(request, {
-    max: 100,
-    windowMs: 60 * 60 * 1000,
-    prefix: "migracion-list",
-  });
-  if (rateLimitResponse) return rateLimitResponse;
-
+export async function GET() {
   try {
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,

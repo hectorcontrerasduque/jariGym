@@ -34,8 +34,12 @@ export async function applyRateLimit(
     p_window_seconds: windowSec,
   });
 
-  if (error || !data?.[0]?.success) {
-    const reset = data?.[0]?.reset || new Date(Date.now() + config.windowMs).toISOString();
+  if (error) {
+    return null;
+  }
+
+  if (!data?.[0]?.success) {
+    const reset = data![0]!.reset;
     const retryAfter = Math.ceil((new Date(reset).getTime() - Date.now()) / 1000);
 
     return NextResponse.json(

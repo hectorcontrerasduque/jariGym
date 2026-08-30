@@ -147,7 +147,7 @@ export const messages = {
     gymName: "Nombre del Gym",
     address: "Dirección (opcional)",
     phoneNumber: "Teléfono (opcional)",
-    contactEmail: "Email de contacto",
+    contactEmail: "Email de contacto (opcional)",
     schedule: "Horario semanal (opcional)",
     maxMembers: "Máximo de miembros (opcional)",
     propietario: "Propietario",

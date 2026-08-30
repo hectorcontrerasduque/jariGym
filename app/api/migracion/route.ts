@@ -192,7 +192,7 @@ export async function POST(request: Request) {
         });
 
         if (authError) {
-          return NextResponse.json({ error: `${messages.migracion.crearUsuarioError}: ${authError.message}` }, { status: 500 });
+          return NextResponse.json({ error: messages.migracion.crearUsuarioError }, { status: 500 });
         }
 
         if (!authUser?.user?.id) {

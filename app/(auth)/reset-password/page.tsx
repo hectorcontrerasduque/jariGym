@@ -11,6 +11,7 @@ import { Dumbbell, CheckCircle } from "lucide-react";
 import { configService } from "@/lib/services/config/config.service";
 import { messages } from "@/lib/messages";
 import { AuthFooter } from "@/components/auth-footer";
+import { showToast } from "@/components/ui/toast";
 import Link from "next/link";
 
 function ResetPasswordForm() {
@@ -40,13 +41,13 @@ const [password, setPassword] = useState("");
     setError("");
 
     if (password.length < 6) {
-      setError(messages.auth.resetPasswordWeakPassword);
+      showToast(messages.auth.resetPasswordWeakPassword, "error");
       return;
     }
 
     // eslint-disable-next-line security/detect-possible-timing-attacks
     if (password !== confirmPassword) {
-      setError(messages.auth.resetPasswordPasswordMismatch);
+      showToast(messages.auth.resetPasswordPasswordMismatch, "error");
       return;
     }
 
@@ -62,13 +63,13 @@ const [password, setPassword] = useState("");
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.error);
+        showToast(data.error, "error");
         return;
       }
 
       setSuccess(true);
     } catch {
-      setError(messages.auth.resetPasswordError);
+      showToast(messages.auth.resetPasswordError, "error");
     } finally {
       setLoading(false);
     }
@@ -160,6 +161,7 @@ const [password, setPassword] = useState("");
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 pb-16 relative overflow-hidden">
+      <LoadingOverlay show={loading} message={messages.common.procesando} />
       <div className="absolute inset-0 bg-gradient-to-br from-gym-primary/5 via-transparent to-gym-secondary/5" />
       <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-gym-primary/10 rounded-full blur-3xl animate-pulse" />
       <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-gym-secondary/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: "1s" }} />
@@ -211,10 +213,6 @@ const [password, setPassword] = useState("");
                 required
               />
             </div>
-
-            {error && (
-              <p className="text-sm text-gym-danger text-center bg-gym-danger/10 p-2 rounded-xl">{error}</p>
-            )}
 
             <Button type="submit" className="w-full" loading={loading}>
               {messages.auth.resetPasswordSubmit}

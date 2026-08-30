@@ -264,8 +264,8 @@ function LoginForm() {
     try {
       await authService.resetPassword(resetEmail);
       setResetSent(true);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : messages.auth.resetPasswordError);
+    } catch {
+      setError(messages.auth.resetPasswordError);
     } finally {
       setResetLoading(false);
     }
@@ -332,8 +332,8 @@ function LoginForm() {
       });
       setMigIsExistingUser(!!result.existingUser);
       setMigrateStep("success");
-    } catch (err) {
-      setMigrateError(err instanceof Error ? err.message : messages.migracion.error);
+    } catch {
+      showToast(messages.migracion.error, "error");
       setMigrateStep("form");
     }
   };
@@ -644,7 +644,6 @@ function LoginForm() {
                     error={migPasswordConfirm && migPassword !== migPasswordConfirm ? messages.migracion.passwordMismatchError : undefined}
                     required={!!migCorreo && !migCorreo.toLowerCase().endsWith("@gmail.com")}
                   />
-                  {migrateError && <p className="text-sm text-gym-danger text-center bg-gym-danger/10 p-2 rounded-xl">{migrateError}</p>}
                   <div className="flex gap-2">
                     <Button
                       type="button"

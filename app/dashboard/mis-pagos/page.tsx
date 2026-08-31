@@ -210,19 +210,17 @@ export default function MisPagosPage() {
       setMetodosPago([]);
     }
 
-    // 5. Cargar miembros (solo super_admin)
-    if (isAdmin) {
-      try {
-        const { data: miembrosData } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("activo", true)
-          .eq("registered", true)
-          .order("full_name");
-        if (miembrosData) setMiembros(miembrosData);
-      } catch (err) {
-        console.error("Error cargando miembros:", err);
-      }
+    // 5. Cargar miembros (para distribucion por hora en Home)
+    try {
+      const { data: miembrosData } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("activo", true)
+        .eq("registered", true)
+        .order("full_name");
+      if (miembrosData) setMiembros(miembrosData);
+    } catch (err) {
+      console.error("Error cargando miembros:", err);
     }
   }, [miembroSeleccionado, isAdmin]);
 
@@ -352,14 +350,19 @@ setMembresiaLibre(!!libre.data);
     setSubmitted(true);
 
     if (!formData.pagar_inscripcion && !formData.pagar_mensualidad && !formData.solicitar_suspension) {
+      showToast("Selecciona un concepto de pago", "warning");
       setTimeout(() => msgConceptoRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 100);
       return;
     }
     if ((formData.pagar_mensualidad || formData.solicitar_suspension) && formData.meses.length === 0) {
+      showToast("Selecciona al menos un mes", "warning");
       setTimeout(() => msgMesesRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 100);
       return;
     }
-    if (!formData.solicitar_suspension && montoTotal === 0) return;
+    if (!formData.solicitar_suspension && montoTotal === 0) {
+      showToast("El monto a pagar es 0. Verifica los montos configurados", "warning");
+      return;
+    }
 
     const nombreMiembro = miembroSeleccionado?.full_name || profile?.full_name || "tu cuenta";
     const acciones: string[] = [];
@@ -810,6 +813,53 @@ setMembresiaLibre(!!libre.data);
               )}
             </CardContent>
           </Card>
+
+          {/* Distribución por hora */}
+          {miembros.length > 0 && (() => {
+            const hourCounts: Record<string, number> = {};
+            for (const m of miembros) {
+              if (m.arrival_time && m.departure_time && m.arrival_time !== "--:--" && m.departure_time !== "--:--") {
+                const startH = parseInt(m.arrival_time.split(":")[0], 10);
+                const endH = parseInt(m.departure_time.split(":")[0], 10);
+                if (!isNaN(startH) && !isNaN(endH)) {
+                  for (let h = startH; h <= endH; h++) {
+                    const key = `${String(h).padStart(2, "0")}:00`;
+                    hourCounts[key] = (hourCounts[key] || 0) + 1;
+                  }
+                }
+              }
+            }
+            const hourEntries = Object.entries(hourCounts).sort((a, b) => a[0].localeCompare(b[0]));
+            const maxHourCount = Math.max(...hourEntries.map((e) => e[1]), 1);
+            if (hourEntries.length === 0) return null;
+            return (
+              <Card className="neon-card">
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <Clock className="w-5 h-5 text-gym-primary" />
+                    Horarios del Gimnasio
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {hourEntries.map(([hour, count]) => (
+                      <div key={hour} className="flex items-center gap-3">
+                        <span className="text-xs text-gym-muted w-12 text-right font-mono">{hour}</span>
+                        <div className="flex-1 h-5 bg-gym-bg rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-gym-primary/70 rounded-full transition-all"
+                            style={{ width: `${(count / maxHourCount) * 100}%` }}
+                          />
+                        </div>
+                        <span className="text-xs text-gym-text w-6 text-right">{count}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-xs text-gym-muted mt-3 text-center">Horarios más concurridos del gimnasio</p>
+                </CardContent>
+              </Card>
+            );
+          })()}
         </div>
       )}
 

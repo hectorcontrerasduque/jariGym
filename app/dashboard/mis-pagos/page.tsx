@@ -921,10 +921,12 @@ setMembresiaLibre(!!libre.data);
                 <div key={pago.id} className="p-2.5 bg-gym-bg rounded-xl hover:bg-gym-surface transition-colors">
                   <div className="flex items-center gap-2">
                     {getPagoIcon(pago)}
-                    <Eye
-                      className="w-4 h-4 text-gym-primary"
-                      onClick={() => setSelectedPago(pago as Payment)}
-                    />
+                    <div className="justify-end">
+                      <Eye
+                        className="w-4 h-4 text-gym-primary"
+                        onClick={() => setSelectedPago(pago as Payment)}
+                      />
+                    </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-medium text-gym-text truncate">{getPagoLabel(pago)}</span>

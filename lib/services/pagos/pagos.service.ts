@@ -469,7 +469,7 @@ export class PagosService {
       .from("payments")
       .select("id, status")
       .eq("user_id", usuarioId)
-      .in("status", ["aprobado", "pendiente"]);
+      .in("status", ["aprobado", "pendiente", "suspendido"]);
 
     if (error || !pagos) return [];
 

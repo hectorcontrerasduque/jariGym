@@ -527,7 +527,7 @@ setMembresiaLibre(!!libre.data);
           if (isSuperAdmin && miembroSeleccionado) {
             return p.status === "pendiente" || p.status === "aprobado" || p.status === "suspendido";
           }
-          return p.status === "pendiente" || p.status === "aprobado";
+          return p.status === "pendiente" || p.status === "aprobado" || p.status === "suspendido";
         })
         .flatMap(p => (p.detail || []).map(d => d.month_number && d.year_number ? `${d.year_number}-${d.month_number}` : null))
         .filter(Boolean)

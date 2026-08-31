@@ -8,7 +8,7 @@ import { pagosService } from "@/lib/services/pagos/pagos.service";
 import { configService } from "@/lib/services/config/config.service";
 import { createClient } from "@/lib/supabase/client";
 import { formatCurrency, getMonthName } from "@/lib/utils";
-import { CreditCard, CheckCircle, Clock, Calendar, Eye, Trash2, FileText, Plus, Search, Upload, Gift, AlertTriangle, ChevronDown, ChevronRight, X, Save } from "lucide-react";
+import { CreditCard, CheckCircle, Clock, Calendar, Eye, Trash2, FileText, Plus, Search, Upload, Gift, AlertTriangle, ChevronDown, ChevronRight, X, Save, Home, Phone, Mail, MapPin } from "lucide-react";
 import { showToast } from "@/components/ui/toast";
 import { Modal } from "@/components/ui/modal";
 import { messages } from "@/lib/messages";
@@ -113,6 +113,7 @@ export default function MisPagosPage() {
   });
   const [comprobante, setComprobante] = useState<File | null>(null);
   const [showPagosRealizados, setShowPagosRealizados] = useState(true);
+  const [activeTab, setActiveTab] = useState<"home" | "pagos">("pagos");
 
   const fetchMisPagosData = useCallback(async () => {
     const supabase = createClient();
@@ -574,6 +575,34 @@ setMembresiaLibre(!!libre.data);
         </div>
       </div>
 
+      {/* Miembro: tab menu */}
+      {!isSuperAdmin && (
+        <div className="flex gap-1 p-1 bg-gym-surface rounded-xl">
+          <button
+            onClick={() => setActiveTab("home")}
+            className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all ${
+              activeTab === "home"
+                ? "bg-gym-primary text-white glow-primary"
+                : "text-gym-muted hover:text-gym-text"
+            }`}
+          >
+            <Home className="w-4 h-4" />
+            Home
+          </button>
+          <button
+            onClick={() => setActiveTab("pagos")}
+            className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all ${
+              activeTab === "pagos"
+                ? "bg-gym-primary text-white glow-primary"
+                : "text-gym-muted hover:text-gym-text"
+            }`}
+          >
+            <CreditCard className="w-4 h-4" />
+            Mis Pagos
+          </button>
+        </div>
+      )}
+
       {/* Super Admin: member selector */}
       {isSuperAdmin && (
         <Card className="neon-card relative z-30">
@@ -647,6 +676,146 @@ setMembresiaLibre(!!libre.data);
         </Card>
       )}
 
+      {/* Home tab - miembro */}
+      {!isSuperAdmin && activeTab === "home" && (
+        <div className="space-y-4">
+          {/* Info del gym */}
+          <Card className="neon-card">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Home className="w-5 h-5 text-gym-primary" />
+                Información del Gimnasio
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {gymConfig?.gym_name && (
+                <div className="text-center mb-4">
+                  <h2 className="text-xl font-bold text-gym-text neon-text">{gymConfig.gym_name}</h2>
+                </div>
+              )}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {gymConfig?.schedule && (
+                  <div className="flex items-start gap-3 p-3 bg-gym-bg rounded-xl">
+                    <Clock className="w-5 h-5 text-gym-primary mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="text-xs text-gym-muted">Horario</p>
+                      <p className="text-sm text-gym-text whitespace-pre-line">{gymConfig.schedule}</p>
+                    </div>
+                  </div>
+                )}
+                {gymConfig?.phone_number && (
+                  <div className="flex items-start gap-3 p-3 bg-gym-bg rounded-xl">
+                    <Phone className="w-5 h-5 text-gym-primary mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="text-xs text-gym-muted">Teléfono</p>
+                      <p className="text-sm text-gym-text">{gymConfig.phone_number}</p>
+                    </div>
+                  </div>
+                )}
+                {gymConfig?.contact_email && (
+                  <div className="flex items-start gap-3 p-3 bg-gym-bg rounded-xl">
+                    <Mail className="w-5 h-5 text-gym-primary mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="text-xs text-gym-muted">Correo</p>
+                      <p className="text-sm text-gym-text">{gymConfig.contact_email}</p>
+                    </div>
+                  </div>
+                )}
+                {gymConfig?.address && (
+                  <div className="flex items-start gap-3 p-3 bg-gym-bg rounded-xl">
+                    <MapPin className="w-5 h-5 text-gym-primary mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="text-xs text-gym-muted">Dirección</p>
+                      <p className="text-sm text-gym-text">{gymConfig.address}</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+              {!gymConfig?.schedule && !gymConfig?.phone_number && !gymConfig?.contact_email && !gymConfig?.address && (
+                <p className="text-center text-gym-muted py-4">Sin información del gimnasio configurada</p>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Precios */}
+          {metodosPago.filter(m => m.is_active).length > 0 && (
+            <Card className="neon-card">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <CreditCard className="w-5 h-5 text-gym-primary" />
+                  Formas de Pago
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {metodosPago.filter(m => m.is_active).map(m => (
+                    <div key={m.payment_method} className="p-3 bg-gym-bg rounded-xl">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="font-medium text-gym-text text-sm">
+                          {m.payment_method === "efectivo" ? "Efectivo" : m.payment_method === "bs" ? "Bs" : "Binance"}
+                        </span>
+                        <Badge variant="success">Activo</Badge>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3 text-sm">
+                        <div>
+                          <p className="text-gym-muted text-xs">Mensualidad</p>
+                          <p className="text-gym-text font-medium">{m.amount_monthly > 0 ? formatCurrency(m.amount_monthly) : "Gratis"}</p>
+                        </div>
+                        <div>
+                          <p className="text-gym-muted text-xs">Inscripción</p>
+                          <p className="text-gym-text font-medium">{m.amount_inscription > 0 ? formatCurrency(m.amount_inscription) : "Gratis"}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Estado de cuenta */}
+          <Card className="neon-card">
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <CheckCircle className="w-5 h-5 text-gym-primary" />
+                Mi Estado
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex items-center justify-between p-3 bg-gym-bg rounded-xl">
+                <span className="text-sm text-gym-muted">Inscripción</span>
+                {profile?.inscription_paid ? (
+                  <Badge variant="success">Pagada</Badge>
+                ) : (
+                  <Badge variant="warning">Pendiente</Badge>
+                )}
+              </div>
+              <div className="flex items-center justify-between p-3 bg-gym-bg rounded-xl">
+                <span className="text-sm text-gym-muted">Deuda mensual</span>
+                <span className="text-sm font-medium text-gym-text">{mesesDisponiblesParaPagar.length} mes(es)</span>
+              </div>
+              <div className="flex items-center justify-between p-3 bg-gym-bg rounded-xl">
+                <span className="text-sm text-gym-muted">Pagos realizados</span>
+                <span className="text-sm font-medium text-gym-text">{pagos.length}</span>
+              </div>
+              <div className="flex items-center justify-between p-3 bg-gym-bg rounded-xl">
+                <span className="text-sm text-gym-muted">Total pagado</span>
+                <span className="text-sm font-semibold text-gym-success">{formatCurrency(montoAprobado)}</span>
+              </div>
+              {montoPendiente > 0 && (
+                <div className="flex items-center justify-between p-3 bg-gym-bg rounded-xl">
+                  <span className="text-sm text-gym-muted">Total pendiente</span>
+                  <span className="text-sm font-semibold text-gym-warning">{formatCurrency(montoPendiente)}</span>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {/* Payment form + pagos - super admin always, miembro only on pagos tab */}
+      {(isSuperAdmin || activeTab === "pagos") && (
+        <>
       {/* Payment form */}
       {showForm && (
         <Card className="neon-card relative z-10">
@@ -871,7 +1040,7 @@ setMembresiaLibre(!!libre.data);
                   </div>
                 )}
 
-                <div className="hidden sm:flex gap-2">
+                <div className="flex gap-2">
                   <Button type="button" variant="secondary" className="flex-1" onClick={() => setShowForm(false)}>
                     Cancelar
                   </Button>
@@ -890,9 +1059,16 @@ setMembresiaLibre(!!libre.data);
         </Card>
       )}
 
+      {!showForm && !isSuperAdmin && (
+        <div className="hidden sm:flex justify-end">
+          <Button onClick={() => setShowForm(true)}>
+            <Plus className="w-4 h-4 mr-1" /> Nuevo pago
+          </Button>
+        </div>
+      )}
+
       {/* Mobile floating buttons for payment form */}
-      {showForm && (
-        <>
+      {showForm ? (
           <button
             type="submit"
             form="pago-form"
@@ -904,7 +1080,14 @@ setMembresiaLibre(!!libre.data);
               <Save className="w-6 h-6" />
             )}
           </button>
-        </>
+      ) : !isSuperAdmin && (
+          <button
+            type="button"
+            onClick={() => setShowForm(true)}
+            className="sm:hidden fixed bottom-20 right-4 z-40 w-14 h-14 rounded-full bg-gym-primary/80 text-white shadow-lg shadow-gym-primary/20 flex items-center justify-center active:scale-95 transition-all"
+          >
+            <Plus className="w-6 h-6" />
+          </button>
       )}
 
       {/* Payment list */}
@@ -1118,6 +1301,8 @@ setMembresiaLibre(!!libre.data);
           </div>
         )}
       </Modal>
+        </>
+      )}
     </div>
   );
 }

@@ -19,8 +19,9 @@ import Link from "next/link";
 
 interface MembresiaLibreInfo {
   start_date: string;
-  fecha_fin: string | null;
-  asignado_por_nombre: string | null;
+  end_date: string | null;
+  assigned_by: string | null;
+  assigned_by_name?: string | null;
 }
 
 export default function ReportarPagoPage() {
@@ -100,15 +101,19 @@ function ReportarPagoForm() {
             }
 
             const { data: libreData } = await supabase
-              .from("membresias")
-              .select("start_date, fecha_fin, asignado_por_nombre")
-              .eq("usuario_id", user.id)
+              .from("memberships")
+              .select("start_date, end_date, assigned_by, profiles!assigned_by(full_name)")
+              .eq("user_id", user.id)
               .order("created_at", { ascending: false })
               .limit(1)
               .maybeSingle();
 
             if (!cancelled && libreData) {
-              setMembresiaLibreInfo(libreData as MembresiaLibreInfo);
+              const assignedByName = (libreData as Record<string, unknown>).profiles;
+              setMembresiaLibreInfo({
+                ...libreData,
+                assigned_by_name: assignedByName && typeof assignedByName === "object" ? (assignedByName as { full_name: string }).full_name : null,
+              } as MembresiaLibreInfo);
             }
           }
         }
@@ -136,7 +141,7 @@ function ReportarPagoForm() {
         const [meses, profile, libreData, tienePendiente] = await Promise.all([
           pagosService.mesesPendientesAdmin(miembroId),
           createClient().from("profiles").select("inscription_paid").eq("id", miembroId).single(),
-          createClient().from("membresias").select("start_date, fecha_fin, asignado_por_nombre").eq("usuario_id", miembroId).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+          createClient().from("memberships").select("start_date, end_date, assigned_by, profiles!assigned_by(full_name)").eq("user_id", miembroId).order("created_at", { ascending: false }).limit(1).maybeSingle(),
           pagosService.tieneInscripcionPendiente(miembroId),
         ]);
 
@@ -146,7 +151,12 @@ function ReportarPagoForm() {
           setInscripcionPendiente(tienePendiente);
 
           if (libreData.data) {
-            setMembresiaLibreInfo(libreData.data as MembresiaLibreInfo);
+            const d = libreData.data as Record<string, unknown>;
+            const assignedByName = d.profiles;
+            setMembresiaLibreInfo({
+              ...d,
+              assigned_by_name: assignedByName && typeof assignedByName === "object" ? (assignedByName as { full_name: string }).full_name : null,
+            } as MembresiaLibreInfo);
           } else {
             setMembresiaLibreInfo(null);
           }
@@ -291,7 +301,7 @@ function ReportarPagoForm() {
   }
 
   const showInscriptionCheckbox = !inscripcionPagada && !inscripcionPendiente && gymConfig && getMontoByMetodo(formData.metodo_pago, "inscripcion") > 0;
-  const isLibre = membresiaLibreInfo && !membresiaLibreInfo.fecha_fin;
+  const isLibre = membresiaLibreInfo && !membresiaLibreInfo.end_date;
 
   return (
     <div className="max-w-2xl mx-auto space-y-6 animate-fadeIn">
@@ -320,9 +330,9 @@ function ReportarPagoForm() {
                   <Calendar className="w-3 h-3" />
                   <span>Desde: {new Date(membresiaLibreInfo!.start_date).toLocaleDateString("es-ES")}</span>
                 </div>
-                {membresiaLibreInfo!.asignado_por_nombre && (
+                {membresiaLibreInfo!.assigned_by_name && (
                   <p className="text-xs text-gym-muted">
-                    Asignada por: {membresiaLibreInfo!.asignado_por_nombre}
+                    Asignada por: {membresiaLibreInfo!.assigned_by_name}
                   </p>
                 )}
               </div>

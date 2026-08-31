@@ -225,9 +225,10 @@ export default function DashboardPage() {
     try {
       const supabase = createClient();
       const { data: libres } = await supabase
-        .from("membresias")
+        .from("memberships")
         .select("user_id")
-        .is("fecha_fin", null);
+        .eq("status", "activa")
+        .is("end_date", null);
       const libresIds = new Set((libres || []).map((l) => l.user_id));
       const libresList = miembros.filter((m) => libresIds.has(m.id));
       setModalData({

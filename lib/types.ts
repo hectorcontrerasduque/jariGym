@@ -22,15 +22,18 @@ export interface Profile {
   updated_at: string;
 }
 
-export interface Membresia {
+export interface Membership {
   id: string;
-  usuario_id: string;
-  fecha_inicio: string;
-  fecha_fin: string | null;
-  asignado_por: string | null;
-  asignado_por_nombre: string | null;
-  estado: "activa" | "vencida" | "cancelada";
+  user_id: string;
+  status: "activa" | "vencida" | "cancelada";
+  start_date: string;
+  end_date: string | null;
+  assigned_by: string | null;
+  membership_note: string | null;
   created_at: string;
+  created_by: string | null;
+  updated_at: string;
+  updated_by: string | null;
 }
 
 export type MetodoPago = "efectivo" | "bs" | "binance";

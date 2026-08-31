@@ -201,10 +201,11 @@ export default function MiembrosPage() {
       }
 
       const { data: libreData } = await supabase
-        .from("membresias")
-        .select("id, fecha_fin")
+        .from("memberships")
+        .select("id, end_date")
         .eq("user_id", miembro.id)
-        .is("fecha_fin", null)
+        .eq("status", "activa")
+        .is("end_date", null)
         .limit(1)
         .maybeSingle();
 
@@ -220,7 +221,7 @@ export default function MiembrosPage() {
     const accion = activar ? "activar" : (miembro.activo === false ? "activar" : "desactivar");
     if (!confirm(`¿${accion.charAt(0).toUpperCase() + accion.slice(1)} a ${miembro.full_name}?`)) return;
     try {
-      await miembrosService.actualizarEstado(miembro.id, activar);
+      await miembrosService.actualizarMiembro(miembro.id, { activo: activar });
       showToast(activar ? messages.toast.miembroActivado : messages.toast.miembroDesactivado, "success");
       await loadMiembros();
     } catch {
@@ -249,7 +250,7 @@ export default function MiembrosPage() {
     const accion = isMembresiaLibre ? "remover membresía libre de" : "asignar membresía libre a";
     if (!confirm(`¿${accion.charAt(0).toUpperCase() + accion.slice(1)} ${miembro.full_name}?`)) return;
     try {
-      await miembrosService.toggleMembresiaLibre(miembro.id, currentUser.id, currentUser.full_name);
+      await miembrosService.toggleMembresiaLibre(miembro.id, currentUser.id);
       setIsMembresiaLibre(!isMembresiaLibre);
       await loadMiembros();
     } catch {

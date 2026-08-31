@@ -603,9 +603,10 @@ export class PagosService {
         .select("id, inscription_paid, start_date, activo, role, email")
         .in("role", ["miembro", "super_admin"]),
       supabase
-        .from("membresias")
-        .select("usuario_id")
-        .is("fecha_fin", null),
+        .from("memberships")
+        .select("user_id")
+        .eq("status", "activa")
+        .is("end_date", null),
       supabase
         .from("gym_config_payment_methods")
         .select("amount_monthly, amount_inscription")
@@ -623,7 +624,7 @@ export class PagosService {
     const config = configResult.data;
 
     const allMiembros = allProfiles.data || [];
-    const miembrosLibresIds = new Set((libres.data || []).map((l) => l.usuario_id));
+    const miembrosLibresIds = new Set((libres.data || []).map((l) => l.user_id));
     const montoMensual = config?.amount_monthly || 5;
     const montoInscripcion = config?.amount_inscription || 0;
 
@@ -734,9 +735,10 @@ export class PagosService {
         .limit(1)
         .maybeSingle(),
       supabase
-        .from("membresias")
-        .select("usuario_id, start_date")
-        .is("fecha_fin", null),
+        .from("memberships")
+        .select("user_id, start_date")
+        .eq("status", "activa")
+        .is("end_date", null),
       supabase
         .from("gym_config")
         .select("owner_email, billing_mode")
@@ -749,10 +751,10 @@ export class PagosService {
 
     const montoMensual = configResult.data?.amount_monthly || 0;
     const montoInscripcion = configResult.data?.amount_inscription || 0;
-    const miembrosLibresIds = new Set((libresResult.data || []).map((l) => l.usuario_id));
+    const miembrosLibresIds = new Set((libresResult.data || []).map((l) => l.user_id));
     const fechaInicioMap = new Map<string, string>();
     for (const l of libresResult.data || []) {
-      if (l.start_date) fechaInicioMap.set(l.usuario_id, l.start_date);
+      if (l.start_date) fechaInicioMap.set(l.user_id, l.start_date);
     }
     const ownerEmail = ownerResult.data?.owner_email?.toLowerCase() || "";
     const modoCobro = (ownerResult.data?.billing_mode as "dia_uno" | "fecha_inscripcion") || "dia_uno";
@@ -925,11 +927,12 @@ export class PagosService {
     );
 
     const { data: libreData } = await supabase
-      .from("membresias")
-      .select("usuario_id")
-      .is("fecha_fin", null);
+      .from("memberships")
+      .select("user_id")
+      .eq("status", "activa")
+      .is("end_date", null);
 
-    const libresIds = new Set((libreData || []).map((l) => l.usuario_id));
+    const libresIds = new Set((libreData || []).map((l) => l.user_id));
     const libresCount = libresIds.size;
 
     const statsMeses = await Promise.all(

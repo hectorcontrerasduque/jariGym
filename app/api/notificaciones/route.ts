@@ -306,10 +306,11 @@ async function procesarRecordatorioPago(
 
   const idsCandidatos = candidatos.map((m) => m.id);
   const { data: libreRows } = await supabase
-    .from("membresias")
+    .from("memberships")
     .select("user_id")
     .in("user_id", idsCandidatos)
-    .is("fecha_fin", null);
+    .eq("status", "activa")
+    .is("end_date", null);
 
   const idsLibres = new Set((libreRows || []).map((r) => r.user_id));
   candidatos = candidatos.filter((m) => !idsLibres.has(m.id));

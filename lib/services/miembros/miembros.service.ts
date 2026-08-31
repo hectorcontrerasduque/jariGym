@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/client";
 import { messages } from "@/lib/messages";
-import type { Profile, Membresia } from "@/lib/types";
+import type { Profile, Membership } from "@/lib/types";
 
 export class MiembrosService {
   private supabase = createClient();
@@ -76,12 +76,12 @@ export class MiembrosService {
     return data.miembro;
   }
 
-  async obtenerMembresia(usuarioId: string): Promise<Membresia | null> {
+  async obtenerMembresia(userId: string): Promise<Membership | null> {
     const { data } = await this.supabase
-      .from("membresias")
+      .from("memberships")
       .select("*")
-      .eq("usuario_id", usuarioId)
-      .eq("estado", "activa")
+      .eq("user_id", userId)
+      .eq("status", "activa")
       .single();
 
     return data;
@@ -93,9 +93,10 @@ export class MiembrosService {
         .from("profiles")
         .select("id", { count: "exact", head: true }),
       this.supabase
-        .from("membresias")
-        .select("usuario_id", { count: "exact", head: true })
-        .is("fecha_fin", null),
+        .from("memberships")
+        .select("user_id", { count: "exact", head: true })
+        .eq("status", "activa")
+        .is("end_date", null),
     ]);
 
     return {
@@ -104,7 +105,7 @@ export class MiembrosService {
     };
   }
 
-  async toggleMembresiaLibre(usuarioId: string, asignadoPor: string, asignadoPorNombre: string): Promise<void> {
+  async toggleMembresiaLibre(userId: string, assignedBy: string): Promise<void> {
     const {
       data: { user },
     } = await this.supabase.auth.getUser();
@@ -119,50 +120,35 @@ export class MiembrosService {
       throw new Error(messages.toast.noAutorizado);
     }
 
-    const { error } = await this.supabase
-      .rpc("toggle_membresia_libre", {
-        p_usuario_id: usuarioId,
-        p_asignado_por: asignadoPor,
-        p_asignado_por_nombre: asignadoPorNombre,
-      });
-
-    if (error) throw error;
-  }
-
-  async actualizarEstado(usuarioId: string, activo: boolean): Promise<void> {
-    const { data: { user } } = await this.supabase.auth.getUser();
-    if (!user) throw new Error(messages.toast.noAutenticado);
-
-    const { data: profile } = await this.supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .single();
-    if (profile?.role !== "super_admin") {
-      throw new Error(messages.toast.noAutorizado);
-    }
-
-    const { error } = await this.supabase
-      .rpc("actualizar_estado_miembro", {
-        p_usuario_id: usuarioId,
-        p_activo: activo,
-        p_changed_by: user?.id || null,
-      });
-
-    if (error) throw error;
-  }
-
-  async obtenerEstadoActual(usuarioId: string): Promise<{ estado: string; changed_by: string | null; notas: string | null; fecha_evidencia: string } | null> {
-    const { data, error } = await this.supabase
-      .from("member_states")
-      .select("estado, changed_by, notas, fecha_evidencia")
-      .eq("usuario_id", usuarioId)
-      .order("fecha_evidencia", { ascending: false })
-      .limit(1)
+    // Buscar membresía activa actual
+    const { data: membresiaActual } = await this.supabase
+      .from("memberships")
+      .select("id, end_date")
+      .eq("user_id", userId)
+      .eq("status", "activa")
+      .is("end_date", null)
       .maybeSingle();
 
-    if (error || !data) return null;
-    return data;
+    if (membresiaActual) {
+      // Tiene membresía perpetua activa → cancelarla (desactivar)
+      const { error } = await this.supabase
+        .from("memberships")
+        .update({ status: "cancelada", end_date: new Date().toISOString().split("T")[0] })
+        .eq("id", membresiaActual.id);
+      if (error) throw error;
+    } else {
+      // No tiene perpetua → crear una nueva
+      const { error } = await this.supabase
+        .from("memberships")
+        .insert({
+          user_id: userId,
+          status: "activa",
+          start_date: new Date().toISOString().split("T")[0],
+          end_date: null,
+          assigned_by: assignedBy,
+        });
+      if (error) throw error;
+    }
   }
 }
 

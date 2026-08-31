@@ -12,28 +12,28 @@ interface Moroso {
 
 function simulateGetMorosos(params: {
   miembros: Array<{ id: string; email: string; full_name: string; inscription_paid: boolean; activo: boolean | null; role: string; start_date?: string }>;
-  pagos: Array<{ usuario_id: string; mes_pagar: number; anio_pagar: number; estado: string; payment_note?: string }>;
+  pagos: Array<{ user_id: string; mes_pagar: number; anio_pagar: number; estado: string; payment_note?: string }>;
   libresIds: Set<string>;
-  membresias?: Array<{ usuario_id: string; start_date?: string }>;
+  memberships?: Array<{ user_id: string; start_date?: string }>;
   ownerEmail: string;
   anioConsulta: number;
   mesActual: number;
   montoMensual: number;
   montoInscripcion: number;
 }): Moroso[] {
-  const { miembros, pagos, libresIds, membresias, ownerEmail, anioConsulta, mesActual, montoMensual, montoInscripcion } = params;
+  const { miembros, pagos, libresIds, memberships, ownerEmail, anioConsulta, mesActual, montoMensual, montoInscripcion } = params;
 
   const pagosAprobados = pagos.filter((p) => p.estado === "aprobado" || p.estado === "suspendido");
 
   const fechaInicioMap = new Map<string, string>();
-  for (const m of membresias || []) {
-    if (m.start_date) fechaInicioMap.set(m.usuario_id, m.start_date);
+  for (const m of memberships || []) {
+    if (m.start_date) fechaInicioMap.set(m.user_id, m.start_date);
   }
 
   const miembrosConInscripcionPagada = new Set<string>();
   for (const pago of pagosAprobados) {
     const isInscripcion = pago.payment_note?.toLowerCase().includes("inscripción") || pago.payment_note?.toLowerCase().includes("inscripcion");
-    if (isInscripcion) miembrosConInscripcionPagada.add(pago.usuario_id);
+    if (isInscripcion) miembrosConInscripcionPagada.add(pago.user_id);
   }
   for (const m of miembros) {
     if (m.inscription_paid) miembrosConInscripcionPagada.add(m.id);
@@ -60,7 +60,7 @@ function simulateGetMorosos(params: {
       }
     }
 
-    const pagosMiembroQueCubren = pagosAprobados.filter((p) => p.usuario_id === miembro.id);
+    const pagosMiembroQueCubren = pagosAprobados.filter((p) => p.user_id === miembro.id);
     const mesesCubiertos = new Set(pagosMiembroQueCubren.map((p) => p.mes_pagar));
 
     const mesesDeuda: number[] = [];
@@ -118,7 +118,7 @@ describe("Morosos detection logic", () => {
 
   it("member who paid Jan-Jul but not Aug is moroso only for Aug", () => {
     const pagos = [1, 2, 3, 4, 5, 6, 7].map((mes) => ({
-      usuario_id: "m1",
+      user_id: "m1",
       mes_pagar: mes,
       anio_pagar: 2026,
       estado: "aprobado" as const,
@@ -143,9 +143,9 @@ describe("Morosos detection logic", () => {
   it("member with Aug in suspendido_pendiente is moroso for Aug", () => {
     const pagos = [
       ...[1, 2, 3, 4, 5, 6, 7].map((mes) => ({
-        usuario_id: "m1", mes_pagar: mes, anio_pagar: 2026, estado: "aprobado" as const,
+        user_id: "m1", mes_pagar: mes, anio_pagar: 2026, estado: "aprobado" as const,
       })),
-      { usuario_id: "m1", mes_pagar: 8, anio_pagar: 2026, estado: "suspendido_pendiente" as const },
+      { user_id: "m1", mes_pagar: 8, anio_pagar: 2026, estado: "suspendido_pendiente" as const },
     ];
 
     const result = simulateGetMorosos({
@@ -166,9 +166,9 @@ describe("Morosos detection logic", () => {
   it("member with Aug rejected is moroso for Aug", () => {
     const pagos = [
       ...[1, 2, 3, 4, 5, 6, 7].map((mes) => ({
-        usuario_id: "m1", mes_pagar: mes, anio_pagar: 2026, estado: "aprobado" as const,
+        user_id: "m1", mes_pagar: mes, anio_pagar: 2026, estado: "aprobado" as const,
       })),
-      { usuario_id: "m1", mes_pagar: 8, anio_pagar: 2026, estado: "rechazado" as const },
+      { user_id: "m1", mes_pagar: 8, anio_pagar: 2026, estado: "rechazado" as const },
     ];
 
     const result = simulateGetMorosos({
@@ -189,9 +189,9 @@ describe("Morosos detection logic", () => {
   it("member with suspendido for Jul but nothing for Aug is moroso only for Aug", () => {
     const pagos = [
       ...[1, 2, 3, 4, 5, 6].map((mes) => ({
-        usuario_id: "m1", mes_pagar: mes, anio_pagar: 2026, estado: "aprobado" as const,
+        user_id: "m1", mes_pagar: mes, anio_pagar: 2026, estado: "aprobado" as const,
       })),
-      { usuario_id: "m1", mes_pagar: 7, anio_pagar: 2026, estado: "suspendido" as const },
+      { user_id: "m1", mes_pagar: 7, anio_pagar: 2026, estado: "suspendido" as const },
     ];
 
     const result = simulateGetMorosos({
@@ -212,7 +212,7 @@ describe("Morosos detection logic", () => {
 
   it("member with all months aprobado or suspendido is NOT moroso", () => {
     const pagos = [1, 2, 3, 4, 5, 6, 7, 8].map((mes) => ({
-      usuario_id: "m1",
+      user_id: "m1",
       mes_pagar: mes,
       anio_pagar: 2026,
       estado: (mes % 2 === 0 ? "aprobado" : "suspendido") as "aprobado" | "suspendido",
@@ -281,7 +281,7 @@ describe("Morosos detection logic", () => {
     const result = simulateGetMorosos({
       miembros: [{ ...baseMiembro, id: "m1", full_name: "Test", inscription_paid: false }],
       pagos: [1, 2, 3, 4, 5, 6, 7, 8].map((mes) => ({
-        usuario_id: "m1", mes_pagar: mes, anio_pagar: 2026, estado: "aprobado" as const,
+        user_id: "m1", mes_pagar: mes, anio_pagar: 2026, estado: "aprobado" as const,
       })),
       libresIds: new Set(),
       ownerEmail,
@@ -300,9 +300,9 @@ describe("Morosos detection logic", () => {
   it("member with pending payment for Aug is moroso for Aug", () => {
     const pagos = [
       ...[1, 2, 3, 4, 5, 6, 7].map((mes) => ({
-        usuario_id: "m1", mes_pagar: mes, anio_pagar: 2026, estado: "aprobado" as const,
+        user_id: "m1", mes_pagar: mes, anio_pagar: 2026, estado: "aprobado" as const,
       })),
-      { usuario_id: "m1", mes_pagar: 8, anio_pagar: 2026, estado: "pendiente" as const },
+      { user_id: "m1", mes_pagar: 8, anio_pagar: 2026, estado: "pendiente" as const },
     ];
 
     const result = simulateGetMorosos({
@@ -324,7 +324,7 @@ describe("Morosos detection logic", () => {
     const result = simulateGetMorosos({
       miembros: [{ ...baseMiembro, id: "m1", full_name: "Test", inscription_paid: true }],
       pagos: [1, 2, 3].map((mes) => ({
-        usuario_id: "m1", mes_pagar: mes, anio_pagar: 2026, estado: "aprobado" as const,
+        user_id: "m1", mes_pagar: mes, anio_pagar: 2026, estado: "aprobado" as const,
       })),
       libresIds: new Set(),
       ownerEmail,
@@ -342,9 +342,9 @@ describe("Morosos detection logic", () => {
     const result = simulateGetMorosos({
       miembros: [{ ...baseMiembro, id: "m1", full_name: "Test", inscription_paid: false }],
       pagos: [
-        { usuario_id: "m1", mes_pagar: 1, anio_pagar: 2026, estado: "aprobado", payment_note: "Inscripción - pago inicial" },
+        { user_id: "m1", mes_pagar: 1, anio_pagar: 2026, estado: "aprobado", payment_note: "Inscripción - pago inicial" },
         ...[1, 2, 3].map((mes) => ({
-          usuario_id: "m1", mes_pagar: mes, anio_pagar: 2026, estado: "aprobado" as const,
+          user_id: "m1", mes_pagar: mes, anio_pagar: 2026, estado: "aprobado" as const,
         })),
       ],
       libresIds: new Set(),
@@ -361,10 +361,10 @@ describe("Morosos detection logic", () => {
 
   it("multiple morosos are returned correctly", () => {
     const pagosM1 = [1, 2, 3, 4, 5, 6, 7].map((mes) => ({
-      usuario_id: "m1", mes_pagar: mes, anio_pagar: 2026, estado: "aprobado" as const,
+      user_id: "m1", mes_pagar: mes, anio_pagar: 2026, estado: "aprobado" as const,
     }));
     const pagosM2 = [1, 2, 3, 4, 5].map((mes) => ({
-      usuario_id: "m2", mes_pagar: mes, anio_pagar: 2026, estado: "aprobado" as const,
+      user_id: "m2", mes_pagar: mes, anio_pagar: 2026, estado: "aprobado" as const,
     }));
 
     const result = simulateGetMorosos({
@@ -393,7 +393,7 @@ describe("Morosos detection logic", () => {
       miembros: [{ ...baseMiembro, id: "m1", full_name: "Test" }],
       pagos: [],
       libresIds: new Set(),
-      membresias: [{ usuario_id: "m1", start_date: "2026-03-15" }],
+      memberships: [{ user_id: "m1", start_date: "2026-03-15" }],
       ownerEmail,
       anioConsulta: 2026,
       mesActual: 8,
@@ -428,7 +428,7 @@ describe("Morosos detection logic", () => {
       miembros: [{ ...baseMiembro, id: "m1", full_name: "Test", start_date: "2026-01-01" }],
       pagos: [],
       libresIds: new Set(),
-      membresias: [{ usuario_id: "m1", start_date: "2026-05-01" }],
+      memberships: [{ user_id: "m1", start_date: "2026-05-01" }],
       ownerEmail,
       anioConsulta: 2026,
       mesActual: 8,
@@ -446,7 +446,7 @@ describe("Morosos detection logic", () => {
       miembros: [{ ...baseMiembro, id: "m1", full_name: "Test" }],
       pagos: [],
       libresIds: new Set(),
-      membresias: [{ usuario_id: "m1", start_date: "2026-08-10" }],
+      memberships: [{ user_id: "m1", start_date: "2026-08-10" }],
       ownerEmail,
       anioConsulta: 2026,
       mesActual: 8,
@@ -464,7 +464,7 @@ describe("Morosos detection logic", () => {
       miembros: [{ ...baseMiembro, id: "m1", full_name: "Test" }],
       pagos: [],
       libresIds: new Set(),
-      membresias: [{ usuario_id: "m1", start_date: "2027-01-15" }],
+      memberships: [{ user_id: "m1", start_date: "2027-01-15" }],
       ownerEmail,
       anioConsulta: 2026,
       mesActual: 12,

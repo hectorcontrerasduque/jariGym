@@ -246,7 +246,7 @@ function MisPagosContent() {
       const [meses, profile, libre, tienePendiente] = await Promise.all([
         pagosService.mesesPendientesAdmin(miembroId, anio),
         createClient().from("profiles").select("inscription_paid").eq("id", miembroId).single(),
-        createClient().from("membresias").select("id").eq("usuario_id", miembroId).is("fecha_fin", null).maybeSingle(),
+        createClient().from("memberships").select("id").eq("user_id", miembroId).eq("status", "activa").is("end_date", null).maybeSingle(),
         pagosService.tieneInscripcionPendiente(miembroId),
       ]);
       setMesesPendientes(meses);
@@ -266,7 +266,7 @@ setMembresiaLibre(!!libre.data);
       const [meses, profile, libre, tienePendiente] = await Promise.all([
         pagosService.mesesPendientes(userId, anio),
         createClient().from("profiles").select("inscription_paid").eq("id", userId).single(),
-        createClient().from("membresias").select("id").eq("usuario_id", userId).is("fecha_fin", null).maybeSingle(),
+        createClient().from("memberships").select("id").eq("user_id", userId).eq("status", "activa").is("end_date", null).maybeSingle(),
         pagosService.tieneInscripcionPendiente(userId),
       ]);
       setMesesPendientes(meses);

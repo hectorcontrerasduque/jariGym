@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
+import { Suspense } from "react";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { useEffect, useState } from "react";
@@ -33,6 +34,40 @@ const miembroNavItems = [
   { href: "/dashboard/mis-pagos?tab=home", label: "Home", icon: Home },
   { href: "/dashboard/mis-pagos?tab=pagos", label: "Mis Pagos", icon: CreditCard },
 ];
+
+function SidebarNavItem({ item, pathname, variant }: { item: { href: string; label: string; icon: typeof Home }; pathname: string; variant: "desktop" | "mobile" }) {
+  const searchParams = useSearchParams();
+  const itemPath = item.href.split("?")[0];
+  const tabParam = item.href.includes("tab=") ? new URL(item.href, "http://localhost").searchParams.get("tab") : null;
+  const currentTab = searchParams.get("tab");
+  const isActive = tabParam
+    ? pathname === itemPath && currentTab === tabParam
+    : pathname === itemPath || (item.href !== "/dashboard" && !item.href.endsWith("/configuracion") && pathname.startsWith(itemPath));
+  if (variant === "mobile") {
+    return (
+      <Link href={item.href} className={cn(
+        "flex-1 flex flex-col items-center gap-1 py-1 rounded-lg transition-all",
+        isActive
+          ? "text-gym-primary shadow-[0_0_10px_rgba(56,189,248,0.3)]"
+          : "text-gym-muted"
+      )}>
+        <item.icon className="w-5 h-5" />
+        <span className="text-[10px] font-medium truncate">{item.label}</span>
+      </Link>
+    );
+  }
+  return (
+    <Link href={item.href} className={cn(
+      "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200",
+      isActive
+        ? "bg-gym-primary/10 text-gym-primary shadow-[0_0_15px_rgba(56,189,248,0.15)]"
+        : "text-gym-muted hover:text-gym-text hover:bg-gym-bg/50"
+    )}>
+      <item.icon className="w-5 h-5" />
+      <span className="font-medium">{item.label}</span>
+    </Link>
+  );
+}
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -179,27 +214,11 @@ export function Sidebar() {
         </div>
 
         <nav className="flex-1 p-4 space-y-1">
-          {navItems.map((item) => {
-            const itemPath = item.href.split("?")[0];
-            const isActive = item.href.includes("mis-pagos")
-              ? pathname.startsWith("/dashboard/mis-pagos")
-              : pathname === itemPath || (item.href !== "/dashboard" && !item.href.endsWith("/configuracion") && pathname.startsWith(itemPath));
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  "flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200",
-                  isActive
-                    ? "bg-gym-primary/10 text-gym-primary shadow-[0_0_15px_rgba(56,189,248,0.15)]"
-                    : "text-gym-muted hover:text-gym-text hover:bg-gym-bg/50"
-                )}
-              >
-                <item.icon className="w-5 h-5" />
-                <span className="font-medium">{item.label}</span>
-              </Link>
-            );
-          })}
+          <Suspense fallback={null}>
+            {navItems.map((item) => (
+              <SidebarNavItem key={item.href} item={item} pathname={pathname} variant="desktop" />
+            ))}
+          </Suspense>
         </nav>
 
         <div className="p-4 border-t border-gym-border/50">
@@ -239,27 +258,11 @@ export function Sidebar() {
       {/* Mobile bottom nav */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-gym-surface/90 backdrop-blur-xl border-t border-gym-border/50 z-50 safe-area-bottom">
         <div className="flex items-center justify-around py-2">
-          {navItems.map((item) => {
-            const isActive = item.href.includes("mis-pagos")
-              ? pathname.startsWith("/dashboard/mis-pagos")
-              : pathname === item.href ||
-                (item.href !== "/dashboard" && !item.href.endsWith("/configuracion") && pathname.startsWith(item.href));
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  "flex-1 flex flex-col items-center gap-1 py-1 rounded-lg transition-all",
-                  isActive
-                    ? "text-gym-primary shadow-[0_0_10px_rgba(56,189,248,0.3)]"
-                    : "text-gym-muted"
-                )}
-              >
-                <item.icon className="w-5 h-5" />
-                <span className="text-[10px] font-medium truncate">{item.label}</span>
-              </Link>
-            );
-          })}
+          <Suspense fallback={null}>
+            {navItems.map((item) => (
+              <SidebarNavItem key={item.href} item={item} pathname={pathname} variant="mobile" />
+            ))}
+          </Suspense>
           {!isAdmin && (
             <Link
               href="/dashboard/perfil"

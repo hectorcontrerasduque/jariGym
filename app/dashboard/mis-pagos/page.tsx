@@ -650,60 +650,62 @@ setMembresiaLibre(!!libre.data);
       {/* Home tab - miembro */}
       {!isSuperAdmin && activeTab === "home" && (
         <div className="space-y-4">
+          {/* Welcome banner */}
+          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-gym-primary/20 via-gym-surface to-gym-primary/10 p-6 border border-gym-primary/20">
+            <div className="relative z-10">
+              <p className="text-gym-muted text-sm">Bienvenido,</p>
+              <h2 className="text-xl font-bold text-gym-text mt-1">{profile?.full_name || "Miembro"}</h2>
+            </div>
+            <div className="absolute -right-4 -top-4 w-24 h-24 bg-gym-primary/10 rounded-full blur-2xl" />
+          </div>
+
           {/* Info del gym */}
           <Card className="neon-card">
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2 text-base">
                 <Home className="w-5 h-5 text-gym-primary" />
-                Información del Gimnasio
+                {gymConfig?.gym_name || "Información del Gimnasio"}
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              {gymConfig?.gym_name && (
-                <div className="text-center mb-4">
-                  <h2 className="text-xl font-bold text-gym-text neon-text">{gymConfig.gym_name}</h2>
-                </div>
-              )}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {gymConfig?.schedule && (
-                  <div className="flex items-start gap-3 p-3 bg-gym-bg rounded-xl">
-                    <Clock className="w-5 h-5 text-gym-primary mt-0.5 flex-shrink-0" />
-                    <div>
-                      <p className="text-xs text-gym-muted">Horario</p>
-                      <p className="text-sm text-gym-text whitespace-pre-line">{gymConfig.schedule}</p>
-                    </div>
-                  </div>
-                )}
-                {gymConfig?.phone_number && (
-                  <div className="flex items-start gap-3 p-3 bg-gym-bg rounded-xl">
-                    <Phone className="w-5 h-5 text-gym-primary mt-0.5 flex-shrink-0" />
-                    <div>
-                      <p className="text-xs text-gym-muted">Teléfono</p>
-                      <p className="text-sm text-gym-text">{gymConfig.phone_number}</p>
-                    </div>
-                  </div>
-                )}
-                {gymConfig?.contact_email && (
-                  <div className="flex items-start gap-3 p-3 bg-gym-bg rounded-xl">
-                    <Mail className="w-5 h-5 text-gym-primary mt-0.5 flex-shrink-0" />
-                    <div>
-                      <p className="text-xs text-gym-muted">Correo</p>
-                      <p className="text-sm text-gym-text">{gymConfig.contact_email}</p>
-                    </div>
-                  </div>
-                )}
-                {gymConfig?.address && (
-                  <div className="flex items-start gap-3 p-3 bg-gym-bg rounded-xl">
-                    <MapPin className="w-5 h-5 text-gym-primary mt-0.5 flex-shrink-0" />
-                    <div>
-                      <p className="text-xs text-gym-muted">Dirección</p>
-                      <p className="text-sm text-gym-text">{gymConfig.address}</p>
-                    </div>
-                  </div>
-                )}
-              </div>
+            <CardContent className="space-y-3">
               {!gymConfig?.schedule && !gymConfig?.phone_number && !gymConfig?.contact_email && !gymConfig?.address && (
                 <p className="text-center text-gym-muted py-4">Sin información del gimnasio configurada</p>
+              )}
+              {gymConfig?.schedule && (
+                <div className="flex items-center gap-3 p-3 bg-gym-bg rounded-xl">
+                  <Clock className="w-5 h-5 text-gym-primary flex-shrink-0" />
+                  <div>
+                    <p className="text-xs text-gym-muted">Horario</p>
+                    <p className="text-sm text-gym-text whitespace-pre-line">{gymConfig.schedule}</p>
+                  </div>
+                </div>
+              )}
+              {gymConfig?.phone_number && (
+                <div className="flex items-center gap-3 p-3 bg-gym-bg rounded-xl">
+                  <Phone className="w-5 h-5 text-gym-primary flex-shrink-0" />
+                  <div>
+                    <p className="text-xs text-gym-muted">Teléfono</p>
+                    <p className="text-sm text-gym-text">{gymConfig.phone_number}</p>
+                  </div>
+                </div>
+              )}
+              {gymConfig?.contact_email && (
+                <div className="flex items-center gap-3 p-3 bg-gym-bg rounded-xl">
+                  <Mail className="w-5 h-5 text-gym-primary flex-shrink-0" />
+                  <div>
+                    <p className="text-xs text-gym-muted">Correo</p>
+                    <p className="text-sm text-gym-text">{gymConfig.contact_email}</p>
+                  </div>
+                </div>
+              )}
+              {gymConfig?.address && (
+                <div className="flex items-center gap-3 p-3 bg-gym-bg rounded-xl">
+                  <MapPin className="w-5 h-5 text-gym-primary flex-shrink-0" />
+                  <div>
+                    <p className="text-xs text-gym-muted">Dirección</p>
+                    <p className="text-sm text-gym-text">{gymConfig.address}</p>
+                  </div>
+                </div>
               )}
             </CardContent>
           </Card>
@@ -714,27 +716,24 @@ setMembresiaLibre(!!libre.data);
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center gap-2 text-base">
                   <CreditCard className="w-5 h-5 text-gym-primary" />
-                  Formas de Pago
+                  Tarifas
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
                   {metodosPago.filter(m => m.is_active).map(m => (
                     <div key={m.payment_method} className="p-3 bg-gym-bg rounded-xl">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="font-medium text-gym-text text-sm">
-                          {m.payment_method === "efectivo" ? "Efectivo" : m.payment_method === "bs" ? "Bs" : "Binance"}
-                        </span>
-                        <Badge variant="success">Activo</Badge>
-                      </div>
+                      <p className="font-medium text-gym-text text-sm mb-2">
+                        {m.payment_method === "efectivo" ? "Efectivo" : m.payment_method === "bs" ? "Bs" : "Binance"}
+                      </p>
                       <div className="grid grid-cols-2 gap-3 text-sm">
-                        <div>
-                          <p className="text-gym-muted text-xs">Mensualidad</p>
-                          <p className="text-gym-text font-medium">{m.amount_monthly > 0 ? formatCurrency(m.amount_monthly) : "Gratis"}</p>
+                        <div className="flex items-center justify-between">
+                          <span className="text-gym-muted">Mensualidad</span>
+                          <span className="text-gym-text font-semibold">{m.amount_monthly > 0 ? formatCurrency(m.amount_monthly) : "Gratis"}</span>
                         </div>
-                        <div>
-                          <p className="text-gym-muted text-xs">Inscripción</p>
-                          <p className="text-gym-text font-medium">{m.amount_inscription > 0 ? formatCurrency(m.amount_inscription) : "Gratis"}</p>
+                        <div className="flex items-center justify-between">
+                          <span className="text-gym-muted">Inscripción</span>
+                          <span className="text-gym-text font-semibold">{m.amount_inscription > 0 ? formatCurrency(m.amount_inscription) : "Gratis"}</span>
                         </div>
                       </div>
                     </div>
@@ -752,7 +751,7 @@ setMembresiaLibre(!!libre.data);
                 Mi Estado
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent className="space-y-2">
               <div className="flex items-center justify-between p-3 bg-gym-bg rounded-xl">
                 <span className="text-sm text-gym-muted">Inscripción</span>
                 {profile?.inscription_paid ? (
@@ -762,8 +761,8 @@ setMembresiaLibre(!!libre.data);
                 )}
               </div>
               <div className="flex items-center justify-between p-3 bg-gym-bg rounded-xl">
-                <span className="text-sm text-gym-muted">Deuda mensual</span>
-                <span className="text-sm font-medium text-gym-text">{mesesDisponiblesParaPagar.length} mes(es)</span>
+                <span className="text-sm text-gym-muted">Meses pendientes</span>
+                <span className="text-sm font-medium text-gym-text">{mesesDisponiblesParaPagar.length}</span>
               </div>
               <div className="flex items-center justify-between p-3 bg-gym-bg rounded-xl">
                 <span className="text-sm text-gym-muted">Pagos realizados</span>
@@ -815,7 +814,7 @@ setMembresiaLibre(!!libre.data);
                         <span className="text-xs text-gym-muted w-12 text-right font-mono">{hour}</span>
                         <div className="flex-1 h-5 bg-gym-bg rounded-full overflow-hidden">
                           <div
-                            className="h-full bg-gym-primary/70 rounded-full transition-all"
+                            className="h-full bg-gradient-to-r from-gym-primary/60 to-gym-primary rounded-full transition-all"
                             style={{ width: `${(count / maxHourCount) * 100}%` }}
                           />
                         </div>

@@ -650,91 +650,122 @@ setMembresiaLibre(!!libre.data);
       {/* Home tab - miembro */}
       {!isSuperAdmin && activeTab === "home" && (
         <div className="space-y-4">
-          {/* Welcome banner */}
-          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-gym-primary/20 via-gym-surface to-gym-primary/10 p-6 border border-gym-primary/20">
+          {/* Hero banner */}
+          <div className="relative overflow-hidden rounded-2xl border border-gym-primary/20 bg-gradient-to-br from-gym-primary/15 via-gym-surface to-gym-secondary/10 p-6">
+            <div className="absolute -right-8 -top-8 w-40 h-40 bg-gym-primary/10 rounded-full blur-3xl" />
+            <div className="absolute -left-6 -bottom-6 w-32 h-32 bg-gym-secondary/10 rounded-full blur-3xl" />
+            <div className="absolute top-3 right-8 w-2 h-2 bg-gym-primary rounded-full animate-float" />
+            <div className="absolute top-6 right-16 w-1.5 h-1.5 bg-gym-secondary rounded-full animate-float" style={{ animationDelay: "0.5s" }} />
+            <div className="absolute bottom-4 right-12 w-1 h-1 bg-gym-primary rounded-full animate-float" style={{ animationDelay: "1s" }} />
             <div className="relative z-10">
-              <p className="text-gym-muted text-sm">Bienvenido,</p>
-              <h2 className="text-xl font-bold text-gym-text mt-1">{profile?.full_name || "Miembro"}</h2>
+              <p className="text-gym-primary text-xs font-medium tracking-widest uppercase mb-1">Bienvenido a</p>
+              <h2 className="text-2xl font-display font-bold text-gym-text neon-text">{gymConfig?.gym_name || "tu gimnasio"}</h2>
+              <p className="text-gym-muted text-sm mt-1">{profile?.full_name || "Miembro"}</p>
             </div>
-            <div className="absolute -right-4 -top-4 w-24 h-24 bg-gym-primary/10 rounded-full blur-2xl" />
+          </div>
+
+          {/* Quick stats */}
+          <div className="grid grid-cols-3 gap-3">
+            <div className="relative overflow-hidden rounded-xl border border-gym-border bg-gym-surface p-4 text-center">
+              <div className="absolute inset-0 bg-gradient-to-b from-gym-success/5 to-transparent" />
+              <div className="relative z-10">
+                <p className="text-2xl font-bold text-gym-success neon-text-success">{pagos.length}</p>
+                <p className="text-[10px] text-gym-muted mt-1 uppercase tracking-wide">Pagos</p>
+              </div>
+            </div>
+            <div className="relative overflow-hidden rounded-xl border border-gym-border bg-gym-surface p-4 text-center">
+              <div className="absolute inset-0 bg-gradient-to-b from-gym-warning/5 to-transparent" />
+              <div className="relative z-10">
+                <p className="text-2xl font-bold text-gym-warning">{mesesDisponiblesParaPagar.length}</p>
+                <p className="text-[10px] text-gym-muted mt-1 uppercase tracking-wide">Pendientes</p>
+              </div>
+            </div>
+            <div className="relative overflow-hidden rounded-xl border border-gym-border bg-gym-surface p-4 text-center">
+              <div className="absolute inset-0 bg-gradient-to-b from-gym-primary/5 to-transparent" />
+              <div className="relative z-10">
+                <p className="text-lg font-bold text-gym-primary neon-text">{formatCurrency(montoAprobado)}</p>
+                <p className="text-[10px] text-gym-muted mt-1 uppercase tracking-wide">Pagado</p>
+              </div>
+            </div>
           </div>
 
           {/* Info del gym */}
-          <Card className="neon-card">
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Home className="w-5 h-5 text-gym-primary" />
-                {gymConfig?.gym_name || "Información del Gimnasio"}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {!gymConfig?.schedule && !gymConfig?.phone_number && !gymConfig?.contact_email && !gymConfig?.address && (
-                <p className="text-center text-gym-muted py-4">Sin información del gimnasio configurada</p>
-              )}
-              {gymConfig?.schedule && (
-                <div className="flex items-center gap-3 p-3 bg-gym-bg rounded-xl">
-                  <Clock className="w-5 h-5 text-gym-primary flex-shrink-0" />
-                  <div>
-                    <p className="text-xs text-gym-muted">Horario</p>
-                    <p className="text-sm text-gym-text whitespace-pre-line">{gymConfig.schedule}</p>
+          {gymConfig && (gymConfig.schedule || gymConfig.phone_number || gymConfig.contact_email || gymConfig.address) && (
+            <Card className="neon-card overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-br from-gym-primary/5 to-transparent pointer-events-none" />
+              <CardHeader className="pb-2 relative">
+                <CardTitle className="flex items-center gap-2 text-sm">
+                  <div className="w-7 h-7 rounded-lg bg-gym-primary/15 flex items-center justify-center">
+                    <Home className="w-4 h-4 text-gym-primary" />
                   </div>
-                </div>
-              )}
-              {gymConfig?.phone_number && (
-                <div className="flex items-center gap-3 p-3 bg-gym-bg rounded-xl">
-                  <Phone className="w-5 h-5 text-gym-primary flex-shrink-0" />
-                  <div>
-                    <p className="text-xs text-gym-muted">Teléfono</p>
-                    <p className="text-sm text-gym-text">{gymConfig.phone_number}</p>
+                  {gymConfig.gym_name || "Información del Gimnasio"}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="relative space-y-2">
+                {gymConfig.schedule && (
+                  <div className="flex items-center gap-3 p-2.5 bg-gym-bg/60 rounded-xl">
+                    <Clock className="w-4 h-4 text-gym-primary flex-shrink-0" />
+                    <div>
+                      <p className="text-[10px] text-gym-muted uppercase tracking-wide">Horario</p>
+                      <p className="text-sm text-gym-text whitespace-pre-line">{gymConfig.schedule}</p>
+                    </div>
                   </div>
-                </div>
-              )}
-              {gymConfig?.contact_email && (
-                <div className="flex items-center gap-3 p-3 bg-gym-bg rounded-xl">
-                  <Mail className="w-5 h-5 text-gym-primary flex-shrink-0" />
-                  <div>
-                    <p className="text-xs text-gym-muted">Correo</p>
-                    <p className="text-sm text-gym-text">{gymConfig.contact_email}</p>
+                )}
+                {gymConfig.phone_number && (
+                  <div className="flex items-center gap-3 p-2.5 bg-gym-bg/60 rounded-xl">
+                    <Phone className="w-4 h-4 text-gym-primary flex-shrink-0" />
+                    <div>
+                      <p className="text-[10px] text-gym-muted uppercase tracking-wide">Teléfono</p>
+                      <p className="text-sm text-gym-text">{gymConfig.phone_number}</p>
+                    </div>
                   </div>
-                </div>
-              )}
-              {gymConfig?.address && (
-                <div className="flex items-center gap-3 p-3 bg-gym-bg rounded-xl">
-                  <MapPin className="w-5 h-5 text-gym-primary flex-shrink-0" />
-                  <div>
-                    <p className="text-xs text-gym-muted">Dirección</p>
-                    <p className="text-sm text-gym-text">{gymConfig.address}</p>
+                )}
+                {gymConfig.contact_email && (
+                  <div className="flex items-center gap-3 p-2.5 bg-gym-bg/60 rounded-xl">
+                    <Mail className="w-4 h-4 text-gym-primary flex-shrink-0" />
+                    <div>
+                      <p className="text-[10px] text-gym-muted uppercase tracking-wide">Correo</p>
+                      <p className="text-sm text-gym-text">{gymConfig.contact_email}</p>
+                    </div>
                   </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                )}
+                {gymConfig.address && (
+                  <div className="flex items-center gap-3 p-2.5 bg-gym-bg/60 rounded-xl">
+                    <MapPin className="w-4 h-4 text-gym-primary flex-shrink-0" />
+                    <div>
+                      <p className="text-[10px] text-gym-muted uppercase tracking-wide">Dirección</p>
+                      <p className="text-sm text-gym-text">{gymConfig.address}</p>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
-          {/* Precios */}
+          {/* Tarifas */}
           {metodosPago.filter(m => m.is_active).length > 0 && (
-            <Card className="neon-card">
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <CreditCard className="w-5 h-5 text-gym-primary" />
+            <Card className="neon-card overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-br from-gym-secondary/5 to-transparent pointer-events-none" />
+              <CardHeader className="pb-2 relative">
+                <CardTitle className="flex items-center gap-2 text-sm">
+                  <div className="w-7 h-7 rounded-lg bg-gym-secondary/15 flex items-center justify-center">
+                    <CreditCard className="w-4 h-4 text-gym-secondary" />
+                  </div>
                   Tarifas
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
+              <CardContent className="relative">
+                <div className="space-y-2">
                   {metodosPago.filter(m => m.is_active).map(m => (
-                    <div key={m.payment_method} className="p-3 bg-gym-bg rounded-xl">
-                      <p className="font-medium text-gym-text text-sm mb-2">
+                    <div key={m.payment_method} className="flex items-center justify-between p-2.5 bg-gym-bg/60 rounded-xl">
+                      <span className="text-sm font-medium text-gym-text">
                         {m.payment_method === "efectivo" ? "Efectivo" : m.payment_method === "bs" ? "Bs" : "Binance"}
-                      </p>
-                      <div className="grid grid-cols-2 gap-3 text-sm">
-                        <div className="flex items-center justify-between">
-                          <span className="text-gym-muted">Mensualidad</span>
-                          <span className="text-gym-text font-semibold">{m.amount_monthly > 0 ? formatCurrency(m.amount_monthly) : "Gratis"}</span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <span className="text-gym-muted">Inscripción</span>
-                          <span className="text-gym-text font-semibold">{m.amount_inscription > 0 ? formatCurrency(m.amount_inscription) : "Gratis"}</span>
-                        </div>
+                      </span>
+                      <div className="flex gap-4 text-sm">
+                        <span className="text-gym-muted">{m.amount_monthly > 0 ? formatCurrency(m.amount_monthly) : "Gratis"}<span className="text-[10px] text-gym-muted ml-1">/mes</span></span>
+                        {m.amount_inscription > 0 && (
+                          <span className="text-gym-success font-medium">{formatCurrency(m.amount_inscription)}<span className="text-[10px] ml-1">insc.</span></span>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -744,15 +775,18 @@ setMembresiaLibre(!!libre.data);
           )}
 
           {/* Estado de cuenta */}
-          <Card className="neon-card">
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <CheckCircle className="w-5 h-5 text-gym-primary" />
+          <Card className="neon-card overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-br from-gym-success/5 to-transparent pointer-events-none" />
+            <CardHeader className="pb-2 relative">
+              <CardTitle className="flex items-center gap-2 text-sm">
+                <div className="w-7 h-7 rounded-lg bg-gym-success/15 flex items-center justify-center">
+                  <CheckCircle className="w-4 h-4 text-gym-success" />
+                </div>
                 Mi Estado
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2">
-              <div className="flex items-center justify-between p-3 bg-gym-bg rounded-xl">
+            <CardContent className="relative space-y-2">
+              <div className="flex items-center justify-between p-2.5 bg-gym-bg/60 rounded-xl">
                 <span className="text-sm text-gym-muted">Inscripción</span>
                 {profile?.inscription_paid ? (
                   <Badge variant="success">Pagada</Badge>
@@ -760,21 +794,15 @@ setMembresiaLibre(!!libre.data);
                   <Badge variant="warning">Pendiente</Badge>
                 )}
               </div>
-              <div className="flex items-center justify-between p-3 bg-gym-bg rounded-xl">
-                <span className="text-sm text-gym-muted">Meses pendientes</span>
-                <span className="text-sm font-medium text-gym-text">{mesesDisponiblesParaPagar.length}</span>
-              </div>
-              <div className="flex items-center justify-between p-3 bg-gym-bg rounded-xl">
-                <span className="text-sm text-gym-muted">Pagos realizados</span>
-                <span className="text-sm font-medium text-gym-text">{pagos.length}</span>
-              </div>
-              <div className="flex items-center justify-between p-3 bg-gym-bg rounded-xl">
-                <span className="text-sm text-gym-muted">Total pagado</span>
-                <span className="text-sm font-semibold text-gym-success">{formatCurrency(montoAprobado)}</span>
-              </div>
+              {profile?.start_date && (
+                <div className="flex items-center justify-between p-2.5 bg-gym-bg/60 rounded-xl">
+                  <span className="text-sm text-gym-muted">Fecha de inicio</span>
+                  <span className="text-sm text-gym-text">{new Date(profile.start_date).toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" })}</span>
+                </div>
+              )}
               {montoPendiente > 0 && (
-                <div className="flex items-center justify-between p-3 bg-gym-bg rounded-xl">
-                  <span className="text-sm text-gym-muted">Total pendiente</span>
+                <div className="flex items-center justify-between p-2.5 bg-gym-bg/60 rounded-xl border border-gym-warning/20">
+                  <span className="text-sm text-gym-warning font-medium">Deuda</span>
                   <span className="text-sm font-semibold text-gym-warning">{formatCurrency(montoPendiente)}</span>
                 </div>
               )}
@@ -800,29 +828,36 @@ setMembresiaLibre(!!libre.data);
             const maxHourCount = Math.max(...hourEntries.map((e) => e[1]), 1);
             if (hourEntries.length === 0) return null;
             return (
-              <Card className="neon-card">
-                <CardHeader className="pb-3">
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <Clock className="w-5 h-5 text-gym-primary" />
-                    Horarios del Gimnasio
+              <Card className="neon-card overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-br from-gym-primary/5 to-transparent pointer-events-none" />
+                <CardHeader className="pb-2 relative">
+                  <CardTitle className="flex items-center gap-2 text-sm">
+                    <div className="w-7 h-7 rounded-lg bg-gym-primary/15 flex items-center justify-center">
+                      <Clock className="w-4 h-4 text-gym-primary" />
+                    </div>
+                    Horarios Pico
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    {hourEntries.map(([hour, count]) => (
-                      <div key={hour} className="flex items-center gap-3">
-                        <span className="text-xs text-gym-muted w-12 text-right font-mono">{hour}</span>
-                        <div className="flex-1 h-5 bg-gym-bg rounded-full overflow-hidden">
-                          <div
-                            className="h-full bg-gradient-to-r from-gym-primary/60 to-gym-primary rounded-full transition-all"
-                            style={{ width: `${(count / maxHourCount) * 100}%` }}
-                          />
+                <CardContent className="relative">
+                  <div className="space-y-1.5">
+                    {hourEntries.map(([hour, count], i) => {
+                      const pct = (count / maxHourCount) * 100;
+                      const isTop = pct >= 80;
+                      return (
+                        <div key={hour} className="flex items-center gap-3">
+                          <span className={`text-[11px] w-10 text-right font-mono ${isTop ? "text-gym-primary font-semibold" : "text-gym-muted"}`}>{hour}</span>
+                          <div className="flex-1 h-4 bg-gym-bg/80 rounded-full overflow-hidden">
+                            <div
+                              className={`h-full rounded-full transition-all duration-700 ${isTop ? "bg-gradient-to-r from-gym-primary/80 to-gym-primary shadow-[0_0_8px_rgba(56,189,248,0.3)]" : "bg-gradient-to-r from-gym-primary/40 to-gym-primary/60"}`}
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                          <span className={`text-[11px] w-5 text-right ${isTop ? "text-gym-primary font-semibold" : "text-gym-muted"}`}>{count}</span>
                         </div>
-                        <span className="text-xs text-gym-text w-6 text-right">{count}</span>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
-                  <p className="text-xs text-gym-muted mt-3 text-center">Horarios más concurridos del gimnasio</p>
+                  <p className="text-[10px] text-gym-muted mt-3 text-center uppercase tracking-wide">Horarios más concurridos</p>
                 </CardContent>
               </Card>
             );

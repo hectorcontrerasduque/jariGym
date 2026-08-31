@@ -74,18 +74,18 @@ export async function POST(request: Request) {
     for (const config of configs.data) {
       const { weekly_frequency, days_before } = config;
 
-      let miembrosQuery = supabase
+      const hoy = new Date();
+      const shouldFilterRole = !forzar && weekly_frequency;
+
+      const baseQuery = supabase
         .from("profiles")
         .select("id, full_name, email, start_date, activo, role")
         .eq("activo", true)
         .not("email", "is", null);
 
-      const hoy = new Date();
-      if (!forzar && weekly_frequency) {
-        miembrosQuery = miembrosQuery.not("role", "in", ["super_admin", "miembro"]);
-      }
-
-      const { data: miembrosData } = await miembrosQuery;
+      const { data: miembrosData } = shouldFilterRole
+        ? await baseQuery.not("role", "in", ["super_admin", "miembro"])
+        : await baseQuery;
       if (!miembrosData || miembrosData.length === 0) {
         continue;
       }

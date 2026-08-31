@@ -45,6 +45,7 @@ export default function MiembrosPage() {
   const [savingMembresia, setSavingMembresia] = useState(false);
   const [savingNotaAdmin, setSavingNotaAdmin] = useState(false);
   const [historialExpanded, setHistorialExpanded] = useState(false);
+  const [historialAdminExpanded, setHistorialAdminExpanded] = useState(false);
 
   // Sub-modal: membresía
   const [modalMembresia, setModalMembresia] = useState(false);
@@ -306,8 +307,8 @@ export default function MiembrosPage() {
           .update(updates)
           .eq("id", latest.id);
       }
-      setModalMembresia(false);
       await loadHistorialMembresias(selectedMiembro.id);
+      setHistorialExpanded(true);
       showToast(messages.toast.notasGuardadas, "success");
     } catch {
       showToast(messages.toast.notasError, "error");
@@ -345,6 +346,7 @@ export default function MiembrosPage() {
       setIsSuperAdmin(newRole === "super_admin");
       setInscripcionAdminNote(newNote);
       setNotaAdminInput("");
+      setHistorialAdminExpanded(false);
       setModalNotaAdmin(true);
       showToast(newRole === "super_admin" ? "Ahora es Super Admin" : "Rol cambiado a Miembro", "success");
       await loadMiembros();
@@ -380,6 +382,7 @@ export default function MiembrosPage() {
 
       setInscripcionAdminNote(newNote);
       setNotaAdminInput("");
+      setHistorialAdminExpanded(true);
       showToast(messages.toast.notasGuardadas, "success");
       await loadMiembros();
     } catch {
@@ -714,24 +717,24 @@ export default function MiembrosPage() {
       </Modal>
 
       {/* Sub-modal: Membresía */}
-      <Modal isOpen={modalMembresia} onClose={() => setModalMembresia(false)} title=" ">
-        <div className="space-y-4">
-          <h2 className="text-lg font-display font-bold text-gym-text neon-text">Membresía</h2>
+      <Modal isOpen={modalMembresia} onClose={() => setModalMembresia(false)} title=" " overlayClassName="bg-black/70" className="border-gym-secondary/30">
+        <div className="space-y-3">
+          <h2 className="text-2xl font-display font-bold text-gym-text neon-text">Membresía</h2>
 
           {/* Historial colapsable */}
           {historialMembresias.length > 0 && (
             <div className="border border-gym-border rounded-xl overflow-hidden">
               <button
                 onClick={() => setHistorialExpanded(!historialExpanded)}
-                className="w-full flex items-center justify-between p-3 bg-gym-bg hover:bg-gym-surface transition-colors text-sm text-gym-muted"
+                className="w-full flex items-center justify-between px-3 py-2 bg-gym-bg hover:bg-gym-surface transition-colors text-[11px] text-gym-muted"
               >
                 <span>{historialExpanded ? "Click para ver menos" : "Click para ver más"}</span>
-                {historialExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                {historialExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
               </button>
               {historialExpanded && (
-                <div className="max-h-48 overflow-y-auto space-y-2 p-3">
+                <div className="max-h-40 overflow-y-auto space-y-1.5 p-2.5">
                   {historialMembresias.map((m) => (
-                    <div key={m.id} className="p-2 bg-gym-surface rounded-lg text-xs">
+                    <div key={m.id} className="p-2 bg-gym-surface rounded-lg text-[11px]">
                       <div className="flex items-center justify-between gap-2">
                         <Badge variant={m.status === "activa" ? "success" : m.status === "vencida" ? "warning" : "danger"}>
                           {m.status === "activa" ? "Activa" : m.status === "vencida" ? "Vencida" : "Cancelada"}
@@ -741,7 +744,7 @@ export default function MiembrosPage() {
                         </span>
                       </div>
                       {m.membership_note && (
-                        <p className="text-gym-muted mt-1 italic">{m.membership_note}</p>
+                        <p className="text-gym-muted mt-0.5 italic">{m.membership_note}</p>
                       )}
                     </div>
                   ))}
@@ -751,10 +754,10 @@ export default function MiembrosPage() {
           )}
 
           {/* Formulario del último registro */}
-          <div className="space-y-3">
+          <div className="space-y-2.5">
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs text-gym-muted mb-1 block">Fecha inicio</label>
+                <label className="text-[11px] text-gym-muted mb-0.5 block">Fecha inicio</label>
                 {isMembresiaLibre ? (
                   <Input
                     type="date"
@@ -762,49 +765,48 @@ export default function MiembrosPage() {
                     onChange={(e) => setMembresiaStartDate(e.target.value)}
                   />
                 ) : (
-                  <p className="text-sm text-gym-text bg-gym-surface px-3 py-2 rounded-xl border border-gym-border">
+                  <p className="text-xs text-gym-text bg-gym-surface px-3 py-2 rounded-xl border border-gym-border">
                     {membresiaStartDate ? formatDate(membresiaStartDate) : "—"}
                   </p>
                 )}
               </div>
               <div>
-                <label className="text-xs text-gym-muted mb-1 block">Fecha fin</label>
+                <label className="text-[11px] text-gym-muted mb-0.5 block">Fecha fin</label>
                 {isMembresiaLibre ? (
                   <Input
                     type="date"
                     value={membresiaEndDate}
                     onChange={(e) => setMembresiaEndDate(e.target.value)}
-                    placeholder="Perpetua"
                   />
                 ) : (
-                  <p className="text-sm text-gym-text bg-gym-surface px-3 py-2 rounded-xl border border-gym-border">
+                  <p className="text-xs text-gym-text bg-gym-surface px-3 py-2 rounded-xl border border-gym-border">
                     {membresiaEndDate ? formatDate(membresiaEndDate) : "Perpetua"}
                   </p>
                 )}
                 {!isMembresiaLibre && (
-                  <p className="text-xs text-gym-muted mt-1">Sin fecha = perpetua</p>
+                  <p className="text-[10px] text-gym-muted mt-0.5">Sin fecha = perpetua</p>
                 )}
               </div>
             </div>
             <div>
-              <label className="text-xs text-gym-muted mb-1 block">Estado</label>
+              <label className="text-[11px] text-gym-muted mb-0.5 block">Estado</label>
               <Badge variant={isMembresiaLibre ? "success" : "danger"}>
                 {isMembresiaLibre ? "Activa" : "Inactiva"}
               </Badge>
             </div>
             <div>
-              <label className="text-xs text-gym-muted mb-1 block">Nota</label>
+              <label className="text-[11px] text-gym-muted mb-0.5 block">Nota</label>
               <textarea
                 value={notaMembresia}
                 onChange={(e) => setNotaMembresia(e.target.value)}
                 placeholder="Nota sobre esta membresía..."
-                rows={3}
-                className="w-full px-3 py-2 bg-gym-surface border border-gym-border rounded-xl text-sm text-gym-text focus:outline-none focus:ring-2 focus:ring-gym-primary/50 resize-none"
+                rows={2}
+                className="w-full px-3 py-2 bg-gym-surface border border-gym-border rounded-xl text-xs text-gym-text focus:outline-none focus:ring-2 focus:ring-gym-primary/50 resize-none"
               />
             </div>
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex gap-2 pt-1">
             <Button variant="ghost" className="flex-1" onClick={() => setModalMembresia(false)}>
               Cerrar
             </Button>
@@ -816,26 +818,39 @@ export default function MiembrosPage() {
       </Modal>
 
       {/* Sub-modal: Nota Admin */}
-      <Modal isOpen={modalNotaAdmin} onClose={() => { setModalNotaAdmin(false); setNotaAdminInput(""); }} title=" ">
-        <div className="space-y-4">
-          <h2 className="text-lg font-display font-bold text-gym-text neon-text">Nota de Admin</h2>
+      <Modal isOpen={modalNotaAdmin} onClose={() => { setModalNotaAdmin(false); setNotaAdminInput(""); }} title=" " overlayClassName="bg-black/70" className="border-gym-primary/30">
+        <div className="space-y-3">
+          <h2 className="text-2xl font-display font-bold text-gym-text neon-text">Nota de Admin</h2>
+
+          {/* Historial colapsable */}
           {inscripcionAdminNote && (
-            <div className="p-3 bg-gym-surface rounded-xl">
-              <label className="text-xs text-gym-muted mb-1 block">Historial</label>
-              <p className="text-sm text-gym-text whitespace-pre-wrap">{inscripcionAdminNote}</p>
+            <div className="border border-gym-border rounded-xl overflow-hidden">
+              <button
+                onClick={() => setHistorialAdminExpanded(!historialAdminExpanded)}
+                className="w-full flex items-center justify-between px-3 py-2 bg-gym-bg hover:bg-gym-surface transition-colors text-[11px] text-gym-muted"
+              >
+                <span>{historialAdminExpanded ? "Click para ver menos" : "Click para ver más"}</span>
+                {historialAdminExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+              </button>
+              {historialAdminExpanded && (
+                <div className="max-h-40 overflow-y-auto p-2.5">
+                  <p className="text-[11px] text-gym-text whitespace-pre-wrap">{inscripcionAdminNote}</p>
+                </div>
+              )}
             </div>
           )}
+
           <div>
-            <label className="text-xs text-gym-muted mb-1 block">Nota</label>
+            <label className="text-[11px] text-gym-muted mb-0.5 block">Nota</label>
             <textarea
               value={notaAdminInput}
               onChange={(e) => setNotaAdminInput(e.target.value)}
               placeholder="Agregar nota..."
-              rows={3}
-              className="w-full px-3 py-2 bg-gym-surface border border-gym-border rounded-xl text-sm text-gym-text focus:outline-none focus:ring-2 focus:ring-gym-primary/50 resize-none"
+              rows={2}
+              className="w-full px-3 py-2 bg-gym-surface border border-gym-border rounded-xl text-xs text-gym-text focus:outline-none focus:ring-2 focus:ring-gym-primary/50 resize-none"
             />
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 pt-1">
             <Button variant="ghost" className="flex-1" onClick={() => { setModalNotaAdmin(false); setNotaAdminInput(""); }}>
               Cerrar
             </Button>

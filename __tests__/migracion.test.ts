@@ -50,36 +50,6 @@ function chainReturn(data: unknown, error: unknown = null) {
   return chain;
 }
 
-function chainReturnOnInsert(insertData: unknown) {
-  const chain: Record<string, ReturnType<typeof vi.fn>> = {};
-  const methods = [
-    "select", "insert", "update", "delete",
-    "eq", "ilike", "or", "in", "order", "limit",
-    "maybeSingle", "single",
-  ];
-  let isInsert = false;
-  for (const m of methods) {
-    if (m === "insert") {
-      // eslint-disable-next-line security/detect-object-injection
-      chain[m] = vi.fn(() => { isInsert = true; return chain; });
-    } else if (m === "select") {
-      // eslint-disable-next-line security/detect-object-injection
-      chain[m] = vi.fn(() => chain);
-    } else if (m === "single") {
-      // eslint-disable-next-line security/detect-object-injection
-      chain[m] = vi.fn(() => chain);
-    } else {
-      // eslint-disable-next-line security/detect-object-injection
-      chain[m] = vi.fn(() => chain);
-    }
-  }
-  chain.then = (resolve: (value: unknown) => void) => {
-    resolve({ data: isInsert ? insertData : null, error: null });
-    return chain;
-  };
-  return chain;
-}
-
 function makeReq(body: Record<string, unknown>) {
   return new Request("http://localhost/api/migracion", {
     method: "POST",

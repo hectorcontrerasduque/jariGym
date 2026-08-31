@@ -1003,7 +1003,7 @@ setMembresiaLibre(!!libre.data);
                 </CardHeader>
                 <CardContent className="relative">
                   <div className="space-y-1.5">
-                    {hourEntries.map(([hour, count], i) => {
+                    {hourEntries.map(([hour, count]) => {
                       const pct = (count / maxHourCount) * 100;
                       const isTop = pct >= 80;
                       return (

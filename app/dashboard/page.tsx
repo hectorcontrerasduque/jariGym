@@ -7,8 +7,8 @@ import { Modal } from "@/components/ui/modal";
 import { createClient } from "@/lib/supabase/client";
 import { pagosService } from "@/lib/services/pagos/pagos.service";
 import { miembrosService } from "@/lib/services/miembros/miembros.service";
-import { notificacionesService } from "@/lib/services/notificaciones/notificaciones.service";
-import { configService } from "@/lib/services/config/config.service";
+
+
 import { formatCurrency, getMonthName } from "@/lib/utils";
 import type { Payment, Profile } from "@/lib/types";
 import { showToast } from "@/components/ui/toast";
@@ -117,20 +117,6 @@ export default function DashboardPage() {
     return () => { cancelled = true; };
   }, [anioSeleccionado]);
 
-  useEffect(() => {
-    if (!isSuperAdmin) return;
-    const triggerNotificaciones = async () => {
-      try {
-        const config = await configService.getConfig();
-        if (config?.notificaciones_enabled) {
-          notificacionesService.procesarTodasLasNotificaciones().catch(() => {});
-        }
-      } catch {
-        // Non-critical: silent - notifications trigger is fire-and-forget
-      }
-    };
-    triggerNotificaciones();
-  }, [isSuperAdmin]);
 
   const getNombreMiembro = (pago: Payment): string => {
     if (pago.profile?.full_name) return pago.profile.full_name;

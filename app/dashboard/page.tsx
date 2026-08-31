@@ -20,8 +20,6 @@ import {
   AlertTriangle,
   UserCheck,
   Gift,
-  FileText,
-  Calendar,
   ChevronDown,
   ChevronRight,
 } from "lucide-react";
@@ -488,32 +486,30 @@ export default function DashboardPage() {
           ) : (
             <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
               {pagosRecientes.map((pago: Payment) => {
-                const isInscripcion = pago.detail?.some(d => d.payment_type === "inscripcion");
+                const detailInfo = pago.detail?.map(d => {
+                  const mes = d.month_number ? getMonthName(d.month_number).slice(0, 3) : "";
+                  const anio = d.year_number || "";
+                  const tipo = d.payment_type === "inscripcion" ? "Insc." : "Mens.";
+                  return d.month_number ? `${mes} ${anio} (${tipo})` : tipo;
+                }).join(" | ") || "—";
+                const statusLabel = pago.status === "aprobado" ? "Aprobado" : pago.status === "rechazado" ? "Rechazado" : pago.status === "suspendido" ? "Suspendido" : "Pendiente";
                 return (
                   <div key={pago.id} className="flex items-center justify-between p-3 bg-gym-bg rounded-xl hover:bg-gym-surface transition-colors">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-9 h-9 bg-gym-surface rounded-full flex items-center justify-center flex-shrink-0">
-                        {isInscripcion ? (
-                          <FileText className="w-4 h-4 text-gym-primary" />
-                        ) : (
-                          <Calendar className="w-4 h-4 text-gym-secondary" />
-                        )}
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium text-gym-text text-sm truncate">{getNombreMiembro(pago)}</p>
+                        <Badge
+                          variant={pago.status === "aprobado" ? "success" : pago.status === "rechazado" ? "danger" : pago.status === "suspendido" ? "secondary" : "warning"}
+                          className="text-[10px] px-1.5 py-0 flex-shrink-0"
+                        >
+                          {statusLabel}
+                        </Badge>
                       </div>
-                      <div className="min-w-0">
-                        <p className="font-medium text-gym-text text-sm truncate">
-                          {getNombreMiembro(pago)}
-                        </p>
-                        <p className="text-xs text-gym-muted">
-                          {isInscripcion ? "Inscripción" : pago.detail?.[0]?.month_number ? `${getMonthName(pago.detail[0].month_number)} ${pago.detail[0].year_number}` : "—"}
-                        </p>
-                      </div>
+                      <p className="text-xs text-gym-muted truncate">{detailInfo}</p>
                     </div>
-                    <div className="flex items-center gap-3 flex-shrink-0">
-                      <p className="font-semibold text-gym-text text-sm">{formatCurrency(pago.detail?.reduce((s, d) => s + d.payment_amount, 0) || 0)}</p>
-                      <Badge variant="success">
-                        <CheckCircle className="w-3 h-3 mr-1" /> ✓
-                      </Badge>
-                    </div>
+                    <p className="font-semibold text-gym-text text-sm flex-shrink-0 ml-3">
+                      {formatCurrency(pago.detail?.reduce((s, d) => s + d.payment_amount, 0) || 0)}
+                    </p>
                   </div>
                 );
               })}

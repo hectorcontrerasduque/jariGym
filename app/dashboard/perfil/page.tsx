@@ -153,14 +153,13 @@ function PerfilContent() {
         body: JSON.stringify({
           user_id: targetUserId || undefined,
           updates: {
-            full_name: formData.full_name || profile!.full_name || "Sin nombre",
+            full_name: (formData.full_name || profile!.full_name || "Sin nombre").trim().toUpperCase(),
             email: formData.email,
             phone_number: phone_numberToSend,
             document_id: document_idToSend,
             arrival_time: formData.arrival_time || null,
             departure_time: formData.departure_time || null,
             role: currentUserRole === "super_admin" ? formData.role : undefined,
-            inscription_admin_note: currentUserRole === "super_admin" ? formData.inscription_admin_note || null : undefined,
           },
           password: formData.password || undefined,
           currentPassword: formData.currentPassword || undefined,
@@ -194,7 +193,7 @@ function PerfilContent() {
   const isAdmin = profile.role === "super_admin";
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6 animate-fadeIn relative">
+    <div className="space-y-6 animate-fadeIn relative">
       <LoadingOverlay show={saving} message={messages.common.guardando} />
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 relative z-10">
         <div>
@@ -310,35 +309,22 @@ function PerfilContent() {
               placeholder="V-12345678"
             />
           </div>
-          {isAdmin && (
+          <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-xs text-gym-muted mb-1 block">Nota de inscripción (admin)</label>
-              <textarea
-                value={formData.inscription_admin_note}
-                onChange={(e) => setFormData({ ...formData, inscription_admin_note: e.target.value })}
-                placeholder="Notas internas sobre inscripción..."
-                rows={2}
-                className="w-full px-3 py-2 bg-gym-surface border border-gym-border rounded-xl text-sm text-gym-text focus:outline-none focus:ring-2 focus:ring-gym-primary/50 resize-none"
+              <label className="text-xs text-gym-muted mb-1 block">Fecha de inicio</label>
+              <Input
+                value={profile.start_date ? new Date(profile.start_date).toLocaleDateString("es-ES") : "—"}
+                disabled
+                className="bg-gym-surface/50"
               />
             </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Audit info */}
-      <Card className="neon-card">
-        <CardHeader>
-          <CardTitle className="text-sm text-gym-muted">Información de auditoría</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 gap-4 text-sm">
             <div>
-              <p className="text-gym-muted">Creado</p>
-              <p className="text-gym-text">{profile.created_at ? formatDateTime(profile.created_at) : "—"}</p>
-            </div>
-            <div>
-              <p className="text-gym-muted">Actualizado</p>
-              <p className="text-gym-text">{profile.updated_at ? formatDateTime(profile.updated_at) : "—"}</p>
+              <label className="text-xs text-gym-muted mb-1 block">Estado</label>
+              <Input
+                value={profile.activo === false ? "Inactivo" : "Activo"}
+                disabled
+                className="bg-gym-surface/50"
+              />
             </div>
           </div>
         </CardContent>
@@ -365,19 +351,4 @@ function PerfilContent() {
       </button>
     </div>
   );
-}
-
-function formatDateTime(dateStr: string): string {
-  try {
-    const d = new Date(dateStr);
-    return d.toLocaleDateString("es-ES", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  } catch {
-    return dateStr;
-  }
 }

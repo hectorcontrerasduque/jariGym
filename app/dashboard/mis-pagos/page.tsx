@@ -943,25 +943,26 @@ setMembresiaLibre(!!libre.data);
               {pagosOrdenados.map(pago => (
                 <div key={pago.id} className="p-2.5 bg-gym-bg rounded-xl hover:bg-gym-surface transition-colors">
                   <div className="flex items-center gap-2">
-                    {getPagoIcon(pago)}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium text-gym-text truncate">{getPagoLabel(pago)}</span>
+                        <span className="text-sm font-bold text-white truncate">
+                          {getPagoLabel(pago)}
+                        </span>
                         <Badge
                           variant={pago.status === "aprobado" ? "success" : pago.status === "rechazado" ? "danger" : pago.status === "suspendido" ? "secondary" : "warning"}
                           className="text-[10px] px-1.5 py-0 flex-shrink-0"
                         >
                           {pago.status === "aprobado" ? "Aprobado" : pago.status === "rechazado" ? "Rechazado" : pago.status === "suspendido" ? "Suspendido" : "Pendiente"}
                         </Badge>
-                        <span className="text-xs text-gym-primary">{getTipoLabel(pago)}</span>
                       </div>
-                      <div className="flex items-center gap-2 text-[11px] text-gym-muted">
-                        <span>{(pago.detail?.reduce((s, d) => s + d.payment_amount, 0) || 0) > 0 ? formatCurrency(pago.detail?.reduce((s, d) => s + d.payment_amount, 0) || 0) : "Gratis"}</span>
-                        {showPagosRealizados && (
-                          <span className="text-[10px] text-gym-primary/80 ms-2">
-                            {getPagoMesesInfo(pago)}
-                          </span>
-                        )}
+                      <div className="flex items-center gap-2 text-[11px] text-gym-muted mt-0.5">
+                        <span className="font-medium">
+                          {(pago.detail?.reduce((s, d) => s + d.payment_amount, 0) || 0) > 0
+                            ? formatCurrency(pago.detail?.reduce((s, d) => s + d.payment_amount, 0) || 0)
+                            : "0.00"}
+                        </span>
+                        <span>·</span>
+                        <span className="text-gym-primary/80">{getPagoMesesInfo(pago)}</span>
                         {pago.bill_code && (
                           <>
                             <span>·</span>
@@ -969,14 +970,6 @@ setMembresiaLibre(!!libre.data);
                           </>
                         )}
                       </div>
-                      {pago.status === "aprobado" && pago.approved_by_profile && (
-                        <p className="text-[10px] text-gym-success/80 mt-0.5">
-                          Aprobado por {pago.approved_by_profile.full_name}{pago.approved_at ? ` · ${new Date(pago.approved_at).toLocaleDateString("es-ES")}` : ""}
-                        </p>
-                      )}
-                      {pago.payment_note && (
-                        <p className="text-[10px] text-gym-muted/70 truncate mt-0.5">{pago.payment_note}</p>
-                      )}
                     </div>
                     <button
                       onClick={() => { setSelectedPago(pago as Payment); setModalOpen(true); }}
@@ -1095,7 +1088,7 @@ setMembresiaLibre(!!libre.data);
                   : "Pendiente"}
               </Badge>
             </div>
-            {selectedPago.bill_code && selectedPago.payment_method === "efectivo" && (
+            {selectedPago.bill_code && (
               <div>
                 <p className="text-sm text-gym-muted">Código del billete</p>
                 <p className="text-gym-text font-mono">{selectedPago.bill_code}</p>

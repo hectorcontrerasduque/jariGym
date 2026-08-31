@@ -39,6 +39,9 @@ export default function MiembrosPage() {
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [historialMembresias, setHistorialMembresias] = useState<Membership[]>([]);
   const [isActivar, setIsActivar] = useState(false);
+  const [togglingMembresia, setTogglingMembresia] = useState(false);
+  const [togglingSuperAdmin, setTogglingSuperAdmin] = useState(false);
+  const [togglingActivar, setTogglingActivar] = useState(false);
 
   // Sub-modal: nota membresía
   const [modalNotaMembresia, setModalNotaMembresia] = useState(false);
@@ -241,6 +244,7 @@ export default function MiembrosPage() {
 
   const handleToggleMembresia = async (miembro: Profile) => {
     if (!currentUser) return;
+    setTogglingMembresia(true);
     try {
       if (isMembresiaLibre) {
         await miembrosService.desactivarMembresia(miembro.id);
@@ -250,10 +254,13 @@ export default function MiembrosPage() {
         setIsMembresiaLibre(true);
       }
       await loadHistorialMembresias(miembro.id);
+      setNotaMembresia("");
       setModalNotaMembresia(true);
       await loadMiembros();
     } catch {
       showToast(messages.toast.membresiaLibreError, "error");
+    } finally {
+      setTogglingMembresia(false);
     }
   };
 
@@ -286,6 +293,7 @@ export default function MiembrosPage() {
 
   const handleToggleSuperAdmin = async (miembro: Profile) => {
     if (!currentUser) return;
+    setTogglingSuperAdmin(true);
     const newRole = isSuperAdmin ? "miembro" : "super_admin";
     const fecha = new Date().toLocaleDateString("es-VE");
     const accion = newRole === "super_admin" ? "Super Admin activado" : "Super Admin desactivado";
@@ -311,11 +319,14 @@ export default function MiembrosPage() {
 
       setIsSuperAdmin(newRole === "super_admin");
       setInscripcionAdminNote(newNote);
+      setNotaAdminInput("");
       setModalNotaAdmin(true);
       showToast(newRole === "super_admin" ? "Ahora es Super Admin" : "Rol cambiado a Miembro", "success");
       await loadMiembros();
     } catch {
       showToast(messages.toast.errorCambiarRol, "error");
+    } finally {
+      setTogglingSuperAdmin(false);
     }
   };
 
@@ -323,10 +334,7 @@ export default function MiembrosPage() {
     if (!selectedMiembro) return;
     try {
       const nota = notaAdminInput.trim();
-      if (!nota) {
-        setModalNotaAdmin(false);
-        return;
-      }
+      if (!nota) return;
       const linea = `* ${nota}`;
       const newNote = inscripcionAdminNote ? `${inscripcionAdminNote}\n${linea}` : linea;
 
@@ -343,7 +351,6 @@ export default function MiembrosPage() {
 
       setInscripcionAdminNote(newNote);
       setNotaAdminInput("");
-      setModalNotaAdmin(false);
       showToast(messages.toast.notasGuardadas, "success");
       await loadMiembros();
     } catch {
@@ -353,6 +360,7 @@ export default function MiembrosPage() {
 
   const handleToggleActivar = async (miembro: Profile) => {
     const activar = miembro.activo === false;
+    setTogglingActivar(true);
     try {
       const res = await fetch("/api/miembros/toggle-status", {
         method: "POST",
@@ -369,6 +377,8 @@ export default function MiembrosPage() {
       await loadMiembros();
     } catch {
       showToast(messages.toast.miembroEstadoError, "error");
+    } finally {
+      setTogglingActivar(false);
     }
   };
 
@@ -586,45 +596,30 @@ export default function MiembrosPage() {
               )}
             </div>
 
-            {/* Membresía toggle + historial */}
+            {/* Membresía toggle */}
             <div className="p-4 bg-gym-bg rounded-xl">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gym-muted">Membresía</p>
                   <p className="text-xs text-gym-muted">{isMembresiaLibre ? "Activa (sin cargo mensual)" : "Sin membresía activa"}</p>
                 </div>
-                <button
-                  onClick={() => handleToggleMembresia(selectedMiembro)}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                    isMembresiaLibre ? "bg-gym-secondary" : "bg-gym-border"
-                  }`}
-                >
-                  <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                      isMembresiaLibre ? "translate-x-6" : "translate-x-1"
+                {togglingMembresia ? (
+                  <div className="animate-spin w-6 h-6 border-2 border-gym-secondary border-t-transparent rounded-full" />
+                ) : (
+                  <button
+                    onClick={() => handleToggleMembresia(selectedMiembro)}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      isMembresiaLibre ? "bg-gym-secondary" : "bg-gym-border"
                     }`}
-                  />
-                </button>
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        isMembresiaLibre ? "translate-x-6" : "translate-x-1"
+                      }`}
+                    />
+                  </button>
+                )}
               </div>
-              {historialMembresias.length > 0 && (
-                <div className="mt-3 max-h-48 overflow-y-auto space-y-2">
-                  {historialMembresias.map((m) => (
-                    <div key={m.id} className="p-2 bg-gym-surface rounded-lg text-xs">
-                      <div className="flex items-center justify-between gap-2">
-                        <Badge variant={m.status === "activa" ? "success" : m.status === "vencida" ? "warning" : "danger"}>
-                          {m.status === "activa" ? "Activa" : m.status === "vencida" ? "Vencida" : "Cancelada"}
-                        </Badge>
-                        <span className="text-gym-muted">
-                          {formatDate(m.start_date)} — {m.end_date ? formatDate(m.end_date) : "Actual"}
-                        </span>
-                      </div>
-                      {m.membership_note && (
-                        <p className="text-gym-muted mt-1 italic">{m.membership_note}</p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
 
             {/* Super Admin toggle */}
@@ -634,40 +629,48 @@ export default function MiembrosPage() {
                   <p className="text-sm font-medium text-gym-muted">Super Admin</p>
                   <p className="text-xs text-gym-muted">Acceso total al sistema</p>
                 </div>
-                <button
-                  onClick={() => handleToggleSuperAdmin(selectedMiembro)}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                    isSuperAdmin ? "bg-gym-primary" : "bg-gym-border"
-                  }`}
-                >
-                  <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                      isSuperAdmin ? "translate-x-6" : "translate-x-1"
+                {togglingSuperAdmin ? (
+                  <div className="animate-spin w-6 h-6 border-2 border-gym-primary border-t-transparent rounded-full" />
+                ) : (
+                  <button
+                    onClick={() => handleToggleSuperAdmin(selectedMiembro)}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      isSuperAdmin ? "bg-gym-primary" : "bg-gym-border"
                     }`}
-                  />
-                </button>
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        isSuperAdmin ? "translate-x-6" : "translate-x-1"
+                      }`}
+                    />
+                  </button>
+                )}
               </div>
             </div>
 
-            {/* Activar toggle */}
+            {/* Activo toggle */}
             <div className="p-4 bg-gym-bg rounded-xl">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gym-muted">Activar</p>
+                  <p className="text-sm font-medium text-gym-muted">Activo</p>
                   <p className="text-xs text-gym-muted">{isActivar ? "Miembro activo en el sistema" : "Miembro inactivo"}</p>
                 </div>
-                <button
-                  onClick={() => handleToggleActivar(selectedMiembro)}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                    isActivar ? "bg-gym-success" : "bg-gym-border"
-                  }`}
-                >
-                  <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                      isActivar ? "translate-x-6" : "translate-x-1"
+                {togglingActivar ? (
+                  <div className="animate-spin w-6 h-6 border-2 border-gym-success border-t-transparent rounded-full" />
+                ) : (
+                  <button
+                    onClick={() => handleToggleActivar(selectedMiembro)}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                      isActivar ? "bg-gym-success" : "bg-gym-border"
                     }`}
-                  />
-                </button>
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        isActivar ? "translate-x-6" : "translate-x-1"
+                      }`}
+                    />
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -677,17 +680,69 @@ export default function MiembrosPage() {
       {/* Sub-modal: Nota Membresía */}
       <Modal isOpen={modalNotaMembresia} onClose={() => { setModalNotaMembresia(false); setNotaMembresia(""); }} title="Nota de Membresía">
         <div className="space-y-4">
-          <p className="text-sm text-gym-muted">Opcionalmente agrega una nota al registro de membresía.</p>
-          <textarea
-            value={notaMembresia}
-            onChange={(e) => setNotaMembresia(e.target.value)}
-            placeholder="Nota sobre esta membresía..."
-            rows={3}
-            className="w-full px-3 py-2 bg-gym-surface border border-gym-border rounded-xl text-sm text-gym-text focus:outline-none focus:ring-2 focus:ring-gym-primary/50 resize-none"
-          />
+          {/* Info del último registro */}
+          {historialMembresias.length > 0 && (() => {
+            const latest = historialMembresias[0];
+            return (
+              <div className="p-3 bg-gym-surface rounded-xl text-sm">
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <p className="text-gym-muted text-xs">Fecha inicio</p>
+                    <p className="text-gym-text">{formatDate(latest.start_date)}</p>
+                  </div>
+                  <div>
+                    <p className="text-gym-muted text-xs">Fecha fin</p>
+                    <p className="text-gym-text">{latest.end_date ? formatDate(latest.end_date) : "Perpetua"}</p>
+                  </div>
+                  <div className="col-span-2">
+                    <p className="text-gym-muted text-xs">Estado</p>
+                    <Badge variant={latest.status === "activa" ? "success" : latest.status === "vencida" ? "warning" : "danger"}>
+                      {latest.status === "activa" ? "Activa" : latest.status === "vencida" ? "Vencida" : "Cancelada"}
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
+          <div>
+            <label className="text-xs text-gym-muted mb-1 block">Nota (opcional)</label>
+            <textarea
+              value={notaMembresia}
+              onChange={(e) => setNotaMembresia(e.target.value)}
+              placeholder="Nota sobre esta membresía..."
+              rows={3}
+              className="w-full px-3 py-2 bg-gym-surface border border-gym-border rounded-xl text-sm text-gym-text focus:outline-none focus:ring-2 focus:ring-gym-primary/50 resize-none"
+            />
+          </div>
+
+          {/* Historial de contratos */}
+          {historialMembresias.length > 0 && (
+            <div>
+              <label className="text-xs text-gym-muted mb-1 block">Historial de contratos</label>
+              <div className="max-h-48 overflow-y-auto space-y-2">
+                {historialMembresias.map((m) => (
+                  <div key={m.id} className="p-2 bg-gym-surface rounded-lg text-xs">
+                    <div className="flex items-center justify-between gap-2">
+                      <Badge variant={m.status === "activa" ? "success" : m.status === "vencida" ? "warning" : "danger"}>
+                        {m.status === "activa" ? "Activa" : m.status === "vencida" ? "Vencida" : "Cancelada"}
+                      </Badge>
+                      <span className="text-gym-muted">
+                        {formatDate(m.start_date)} — {m.end_date ? formatDate(m.end_date) : "Actual"}
+                      </span>
+                    </div>
+                    {m.membership_note && (
+                      <p className="text-gym-muted mt-1 italic">{m.membership_note}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="flex gap-2">
             <Button variant="ghost" className="flex-1" onClick={() => { setModalNotaMembresia(false); setNotaMembresia(""); }}>
-              Omitir
+              Cerrar
             </Button>
             <Button className="flex-1" onClick={handleSaveNotaMembresia}>
               Guardar

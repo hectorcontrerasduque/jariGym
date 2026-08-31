@@ -712,7 +712,15 @@ export class PagosService {
     ]);
 
     const miembros = (miembrosResult.data || []).filter((m) => m.activo !== false);
-    const miembrosLibresIds = new Set((libresResult.data || []).map((l) => l.user_id));
+    const now = new Date();
+    const miembrosLibresIds = new Set(
+      (libresResult.data || [])
+        .filter((l) => {
+          if (!l.start_date) return true;
+          return new Date(l.start_date) <= now;
+        })
+        .map((l) => l.user_id)
+    );
     const fechaInicioMap = new Map<string, string>();
     for (const l of libresResult.data || []) {
       if (l.start_date) fechaInicioMap.set(l.user_id, l.start_date);
@@ -808,19 +816,24 @@ export class PagosService {
 
       const fechaInicioMembresia = fechaInicioMap.get(miembro.id);
       const fechaInscripcion = miembro.start_date;
-      const fechaInicioStr = fechaInicioMembresia || fechaInscripcion;
+
+      let fechaInicioStr = fechaInicioMembresia || fechaInscripcion;
+      if (fechaInicioMembresia) {
+        const membershipStart = new Date(fechaInicioMembresia);
+        if (membershipStart > hoy) {
+          fechaInicioStr = fechaInscripcion;
+          if (!fechaInicioStr) continue;
+        }
+      }
+
       let primerMesDeuda = 1;
       if (fechaInicioStr) {
         const parts = fechaInicioStr.split("-").map(Number);
         const anioInicio = parts[0];
         const mesInicio = parts[1];
 
-        let mesDeuda = mesInicio + 1;
-        let anioDeuda = anioInicio;
-        if (mesDeuda > 12) {
-          mesDeuda = 1;
-          anioDeuda = anioInicio + 1;
-        }
+        const anioDeuda = anioInicio;
+        const mesDeuda = mesInicio;
 
         if (anioDeuda > anioConsulta) continue;
         if (anioDeuda === anioConsulta) {

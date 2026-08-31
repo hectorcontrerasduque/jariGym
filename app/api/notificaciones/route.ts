@@ -297,14 +297,6 @@ async function procesarRecordatorioPago(
 
   let candidatos = miembros.filter((m) => m.email !== duenoEmail);
 
-  candidatos = candidatos.filter((m) => {
-    if (!m.start_date) return true;
-    const fechaInsc = new Date(m.start_date);
-    const diasDesdeInscripcion =
-      (hoy.getTime() - fechaInsc.getTime()) / (1000 * 60 * 60 * 24);
-    return diasDesdeInscripcion >= 30;
-  });
-
   if (candidatos.length === 0) return 0;
 
   const idsCandidatos = candidatos.map((m) => m.id);

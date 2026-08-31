@@ -9,7 +9,7 @@ import { pagosService } from "@/lib/services/pagos/pagos.service";
 import { configService } from "@/lib/services/config/config.service";
 import { createClient } from "@/lib/supabase/client";
 import { formatCurrency, getMonthName } from "@/lib/utils";
-import { CreditCard, CheckCircle, Clock, Calendar, Trash2, FileText, Plus, Search, Upload, Gift, AlertTriangle, ChevronDown, ChevronRight, X, Save } from "lucide-react";
+import { CreditCard, CheckCircle, Clock, Calendar, Eye, Trash2, FileText, Plus, Search, Upload, Gift, AlertTriangle, ChevronDown, ChevronRight, X, Save } from "lucide-react";
 import { showToast } from "@/components/ui/toast";
 import { messages } from "@/lib/messages";
 import { Avatar } from "@/components/ui/avatar";
@@ -33,6 +33,18 @@ function getPagoIcon(pago: Payment) {
   const det = pago.detail?.[0];
   if (det?.payment_type === "inscripcion") return <FileText className="w-5 h-5 text-gym-primary" />;
   return <Calendar className="w-5 h-5 text-gym-secondary" />;
+}
+
+function getPagoMeses(pago: Payment): string {
+  const meses = pago.detail
+    ?.filter((d) => d.month_number && d.year_number)
+    .sort(
+      (a, b) =>
+        (a.year_number! - b.year_number!) * 12 + (a.month_number! - b.month_number!)
+    )
+    .map((d) => `${getMonthName(d.month_number!).slice(0, 3)} ${d.year_number}`)
+    .join(", ");
+  return meses || "—";
 }
 
 export default function MisPagosPage() {
@@ -106,7 +118,8 @@ export default function MisPagosPage() {
         const { data: pg, error: pgError } = await supabase
           .from("payments")
           .select("*, detail:payment_detail(*)")
-          .eq("user_id", targetId);
+          .eq("user_id", targetId)
+          .order("created_at", { ascending: false });
         if (pgError) throw pgError;
         pagosData = pg || [];
       } else {
@@ -900,6 +913,8 @@ setMembresiaLibre(!!libre.data);
                 <div key={pago.id} className="p-2.5 bg-gym-bg rounded-xl hover:bg-gym-surface transition-colors">
                   <div className="flex items-center gap-2">
                     {getPagoIcon(pago)}
+                    <Eye className="w-4 h-4 text-gym-primary"
+                    />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-medium text-gym-text truncate">{getPagoLabel(pago)}</span>
@@ -912,6 +927,11 @@ setMembresiaLibre(!!libre.data);
                       </div>
                       <div className="flex items-center gap-2 text-[11px] text-gym-muted">
                         <span>{(pago.detail?.reduce((s, d) => s + d.payment_amount, 0) || 0) > 0 ? formatCurrency(pago.detail?.reduce((s, d) => s + d.payment_amount, 0) || 0) : "Gratis"}</span>
+                        {showPagosRealizados && (
+                          <span className="text-[10px] text-gym-primary/80 ms-2">
+                            {getPagoMeses(pago)}
+                          </span>
+                        )}
                         {pago.bill_code && (
                           <>
                             <span>·</span>

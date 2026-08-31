@@ -11,7 +11,7 @@ import { Avatar } from "@/components/ui/avatar";
 import { miembrosService } from "@/lib/services/miembros/miembros.service";
 import { formatDate, formatCurrency } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
-import { Users, Search, Plus, Settings, Save, Pencil } from "lucide-react";
+import { Users, Search, Plus, Settings, Save, Pencil, ChevronDown, ChevronUp } from "lucide-react";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { showToast } from "@/components/ui/toast";
 import { messages } from "@/lib/messages";
@@ -42,10 +42,15 @@ export default function MiembrosPage() {
   const [togglingMembresia, setTogglingMembresia] = useState(false);
   const [togglingSuperAdmin, setTogglingSuperAdmin] = useState(false);
   const [togglingActivar, setTogglingActivar] = useState(false);
+  const [savingMembresia, setSavingMembresia] = useState(false);
+  const [savingNotaAdmin, setSavingNotaAdmin] = useState(false);
+  const [historialExpanded, setHistorialExpanded] = useState(false);
 
-  // Sub-modal: nota membresía
-  const [modalNotaMembresia, setModalNotaMembresia] = useState(false);
+  // Sub-modal: membresía
+  const [modalMembresia, setModalMembresia] = useState(false);
   const [notaMembresia, setNotaMembresia] = useState("");
+  const [membresiaStartDate, setMembresiaStartDate] = useState("");
+  const [membresiaEndDate, setMembresiaEndDate] = useState("");
 
   // Sub-modal: nota admin
   const [modalNotaAdmin, setModalNotaAdmin] = useState(false);
@@ -254,8 +259,19 @@ export default function MiembrosPage() {
         setIsMembresiaLibre(true);
       }
       await loadHistorialMembresias(miembro.id);
-      setNotaMembresia("");
-      setModalNotaMembresia(true);
+      // Set form values from latest membership
+      const latest = historialMembresias[0];
+      if (latest) {
+        setMembresiaStartDate(latest.start_date);
+        setMembresiaEndDate(latest.end_date || "");
+        setNotaMembresia(latest.membership_note || "");
+      } else {
+        setMembresiaStartDate(new Date().toISOString().split("T")[0]);
+        setMembresiaEndDate("");
+        setNotaMembresia("");
+      }
+      setHistorialExpanded(false);
+      setModalMembresia(true);
       await loadMiembros();
     } catch {
       showToast(messages.toast.membresiaLibreError, "error");
@@ -264,8 +280,9 @@ export default function MiembrosPage() {
     }
   };
 
-  const handleSaveNotaMembresia = async () => {
+  const handleSaveMembresia = async () => {
     if (!selectedMiembro) return;
+    setSavingMembresia(true);
     try {
       const supabase = createClient();
       const { data: latest } = await supabase
@@ -277,17 +294,25 @@ export default function MiembrosPage() {
         .maybeSingle();
 
       if (latest) {
+        const updates: Record<string, unknown> = {
+          membership_note: notaMembresia || null,
+        };
+        if (isMembresiaLibre) {
+          updates.start_date = membresiaStartDate || undefined;
+          updates.end_date = membresiaEndDate || null;
+        }
         await supabase
           .from("memberships")
-          .update({ membership_note: notaMembresia || null })
+          .update(updates)
           .eq("id", latest.id);
       }
-      setModalNotaMembresia(false);
-      setNotaMembresia("");
+      setModalMembresia(false);
       await loadHistorialMembresias(selectedMiembro.id);
       showToast(messages.toast.notasGuardadas, "success");
     } catch {
       showToast(messages.toast.notasError, "error");
+    } finally {
+      setSavingMembresia(false);
     }
   };
 
@@ -332,9 +357,13 @@ export default function MiembrosPage() {
 
   const handleSaveNotaAdmin = async () => {
     if (!selectedMiembro) return;
+    setSavingNotaAdmin(true);
     try {
       const nota = notaAdminInput.trim();
-      if (!nota) return;
+      if (!nota) {
+        setSavingNotaAdmin(false);
+        return;
+      }
       const linea = `* ${nota}`;
       const newNote = inscripcionAdminNote ? `${inscripcionAdminNote}\n${linea}` : linea;
 
@@ -355,6 +384,8 @@ export default function MiembrosPage() {
       await loadMiembros();
     } catch {
       showToast(messages.toast.notasError, "error");
+    } finally {
+      setSavingNotaAdmin(false);
     }
   };
 
@@ -398,6 +429,11 @@ export default function MiembrosPage() {
   return (
     <div className="space-y-6 animate-fadeIn relative">
       <LoadingOverlay show={saving} message="Creando miembro..." />
+      <LoadingOverlay show={togglingMembresia} message="Actualizando membresía..." />
+      <LoadingOverlay show={togglingSuperAdmin} message="Cambiando rol..." />
+      <LoadingOverlay show={togglingActivar} message="Actualizando estado..." />
+      <LoadingOverlay show={savingMembresia} message="Guardando membresía..." />
+      <LoadingOverlay show={savingNotaAdmin} message="Guardando nota..." />
       <div className="absolute top-0 right-0 w-72 h-72 bg-gym-secondary/5 rounded-full blur-3xl animate-pulse" />
 
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 relative z-10">
@@ -677,83 +713,112 @@ export default function MiembrosPage() {
         )}
       </Modal>
 
-      {/* Sub-modal: Nota Membresía */}
-      <Modal isOpen={modalNotaMembresia} onClose={() => { setModalNotaMembresia(false); setNotaMembresia(""); }} title="Nota de Membresía">
+      {/* Sub-modal: Membresía */}
+      <Modal isOpen={modalMembresia} onClose={() => setModalMembresia(false)} title=" ">
         <div className="space-y-4">
-          {/* Info del último registro */}
-          {historialMembresias.length > 0 && (() => {
-            const latest = historialMembresias[0];
-            return (
-              <div className="p-3 bg-gym-surface rounded-xl text-sm">
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <p className="text-gym-muted text-xs">Fecha inicio</p>
-                    <p className="text-gym-text">{formatDate(latest.start_date)}</p>
-                  </div>
-                  <div>
-                    <p className="text-gym-muted text-xs">Fecha fin</p>
-                    <p className="text-gym-text">{latest.end_date ? formatDate(latest.end_date) : "Perpetua"}</p>
-                  </div>
-                  <div className="col-span-2">
-                    <p className="text-gym-muted text-xs">Estado</p>
-                    <Badge variant={latest.status === "activa" ? "success" : latest.status === "vencida" ? "warning" : "danger"}>
-                      {latest.status === "activa" ? "Activa" : latest.status === "vencida" ? "Vencida" : "Cancelada"}
-                    </Badge>
-                  </div>
-                </div>
-              </div>
-            );
-          })()}
+          <h2 className="text-lg font-display font-bold text-gym-text neon-text">Membresía</h2>
 
-          <div>
-            <label className="text-xs text-gym-muted mb-1 block">Nota (opcional)</label>
-            <textarea
-              value={notaMembresia}
-              onChange={(e) => setNotaMembresia(e.target.value)}
-              placeholder="Nota sobre esta membresía..."
-              rows={3}
-              className="w-full px-3 py-2 bg-gym-surface border border-gym-border rounded-xl text-sm text-gym-text focus:outline-none focus:ring-2 focus:ring-gym-primary/50 resize-none"
-            />
-          </div>
-
-          {/* Historial de contratos */}
+          {/* Historial colapsable */}
           {historialMembresias.length > 0 && (
-            <div>
-              <label className="text-xs text-gym-muted mb-1 block">Historial de contratos</label>
-              <div className="max-h-48 overflow-y-auto space-y-2">
-                {historialMembresias.map((m) => (
-                  <div key={m.id} className="p-2 bg-gym-surface rounded-lg text-xs">
-                    <div className="flex items-center justify-between gap-2">
-                      <Badge variant={m.status === "activa" ? "success" : m.status === "vencida" ? "warning" : "danger"}>
-                        {m.status === "activa" ? "Activa" : m.status === "vencida" ? "Vencida" : "Cancelada"}
-                      </Badge>
-                      <span className="text-gym-muted">
-                        {formatDate(m.start_date)} — {m.end_date ? formatDate(m.end_date) : "Actual"}
-                      </span>
+            <div className="border border-gym-border rounded-xl overflow-hidden">
+              <button
+                onClick={() => setHistorialExpanded(!historialExpanded)}
+                className="w-full flex items-center justify-between p-3 bg-gym-bg hover:bg-gym-surface transition-colors text-sm text-gym-muted"
+              >
+                <span>{historialExpanded ? "Click para ver menos" : "Click para ver más"}</span>
+                {historialExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              </button>
+              {historialExpanded && (
+                <div className="max-h-48 overflow-y-auto space-y-2 p-3">
+                  {historialMembresias.map((m) => (
+                    <div key={m.id} className="p-2 bg-gym-surface rounded-lg text-xs">
+                      <div className="flex items-center justify-between gap-2">
+                        <Badge variant={m.status === "activa" ? "success" : m.status === "vencida" ? "warning" : "danger"}>
+                          {m.status === "activa" ? "Activa" : m.status === "vencida" ? "Vencida" : "Cancelada"}
+                        </Badge>
+                        <span className="text-gym-muted">
+                          {formatDate(m.start_date)} — {m.end_date ? formatDate(m.end_date) : "Actual"}
+                        </span>
+                      </div>
+                      {m.membership_note && (
+                        <p className="text-gym-muted mt-1 italic">{m.membership_note}</p>
+                      )}
                     </div>
-                    {m.membership_note && (
-                      <p className="text-gym-muted mt-1 italic">{m.membership_note}</p>
-                    )}
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
+          {/* Formulario del último registro */}
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs text-gym-muted mb-1 block">Fecha inicio</label>
+                {isMembresiaLibre ? (
+                  <Input
+                    type="date"
+                    value={membresiaStartDate}
+                    onChange={(e) => setMembresiaStartDate(e.target.value)}
+                  />
+                ) : (
+                  <p className="text-sm text-gym-text bg-gym-surface px-3 py-2 rounded-xl border border-gym-border">
+                    {membresiaStartDate ? formatDate(membresiaStartDate) : "—"}
+                  </p>
+                )}
+              </div>
+              <div>
+                <label className="text-xs text-gym-muted mb-1 block">Fecha fin</label>
+                {isMembresiaLibre ? (
+                  <Input
+                    type="date"
+                    value={membresiaEndDate}
+                    onChange={(e) => setMembresiaEndDate(e.target.value)}
+                    placeholder="Perpetua"
+                  />
+                ) : (
+                  <p className="text-sm text-gym-text bg-gym-surface px-3 py-2 rounded-xl border border-gym-border">
+                    {membresiaEndDate ? formatDate(membresiaEndDate) : "Perpetua"}
+                  </p>
+                )}
+                {!isMembresiaLibre && (
+                  <p className="text-xs text-gym-muted mt-1">Sin fecha = perpetua</p>
+                )}
+              </div>
+            </div>
+            <div>
+              <label className="text-xs text-gym-muted mb-1 block">Estado</label>
+              <Badge variant={isMembresiaLibre ? "success" : "danger"}>
+                {isMembresiaLibre ? "Activa" : "Inactiva"}
+              </Badge>
+            </div>
+            <div>
+              <label className="text-xs text-gym-muted mb-1 block">Nota</label>
+              <textarea
+                value={notaMembresia}
+                onChange={(e) => setNotaMembresia(e.target.value)}
+                placeholder="Nota sobre esta membresía..."
+                rows={3}
+                className="w-full px-3 py-2 bg-gym-surface border border-gym-border rounded-xl text-sm text-gym-text focus:outline-none focus:ring-2 focus:ring-gym-primary/50 resize-none"
+              />
+            </div>
+          </div>
+
           <div className="flex gap-2">
-            <Button variant="ghost" className="flex-1" onClick={() => { setModalNotaMembresia(false); setNotaMembresia(""); }}>
+            <Button variant="ghost" className="flex-1" onClick={() => setModalMembresia(false)}>
               Cerrar
             </Button>
-            <Button className="flex-1" onClick={handleSaveNotaMembresia}>
-              Guardar
+            <Button className="flex-1" onClick={handleSaveMembresia} disabled={savingMembresia}>
+              {savingMembresia ? "Guardando..." : "Guardar"}
             </Button>
           </div>
         </div>
       </Modal>
 
       {/* Sub-modal: Nota Admin */}
-      <Modal isOpen={modalNotaAdmin} onClose={() => { setModalNotaAdmin(false); setNotaAdminInput(""); }} title="Nota de Admin">
+      <Modal isOpen={modalNotaAdmin} onClose={() => { setModalNotaAdmin(false); setNotaAdminInput(""); }} title=" ">
         <div className="space-y-4">
+          <h2 className="text-lg font-display font-bold text-gym-text neon-text">Nota de Admin</h2>
           {inscripcionAdminNote && (
             <div className="p-3 bg-gym-surface rounded-xl">
               <label className="text-xs text-gym-muted mb-1 block">Historial</label>
@@ -774,8 +839,8 @@ export default function MiembrosPage() {
             <Button variant="ghost" className="flex-1" onClick={() => { setModalNotaAdmin(false); setNotaAdminInput(""); }}>
               Cerrar
             </Button>
-            <Button className="flex-1" onClick={handleSaveNotaAdmin}>
-              Guardar Nota
+            <Button className="flex-1" onClick={handleSaveNotaAdmin} disabled={savingNotaAdmin}>
+              {savingNotaAdmin ? "Guardando..." : "Guardar Nota"}
             </Button>
           </div>
         </div>

@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState, useCallback, useMemo, useRef } from "react";
-import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -70,7 +69,6 @@ function getPagoMesesInfo(pago: Payment): string {
 }
 
 export default function MisPagosPage() {
-  const router = useRouter();
   const [pagos, setPagos] = useState<Payment[]>([]);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -460,16 +458,11 @@ setMembresiaLibre(!!libre.data);
       }
 
       showToast(isSelf ? "Pago registrado y aprobado" : "Pago registrado (pendiente de aprobación)", "success");
-      if (isSuperAdmin) {
-        router.push("/dashboard/pagos");
-      } else {
-        setShowForm(true);
-        setSubmitted(false);
-        setFormData({ meses: [], metodo_pago: "efectivo", codigo_billete: "", notas: "", pagar_inscripcion: false, pagar_mensualidad: false, solicitar_suspension: false, fecha_pago: new Date().toISOString().split("T")[0] });
-        setComprobante(null);
-        await fetchMisPagosData();
-        await reloadPendientes();
-      }
+      setFormData({ meses: [], metodo_pago: "efectivo", codigo_billete: "", notas: "", pagar_inscripcion: false, pagar_mensualidad: false, solicitar_suspension: false, fecha_pago: new Date().toISOString().split("T")[0] });
+      setComprobante(null);
+      setSubmitted(false);
+      await fetchMisPagosData();
+      await reloadPendientes();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Error al registrar pago";
       showToast(msg, "error");
@@ -507,6 +500,20 @@ setMembresiaLibre(!!libre.data);
       setDeleting(null);
     }
   };
+
+  const pagosOrdenados = useMemo(() => {
+    return [...pagos].sort((a, b) => {
+      const aMax = a.detail?.reduce((max, d) => {
+        const key = (d.year_number || 0) * 100 + (d.month_number || 0);
+        return key > max ? key : max;
+      }, 0) || 0;
+      const bMax = b.detail?.reduce((max, d) => {
+        const key = (d.year_number || 0) * 100 + (d.month_number || 0);
+        return key > max ? key : max;
+      }, 0) || 0;
+      return bMax - aMax;
+    });
+  }, [pagos]);
 
   const aprobados = pagos.filter(p => p.status === "aprobado");
   const pendientes = pagos.filter(p => p.status === "pendiente");
@@ -569,7 +576,7 @@ setMembresiaLibre(!!libre.data);
 
       {/* Super Admin: member selector */}
       {isSuperAdmin && (
-        <Card className="neon-card relative z-10">
+        <Card className="neon-card relative z-30">
           <CardContent className="p-3">
             <div className="flex items-center gap-3">
               {miembroSeleccionado ? (
@@ -933,7 +940,7 @@ setMembresiaLibre(!!libre.data);
             </div>
           ) : (
             <div className="max-h-40 overflow-y-auto space-y-2 pr-1">
-              {pagos.map(pago => (
+              {pagosOrdenados.map(pago => (
                 <div key={pago.id} className="p-2.5 bg-gym-bg rounded-xl hover:bg-gym-surface transition-colors">
                   <div className="flex items-center gap-2">
                     {getPagoIcon(pago)}

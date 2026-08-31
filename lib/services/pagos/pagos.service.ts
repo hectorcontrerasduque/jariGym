@@ -359,8 +359,10 @@ export class PagosService {
     } = await this.supabase.auth.getUser();
     if (!user) throw new Error(messages.toast.noAutenticado);
 
-    let count = 0;
+    const statusFinal = status || "pendiente";
 
+    // Check if there's already an existing pending payment for any of these months
+    const existingIds = new Set<string>();
     for (const { month_number: mes, year_number: anio } of meses) {
       const { data: detalleExistente } = await this.supabase
         .from("payment_detail")
@@ -368,50 +370,57 @@ export class PagosService {
         .eq("month_number", mes)
         .eq("year_number", anio)
         .eq("payments.user_id", usuarioId)
-        .eq("payments.status", "pendiente")
+        .in("payments.status", ["pendiente", "suspendido_pendiente"])
         .maybeSingle();
 
       if (detalleExistente) {
-        const { error } = await this.supabase
-          .from("payments")
-          .update({
-            status: status || "pendiente",
-            payment_method: "efectivo",
-            payment_note: motivo || "Solicitud de suspensión",
-            approved_by: null,
-            approved_at: null,
-          })
-          .eq("id", detalleExistente.payment_id);
-        if (!error) count++;
-      } else {
-        const { data: nuevoPago, error: pagoError } = await this.supabase
-          .from("payments")
-          .insert({
-            user_id: usuarioId,
-            status: status || "pendiente",
-            payment_method: "efectivo",
-            payment_note: motivo || "Solicitud de suspensión",
-            created_by: user.id,
-          })
-          .select()
-          .single();
-
-        if (!pagoError && nuevoPago) {
-          const { error: detError } = await this.supabase
-            .from("payment_detail")
-            .insert({
-              payment_id: nuevoPago.id,
-              month_number: mes,
-              year_number: anio,
-              payment_type: "mensualidad",
-              payment_amount: 0,
-            });
-          if (!detError) count++;
-        }
+        existingIds.add(detalleExistente.payment_id);
       }
     }
 
-    return count;
+    // Update existing pending payments to the new status
+    for (const pagoId of existingIds) {
+      await this.supabase
+        .from("payments")
+        .update({
+          status: statusFinal,
+          payment_method: "efectivo",
+          payment_note: motivo || "Solicitud de suspensión",
+          approved_by: null,
+          approved_at: null,
+        })
+        .eq("id", pagoId);
+    }
+
+    // Create one new payment with all month details
+    const { data: nuevoPago, error: pagoError } = await this.supabase
+      .from("payments")
+      .insert({
+        user_id: usuarioId,
+        status: statusFinal,
+        payment_method: "efectivo",
+        payment_note: motivo || "Solicitud de suspensión",
+        created_by: user.id,
+      })
+      .select()
+      .single();
+
+    if (pagoError || !nuevoPago) return 0;
+
+    // Insert all month details for this single payment
+    const detalles = meses.map(({ month_number, year_number }) => ({
+      payment_id: nuevoPago.id,
+      month_number,
+      year_number,
+      payment_type: "mensualidad" as const,
+      payment_amount: 0,
+    }));
+
+    const { error: detError } = await this.supabase
+      .from("payment_detail")
+      .insert(detalles);
+
+    return detError ? 0 : meses.length;
   }
 
   async listarPagos(estado?: string, anio?: number, mes?: number, supabaseClient?: ReturnType<typeof createClient>): Promise<Pago[]> {

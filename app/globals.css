@@ -33,4 +33,18 @@
 
 select {
   color-scheme: dark;
+  -webkit-appearance: none;
+  appearance: none;
+  background-color: var(--color-gym-surface);
+  border-color: var(--color-gym-border);
+  color: var(--color-gym-text);
+}
+
+select::-ms-expand {
+  display: none;
+}
+
+option {
+  background-color: var(--color-gym-surface);
+  color: var(--color-gym-text);
 }

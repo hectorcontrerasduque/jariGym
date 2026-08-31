@@ -936,6 +936,7 @@ setMembresiaLibre(!!libre.data);
                         >
                           {pago.status === "aprobado" ? "Aprobado" : pago.status === "rechazado" ? "Rechazado" : pago.status === "suspendido" ? "Suspendido" : "Pendiente"}
                         </Badge>
+                        <span className="text-xs text-gym-primary">{getTipoLabel(pago)}</span>
                       </div>
                       <div className="flex items-center gap-2 text-[11px] text-gym-muted">
                         <span>{(pago.detail?.reduce((s, d) => s + d.payment_amount, 0) || 0) > 0 ? formatCurrency(pago.detail?.reduce((s, d) => s + d.payment_amount, 0) || 0) : "Gratis"}</span>
@@ -960,7 +961,7 @@ setMembresiaLibre(!!libre.data);
                         <p className="text-[10px] text-gym-muted/70 truncate mt-0.5">{pago.payment_note}</p>
                       )}
                     </div>
-                    {(pago.status === "pendiente") && (
+                    {(pago.status === "pendiente" || pago.status === "suspendido_pendiente") && (
                       <button
                         onClick={() => handleDelete(pago.id)}
                         disabled={deleting === pago.id}

@@ -35,16 +35,23 @@ function getPagoIcon(pago: Payment) {
   return <Calendar className="w-5 h-5 text-gym-secondary" />;
 }
 
-function getPagoMeses(pago: Payment): string {
-  const meses = pago.detail
-    ?.filter((d) => d.month_number && d.year_number)
-    .sort(
-      (a, b) =>
-        (a.year_number! - b.year_number!) * 12 + (a.month_number! - b.month_number!)
-    )
-    .map((d) => `${getMonthName(d.month_number!).slice(0, 3)} ${d.year_number}`)
-    .join(", ");
-  return meses || "—";
+
+function isInscripcion(pago: Payment): boolean {
+  return pago.detail?.some((d) => d.payment_type === "inscripcion") || false;
+}
+
+function getTipoLabel(pago: Payment): string {
+
+function getTotalMonto(pago: Payment): number {
+  return pago.detail?.reduce((sum, d) => sum + d.payment_amount, 0) || 0;
+}
+
+
+  return isInscripcion(pago) ? "Inscripción" : "Mensualidad";
+}
+
+function getTotalMonto(pago: Payment): number {
+  return pago.detail?.reduce((sum, d) => sum + d.payment_amount, 0) || 0;
 }
 
 export default function MisPagosPage() {
@@ -67,6 +74,7 @@ export default function MisPagosPage() {
   const [showSearch, setShowSearch] = useState(false);
 
   // Payment form
+  const [selectedPago, setSelectedPago] = useState<Payment | null>(null);
   const [showForm, setShowForm] = useState(true);
   const [metodosPago, setMetodosPago] = useState<PaymentMethod[]>([]);
   const [mesesPendientes, setMesesPendientes] = useState<{ month_number: number; year_number: number }[]>([]);
@@ -913,7 +921,9 @@ setMembresiaLibre(!!libre.data);
                 <div key={pago.id} className="p-2.5 bg-gym-bg rounded-xl hover:bg-gym-surface transition-colors">
                   <div className="flex items-center gap-2">
                     {getPagoIcon(pago)}
-                    <Eye className="w-4 h-4 text-gym-primary"
+                    <Eye
+                      className="w-4 h-4 text-gym-primary"
+                      onClick={() => setSelectedPago(pago as Payment)}
                     />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
@@ -929,7 +939,7 @@ setMembresiaLibre(!!libre.data);
                         <span>{(pago.detail?.reduce((s, d) => s + d.payment_amount, 0) || 0) > 0 ? formatCurrency(pago.detail?.reduce((s, d) => s + d.payment_amount, 0) || 0) : "Gratis"}</span>
                         {showPagosRealizados && (
                           <span className="text-[10px] text-gym-primary/80 ms-2">
-                            {getPagoMeses(pago)}
+                            {getPagoMesesInfo(pago)}
                           </span>
                         )}
                         {pago.bill_code && (

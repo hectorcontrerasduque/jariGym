@@ -72,45 +72,25 @@ export async function POST(request: Request) {
     let errores = 0;
 
     for (const config of configs.data) {
-      const { daily_frequency, weekly_frequency, biweekly_frequency, monthly_frequency, days_before } = config;
+      const { weekly_frequency, days_before } = config;
 
-      let candidatos;
+      let miembrosQuery = supabase
+        .from("profiles")
+        .select("id, full_name, email, start_date, activo, role")
+        .eq("activo", true)
+        .not("email", "is", null);
+
       const hoy = new Date();
-      if (forzar) {
-        candidatos = await supabase
-          .from("miembros")
-          .select("id, full_name, email, start_date, activo, role")
-          .maybeSingle();
-      } else {
-        if (daily_frequency) {
-          candidatos = await supabase
-            .from("miembros")
-            .select("id, full_name, email, start_date, activo, role")
-            .eq("activo", true);
-        } else if (weekly_frequency) {
-          candidatos = await supabase
-            .from("miembros")
-            .select("id, full_name, email, start_date, activo, role")
-            .eq("activo", true)
-            .not("role", "in", ["super_admin", "miembro"]);
-        } else if (biweekly_frequency) {
-          candidatos = await supabase
-            .from("miembros")
-            .select("id, full_name, email, start_date, activo, role")
-            .eq("activo", true);
-        } else if (monthly_frequency) {
-          candidatos = await supabase
-            .from("miembros")
-            .select("id, full_name, email, start_date, activo, role")
-            .eq("activo", true);
-        }
+      if (!forzar && weekly_frequency) {
+        miembrosQuery = miembrosQuery.not("role", "in", ["super_admin", "miembro"]);
       }
 
-      if (!candidatos || !candidatos.data) {
+      const { data: miembrosData } = await miembrosQuery;
+      if (!miembrosData || miembrosData.length === 0) {
         continue;
       }
 
-      const miembrosList = Array.isArray(candidatos.data) ? candidatos.data : [candidatos.data];
+      const miembrosList = miembrosData;
 
       for (const miembro of miembrosList) {
         ejecuciones++;

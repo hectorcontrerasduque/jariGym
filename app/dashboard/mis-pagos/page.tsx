@@ -222,7 +222,7 @@ function MisPagosContent() {
     } catch (err) {
       console.error("Error cargando miembros:", err);
     }
-  }, [miembroSeleccionado, isAdmin]);
+  }, [miembroSeleccionado]);
 
   useEffect(() => {
     let cancelled = false;
@@ -982,6 +982,7 @@ setMembresiaLibre(!!libre.data);
                 if (!isNaN(startH) && !isNaN(endH)) {
                   for (let h = startH; h <= endH; h++) {
                     const key = `${String(h).padStart(2, "0")}:00`;
+                    // eslint-disable-next-line security/detect-object-injection
                     hourCounts[key] = (hourCounts[key] || 0) + 1;
                   }
                 }

@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { pagosService } from "@/lib/services/pagos/pagos.service";
 import { configService } from "@/lib/services/config/config.service";
 import { createClient } from "@/lib/supabase/client";
-import { formatCurrency, getMonthName } from "@/lib/utils";
+import { formatCurrency, getMonthName, getDiaCobro } from "@/lib/utils";
 import { CreditCard, CheckCircle, Clock, Calendar, Eye, Trash2, FileText, Plus, Search, Upload, Gift, AlertTriangle, ChevronDown, ChevronRight, X, Save, Home, Phone, Mail, MapPin } from "lucide-react";
 import { showToast } from "@/components/ui/toast";
 import { Modal } from "@/components/ui/modal";
@@ -82,6 +82,10 @@ function MisPagosContent() {
   const [miembroSearch, setMiembroSearch] = useState("");
   const [miembroSeleccionado, setMiembroSeleccionado] = useState<Profile | null>(null);
   const [showSearch, setShowSearch] = useState(false);
+
+  // Home expand toggles
+  const [expandedPendientes, setExpandedPendientes] = useState(false);
+  const [expandedMoroso, setExpandedMoroso] = useState(false);
 
   // Payment form
   const [selectedPago, setSelectedPago] = useState<Payment | null>(null);
@@ -520,6 +524,51 @@ setMembresiaLibre(!!libre.data);
   const montoAprobado = aprobados.reduce((sum, p) => sum + (p.detail?.reduce((s, d) => s + d.payment_amount, 0) || 0), 0);
   const montoPendiente = pendientes.reduce((sum, p) => sum + (p.detail?.reduce((s, d) => s + d.payment_amount, 0) || 0), 0);
 
+  // Pagos pendientes / suspendido_pendiente
+  const pagosPendientes = pagos.filter(p => p.status === "pendiente" || p.status === "suspendido_pendiente");
+  const totalPendientes = pagosPendientes.reduce((sum, p) => sum + (p.detail?.reduce((s, d) => s + d.payment_amount, 0) || 0), 0);
+
+  // Morosidad (client-side)
+  const morosidad = useMemo(() => {
+    if (!profile?.start_date || !gymConfig) return null;
+    const hoy = new Date();
+    const mesActual = hoy.getMonth() + 1;
+    const anioActual = hoy.getFullYear();
+    const modoCobro = (gymConfig.billing_mode as "dia_uno" | "fecha_inscripcion") || "dia_uno";
+
+    const parts = profile.start_date.split("-").map(Number);
+    let mesDeuda = parts[1] + 1;
+    let anioDeuda = parts[0];
+    if (mesDeuda > 12) { mesDeuda = 1; anioDeuda++; }
+    if (anioDeuda > anioActual) return null;
+    const primerMesDeuda = anioDeuda === anioActual ? mesDeuda : 1;
+
+    const mesesCubiertos = new Set(
+      pagos
+        .filter(p => p.status === "aprobado" || p.status === "suspendido")
+        .flatMap(p => (p.detail || [])
+          .filter(d => d.payment_type === "mensualidad" && d.year_number === anioActual)
+          .map(d => d.month_number!))
+    );
+
+    const mesesDeuda: number[] = [];
+    for (let mes = primerMesDeuda; mes <= mesActual; mes++) {
+      if (mesesCubiertos.has(mes)) continue;
+      const diaCobro = getDiaCobro(profile.start_date, mes, anioActual, modoCobro);
+      if (mes === mesActual && hoy.getDate() < diaCobro) continue;
+      mesesDeuda.push(mes);
+    }
+
+    const debeInscripcion = !profile.inscription_paid;
+    const activeMetodo = metodosPago.find(m => m.is_active);
+    const montoMensual = activeMetodo?.amount_monthly || 0;
+    const montoInscripcion = activeMetodo?.amount_inscription || 0;
+    const totalDeuda = mesesDeuda.length * montoMensual + (debeInscripcion ? montoInscripcion : 0);
+
+    if (!debeInscripcion && mesesDeuda.length === 0) return null;
+    return { mesesDeuda, debeInscripcion, totalDeuda, montoMensual, montoInscripcion, anioActual };
+  }, [profile, gymConfig, pagos, metodosPago]);
+
   const filteredMiembros = miembros.filter(m => {
     const s = miembroSearch.toLowerCase();
     return m.full_name?.toLowerCase().includes(s) || m.email?.toLowerCase().includes(s);
@@ -810,6 +859,118 @@ setMembresiaLibre(!!libre.data);
               )}
             </CardContent>
           </Card>
+
+          {/* Pendientes */}
+          {pagosPendientes.length > 0 && (
+            <Card className="neon-card overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-br from-gym-warning/5 to-transparent pointer-events-none" />
+              <button
+                type="button"
+                onClick={() => setExpandedPendientes(!expandedPendientes)}
+                className="w-full text-left"
+              >
+                <CardHeader className="pb-2 relative">
+                  <CardTitle className="flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-lg bg-gym-warning/15 flex items-center justify-center">
+                        <AlertTriangle className="w-4 h-4 text-gym-warning" />
+                      </div>
+                      <span>Pendientes</span>
+                      <Badge variant="warning" className="text-[10px]">{pagosPendientes.length}</Badge>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-semibold text-gym-warning">{formatCurrency(totalPendientes)}</span>
+                      {expandedPendientes ? <ChevronDown className="w-4 h-4 text-gym-muted" /> : <ChevronRight className="w-4 h-4 text-gym-muted" />}
+                    </div>
+                  </CardTitle>
+                </CardHeader>
+              </button>
+              {expandedPendientes && (
+                <CardContent className="relative">
+                  <div className="space-y-2">
+                    {pagosPendientes.map(p => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => { setSelectedPago(p as Payment); setModalOpen(true); }}
+                        className="w-full text-left p-2.5 bg-gym-bg/60 rounded-xl hover:bg-gym-bg transition-colors"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-bold text-white">{getPagoLabel(p)}</span>
+                          <Badge variant={p.status === "pendiente" ? "warning" : "secondary"} className="text-[10px]">
+                            {p.status === "pendiente" ? "Pendiente" : "Suspendido"}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center gap-2 text-[11px] text-gym-muted mt-1">
+                          <span>{getTotalMonto(p) > 0 ? formatCurrency(getTotalMonto(p)) : "0.00"}</span>
+                          <span>·</span>
+                          <span className="text-gym-primary/80">{getPagoMesesInfo(p)}</span>
+                          {p.bill_code && (
+                            <>
+                              <span>·</span>
+                              <span className="font-mono text-gym-secondary">{p.bill_code}</span>
+                            </>
+                          )}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </CardContent>
+              )}
+            </Card>
+          )}
+
+          {/* Morosidad */}
+          {morosidad && (
+            <Card className="neon-card overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-br from-gym-danger/5 to-transparent pointer-events-none" />
+              <button
+                type="button"
+                onClick={() => setExpandedMoroso(!expandedMoroso)}
+                className="w-full text-left"
+              >
+                <CardHeader className="pb-2 relative">
+                  <CardTitle className="flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-lg bg-gym-danger/15 flex items-center justify-center">
+                        <AlertTriangle className="w-4 h-4 text-gym-danger" />
+                      </div>
+                      <span>Morosidad</span>
+                      <Badge variant="danger" className="text-[10px]">{morosidad.mesesDeuda.length} mes(es)</Badge>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-semibold text-gym-danger">{formatCurrency(morosidad.totalDeuda)}</span>
+                      {expandedMoroso ? <ChevronDown className="w-4 h-4 text-gym-muted" /> : <ChevronRight className="w-4 h-4 text-gym-muted" />}
+                    </div>
+                  </CardTitle>
+                </CardHeader>
+              </button>
+              {expandedMoroso && (
+                <CardContent className="relative">
+                  <div className="space-y-2">
+                    {morosidad.mesesDeuda.map(mes => (
+                      <div key={mes} className="flex items-center justify-between p-2.5 bg-gym-bg/60 rounded-xl">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full bg-gym-danger" />
+                          <span className="text-sm text-gym-text">{getMonthName(mes)} {morosidad.anioActual}</span>
+                        </div>
+                        <span className="text-sm font-medium text-gym-text">{formatCurrency(morosidad.montoMensual)}</span>
+                      </div>
+                    ))}
+                    {morosidad.debeInscripcion && (
+                      <div className="flex items-center justify-between p-2.5 bg-gym-bg/60 rounded-xl border border-gym-danger/20">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full bg-gym-danger" />
+                          <span className="text-sm text-gym-danger font-medium">Inscripción</span>
+                        </div>
+                        <span className="text-sm font-medium text-gym-danger">{formatCurrency(morosidad.montoInscripcion)}</span>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              )}
+            </Card>
+          )}
 
           {/* Distribución por hora */}
           {miembros.length > 0 && (() => {

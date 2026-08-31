@@ -100,37 +100,4 @@ export function esDiaDeNotificacion(
     fechaActual.getFullYear() === notif.anio;
 }
 
-export function esMoroso(
-  fechaInscripcion: string,
-  mesesCubiertos: Set<number>,
-  mesActual: number,
-  anioActual: number,
-  fechaActual: Date = new Date()
-): boolean {
-  const diaInscripcion = new Date(fechaInscripcion).getDate();
-  const parts = fechaInscripcion.split("-").map(Number);
-  const anioInicio = parts[0];
-  const mesInicio = parts[1];
 
-  let mesDeuda = mesInicio + 1;
-  let anioDeuda = anioInicio;
-  if (mesDeuda > 12) {
-    mesDeuda = 1;
-    anioDeuda = anioInicio + 1;
-  }
-
-  if (anioDeuda > anioActual) return false;
-  const primerMesDeuda = anioDeuda === anioActual ? mesDeuda : 1;
-
-  for (let mes = primerMesDeuda; mes <= mesActual; mes++) {
-    if (mesesCubiertos.has(mes)) continue;
-
-    const diaCobro = Math.min(diaInscripcion, new Date(anioActual, mes, 0).getDate());
-
-    if (mes === mesActual && fechaActual.getDate() < diaCobro) continue;
-
-    return true;
-  }
-
-  return false;
-}

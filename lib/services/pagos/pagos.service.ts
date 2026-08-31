@@ -597,36 +597,10 @@ export class PagosService {
     const anioConsulta = anio || hoy.getFullYear();
     const mesActual = hoy.getMonth() + 1;
 
-    const [allProfiles, libres, configResult, ownerResult] = await Promise.all([
-      supabase
-        .from("profiles")
-        .select("id, inscription_paid, start_date, activo, role, email")
-        .in("role", ["miembro", "super_admin"]),
-      supabase
-        .from("memberships")
-        .select("user_id")
-        .eq("status", "activa")
-        .is("end_date", null),
-      supabase
-        .from("gym_config_payment_methods")
-        .select("amount_monthly, amount_inscription")
-        .eq("is_active", true)
-        .limit(1)
-        .maybeSingle(),
-      supabase
-        .from("gym_config")
-        .select("owner_email")
-        .limit(1)
-        .maybeSingle(),
-    ]);
+    const elegibles = await this.getMiembrosElegibles(supabase);
+    const { miembros: allMiembros, miembrosLibresIds, ownerEmail, montoMensual, montoInscripcion } = elegibles;
 
-    const ownerEmail = ownerResult.data?.owner_email?.toLowerCase() || "";
-    const config = configResult.data;
-
-    const allMiembros = allProfiles.data || [];
-    const miembrosLibresIds = new Set((libres.data || []).map((l) => l.user_id));
-    const montoMensual = config?.amount_monthly || 5;
-    const montoInscripcion = config?.amount_inscription || 0;
+    const miembrosActivos = allMiembros.filter((m) => m.email?.toLowerCase() !== ownerEmail);
 
     const { data: pagosAnio } = await supabase
       .from("payments")
@@ -664,7 +638,6 @@ export class PagosService {
       }
     }
 
-    const miembrosActivos = allMiembros.filter((m) => m.activo !== false && m.email?.toLowerCase() !== ownerEmail);
     const inscritosPagados = miembrosActivos.filter((m) => miembrosConInscripcionPagada.has(m.id)).length;
     const inscritosPendientes = miembrosActivos.filter((m) => !miembrosConInscripcionPagada.has(m.id)).length;
 
@@ -706,21 +679,13 @@ export class PagosService {
     };
   }
 
-  async getMiembrosMorosos(anio?: number, supabaseClient?: ReturnType<typeof createClient>): Promise<
-    Array<{
-      id: string;
-      email: string;
-      full_name: string;
-      deudas: Array<{ month_number: number; year_number: number; payment_amount: number }>;
-      totalDeuda: number;
-      debeInscripcion: boolean;
-      mesesDeuda: number[];
-    }>
-  > {
+  /**
+   * Fuente centralizada de miembros elegibles.
+   * Retorna miembros activos (excluyendo dueño y membresía libre) junto con
+   * la configuración de cobro. Todas las funciones de morosos/deudas usan esto.
+   */
+  async getMiembrosElegibles(supabaseClient?: ReturnType<typeof createClient>) {
     const supabase = supabaseClient || this.supabase;
-    const hoy = new Date();
-    const anioConsulta = anio || hoy.getFullYear();
-    const mesActual = anioConsulta === hoy.getFullYear() ? hoy.getMonth() + 1 : 12;
 
     const [miembrosResult, configResult, libresResult, ownerResult] = await Promise.all([
       supabase
@@ -747,10 +712,6 @@ export class PagosService {
     ]);
 
     const miembros = (miembrosResult.data || []).filter((m) => m.activo !== false);
-    if (miembros.length === 0) return [];
-
-    const montoMensual = configResult.data?.amount_monthly || 0;
-    const montoInscripcion = configResult.data?.amount_inscription || 0;
     const miembrosLibresIds = new Set((libresResult.data || []).map((l) => l.user_id));
     const fechaInicioMap = new Map<string, string>();
     for (const l of libresResult.data || []) {
@@ -758,6 +719,40 @@ export class PagosService {
     }
     const ownerEmail = ownerResult.data?.owner_email?.toLowerCase() || "";
     const modoCobro = (ownerResult.data?.billing_mode as "dia_uno" | "fecha_inscripcion") || "dia_uno";
+    const montoMensual = configResult.data?.amount_monthly || 0;
+    const montoInscripcion = configResult.data?.amount_inscription || 0;
+
+    return {
+      miembros,
+      miembrosLibresIds,
+      fechaInicioMap,
+      ownerEmail,
+      modoCobro,
+      montoMensual,
+      montoInscripcion,
+    };
+  }
+
+  async getMiembrosMorosos(anio?: number, supabaseClient?: ReturnType<typeof createClient>): Promise<
+    Array<{
+      id: string;
+      email: string;
+      full_name: string;
+      deudas: Array<{ month_number: number; year_number: number; payment_amount: number }>;
+      totalDeuda: number;
+      debeInscripcion: boolean;
+      mesesDeuda: number[];
+    }>
+  > {
+    const supabase = supabaseClient || this.supabase;
+    const hoy = new Date();
+    const anioConsulta = anio || hoy.getFullYear();
+    const mesActual = anioConsulta === hoy.getFullYear() ? hoy.getMonth() + 1 : 12;
+
+    const elegibles = await this.getMiembrosElegibles(supabase);
+    const { miembros, miembrosLibresIds, fechaInicioMap, ownerEmail, modoCobro, montoMensual, montoInscripcion } = elegibles;
+
+    if (miembros.length === 0) return [];
 
     const { data: todosPagosHeader } = await supabase
       .from("payments")
@@ -887,19 +882,11 @@ export class PagosService {
     const anioConsulta = anio || hoy.getFullYear();
     const mesMaximo = anioConsulta === hoy.getFullYear() ? hoy.getMonth() + 1 : 12;
 
-    let config = null;
-    try {
-      const { data } = await supabase
-        .from("gym_config_payment_methods")
-        .select("amount_monthly")
-        .eq("is_active", true)
-        .limit(1)
-        .maybeSingle();
-      config = data;
-    } catch (_error /* eslint-disable-line @typescript-eslint/no-unused-vars */) {
-      config = null;
-    }
-    const montoMensual = config?.amount_monthly || 5;
+    const elegibles = await this.getMiembrosElegibles(supabase);
+    const { miembros: allProfiles, miembrosLibresIds: libresIds, ownerEmail, montoMensual } = elegibles;
+
+    const profiles = allProfiles.filter((p) => p.email?.toLowerCase() !== ownerEmail);
+    const libresCount = libresIds.size;
 
     const meses = [];
     for (let mes = 1; mes <= mesMaximo; mes++) {
@@ -909,31 +896,6 @@ export class PagosService {
         nombre: getMonthName(mes),
       });
     }
-
-    const { data: configData } = await supabase
-      .from("gym_config")
-      .select("owner_email")
-      .limit(1)
-      .maybeSingle();
-    const ownerEmail = configData?.owner_email?.toLowerCase() || "";
-
-    const { data: allProfiles } = await supabase
-      .from("profiles")
-      .select("id, start_date, role, email, activo")
-      .in("role", ["miembro", "super_admin"]);
-
-    const profiles = (allProfiles || []).filter(
-      (p) => p.activo !== false && p.email?.toLowerCase() !== ownerEmail
-    );
-
-    const { data: libreData } = await supabase
-      .from("memberships")
-      .select("user_id")
-      .eq("status", "activa")
-      .is("end_date", null);
-
-    const libresIds = new Set((libreData || []).map((l) => l.user_id));
-    const libresCount = libresIds.size;
 
     const statsMeses = await Promise.all(
       meses.map(async (m) => {

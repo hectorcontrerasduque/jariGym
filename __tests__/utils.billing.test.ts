@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getDiaCobro, getDiaNotificacion, esMoroso, esDiaDeNotificacion } from "@/lib/utils";
+import { getDiaCobro, getDiaNotificacion, esDiaDeNotificacion } from "@/lib/utils";
 
 describe("getDiaCobro", () => {
   it("modo dia_uno siempre retorna 1", () => {
@@ -24,27 +24,6 @@ describe("getDiaNotificacion", () => {
   });
   it("envuelve a año anterior en enero", () => {
     expect(getDiaNotificacion(2, 5, 1, 2024)).toEqual({ dia: 28, mes: 12, anio: 2023 });
-  });
-});
-
-describe("esMoroso", () => {
-  it("respeta grace period 30 días", () => {
-    const covered = new Set<number>();
-    expect(esMoroso("2024-11-15T12:00:00Z", covered, 11, 2024, new Date("2024-11-30T12:00:00Z"))).toBe(false);
-  });
-  it("moroso después de 30 días sin pagos (dia_inscripcion=1 => diaCobro=1)", () => {
-    const covered = new Set<number>();
-    // Inscrito 1 oct, hoy 15 nov. diaInscripcion=1 => diaCobro=1. mesActual=11, hoy=15 >= 1 -> moroso
-    expect(esMoroso("2024-10-01T12:00:00Z", covered, 11, 2024, new Date("2024-11-15T12:00:00Z"))).toBe(true);
-  });
-  it("no moroso si mes cubierto por pago", () => {
-    const covered = new Set([11]);
-    expect(esMoroso("2024-10-01T12:00:00Z", covered, 11, 2024, new Date("2024-11-15T12:00:00Z"))).toBe(false);
-  });
-  it("no moroso si hoy < diaCobro en mes actual (fecha_inscripcion día 15)", () => {
-    const covered = new Set<number>();
-    // fecha_inscripcion día 15 -> diaCobro=15. hoy=10 < 15 -> no moroso
-    expect(esMoroso("2024-10-15T12:00:00Z", covered, 11, 2024, new Date("2024-11-10T12:00:00Z"))).toBe(false);
   });
 });
 

@@ -446,6 +446,9 @@ async function procesarResumenDueno(gymConfig: Record<string, unknown>): Promise
     .eq("role", "miembro")
     .eq("activo", true);
 
+  const morosos = await pagosService.getMiembrosMorosos(anioActual, supabase);
+  const miembrosDeudores = morosos.filter((m) => m.mesesDeuda.length > 0).length;
+
   const { count: migraciones } = await supabase
     .from("migracion")
     .select("id", { count: "exact", head: true })
@@ -470,7 +473,7 @@ async function procesarResumenDueno(gymConfig: Record<string, unknown>): Promise
           0
         ),
         miembrosAlDia: miembrosActivos || 0,
-        miembrosDeudores: 0,
+        miembrosDeudores,
         migraciones: migraciones || 0,
       },
       `${process.env.NEXT_PUBLIC_SITE_URL}/dashboard/pagos`,

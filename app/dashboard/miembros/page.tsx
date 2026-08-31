@@ -184,13 +184,37 @@ export default function MiembrosPage() {
     }
   };
 
-  const loadHistorialMembresias = async (userId: string) => {
+  const loadHistorialMembresias = async (userId: string): Promise<Membership[]> => {
     try {
       const historial = await miembrosService.obtenerHistorialMembresias(userId);
       setHistorialMembresias(historial);
+      return historial;
     } catch {
-      // silent
+      return [];
     }
+  };
+
+  const openMembresiaModal = async (miembro: Profile) => {
+    const historial = await loadHistorialMembresias(miembro.id);
+    const latest = historial[0];
+    if (latest) {
+      setMembresiaStartDate(latest.start_date);
+      setMembresiaEndDate(latest.end_date || "");
+      setNotaMembresia(latest.membership_note || "");
+    } else {
+      setMembresiaStartDate(new Date().toISOString().split("T")[0]);
+      setMembresiaEndDate("");
+      setNotaMembresia("");
+    }
+    setHistorialExpanded(false);
+    setModalMembresia(true);
+  };
+
+  const openHistorialAdmin = async (miembro: Profile) => {
+    setInscripcionAdminNote(miembro.inscription_admin_note || "");
+    setNotaAdminInput("");
+    setHistorialAdminExpanded(true);
+    setModalNotaAdmin(true);
   };
 
   const verDetalle = async (miembro: Profile) => {
@@ -250,6 +274,10 @@ export default function MiembrosPage() {
 
   const handleToggleMembresia = async (miembro: Profile) => {
     if (!currentUser) return;
+    if (miembro.id === currentUser.id) {
+      showToast("No puedes cambiar tu propia membresía", "warning");
+      return;
+    }
     setTogglingMembresia(true);
     try {
       if (isMembresiaLibre) {
@@ -319,6 +347,10 @@ export default function MiembrosPage() {
 
   const handleToggleSuperAdmin = async (miembro: Profile) => {
     if (!currentUser) return;
+    if (miembro.id === currentUser.id) {
+      showToast("No puedes cambiar tu propio rol de Super Admin", "warning");
+      return;
+    }
     setTogglingSuperAdmin(true);
     const newRole = isSuperAdmin ? "miembro" : "super_admin";
     const fecha = new Date().toLocaleDateString("es-VE");
@@ -659,6 +691,14 @@ export default function MiembrosPage() {
                   </button>
                 )}
               </div>
+              {selectedMiembro.id !== currentUser?.id && (
+                <button
+                  onClick={() => openMembresiaModal(selectedMiembro)}
+                  className="text-[11px] text-gym-primary hover:underline mt-2"
+                >
+                  Editar membresía actual
+                </button>
+              )}
             </div>
 
             {/* Super Admin toggle */}
@@ -685,6 +725,14 @@ export default function MiembrosPage() {
                   </button>
                 )}
               </div>
+              {selectedMiembro.id !== currentUser?.id && (
+                <button
+                  onClick={() => openHistorialAdmin(selectedMiembro)}
+                  className="text-[11px] text-gym-primary hover:underline mt-2"
+                >
+                  Ver historial
+                </button>
+              )}
             </div>
 
             {/* Activo toggle */}

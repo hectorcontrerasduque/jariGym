@@ -17,6 +17,7 @@ import {
   Dumbbell,
   Bell,
   User,
+  Home,
 } from "lucide-react";
 import type { Profile } from "@/lib/types";
 
@@ -29,7 +30,8 @@ const adminNavItems = [
 ];
 
 const miembroNavItems = [
-  { href: "/dashboard/mis-pagos", label: "Mis Pagos", icon: CreditCard },
+  { href: "/dashboard/mis-pagos?tab=home", label: "Home", icon: Home },
+  { href: "/dashboard/mis-pagos?tab=pagos", label: "Mis Pagos", icon: CreditCard },
 ];
 
 export function Sidebar() {
@@ -57,7 +59,7 @@ export function Sidebar() {
         if (data && data.role !== "super_admin") {
           const allowed = ["/dashboard/mis-pagos", "/dashboard/reportar-pago", "/dashboard/perfil"];
           if (!allowed.some((p) => pathname.startsWith(p))) {
-            router.replace("/dashboard/mis-pagos");
+            router.replace("/dashboard/mis-pagos?tab=pagos");
           }
         }
       }
@@ -178,8 +180,10 @@ export function Sidebar() {
 
         <nav className="flex-1 p-4 space-y-1">
           {navItems.map((item) => {
-            const isActive = pathname === item.href ||
-              (item.href !== "/dashboard" && !item.href.endsWith("/configuracion") && pathname.startsWith(item.href));
+            const itemPath = item.href.split("?")[0];
+            const isActive = item.href.includes("mis-pagos")
+              ? pathname.startsWith("/dashboard/mis-pagos")
+              : pathname === itemPath || (item.href !== "/dashboard" && !item.href.endsWith("/configuracion") && pathname.startsWith(itemPath));
             return (
               <Link
                 key={item.href}
@@ -236,8 +240,10 @@ export function Sidebar() {
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-gym-surface/90 backdrop-blur-xl border-t border-gym-border/50 z-50 safe-area-bottom">
         <div className="flex items-center justify-around py-2">
           {navItems.map((item) => {
-            const isActive = pathname === item.href ||
-              (item.href !== "/dashboard" && !item.href.endsWith("/configuracion") && pathname.startsWith(item.href));
+            const isActive = item.href.includes("mis-pagos")
+              ? pathname.startsWith("/dashboard/mis-pagos")
+              : pathname === item.href ||
+                (item.href !== "/dashboard" && !item.href.endsWith("/configuracion") && pathname.startsWith(item.href));
             return (
               <Link
                 key={item.href}

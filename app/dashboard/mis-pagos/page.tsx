@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo, useRef } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -28,13 +29,6 @@ function getPagoLabel(pago: Payment): string {
   if (det?.month_number && det?.year_number) return `${getMonthName(det.month_number)} ${det.year_number}`;
   return "Pago";
 }
-
-function getPagoIcon(pago: Payment) {
-  const det = pago.detail?.[0];
-  if (det?.payment_type === "inscripcion") return <FileText className="w-5 h-5 text-gym-primary" />;
-  return <Calendar className="w-5 h-5 text-gym-secondary" />;
-}
-
 
 function isInscripcion(pago: Payment): boolean {
   return pago.detail?.some((d) => d.payment_type === "inscripcion") || false;
@@ -68,7 +62,10 @@ function getPagoMesesInfo(pago: Payment): string {
   return parts.join(" | ") || "—";
 }
 
-export default function MisPagosPage() {
+function MisPagosContent() {
+  const searchParams = useSearchParams();
+  const activeTab = (searchParams.get("tab") as "home" | "pagos") || "pagos";
+
   const [pagos, setPagos] = useState<Payment[]>([]);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -113,7 +110,6 @@ export default function MisPagosPage() {
   });
   const [comprobante, setComprobante] = useState<File | null>(null);
   const [showPagosRealizados, setShowPagosRealizados] = useState(true);
-  const [activeTab, setActiveTab] = useState<"home" | "pagos">("pagos");
 
   const fetchMisPagosData = useCallback(async () => {
     const supabase = createClient();
@@ -577,34 +573,6 @@ setMembresiaLibre(!!libre.data);
           </select>
         </div>
       </div>
-
-      {/* Miembro: tab menu */}
-      {!isSuperAdmin && (
-        <div className="flex gap-1 p-1 bg-gym-surface rounded-xl">
-          <button
-            onClick={() => setActiveTab("home")}
-            className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all ${
-              activeTab === "home"
-                ? "bg-gym-primary text-white glow-primary"
-                : "text-gym-muted hover:text-gym-text"
-            }`}
-          >
-            <Home className="w-4 h-4" />
-            Home
-          </button>
-          <button
-            onClick={() => setActiveTab("pagos")}
-            className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all ${
-              activeTab === "pagos"
-                ? "bg-gym-primary text-white glow-primary"
-                : "text-gym-muted hover:text-gym-text"
-            }`}
-          >
-            <CreditCard className="w-4 h-4" />
-            Mis Pagos
-          </button>
-        </div>
-      )}
 
       {/* Super Admin: member selector */}
       {isSuperAdmin && (
@@ -1091,7 +1059,11 @@ setMembresiaLibre(!!libre.data);
                 )}
 
                 <div className="flex gap-2">
-                  <Button type="button" variant="secondary" className="flex-1" onClick={() => setShowForm(false)}>
+                  <Button type="button" variant="secondary" className="flex-1" onClick={() => {
+                    setFormData({ meses: [], metodo_pago: "efectivo", codigo_billete: "", notas: "", pagar_inscripcion: false, pagar_mensualidad: false, solicitar_suspension: false, fecha_pago: new Date().toISOString().split("T")[0] });
+                    setComprobante(null);
+                    setSubmitted(false);
+                  }}>
                     Cancelar
                   </Button>
                   <Button
@@ -1354,5 +1326,13 @@ setMembresiaLibre(!!libre.data);
         </>
       )}
     </div>
+  );
+}
+
+export default function MisPagosPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center min-h-[50vh]"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gym-primary" /></div>}>
+      <MisPagosContent />
+    </Suspense>
   );
 }

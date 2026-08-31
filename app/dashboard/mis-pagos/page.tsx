@@ -11,6 +11,7 @@ import { createClient } from "@/lib/supabase/client";
 import { formatCurrency, getMonthName } from "@/lib/utils";
 import { CreditCard, CheckCircle, Clock, Calendar, Eye, Trash2, FileText, Plus, Search, Upload, Gift, AlertTriangle, ChevronDown, ChevronRight, X, Save } from "lucide-react";
 import { showToast } from "@/components/ui/toast";
+import { Modal } from "@/components/ui/modal";
 import { messages } from "@/lib/messages";
 import { Avatar } from "@/components/ui/avatar";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
@@ -89,6 +90,7 @@ export default function MisPagosPage() {
 
   // Payment form
   const [selectedPago, setSelectedPago] = useState<Payment | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
   const [showForm, setShowForm] = useState(true);
   const [metodosPago, setMetodosPago] = useState<PaymentMethod[]>([]);
   const [mesesPendientes, setMesesPendientes] = useState<{ month_number: number; year_number: number }[]>([]);
@@ -390,7 +392,7 @@ setMembresiaLibre(!!libre.data);
         if (formData.meses.length === 0) {
           throw new Error("Selecciona al menos un mes para solicitar suspensión");
         }
-        await pagosService.crearPagoSuspendido(targetId, formData.meses, formData.notas || undefined);
+        await pagosService.crearPagoSuspendido(targetId, formData.meses, formData.notas || undefined, isSuperAdmin ? "suspendido" : "pendiente");
         showToast(messages.misPagos.solicitudEnviada, "success");
         setFormData({ meses: [], metodo_pago: "efectivo", codigo_billete: "", notas: "", pagar_inscripcion: false, pagar_mensualidad: false, solicitar_suspension: false, fecha_pago: new Date().toISOString().split("T")[0] });
         await fetchMisPagosData();
@@ -935,17 +937,11 @@ setMembresiaLibre(!!libre.data);
                 <div key={pago.id} className="p-2.5 bg-gym-bg rounded-xl hover:bg-gym-surface transition-colors">
                   <div className="flex items-center gap-2">
                     {getPagoIcon(pago)}
-                    <div className="justify-end">
-                      <Eye
-                        className="w-4 h-4 text-gym-primary"
-                        onClick={() => setSelectedPago(pago as Payment)}
-                      />
-                    </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-medium text-gym-text truncate">{getPagoLabel(pago)}</span>
                         <Badge
-                          variant={pago.status === "aprobado" ? "success" : pago.status === "rechazado" ? "danger" : "warning"}
+                          variant={pago.status === "aprobado" ? "success" : pago.status === "rechazado" ? "danger" : pago.status === "suspendido" ? "secondary" : "warning"}
                           className="text-[10px] px-1.5 py-0 flex-shrink-0"
                         >
                           {pago.status === "aprobado" ? "Aprobado" : pago.status === "rechazado" ? "Rechazado" : pago.status === "suspendido" ? "Suspendido" : "Pendiente"}
@@ -975,6 +971,13 @@ setMembresiaLibre(!!libre.data);
                         <p className="text-[10px] text-gym-muted/70 truncate mt-0.5">{pago.payment_note}</p>
                       )}
                     </div>
+                    <button
+                      onClick={() => { setSelectedPago(pago as Payment); setModalOpen(true); }}
+                      className="p-2 text-gym-primary hover:bg-gym-primary/10 rounded-lg transition-colors flex-shrink-0"
+                      title="Ver detalle"
+                    >
+                      <Eye className="w-4 h-4" />
+                    </button>
                     {(pago.status === "pendiente" || pago.status === "suspendido_pendiente") && (
                       <button
                         onClick={() => handleDelete(pago.id)}
@@ -1024,6 +1027,97 @@ setMembresiaLibre(!!libre.data);
           </CardContent>
         </Card>
       )}
+
+      {/* Detail Modal */}
+      <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} title="Detalle del Pago">
+        {selectedPago && (
+          <div className="space-y-4">
+            {isSuperAdmin && miembroSeleccionado && (
+              <div>
+                <p className="text-sm text-gym-muted">Miembro</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <Avatar src={miembroSeleccionado.avatar_url} alt={miembroSeleccionado.full_name || ""} size="sm" />
+                  <div>
+                    <p className="text-gym-text font-medium">{miembroSeleccionado.full_name}</p>
+                    <p className="text-xs text-gym-muted">{miembroSeleccionado.email}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+            <div>
+              <p className="text-sm text-gym-muted">Concepto</p>
+              <p className="text-gym-text font-medium">
+                {selectedPago.detail?.[0]?.month_number
+                  ? getPagoMesesInfo(selectedPago)
+                  : isInscripcion(selectedPago)
+                  ? "Inscripción"
+                  : "—"}
+              </p>
+            </div>
+            <div>
+              <p className="text-sm text-gym-muted">Tipo</p>
+              <p className="text-gym-text">{getTipoLabel(selectedPago)}</p>
+            </div>
+            <div>
+              <p className="text-sm text-gym-muted">Monto</p>
+              <p className="text-2xl font-bold text-gym-text neon-text">{formatCurrency(getTotalMonto(selectedPago))}</p>
+            </div>
+            <div>
+              <p className="text-sm text-gym-muted">Método de pago</p>
+              <p className="text-gym-text">{metodoLabels[selectedPago.payment_method] || selectedPago.payment_method}</p>
+            </div>
+            <div>
+              <p className="text-sm text-gym-muted">Estado</p>
+              <Badge
+                variant={
+                  selectedPago.status === "aprobado"
+                    ? "success"
+                    : selectedPago.status === "rechazado"
+                    ? "danger"
+                    : selectedPago.status === "suspendido"
+                    ? "secondary"
+                    : "warning"
+                }
+              >
+                {selectedPago.status === "aprobado"
+                  ? "Aprobado"
+                  : selectedPago.status === "rechazado"
+                  ? "Rechazado"
+                  : selectedPago.status === "suspendido"
+                  ? "Suspendido"
+                  : "Pendiente"}
+              </Badge>
+            </div>
+            {selectedPago.bill_code && selectedPago.payment_method === "efectivo" && (
+              <div>
+                <p className="text-sm text-gym-muted">Código del billete</p>
+                <p className="text-gym-text font-mono">{selectedPago.bill_code}</p>
+              </div>
+            )}
+            {selectedPago.receipt_url && (
+              <div>
+                <p className="text-sm text-gym-muted mb-2">Comprobante</p>
+                <a href={selectedPago.receipt_url} target="_blank" rel="noopener noreferrer" className="text-gym-primary hover:underline">
+                  Ver comprobante
+                </a>
+              </div>
+            )}
+            <div>
+              <p className="text-sm text-gym-muted">Notas</p>
+              <p className="text-gym-text">{selectedPago.payment_note || "—"}</p>
+            </div>
+            {selectedPago.status === "aprobado" && selectedPago.approved_by_profile && (
+              <div>
+                <p className="text-sm text-gym-muted">Aprobado por</p>
+                <p className="text-gym-text">
+                  {selectedPago.approved_by_profile.full_name}
+                  {selectedPago.approved_at ? ` · ${new Date(selectedPago.approved_at).toLocaleDateString("es-ES")}` : ""}
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }

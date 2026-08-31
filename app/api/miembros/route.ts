@@ -87,15 +87,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: messages.miembros.errorObtenerUsuario }, { status: 500 });
     }
 
-    const { data, error: rpcError } = await serviceSupabase
-      .rpc("crear_miembro_completo", {
-        p_user_id: userId,
-        p_nombre: nombre,
-        p_email: email,
-        p_changed_by: user.id,
-      });
+    const { data: profileData, error: profileError } = await serviceSupabase
+      .from("profiles")
+      .upsert({
+        id: userId,
+        full_name: nombre,
+        email: email,
+        role: "miembro",
+        inscription_paid: false,
+      }, { onConflict: "id" })
+      .select()
+      .single();
 
-    if (rpcError) {
+    if (profileError) {
+      await serviceSupabase.auth.admin.deleteUser(userId);
       return NextResponse.json({ error: messages.toast.miembroError }, { status: 400 });
     }
 
@@ -122,7 +127,7 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({
-      miembro: data,
+      miembro: profileData,
       password: userPassword,
       loginEmail: email,
       welcomeEmailSent,

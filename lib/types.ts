@@ -41,7 +41,7 @@ export type TipoPago = "mensualidad" | "inscripcion";
 export interface Payment {
   id: string;
   user_id: string;
-  status: "pendiente" | "aprobado" | "rechazado" | "suspendido";
+  status: "pendiente" | "aprobado" | "rechazado" | "suspendido" | "suspendido_pendiente";
   payment_method: MetodoPago;
   bill_code: string | null;
   receipt_url: string | null;
@@ -93,7 +93,7 @@ export interface Movimiento {
   payment_note: string | null;
   month_number: number | null;
   year_number: number | null;
-  status: "pendiente" | "aprobado" | "rechazado" | "suspendido";
+  status: "pendiente" | "aprobado" | "rechazado" | "suspendido" | "suspendido_pendiente";
   activo: boolean | null;
   approved_by: string | null;
   approved_at: string | null;

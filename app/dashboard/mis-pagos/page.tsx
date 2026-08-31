@@ -41,17 +41,31 @@ function isInscripcion(pago: Payment): boolean {
 }
 
 function getTipoLabel(pago: Payment): string {
-
-function getTotalMonto(pago: Payment): number {
-  return pago.detail?.reduce((sum, d) => sum + d.payment_amount, 0) || 0;
-}
-
-
   return isInscripcion(pago) ? "Inscripción" : "Mensualidad";
 }
 
 function getTotalMonto(pago: Payment): number {
   return pago.detail?.reduce((sum, d) => sum + d.payment_amount, 0) || 0;
+}
+
+function getPagoMesesInfo(pago: Payment): string {
+  const detalles = pago.detail || [];
+  if (!detalles.length) return "—";
+  
+  // Ordenar por year_number, month_number
+  const sorted = detalles.sort(
+    (a, b) => (a.year_number || 0) - (b.year_number || 0) || (a.month_number || 0) - (b.month_number || 0)
+  );
+  
+  // Agrupar por tipo y formar cadena
+  const parts: string[] = [];
+  for (const d of sorted) {
+    const mes = getMonthName(d.month_number ?? 0).slice(0, 3);
+    const tipo = d.payment_type === "inscripcion" ? "Inscripción" : "Mensualidad";
+    parts.push(`${mes} ${d.year_number} (${tipo})`);
+  }
+  
+  return parts.join(" | ") || "—";
 }
 
 export default function MisPagosPage() {

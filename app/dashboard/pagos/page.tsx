@@ -32,6 +32,26 @@ function getTotalMonto(pago: Payment): number {
   return pago.detail?.reduce((sum, d) => sum + d.payment_amount, 0) || 0;
 }
 
+function getPagoMesesInfo(pago: Payment): string {
+  const detalles = pago.detail || [];
+  if (!detalles.length) return "—";
+  
+  // Ordenar por year_number, month_number
+  const sorted = detalles.sort(
+    (a, b) => (a.year_number || 0) - (b.year_number || 0) || (a.month_number || 0) - (b.month_number || 0)
+  );
+  
+  // Agrupar por tipo y formar cadena
+  const parts: string[] = [];
+  for (const d of sorted) {
+    const mes = getMonthName(d.month_number ?? 0).slice(0, 3);
+    const tipo = d.payment_type === "inscripcion" ? "Inscripción" : "Mensualidad";
+    parts.push(`${mes} ${d.year_number} (${tipo})`);
+  }
+  
+  return parts.join(" | ") || "—";
+}
+
 export default function PagosPage() {
   const [pagos, setPagos] = useState<Payment[]>([]);
   const [filtro, setFiltro] = useState<string>("todos");
@@ -311,7 +331,7 @@ export default function PagosPage() {
                         {getNombreMiembro(pago)}
                       </p>
                       <div className="flex items-center gap-2 mt-0.5">
-                        <span className="text-xs text-gym-muted">{pago.detail?.[0]?.month_number ? `${getMonthName(pago.detail[0].month_number)} ${pago.detail[0].year_number}` : "—"}</span>
+                        <span className="text-xs text-gym-muted">{getPagoMesesInfo(pago)}</span>
                         <span className="text-xs text-gym-muted">·</span>
                         <span className={`text-xs ${isInscripcion(pago) ? "text-gym-primary" : "text-gym-secondary"}`}>
                           {getTipoLabel(pago)}
@@ -367,7 +387,13 @@ export default function PagosPage() {
             </div>
             <div>
               <p className="text-sm text-gym-muted">Concepto</p>
-              <p className="text-gym-text font-medium">{selectedPago.detail?.[0]?.month_number ? `${getMonthName(selectedPago.detail[0].month_number)} ${selectedPago.detail[0].year_number}` : isInscripcion(selectedPago) ? "Inscripción" : "—"}</p>
+              <p className="text-gym-text font-medium">
+                {selectedPago.detail?.[0]?.month_number
+                  ? getPagoMesesInfo(selectedPago)
+                  : isInscripcion(selectedPago)
+                  ? "Inscripción"
+                  : "—"}
+              </p>
             </div>
             <div>
               <p className="text-sm text-gym-muted">Tipo</p>

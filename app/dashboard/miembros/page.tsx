@@ -9,13 +9,13 @@ import { PasswordInput } from "@/components/ui/password-input";
 import { Modal } from "@/components/ui/modal";
 import { Avatar } from "@/components/ui/avatar";
 import { miembrosService } from "@/lib/services/miembros/miembros.service";
-import { formatDate, formatCurrency, formatDateTime } from "@/lib/utils";
+import { formatDate, formatCurrency } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
-import { Users, Search, Plus, Eye, UserX, UserCheck, Settings, Save, Pencil, Trash2 } from "lucide-react";
+import { Users, Search, Plus, Settings, Save, Pencil } from "lucide-react";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { showToast } from "@/components/ui/toast";
 import { messages } from "@/lib/messages";
-import type { Profile, Payment } from "@/lib/types";
+import type { Profile, Payment, Membership } from "@/lib/types";
 import Link from "next/link";
 
 export default function MiembrosPage() {
@@ -26,7 +26,7 @@ export default function MiembrosPage() {
   const [stats, setStats] = useState({ totalMiembros: 0, membresiaLibre: 0, maxMiembros: 50 });
 
   const [selectedMiembro, setSelectedMiembro] = useState<Profile | null>(null);
-  const [modalDetalle, setModalDetalle] = useState(false);
+  const [modalGestion, setModalGestion] = useState(false);
   const [modalNuevo, setModalNuevo] = useState(false);
   const [nuevoEmail, setNuevoEmail] = useState("");
   const [nuevoNombre, setNuevoNombre] = useState("");
@@ -37,7 +37,17 @@ export default function MiembrosPage() {
   const [isMembresiaLibre, setIsMembresiaLibre] = useState(false);
   const [currentUser, setCurrentUser] = useState<Profile | null>(null);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
-  const [notasAdmin, setNotasAdmin] = useState("");
+  const [historialMembresias, setHistorialMembresias] = useState<Membership[]>([]);
+  const [isActivar, setIsActivar] = useState(false);
+
+  // Sub-modal: nota membresía
+  const [modalNotaMembresia, setModalNotaMembresia] = useState(false);
+  const [notaMembresia, setNotaMembresia] = useState("");
+
+  // Sub-modal: nota admin
+  const [modalNotaAdmin, setModalNotaAdmin] = useState(false);
+  const [notaAdminInput, setNotaAdminInput] = useState("");
+  const [inscripcionAdminNote, setInscripcionAdminNote] = useState("");
 
   const fetchMiembrosData = async () => {
     const supabase = createClient();
@@ -165,12 +175,22 @@ export default function MiembrosPage() {
     }
   };
 
+  const loadHistorialMembresias = async (userId: string) => {
+    try {
+      const historial = await miembrosService.obtenerHistorialMembresias(userId);
+      setHistorialMembresias(historial);
+    } catch {
+      // silent
+    }
+  };
+
   const verDetalle = async (miembro: Profile) => {
     setSelectedMiembro(miembro);
     setPagoInscripcion(null);
     setIsMembresiaLibre(false);
     setIsSuperAdmin(miembro.role === "super_admin");
-    setNotasAdmin(miembro.inscription_admin_note || "");
+    setIsActivar(miembro.activo !== false);
+    setInscripcionAdminNote(miembro.inscription_admin_note || "");
     try {
       const supabase = createClient();
 
@@ -211,58 +231,70 @@ export default function MiembrosPage() {
 
       if (pagoInsc) setPagoInscripcion(pagoInsc);
       setIsMembresiaLibre(!!libreData);
+
+      await loadHistorialMembresias(miembro.id);
     } catch {
       showToast(messages.toast.errorCargaDatos, "error");
     }
-    setModalDetalle(true);
+    setModalGestion(true);
   };
 
-  const handleToggleStatus = async (miembro: Profile, activar: boolean) => {
-    const accion = activar ? "activar" : (miembro.activo === false ? "activar" : "desactivar");
-    if (!confirm(`¿${accion.charAt(0).toUpperCase() + accion.slice(1)} a ${miembro.full_name}?`)) return;
-    try {
-      await miembrosService.actualizarMiembro(miembro.id, { activo: activar });
-      showToast(activar ? messages.toast.miembroActivado : messages.toast.miembroDesactivado, "success");
-      await loadMiembros();
-    } catch {
-      showToast(messages.toast.miembroEstadoError, "error");
-    }
-  };
-
-  const handleEliminar = async (miembro: Profile) => {
-    if (!confirm(messages.miembros.confirmarEliminar.replace("{nombre}", miembro.full_name))) return;
-    try {
-      const res = await fetch(`/api/miembros?id=${miembro.id}`, { method: "DELETE" });
-      const data = await res.json();
-      if (!res.ok) {
-        showToast(data.error || messages.miembros.miembroEliminadoError, "error");
-        return;
-      }
-      showToast(messages.miembros.miembroEliminado, "success");
-      await loadMiembros();
-    } catch {
-      showToast(messages.miembros.miembroEliminadoError, "error");
-    }
-  };
-
-  const handleToggleMembresiaLibre = async (miembro: Profile) => {
+  const handleToggleMembresia = async (miembro: Profile) => {
     if (!currentUser) return;
-    const accion = isMembresiaLibre ? "remover membresía libre de" : "asignar membresía libre a";
-    if (!confirm(`¿${accion.charAt(0).toUpperCase() + accion.slice(1)} ${miembro.full_name}?`)) return;
     try {
-      await miembrosService.toggleMembresiaLibre(miembro.id, currentUser.id);
-      setIsMembresiaLibre(!isMembresiaLibre);
+      if (isMembresiaLibre) {
+        await miembrosService.desactivarMembresia(miembro.id);
+        setIsMembresiaLibre(false);
+      } else {
+        await miembrosService.activarMembresia(miembro.id, currentUser.id);
+        setIsMembresiaLibre(true);
+      }
+      await loadHistorialMembresias(miembro.id);
+      setModalNotaMembresia(true);
       await loadMiembros();
     } catch {
       showToast(messages.toast.membresiaLibreError, "error");
     }
   };
 
-  const handleToggleSuperAdmin = async (miembro: Profile) => {
-    const newRole = isSuperAdmin ? "miembro" : "super_admin";
-    const accion = isSuperAdmin ? "remover Super Admin de" : "asignar Super Admin a";
-    if (!confirm(`¿${accion.charAt(0).toUpperCase() + accion.slice(1)} ${miembro.full_name}?`)) return;
+  const handleSaveNotaMembresia = async () => {
+    if (!selectedMiembro) return;
     try {
+      const supabase = createClient();
+      const { data: latest } = await supabase
+        .from("memberships")
+        .select("id")
+        .eq("user_id", selectedMiembro.id)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (latest) {
+        await supabase
+          .from("memberships")
+          .update({ membership_note: notaMembresia || null })
+          .eq("id", latest.id);
+      }
+      setModalNotaMembresia(false);
+      setNotaMembresia("");
+      await loadHistorialMembresias(selectedMiembro.id);
+      showToast(messages.toast.notasGuardadas, "success");
+    } catch {
+      showToast(messages.toast.notasError, "error");
+    }
+  };
+
+  const handleToggleSuperAdmin = async (miembro: Profile) => {
+    if (!currentUser) return;
+    const newRole = isSuperAdmin ? "miembro" : "super_admin";
+    const fecha = new Date().toLocaleDateString("es-VE");
+    const accion = newRole === "super_admin" ? "Super Admin activado" : "Super Admin desactivado";
+    const linea = `* ${fecha} ${currentUser.full_name} - ${accion}`;
+
+    try {
+      const currentNote = miembro.inscription_admin_note || "";
+      const newNote = currentNote ? `${currentNote}\n${linea}` : linea;
+
       const res = await fetch("/api/profile", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -270,14 +302,16 @@ export default function MiembrosPage() {
           user_id: miembro.id,
           updates: {
             role: newRole,
-            inscription_admin_note: newRole === "super_admin" ? notasAdmin || null : null,
+            inscription_admin_note: newNote,
           },
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Error al cambiar rol");
+
       setIsSuperAdmin(newRole === "super_admin");
-      if (newRole === "miembro") setNotasAdmin("");
+      setInscripcionAdminNote(newNote);
+      setModalNotaAdmin(true);
       showToast(newRole === "super_admin" ? "Ahora es Super Admin" : "Rol cambiado a Miembro", "success");
       await loadMiembros();
     } catch {
@@ -285,24 +319,56 @@ export default function MiembrosPage() {
     }
   };
 
-  const handleSaveNotasAdmin = async (miembro: Profile) => {
+  const handleSaveNotaAdmin = async () => {
+    if (!selectedMiembro) return;
     try {
+      const nota = notaAdminInput.trim();
+      if (!nota) {
+        setModalNotaAdmin(false);
+        return;
+      }
+      const linea = `* ${nota}`;
+      const newNote = inscripcionAdminNote ? `${inscripcionAdminNote}\n${linea}` : linea;
+
       const res = await fetch("/api/profile", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          user_id: miembro.id,
-          updates: {
-            inscription_admin_note: notasAdmin || null,
-          },
+          user_id: selectedMiembro.id,
+          updates: { inscription_admin_note: newNote },
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Error al guardar notas");
+      if (!res.ok) throw new Error(data.error || "Error al guardar nota");
+
+      setInscripcionAdminNote(newNote);
+      setNotaAdminInput("");
+      setModalNotaAdmin(false);
       showToast(messages.toast.notasGuardadas, "success");
       await loadMiembros();
     } catch {
       showToast(messages.toast.notasError, "error");
+    }
+  };
+
+  const handleToggleActivar = async (miembro: Profile) => {
+    const activar = miembro.activo === false;
+    try {
+      const res = await fetch("/api/miembros/toggle-status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          user_id: miembro.id,
+          activar,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Error al cambiar estado");
+      setIsActivar(activar);
+      showToast(activar ? messages.toast.miembroActivado : messages.toast.miembroDesactivado, "success");
+      await loadMiembros();
+    } catch {
+      showToast(messages.toast.miembroEstadoError, "error");
     }
   };
 
@@ -416,23 +482,9 @@ export default function MiembrosPage() {
                             <Pencil className="w-4 h-4" />
                           </Button>
                         </Link>
-                        <Button variant="ghost" size="sm" onClick={() => verDetalle(miembro)}>
-                          <Eye className="w-4 h-4" />
+                        <Button variant="ghost" size="sm" onClick={() => verDetalle(miembro)} title="Gestionar">
+                          <Settings className="w-4 h-4" />
                         </Button>
-                        {miembro.activo !== false ? (
-                          <Button variant="ghost" size="sm" onClick={() => handleToggleStatus(miembro, false)} className="text-gym-danger hover:text-gym-danger" title="Desactivar">
-                            <UserX className="w-4 h-4" />
-                          </Button>
-                        ) : (
-                          <Button variant="ghost" size="sm" onClick={() => handleToggleStatus(miembro, true)} className="text-gym-success hover:text-gym-success" title="Activar">
-                            <UserCheck className="w-4 h-4" />
-                          </Button>
-                        )}
-                        {currentUser?.role === "super_admin" && (
-                          <Button variant="ghost" size="sm" onClick={() => handleEliminar(miembro)} className="text-gym-danger hover:text-gym-danger" title={messages.miembros.eliminarMiembro}>
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        )}
                       </div>
                     </td>
                   </tr>
@@ -471,22 +523,8 @@ export default function MiembrosPage() {
                   </Button>
                 </Link>
                 <Button variant="ghost" size="sm" className="flex-1" onClick={() => verDetalle(miembro)}>
-                  <Eye className="w-4 h-4 mr-1" /> Ver detalle
+                  <Settings className="w-4 h-4 mr-1" /> Gestionar
                 </Button>
-                {miembro.activo !== false ? (
-                  <Button variant="ghost" size="sm" onClick={() => handleToggleStatus(miembro, false)} className="text-gym-danger">
-                    <UserX className="w-4 h-4" />
-                  </Button>
-                ) : (
-                  <Button variant="ghost" size="sm" onClick={() => handleToggleStatus(miembro, true)} className="text-gym-success">
-                    <UserCheck className="w-4 h-4" />
-                  </Button>
-                )}
-                {currentUser?.role === "super_admin" && (
-                  <Button variant="ghost" size="sm" onClick={() => handleEliminar(miembro)} className="text-gym-danger">
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
-                )}
               </div>
             </CardContent>
           </Card>
@@ -502,35 +540,31 @@ export default function MiembrosPage() {
         </Card>
       )}
 
-      {/* Modal Detalle Miembro */}
-      <Modal isOpen={modalDetalle} onClose={() => setModalDetalle(false)} title="Detalle del Miembro">
+      {/* Modal Gestión */}
+      <Modal isOpen={modalGestion} onClose={() => setModalGestion(false)} title="Gestión">
         {selectedMiembro && (
           <div className="space-y-4">
-            {currentUser?.role === "super_admin" && (
-              <Link
-                href={`/dashboard/perfil?user_id=${selectedMiembro.id}`}
-                onClick={() => setModalDetalle(false)}
-                className="flex items-center gap-2 p-3 bg-gym-primary/10 rounded-xl hover:bg-gym-primary/20 transition-colors text-gym-primary"
-              >
-                <Settings className="w-4 h-4" />
-                <span className="text-sm font-medium">Editar perfil de este miembro</span>
-              </Link>
-            )}
+            {/* Header: Avatar + Badges */}
             <div className="flex items-center gap-4">
               <Avatar src={selectedMiembro.avatar_url} alt={selectedMiembro.full_name} size="lg" />
               <div>
                 <h3 className="font-semibold text-gym-text">{selectedMiembro.full_name}</h3>
                 <p className="text-sm text-gym-muted">{selectedMiembro.email || "Sin email"}</p>
-                <div className="flex gap-2 mt-1">
+                <div className="flex gap-2 mt-1 flex-wrap">
                   <Badge variant={selectedMiembro.role === "super_admin" ? "primary" : "secondary"}>
                     {selectedMiembro.role === "super_admin" ? "Super Admin" : "Miembro"}
                   </Badge>
                   <Badge variant={selectedMiembro.activo !== false ? "success" : "danger"}>
                     {selectedMiembro.activo !== false ? "Activo" : "Inactivo"}
                   </Badge>
+                  <Badge variant={pagoInscripcion ? "success" : "warning"}>
+                    Inscripción: {pagoInscripcion ? "Pagada" : "Pendiente"}
+                  </Badge>
                 </div>
               </div>
             </div>
+
+            {/* Info grid */}
             <div className="grid grid-cols-2 gap-3 text-sm">
               <div>
                 <p className="text-gym-muted">Cédula</p>
@@ -540,45 +574,27 @@ export default function MiembrosPage() {
                 <p className="text-gym-muted">WhatsApp</p>
                 <p className="text-gym-text">{selectedMiembro.phone_number || "—"}</p>
               </div>
-
               <div>
                 <p className="text-gym-muted">Registro</p>
                 <p className="text-gym-text">{formatDate(selectedMiembro.start_date || selectedMiembro.created_at)}</p>
               </div>
-            </div>
-
-            {/* Inscripción desde pagos */}
-            <div className="p-4 bg-gym-bg rounded-xl">
-              <p className="text-sm font-medium text-gym-muted mb-2">Inscripción</p>
-              {pagoInscripcion ? (
+              {pagoInscripcion && (
                 <div>
-                  <div className="flex items-center justify-between">
-                    <Badge variant="success">Pagada</Badge>
-                    <span className="text-lg font-bold text-gym-text neon-text">{formatCurrency(pagoInscripcion.detail?.reduce((s, d) => s + d.payment_amount, 0) || 0)}</span>
-                  </div>
-                  <p className="text-xs text-gym-muted mt-1">
-                    Pago: {formatDateTime(pagoInscripcion.created_at)}
-                  </p>
-                  {pagoInscripcion.approved_at && (
-                    <p className="text-xs text-gym-success">
-                      Confirmado: {formatDateTime(pagoInscripcion.approved_at)}
-                    </p>
-                  )}
+                  <p className="text-gym-muted">Monto Inscripción</p>
+                  <p className="text-gym-text font-bold">{formatCurrency(pagoInscripcion.detail?.reduce((s, d) => s + d.payment_amount, 0) || 0)}</p>
                 </div>
-              ) : (
-                <Badge variant="warning">Pendiente</Badge>
               )}
             </div>
 
-            {/* Membresía libre toggle */}
+            {/* Membresía toggle + historial */}
             <div className="p-4 bg-gym-bg rounded-xl">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gym-muted">Membresía Libre</p>
-                  <p className="text-xs text-gym-muted">Sin cargo mensual</p>
+                  <p className="text-sm font-medium text-gym-muted">Membresía</p>
+                  <p className="text-xs text-gym-muted">{isMembresiaLibre ? "Activa (sin cargo mensual)" : "Sin membresía activa"}</p>
                 </div>
                 <button
-                  onClick={() => handleToggleMembresiaLibre(selectedMiembro)}
+                  onClick={() => handleToggleMembresia(selectedMiembro)}
                   className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
                     isMembresiaLibre ? "bg-gym-secondary" : "bg-gym-border"
                   }`}
@@ -590,8 +606,24 @@ export default function MiembrosPage() {
                   />
                 </button>
               </div>
-              {isMembresiaLibre && (
-                <p className="text-xs text-gym-secondary mt-2">Este miembro no paga mensualidad</p>
+              {historialMembresias.length > 0 && (
+                <div className="mt-3 max-h-48 overflow-y-auto space-y-2">
+                  {historialMembresias.map((m) => (
+                    <div key={m.id} className="p-2 bg-gym-surface rounded-lg text-xs">
+                      <div className="flex items-center justify-between gap-2">
+                        <Badge variant={m.status === "activa" ? "success" : m.status === "vencida" ? "warning" : "danger"}>
+                          {m.status === "activa" ? "Activa" : m.status === "vencida" ? "Vencida" : "Cancelada"}
+                        </Badge>
+                        <span className="text-gym-muted">
+                          {formatDate(m.start_date)} — {m.end_date ? formatDate(m.end_date) : "Actual"}
+                        </span>
+                      </div>
+                      {m.membership_note && (
+                        <p className="text-gym-muted mt-1 italic">{m.membership_note}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
 
@@ -615,47 +647,83 @@ export default function MiembrosPage() {
                   />
                 </button>
               </div>
-              {isSuperAdmin && (
-                <div className="mt-3 space-y-2">
-                  <div>
-                    <label className="text-xs text-gym-muted mb-1 block">Nota de admin</label>
-                    <textarea
-                      value={notasAdmin}
-                      onChange={(e) => setNotasAdmin(e.target.value)}
-                      placeholder="Notas internas sobre este miembro..."
-                      rows={2}
-                      className="w-full px-3 py-2 bg-gym-surface border border-gym-border rounded-xl text-sm text-gym-text focus:outline-none focus:ring-2 focus:ring-gym-primary/50 resize-none"
-                    />
-                  </div>
-                  <Button size="sm" onClick={() => handleSaveNotasAdmin(selectedMiembro)}>
-                    Guardar Nota
-                  </Button>
-                </div>
-              )}
             </div>
 
-            {/* Status toggle */}
+            {/* Activar toggle */}
             <div className="p-4 bg-gym-bg rounded-xl">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gym-muted">Estado</p>
-                  <p className="text-xs text-gym-muted">{selectedMiembro.activo !== false ? "Activo" : "Inactivo"}</p>
+                  <p className="text-sm font-medium text-gym-muted">Activar</p>
+                  <p className="text-xs text-gym-muted">{isActivar ? "Miembro activo en el sistema" : "Miembro inactivo"}</p>
                 </div>
-                <div className="flex gap-2">
-                  {selectedMiembro.activo !== false ? (
-                    <Button variant="danger" size="sm" onClick={() => { handleToggleStatus(selectedMiembro, false); setModalDetalle(false); }}>
-                      <UserX className="w-4 h-4 mr-1" /> Desactivar
-                    </Button>
-                  ) : (
-                    <Button size="sm" onClick={() => { handleToggleStatus(selectedMiembro, true); setModalDetalle(false); }}>
-                      <UserCheck className="w-4 h-4 mr-1" /> Activar
-                    </Button>
-                  )}
-                </div>
+                <button
+                  onClick={() => handleToggleActivar(selectedMiembro)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    isActivar ? "bg-gym-success" : "bg-gym-border"
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      isActivar ? "translate-x-6" : "translate-x-1"
+                    }`}
+                  />
+                </button>
               </div>
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* Sub-modal: Nota Membresía */}
+      <Modal isOpen={modalNotaMembresia} onClose={() => { setModalNotaMembresia(false); setNotaMembresia(""); }} title="Nota de Membresía">
+        <div className="space-y-4">
+          <p className="text-sm text-gym-muted">Opcionalmente agrega una nota al registro de membresía.</p>
+          <textarea
+            value={notaMembresia}
+            onChange={(e) => setNotaMembresia(e.target.value)}
+            placeholder="Nota sobre esta membresía..."
+            rows={3}
+            className="w-full px-3 py-2 bg-gym-surface border border-gym-border rounded-xl text-sm text-gym-text focus:outline-none focus:ring-2 focus:ring-gym-primary/50 resize-none"
+          />
+          <div className="flex gap-2">
+            <Button variant="ghost" className="flex-1" onClick={() => { setModalNotaMembresia(false); setNotaMembresia(""); }}>
+              Omitir
+            </Button>
+            <Button className="flex-1" onClick={handleSaveNotaMembresia}>
+              Guardar
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Sub-modal: Nota Admin */}
+      <Modal isOpen={modalNotaAdmin} onClose={() => { setModalNotaAdmin(false); setNotaAdminInput(""); }} title="Nota de Admin">
+        <div className="space-y-4">
+          {inscripcionAdminNote && (
+            <div className="p-3 bg-gym-surface rounded-xl">
+              <label className="text-xs text-gym-muted mb-1 block">Historial</label>
+              <p className="text-sm text-gym-text whitespace-pre-wrap">{inscripcionAdminNote}</p>
+            </div>
+          )}
+          <div>
+            <label className="text-xs text-gym-muted mb-1 block">Nota</label>
+            <textarea
+              value={notaAdminInput}
+              onChange={(e) => setNotaAdminInput(e.target.value)}
+              placeholder="Agregar nota..."
+              rows={3}
+              className="w-full px-3 py-2 bg-gym-surface border border-gym-border rounded-xl text-sm text-gym-text focus:outline-none focus:ring-2 focus:ring-gym-primary/50 resize-none"
+            />
+          </div>
+          <div className="flex gap-2">
+            <Button variant="ghost" className="flex-1" onClick={() => { setModalNotaAdmin(false); setNotaAdminInput(""); }}>
+              Cerrar
+            </Button>
+            <Button className="flex-1" onClick={handleSaveNotaAdmin}>
+              Guardar Nota
+            </Button>
+          </div>
+        </div>
       </Modal>
 
       {/* Modal Nuevo Miembro */}

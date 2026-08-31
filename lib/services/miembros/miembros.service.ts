@@ -105,7 +105,7 @@ export class MiembrosService {
     };
   }
 
-  async toggleMembresiaLibre(userId: string, assignedBy: string): Promise<void> {
+  async activarMembresia(userId: string, assignedBy: string): Promise<void> {
     const {
       data: { user },
     } = await this.supabase.auth.getUser();
@@ -120,35 +120,57 @@ export class MiembrosService {
       throw new Error(messages.toast.noAutorizado);
     }
 
-    // Buscar membresía activa actual
-    const { data: membresiaActual } = await this.supabase
+    const hoy = new Date().toISOString().split("T")[0];
+
+    // Cancelar membresía perpetua activa anterior si existe
+    const { data: oldMembership } = await this.supabase
       .from("memberships")
-      .select("id, end_date")
+      .select("id")
       .eq("user_id", userId)
       .eq("status", "activa")
       .is("end_date", null)
       .maybeSingle();
 
-    if (membresiaActual) {
-      // Tiene membresía perpetua activa → cancelarla (desactivar)
+    if (oldMembership) {
       const { error } = await this.supabase
         .from("memberships")
-        .update({ status: "cancelada", end_date: new Date().toISOString().split("T")[0] })
-        .eq("id", membresiaActual.id);
-      if (error) throw error;
-    } else {
-      // No tiene perpetua → crear una nueva
-      const { error } = await this.supabase
-        .from("memberships")
-        .insert({
-          user_id: userId,
-          status: "activa",
-          start_date: new Date().toISOString().split("T")[0],
-          end_date: null,
-          assigned_by: assignedBy,
-        });
+        .update({ status: "cancelada", end_date: hoy })
+        .eq("id", oldMembership.id);
       if (error) throw error;
     }
+
+    // Crear nueva membresía perpetua activa
+    const { error } = await this.supabase
+      .from("memberships")
+      .insert({
+        user_id: userId,
+        status: "activa",
+        start_date: hoy,
+        end_date: null,
+        assigned_by: assignedBy,
+      });
+    if (error) throw error;
+  }
+
+  async desactivarMembresia(userId: string): Promise<void> {
+    const hoy = new Date().toISOString().split("T")[0];
+    const { error } = await this.supabase
+      .from("memberships")
+      .update({ status: "cancelada", end_date: hoy })
+      .eq("user_id", userId)
+      .eq("status", "activa")
+      .is("end_date", null);
+    if (error) throw error;
+  }
+
+  async obtenerHistorialMembresias(userId: string): Promise<Membership[]> {
+    const { data, error } = await this.supabase
+      .from("memberships")
+      .select("*, profiles!assigned_by(full_name)")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+    return (data || []) as Membership[];
   }
 }
 

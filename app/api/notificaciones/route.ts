@@ -69,9 +69,9 @@ export async function POST(request: NextRequest) {
     }
 
     const { data: configs } = await supabase
-      .from("notificacion_config")
+      .from("notification_config")
       .select("*")
-      .eq("habilitado", true);
+      .eq("is_active", true);
 
     if (!configs || configs.length === 0) {
       return NextResponse.json({
@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
       if (!debeEjecutar) continue;
 
       ejecutadas++;
-      const resultado = await ejecutarTipo(config, gymConfig, false);
+      const resultado = await ejecutarTipo(config, gymConfig, false, userId);
       if (resultado.sinProblemas) {
         enviados += resultado.miembrosNotificados;
       } else {
@@ -117,37 +117,37 @@ export async function POST(request: NextRequest) {
 
 async function verificarFrecuencia(config: {
   id: string;
-  frecuencia_diaria: boolean;
-  frecuencia_semanal: boolean;
-  frecuencia_quincenal: boolean;
-  frecuencia_mensual: boolean;
+  daily_frequency: boolean;
+  weekly_frequency: boolean;
+  biweekly_frequency: boolean;
+  monthly_frequency: boolean;
 }): Promise<boolean> {
   const tieneFrecuencia =
-    config.frecuencia_diaria ||
-    config.frecuencia_semanal ||
-    config.frecuencia_quincenal ||
-    config.frecuencia_mensual;
+    config.daily_frequency ||
+    config.weekly_frequency ||
+    config.biweekly_frequency ||
+    config.monthly_frequency;
   if (!tieneFrecuencia) return false;
 
   const { data: ultimoLog } = await supabase
-    .from("notificacion_log")
-    .select("fecha_hora_envio")
-    .eq("id_notificacion_config", config.id)
-    .order("fecha_hora_envio", { ascending: false })
+    .from("notification_log")
+    .select("sent_at")
+    .eq("notification_config_id", config.id)
+    .order("sent_at", { ascending: false })
     .limit(1)
     .single();
 
   if (!ultimoLog) return true;
 
   const ahora = new Date();
-  const ultimoEnvio = new Date(ultimoLog.fecha_hora_envio);
+  const ultimoEnvio = new Date(ultimoLog.sent_at);
   const diasDesdeUltimo =
     (ahora.getTime() - ultimoEnvio.getTime()) / (1000 * 60 * 60 * 24);
 
-  if (config.frecuencia_diaria && diasDesdeUltimo >= 1) return true;
-  if (config.frecuencia_semanal && diasDesdeUltimo >= 7) return true;
-  if (config.frecuencia_quincenal && diasDesdeUltimo >= 15) return true;
-  if (config.frecuencia_mensual && diasDesdeUltimo >= 30) return true;
+  if (config.daily_frequency && diasDesdeUltimo >= 1) return true;
+  if (config.weekly_frequency && diasDesdeUltimo >= 7) return true;
+  if (config.biweekly_frequency && diasDesdeUltimo >= 15) return true;
+  if (config.monthly_frequency && diasDesdeUltimo >= 30) return true;
 
   return false;
 }
@@ -155,8 +155,8 @@ async function verificarFrecuencia(config: {
 async function ejecutarTipo(
   config: {
     id: string;
-    tipo_notificacion: string;
-    dias_previo: number;
+    notification_type: string;
+    days_before: number;
   },
   gymConfig: {
     gym_name: string | null;
@@ -165,18 +165,19 @@ async function ejecutarTipo(
     max_members: number;
     address: string | null;
   },
-  forzar: boolean = false
+  forzar: boolean = false,
+  userId: string | null = null
 ): Promise<{ miembrosNotificados: number; sinProblemas: boolean }> {
   try {
     let miembrosNotificados = 0;
 
-    switch (config.tipo_notificacion) {
+    switch (config.notification_type) {
       case "miembros_deudores":
         miembrosNotificados = await procesarMiembrosDeudores(gymConfig);
         break;
       case "recordatorio_pago":
         miembrosNotificados = await procesarRecordatorioPago(
-          config.dias_previo,
+          config.days_before,
           gymConfig,
           forzar
         );
@@ -189,20 +190,22 @@ async function ejecutarTipo(
         break;
     }
 
-    await supabase.from("notificacion_log").insert({
-      id_notificacion_config: config.id,
-      miembros_notificados: miembrosNotificados,
-      sin_problemas: true,
+    await supabase.from("notification_log").insert({
+      notification_config_id: config.id,
+      members_notified: miembrosNotificados,
+      no_issues: true,
+      created_by: userId,
     });
 
     return { miembrosNotificados, sinProblemas: true };
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : String(error);
-    await supabase.from("notificacion_log").insert({
-      id_notificacion_config: config.id,
-      miembros_notificados: 0,
-      sin_problemas: false,
-      error_detalle: errorMsg,
+    await supabase.from("notification_log").insert({
+      notification_config_id: config.id,
+      members_notified: 0,
+      no_issues: false,
+      error_detail: errorMsg,
+      created_by: userId,
     });
     return { miembrosNotificados: 0, sinProblemas: false };
   }
@@ -262,20 +265,20 @@ async function procesarRecordatorioPago(
 
   if (!forzar) {
     const { data: configRecordatorio } = await supabase
-      .from("notificacion_config")
+      .from("notification_config")
       .select("id")
-      .eq("tipo_notificacion", "recordatorio_pago")
+      .eq("notification_type", "recordatorio_pago")
       .maybeSingle();
 
     if (configRecordatorio) {
       const inicioMes = new Date(anioActual, mesActual - 1, 1).toISOString();
       const finMes = new Date(anioActual, mesActual, 0, 23, 59, 59).toISOString();
       const { data: logExistente } = await supabase
-        .from("notificacion_log")
+        .from("notification_log")
         .select("id")
-        .eq("id_notificacion_config", configRecordatorio.id)
-        .gte("fecha_hora_envio", inicioMes)
-        .lte("fecha_hora_envio", finMes)
+        .eq("notification_config_id", configRecordatorio.id)
+        .gte("sent_at", inicioMes)
+        .lte("sent_at", finMes)
         .limit(1)
         .maybeSingle();
 
@@ -537,16 +540,16 @@ async function procesarEstatusSistema(gymConfig: Record<string, unknown>): Promi
     .single();
 
   const { data: erroresRecientes } = await supabase
-    .from("notificacion_log")
-    .select("id, fecha_hora_envio, error_detalle, notificacion_config(tipo_notificacion)")
-    .eq("sin_problemas", false)
-    .order("fecha_hora_envio", { ascending: false })
+    .from("notification_log")
+    .select("id, sent_at, error_detail, notification_config(notification_type)")
+    .eq("no_issues", false)
+    .order("sent_at", { ascending: false })
     .limit(10);
 
   const erroresFormateados = (erroresRecientes || []).map((e) => ({
-    tipo: (e as unknown as { notificacion_config?: { tipo_notificacion?: string } }).notificacion_config?.tipo_notificacion || "desconocido",
-    fecha: new Date(e.fecha_hora_envio).toLocaleDateString("es-ES"),
-    detalle: e.error_detalle || "Sin detalle",
+    tipo: (e as unknown as { notification_config?: { notification_type?: string } }).notification_config?.notification_type || "desconocido",
+    fecha: new Date(e.sent_at).toLocaleDateString("es-ES"),
+    detalle: e.error_detail || "Sin detalle",
   }));
 
   const { count: migraciones } = await supabase

@@ -38,7 +38,7 @@ serve(async (req) => {
       .select("role")
       .eq("id", user.id)
       .single();
-    if (!profile || !["super_admin", "admin"].includes(profile.role)) {
+    if (!profile || !["super_admin"].includes(profile.role)) {
       return new Response(
         JSON.stringify({ success: false, error: "Forbidden: Admin access required" }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -49,13 +49,12 @@ serve(async (req) => {
     const primerDiaMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
 
     const { data: pagosPendientes, error } = await supabase
-      .from("pagos")
+      .from("payments")
       .select(`
         *,
-        profile:profiles(full_name, id),
-        notificaciones_config:notificaciones_config(whatsapp_enabled, email_enabled, whatsapp_number)
+        profile:profiles(full_name, id)
       `)
-      .eq("estado", "pendiente")
+      .eq("status", "pendiente")
       .lt("created_at", primerDiaMes.toISOString());
 
     if (error) throw error;
@@ -63,33 +62,50 @@ serve(async (req) => {
     const resultados = [];
 
     for (const pago of pagosPendientes || []) {
-      const notisConfig = pago.notificaciones_config;
+      const notisConfigResult = await supabase
+        .from("notification_config")
+        .select("notify_by_email, notify_by_whatsapp")
+        .eq("notification_type", "miembros_deudores")
+        .eq("is_active", true)
+        .maybeSingle();
 
-      if (notisConfig?.email_enabled) {
-        await supabase.from("notificaciones_log").insert({
-          usuario_id: pago.usuario_id,
-          tipo: "pago_pendiente",
-          canal: "email",
-          enviado: true,
+      const notisConfig = notisConfigResult.data;
+
+      if (notisConfig?.notify_by_email) {
+        await supabase.from("notification_log").insert({
+          notification_config_id: (await supabase
+            .from("notification_config")
+            .select("id")
+            .eq("notification_type", "miembros_deudores")
+            .single()
+          ).data?.id,
+          members_notified: 1,
+          no_issues: true,
+          created_by: user.id,
         });
 
         resultados.push({
-          usuario_id: pago.usuario_id,
+          user_id: pago.user_id,
           canal: "email",
           estado: "enviado",
         });
       }
 
-      if (notisConfig?.whatsapp_enabled && notisConfig?.whatsapp_number) {
-        await supabase.from("notificaciones_log").insert({
-          usuario_id: pago.usuario_id,
-          tipo: "pago_pendiente",
-          canal: "whatsapp",
-          enviado: true,
+      if (notisConfig?.notify_by_whatsapp) {
+        await supabase.from("notification_log").insert({
+          notification_config_id: (await supabase
+            .from("notification_config")
+            .select("id")
+            .eq("notification_type", "miembros_deudores")
+            .single()
+          ).data?.id,
+          members_notified: 1,
+          no_issues: true,
+          created_by: user.id,
         });
 
         resultados.push({
-          usuario_id: pago.usuario_id,
+          user_id: pago.user_id,
           canal: "whatsapp",
           estado: "enviado",
         });

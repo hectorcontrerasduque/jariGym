@@ -2,7 +2,7 @@
 -- ADVERTENCIA: Reset completo
 
 -- 1. Limpiar tablas de datos (orden: hijos primero, luego padres)
-TRUNCATE TABLE payment_detail, payments, membresias, memberships, password_reset_tokens, notificacion_log, notificacion_config RESTART IDENTITY CASCADE;
+TRUNCATE TABLE payment_detail, payments, membresias, memberships, password_reset_tokens, notification_log, notification_config RESTART IDENTITY CASCADE;
 
 DO $$
 BEGIN
@@ -30,6 +30,6 @@ UNION ALL SELECT 'auth.users', COUNT(*) FROM auth.users
 UNION ALL SELECT 'membresias', COUNT(*) FROM membresias
 UNION ALL SELECT 'memberships', COUNT(*) FROM memberships
 UNION ALL SELECT 'migracion', COUNT(*) FROM migracion
-UNION ALL SELECT 'notificacion_config', COUNT(*) FROM notificacion_config
-UNION ALL SELECT 'notificacion_log', COUNT(*) FROM notificacion_log
+UNION ALL SELECT 'notification_config', COUNT(*) FROM notification_config
+UNION ALL SELECT 'notification_log', COUNT(*) FROM notification_log
 UNION ALL SELECT 'migracion pendientes', COUNT(*) FROM migracion WHERE migrado = 'no';

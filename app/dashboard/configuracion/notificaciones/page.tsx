@@ -87,7 +87,7 @@ export default function NotificacionesPage() {
   };
 
   const handleDiasPrevioChange = (id: string, value: number) => {
-    setConfigs(configs.map((c) => (c.id === id ? { ...c, dias_previo: value } : c)));
+    setConfigs(configs.map((c) => (c.id === id ? { ...c, days_before: value } : c)));
   };
 
   const handleSave = async () => {
@@ -99,14 +99,14 @@ export default function NotificacionesPage() {
 
       for (const config of configs) {
         await notificacionesService.updateNotificacionConfig(config.id, {
-          habilitado: config.habilitado,
-          frecuencia_diaria: config.frecuencia_diaria,
-          frecuencia_semanal: config.frecuencia_semanal,
-          frecuencia_quincenal: config.frecuencia_quincenal,
-          frecuencia_mensual: config.frecuencia_mensual,
-          dias_previo: config.dias_previo,
-          notificar_por_email: config.notificar_por_email,
-          notificar_por_whatsapp: false,
+          is_active: config.is_active,
+          daily_frequency: config.daily_frequency,
+          weekly_frequency: config.weekly_frequency,
+          biweekly_frequency: config.biweekly_frequency,
+          monthly_frequency: config.monthly_frequency,
+          days_before: config.days_before,
+          notify_by_email: config.notify_by_email,
+          notify_by_whatsapp: false,
         });
       }
 
@@ -224,7 +224,7 @@ export default function NotificacionesPage() {
 
       {gymConfig.notificaciones_enabled && <>
         {configs.map((config) => {
-          const info = tipoLabels[config.tipo_notificacion];
+          const info = tipoLabels[config.notification_type];
           return (
             <Card key={config.id} className="neon-card relative z-10">
               <CardHeader className="pb-2">
@@ -235,8 +235,8 @@ export default function NotificacionesPage() {
                   </div>
                   <Button
                     size="sm"
-                    onClick={() => handleEjecutarTipo(config.tipo_notificacion)}
-                    loading={executingTipo === config.tipo_notificacion}
+                    onClick={() => handleEjecutarTipo(config.notification_type)}
+                    loading={executingTipo === config.notification_type}
                     className="text-xs"
                   >
                     <Send className="w-3 h-3 mr-1" />
@@ -252,8 +252,8 @@ export default function NotificacionesPage() {
                     <input
                       type="checkbox"
                       className="sr-only peer"
-                      checked={config.habilitado}
-                      onChange={(e) => handleToggleConfig(config.id, "habilitado", e.target.checked)}
+                      checked={config.is_active}
+                      onChange={(e) => handleToggleConfig(config.id, "is_active", e.target.checked)}
                     />
                     <div className="w-11 h-6 bg-gym-surface peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-gym-primary rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-gym-primary"></div>
                   </label>
@@ -263,10 +263,10 @@ export default function NotificacionesPage() {
                   <p className="text-sm font-medium text-gym-text mb-2">{messages.notificaciones.frecuencia}</p>
                   <div className="flex flex-wrap gap-4">
                     {[
-                      { field: "frecuencia_diaria", label: messages.notificaciones.diariaS },
-                      { field: "frecuencia_semanal", label: messages.notificaciones.semanaS },
-                      { field: "frecuencia_quincenal", label: messages.notificaciones.quincenalS },
-                      { field: "frecuencia_mensual", label: messages.notificaciones.mensualS },
+                      { field: "daily_frequency", label: messages.notificaciones.diariaS },
+                      { field: "weekly_frequency", label: messages.notificaciones.semanaS },
+                      { field: "biweekly_frequency", label: messages.notificaciones.quincenalS },
+                      { field: "monthly_frequency", label: messages.notificaciones.mensualS },
                     ].map((freq) => (
                       <label key={freq.field} className="flex items-center gap-2 cursor-pointer">
                         <input
@@ -281,7 +281,7 @@ export default function NotificacionesPage() {
                   </div>
                 </div>
 
-                {config.tipo_notificacion === "recordatorio_pago" && (
+                {config.notification_type === "recordatorio_pago" && (
                   <div>
                     <p className="text-sm font-medium text-gym-text mb-1">{messages.notificaciones.diasPrevio}</p>
                     <p className="text-xs text-gym-muted mb-2">{messages.notificaciones.diasPrevioDesc}</p>
@@ -289,7 +289,7 @@ export default function NotificacionesPage() {
                       type="number"
                       min="1"
                       max="30"
-                      value={config.dias_previo}
+                      value={config.days_before}
                       onChange={(e) => handleDiasPrevioChange(config.id, parseInt(e.target.value) || 3)}
                       className="w-20 px-3 py-2 bg-gym-surface border border-gym-border rounded-xl text-gym-text focus:outline-none focus:ring-2 focus:ring-gym-primary"
                     />
@@ -303,8 +303,8 @@ export default function NotificacionesPage() {
                       <input
                         type="checkbox"
                         className="w-4 h-4 rounded border-gym-border text-gym-primary focus:ring-gym-primary"
-                        checked={config.notificar_por_email}
-                        onChange={(e) => handleToggleConfig(config.id, "notificar_por_email", e.target.checked)}
+                        checked={config.notify_by_email}
+                        onChange={(e) => handleToggleConfig(config.id, "notify_by_email", e.target.checked)}
                       />
                       <span className="text-sm text-gym-text">{messages.notificaciones.email}</span>
                     </label>
@@ -352,21 +352,21 @@ export default function NotificacionesPage() {
             ) : (
               <div className="max-h-64 overflow-y-auto space-y-2">
                 {historial.map((log) => {
-                  const tipoConfig = log.notificacion_config;
-                  const tipoInfo = tipoConfig ? tipoLabels[tipoConfig.tipo_notificacion] : null;
-                  const fecha = new Date(log.fecha_hora_envio);
+                  const tipoConfig = log.notification_config;
+                  const tipoInfo = tipoConfig ? tipoLabels[tipoConfig.notification_type] : null;
+                  const fecha = new Date(log.sent_at);
                   return (
                     <div key={log.id} className="flex items-center justify-between p-3 bg-gym-bg rounded-xl">
                       <div className="flex items-center gap-3 min-w-0">
-                        {log.sin_problemas ? (
+                        {log.no_issues ? (
                           <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
                         ) : (
                           <XCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
                         )}
                         <div className="min-w-0">
-                          <p className="text-sm font-medium text-gym-text truncate">{tipoInfo?.label || tipoConfig?.tipo_notificacion}</p>
+                          <p className="text-sm font-medium text-gym-text truncate">{tipoInfo?.label || tipoConfig?.notification_type}</p>
                           <p className="text-xs text-gym-muted">
-                            {fecha.getDate()} {mesesNombres[fecha.getMonth()]} {fecha.getHours().toString().padStart(2, "0")}:{fecha.getMinutes().toString().padStart(2, "0")} · {log.miembros_notificados} miembro(s)
+                            {fecha.getDate()} {mesesNombres[fecha.getMonth()]} {fecha.getHours().toString().padStart(2, "0")}:{fecha.getMinutes().toString().padStart(2, "0")} · {log.members_notified} miembro(s)
                           </p>
                         </div>
                       </div>

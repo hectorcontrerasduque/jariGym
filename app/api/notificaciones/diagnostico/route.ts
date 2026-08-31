@@ -86,24 +86,24 @@ export async function POST(request: Request) {
         : "No hay configuracion del gym",
     });
 
-    // 4. Tabla notificacion_config
+    // 4. Tabla notification_config
     const { data: notifConfigs } = await supabase
-      .from("notificacion_config")
+      .from("notification_config")
       .select("id");
     resultados.push({
-      paso: "Tabla notificacion_config",
+      paso: "Tabla notification_config",
       estado: notifConfigs && notifConfigs.length > 0 ? "ok" : "warning",
       detalle: notifConfigs
         ? `${notifConfigs.length} configuraciones registradas`
         : "No hay configuraciones de notificacion",
     });
 
-    // 5. Tabla notificacion_log
+    // 5. Tabla notification_log
     const { count: logCount } = await supabase
-      .from("notificacion_log")
+      .from("notification_log")
       .select("id", { count: "exact", head: true });
     resultados.push({
-      paso: "Tabla notificacion_log",
+      paso: "Tabla notification_log",
       estado: "ok",
       detalle: `${logCount || 0} registros en historial`,
     });
@@ -127,7 +127,7 @@ export async function POST(request: Request) {
     const { count: pagosPendientes } = await supabase
       .from("payments")
       .select("id", { count: "exact", head: true })
-      .in("estado", ["pendiente", "suspendido"]);
+      .in("status", ["pendiente", "suspendido"]);
     resultados.push({
       paso: "Pagos pendientes",
       estado: "ok",
@@ -136,16 +136,16 @@ export async function POST(request: Request) {
 
     // 8. Ultimo envio
     const { data: ultimoLog } = await supabase
-      .from("notificacion_log")
-      .select("fecha_hora_envio")
-      .order("fecha_hora_envio", { ascending: false })
+      .from("notification_log")
+      .select("sent_at")
+      .order("sent_at", { ascending: false })
       .limit(1)
       .single();
     resultados.push({
       paso: "Ultimo envio",
       estado: "ok",
       detalle: ultimoLog
-        ? `Ultimo envio: ${new Date(ultimoLog.fecha_hora_envio).toLocaleString("es-ES")}`
+        ? `Ultimo envio: ${new Date(ultimoLog.sent_at).toLocaleString("es-ES")}`
         : "Nunca se han enviado notificaciones",
     });
 

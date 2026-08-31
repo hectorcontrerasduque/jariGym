@@ -145,29 +145,33 @@ export type TipoNotificacion =
 
 export interface NotificacionConfig {
   id: string;
-  tipo_notificacion: TipoNotificacion;
-  habilitado: boolean;
-  frecuencia_diaria: boolean;
-  frecuencia_semanal: boolean;
-  frecuencia_quincenal: boolean;
-  frecuencia_mensual: boolean;
-  dias_previo: number;
-  notificar_por_email: boolean;
-  notificar_por_whatsapp: boolean;
+  notification_type: TipoNotificacion;
+  is_active: boolean;
+  daily_frequency: boolean;
+  weekly_frequency: boolean;
+  biweekly_frequency: boolean;
+  monthly_frequency: boolean;
+  days_before: number;
+  notify_by_email: boolean;
+  notify_by_whatsapp: boolean;
   created_at: string;
   updated_at: string;
+  created_by: string | null;
+  updated_by: string | null;
 }
 
 export interface NotificacionLog {
   id: string;
-  id_notificacion_config: string;
-  miembros_notificados: number;
-  fecha_hora_envio: string;
-  sin_problemas: boolean;
-  error_detalle: string | null;
+  notification_config_id: string;
+  members_notified: number;
+  sent_at: string;
+  no_issues: boolean;
+  error_detail: string | null;
   created_at: string;
   updated_at: string;
-  notificacion_config?: NotificacionConfig;
+  created_by: string | null;
+  updated_by: string | null;
+  notification_config?: NotificacionConfig;
 }
 
 export interface DashboardStats {

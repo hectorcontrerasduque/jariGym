@@ -54,11 +54,11 @@ export async function POST(request: Request) {
     const forzar = body?.forzar === true;
 
     let query = supabase
-      .from("notificacion_config")
+      .from("notification_config")
       .select("*")
-      .eq("habilitado", true);
+      .eq("is_active", true);
     if (tipoFiltro) {
-      query = query.eq("tipo_notificacion", tipoFiltro);
+      query = query.eq("notification_type", tipoFiltro);
     }
 
     const configs = await query;
@@ -72,7 +72,7 @@ export async function POST(request: Request) {
     let errores = 0;
 
     for (const config of configs.data) {
-      const { frecuencia_diaria, frecuencia_semanal, frecuencia_quincenal, frecuencia_mensual, dias_previo } = config;
+      const { daily_frequency, weekly_frequency, biweekly_frequency, monthly_frequency, days_before } = config;
 
       let candidatos;
       const hoy = new Date();
@@ -82,23 +82,23 @@ export async function POST(request: Request) {
           .select("id, full_name, email, start_date, activo, role")
           .maybeSingle();
       } else {
-        if (frecuencia_diaria) {
+        if (daily_frequency) {
           candidatos = await supabase
             .from("miembros")
             .select("id, full_name, email, start_date, activo, role")
             .eq("activo", true);
-        } else if (frecuencia_semanal) {
+        } else if (weekly_frequency) {
           candidatos = await supabase
             .from("miembros")
             .select("id, full_name, email, start_date, activo, role")
             .eq("activo", true)
             .not("role", "in", ["super_admin", "miembro"]);
-        } else if (frecuencia_quincenal) {
+        } else if (biweekly_frequency) {
           candidatos = await supabase
             .from("miembros")
             .select("id, full_name, email, start_date, activo, role")
             .eq("activo", true);
-        } else if (frecuencia_mensual) {
+        } else if (monthly_frequency) {
           candidatos = await supabase
             .from("miembros")
             .select("id, full_name, email, start_date, activo, role")
@@ -118,7 +118,7 @@ export async function POST(request: Request) {
         if (forzar) {
           // Modo forzar: envía a todos los miembros activos
           const diaCobro = getDiaCobro(miembro.start_date, hoy.getMonth() + 1, hoy.getFullYear(), gymConfig.billing_mode || "dia_uno");
-          const notif = getDiaNotificacion(diaCobro, dias_previo, hoy.getMonth() + 1, hoy.getFullYear());
+          const notif = getDiaNotificacion(diaCobro, days_before, hoy.getMonth() + 1, hoy.getFullYear());
 
           if (hoy.getDate() === notif.dia && hoy.getMonth() + 1 === notif.mes && hoy.getFullYear() === notif.anio) {
             try {
@@ -130,7 +130,7 @@ export async function POST(request: Request) {
         } else {
           // Modo normal: verifica si es el día de notificación para este miembro específico
           const diaCobro = getDiaCobro(miembro.start_date, hoy.getMonth() + 1, hoy.getFullYear(), gymConfig.billing_mode || "dia_uno");
-          const notif = getDiaNotificacion(diaCobro, dias_previo, hoy.getMonth() + 1, hoy.getFullYear());
+          const notif = getDiaNotificacion(diaCobro, days_before, hoy.getMonth() + 1, hoy.getFullYear());
 
           if (hoy.getDate() === notif.dia && hoy.getMonth() + 1 === notif.mes && hoy.getFullYear() === notif.anio) {
             try {

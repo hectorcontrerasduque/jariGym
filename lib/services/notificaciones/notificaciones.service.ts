@@ -33,22 +33,22 @@ export class NotificacionesService {
   // ─── CONFIG POR TIPO ──────────────────────────
 
   private defaultConfigs = [
-    { tipo_notificacion: "miembros_deudores", habilitado: true, frecuencia_semanal: true, frecuencia_quincenal: false, frecuencia_mensual: false, dias_previo: 7, notificar_por_email: true, notificar_por_whatsapp: false },
-    { tipo_notificacion: "recordatorio_pago", habilitado: true, frecuencia_semanal: false, frecuencia_quincenal: true, frecuencia_mensual: false, dias_previo: 7, notificar_por_email: true, notificar_por_whatsapp: false },
-    { tipo_notificacion: "resumen_dueno", habilitado: true, frecuencia_semanal: true, frecuencia_quincenal: false, frecuencia_mensual: false, dias_previo: 7, notificar_por_email: true, notificar_por_whatsapp: false },
-    { tipo_notificacion: "estatus_sistema", habilitado: true, frecuencia_semanal: false, frecuencia_quincenal: false, frecuencia_mensual: true, dias_previo: 7, notificar_por_email: true, notificar_por_whatsapp: false },
+    { notification_type: "miembros_deudores", is_active: true, daily_frequency: false, weekly_frequency: true, biweekly_frequency: false, monthly_frequency: false, days_before: 7, notify_by_email: true, notify_by_whatsapp: false },
+    { notification_type: "recordatorio_pago", is_active: true, daily_frequency: false, weekly_frequency: false, biweekly_frequency: true, monthly_frequency: false, days_before: 7, notify_by_email: true, notify_by_whatsapp: false },
+    { notification_type: "resumen_dueno", is_active: true, daily_frequency: false, weekly_frequency: true, biweekly_frequency: false, monthly_frequency: false, days_before: 7, notify_by_email: true, notify_by_whatsapp: false },
+    { notification_type: "estatus_sistema", is_active: true, daily_frequency: false, weekly_frequency: false, biweekly_frequency: false, monthly_frequency: true, days_before: 7, notify_by_email: true, notify_by_whatsapp: false },
   ];
 
   async ensureDefaultConfigs(): Promise<void> {
     const { data: existing } = await this.supabase
-      .from("notificacion_config")
+      .from("notification_config")
       .select("id")
       .limit(1);
 
     if (existing && existing.length > 0) return;
 
     const { error } = await this.supabase
-      .from("notificacion_config")
+      .from("notification_config")
       .insert(this.defaultConfigs);
     if (error) throw error;
   }
@@ -56,25 +56,25 @@ export class NotificacionesService {
   async getNotificacionesConfig(): Promise<NotificacionConfig[]> {
     await this.ensureDefaultConfigs();
     const { data, error } = await this.supabase
-      .from("notificacion_config")
+      .from("notification_config")
       .select("*")
-      .order("tipo_notificacion");
+      .order("notification_type");
     if (error) throw error;
     return data || [];
   }
 
   async getNotificacionConfigByTipo(tipo: string): Promise<NotificacionConfig | null> {
     const { data } = await this.supabase
-      .from("notificacion_config")
+      .from("notification_config")
       .select("*")
-      .eq("tipo_notificacion", tipo)
+      .eq("notification_type", tipo)
       .single();
     return data;
   }
 
   async updateNotificacionConfig(id: string, updates: Partial<NotificacionConfig>): Promise<void> {
     const { error } = await this.supabase
-      .from("notificacion_config")
+      .from("notification_config")
       .update(updates)
       .eq("id", id);
     if (error) throw error;
@@ -144,9 +144,9 @@ export class NotificacionesService {
 
   async getHistorial(limit = 50): Promise<NotificacionLog[]> {
     const { data, error } = await this.supabase
-      .from("notificacion_log")
-      .select("*, notificacion_config(*)")
-      .order("fecha_hora_envio", { ascending: false })
+      .from("notification_log")
+      .select("*, notification_config(*)")
+      .order("sent_at", { ascending: false })
       .limit(limit);
     if (error) throw error;
     return data || [];

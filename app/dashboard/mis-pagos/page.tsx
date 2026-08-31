@@ -24,10 +24,10 @@ const metodoLabels: Record<MetodoPago, string> = {
 };
 
 function getPagoLabel(pago: Payment): string {
-  const det = pago.detail?.[0];
-  if (det?.payment_type === "inscripcion") return "Inscripción";
-  if (det?.month_number && det?.year_number) return `${getMonthName(det.month_number)} ${det.year_number}`;
-  return "Pago";
+  const detalles = pago.detail || [];
+  if (!detalles.length) return "Pago";
+  if (detalles.some(d => d.payment_type === "inscripcion")) return "Inscripción";
+  return "Mensualidad";
 }
 
 function isInscripcion(pago: Payment): boolean {
@@ -1180,13 +1180,13 @@ setMembresiaLibre(!!libre.data);
               <p className="text-gym-muted">No hay pagos registrados</p>
             </div>
           ) : (
-            <div className="max-h-40 overflow-y-auto space-y-2 pr-1">
+            <div className="max-h-[60vh] overflow-y-auto space-y-2 pr-1">
               {pagosOrdenados.map(pago => (
-                <div key={pago.id} className="p-2.5 bg-gym-bg rounded-xl hover:bg-gym-surface transition-colors">
-                  <div className="flex items-center gap-2">
+                <div key={pago.id} className="p-3 bg-gym-bg rounded-xl hover:bg-gym-surface transition-colors">
+                  <div className="flex items-center justify-between">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-bold text-white truncate">
+                        <span className="text-base font-bold text-white truncate">
                           {getPagoLabel(pago)}
                         </span>
                         <Badge
@@ -1196,7 +1196,7 @@ setMembresiaLibre(!!libre.data);
                           {pago.status === "aprobado" ? "Aprobado" : pago.status === "rechazado" ? "Rechazado" : pago.status === "suspendido" ? "Suspendido" : "Pendiente"}
                         </Badge>
                       </div>
-                      <div className="flex items-center gap-2 text-[11px] text-gym-muted mt-0.5">
+                      <div className="flex items-center gap-2 text-[11px] text-gym-muted mt-1">
                         <span className="font-medium">
                           {(pago.detail?.reduce((s, d) => s + d.payment_amount, 0) || 0) > 0
                             ? formatCurrency(pago.detail?.reduce((s, d) => s + d.payment_amount, 0) || 0)
@@ -1207,7 +1207,7 @@ setMembresiaLibre(!!libre.data);
                         {pago.bill_code && (
                           <>
                             <span>·</span>
-                            <span className="font-mono">{pago.bill_code}</span>
+                            <span className="font-mono text-gym-secondary">{pago.bill_code}</span>
                           </>
                         )}
                       </div>

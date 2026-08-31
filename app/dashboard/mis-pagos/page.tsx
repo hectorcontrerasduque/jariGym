@@ -558,20 +558,22 @@ setMembresiaLibre(!!libre.data);
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-display font-bold text-gym-text neon-text">Mis Pagos</h1>
+          <h1 className="text-2xl font-display font-bold text-gym-text neon-text">{activeTab === "home" ? "Home" : "Mis Pagos"}</h1>
           <p className="text-gym-muted text-sm">
-            {miembroSeleccionado ? `Pagos de ${miembroSeleccionado.full_name || miembroSeleccionado.email}` : "Historial y registro de pagos"}
+            {activeTab === "home" ? "Resumen de tu cuenta" : miembroSeleccionado ? `Pagos de ${miembroSeleccionado.full_name || miembroSeleccionado.email}` : "Historial y registro de pagos"}
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <select
-            value={anioSeleccionado}
-            onChange={(e) => setAnioSeleccionado(Number(e.target.value))}
-            className="px-4 py-2 bg-gym-surface border border-gym-border rounded-xl text-gym-text focus:outline-none focus:ring-2 focus:ring-gym-primary"
-          >
-            {anios.map(a => <option key={a} value={a}>{a}</option>)}
-          </select>
-        </div>
+        {activeTab === "pagos" && (
+          <div className="flex items-center gap-2">
+            <select
+              value={anioSeleccionado}
+              onChange={(e) => setAnioSeleccionado(Number(e.target.value))}
+              className="px-4 py-2 bg-gym-surface border border-gym-border rounded-xl text-gym-text focus:outline-none focus:ring-2 focus:ring-gym-primary"
+            >
+              {anios.map(a => <option key={a} value={a}>{a}</option>)}
+            </select>
+          </div>
+        )}
       </div>
 
       {/* Super Admin: member selector */}

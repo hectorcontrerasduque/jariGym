@@ -70,6 +70,49 @@ export async function POST(request: Request) {
 
     const userPassword = password || randomBytes(12).toString("base64url").slice(0, 16);
 
+    const { data: { users }, error: listError } = await serviceSupabase.auth.admin.listUsers();
+
+    if (listError) {
+      return NextResponse.json({ error: messages.toast.miembroError }, { status: 400 });
+    }
+
+    const existingAuthUser = users?.find(u => u.email === email);
+
+    if (existingAuthUser) {
+      const orphanedUserId = existingAuthUser.id;
+
+      const { data: profileData, error: profileError } = await serviceSupabase
+        .from("profiles")
+        .upsert({
+          id: orphanedUserId,
+          full_name: nombre,
+          email: email,
+          role: "miembro",
+          inscription_paid: false,
+        }, { onConflict: "id" })
+        .select()
+        .single();
+
+      if (profileError) {
+        return NextResponse.json({ error: messages.toast.miembroError }, { status: 400 });
+      }
+
+      if (password) {
+        try {
+          await serviceSupabase.auth.admin.updateUserById(orphanedUserId, { password });
+        } catch {
+          // silent
+        }
+      }
+
+      return NextResponse.json({
+        miembro: profileData,
+        password,
+        loginEmail: email,
+        welcomeEmailSent: false,
+      });
+    }
+
     const { data: authUser, error: authError } = await serviceSupabase.auth.admin.createUser({
       email: email,
       email_confirm: true,
@@ -80,7 +123,7 @@ export async function POST(request: Request) {
     const userId = authUser?.user?.id;
 
     if (authError) {
-      return NextResponse.json({ error: messages.toast.miembroError }, { status: 400 });
+      return NextResponse.json({ error: authError.message || messages.toast.miembroError }, { status: 400 });
     }
 
     if (!userId) {

@@ -167,7 +167,7 @@ export default function MiembrosPage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        setEmailError(data.error);
+        showToast(data.error, "error");
         return;
       }
       setModalNuevo(false);

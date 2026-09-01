@@ -37,7 +37,7 @@ export function Modal({ isOpen, onClose, title, children, className, overlayClas
   return (
     <div
       ref={overlayRef}
-      className={cn("fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm", overlayClassName)}
+      className={cn("fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm", overlayClassName)}
       onClick={(e) => {
         if (e.target === overlayRef.current) onClose();
       }}
@@ -50,7 +50,7 @@ export function Modal({ isOpen, onClose, title, children, className, overlayClas
         )}
       >
         {title && (
-          <div className="flex items-center justify-between p-6 border-b border-gym-border sticky top-0 bg-gym-surface z-10">
+          <div className="flex items-center justify-between p-6 border-b border-gym-border bg-gym-surface">
             <h2 className="text-lg font-semibold text-gym-text">{title}</h2>
             <button
               onClick={onClose}

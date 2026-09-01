@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import Image from "next/image";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { configService, METODOS_PAGO_DEFAULT } from "@/lib/services/config/config.service";
+import { METODOS_PAGO_DEFAULT } from "@/lib/services/config/config.service";
 import { createClient } from "@/lib/supabase/client";
 import { Save, Building2, User, CreditCard, Upload, Dumbbell, Trash2 } from "lucide-react";
 import { showToast } from "@/components/ui/toast";
@@ -76,8 +76,15 @@ export default function ConfiguracionPage() {
 
     setSaving(true);
     try {
-      await configService.updateConfig(config);
-      await configService.saveMetodosPago(metodos);
+      const res = await fetch("/api/config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ config, metodos }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || "Error guardando");
+      }
       showToast(messages.toast.configuracionGuardada, "success");
       window.dispatchEvent(new Event("config:updated"));
     } catch {
@@ -129,7 +136,11 @@ export default function ConfiguracionPage() {
       const { data: urlData } = supabase.storage.from("logos").getPublicUrl(fileName);
       const logoUrl = `${urlData.publicUrl}?t=${Date.now()}`;
       setConfig({ ...config, logo_url: logoUrl });
-      await configService.updateConfig({ logo_url: logoUrl });
+      await fetch("/api/config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ config: { logo_url: logoUrl } }),
+      });
       showToast(messages.toast.logoActualizado, "success");
     } catch {
       showToast(messages.toast.logoErrorSubir, "error");
@@ -144,7 +155,11 @@ export default function ConfiguracionPage() {
       await supabase.storage.from("logos").remove(["logo.png"]).catch(() => {});
       await supabase.storage.from("logos").remove(["logo.jpg"]).catch(() => {});
       setConfig({ ...config, logo_url: "" });
-      await configService.updateConfig({ logo_url: "" });
+      await fetch("/api/config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ config: { logo_url: "" } }),
+      });
       showToast(messages.toast.logoEliminado, "success");
     } catch {
       showToast(messages.toast.logoErrorEliminar, "error");

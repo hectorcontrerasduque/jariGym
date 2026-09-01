@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { notificacionesService } from "@/lib/services/notificaciones/notificaciones.service";
-import { configService } from "@/lib/services/config/config.service";
+
 import {
   Save,
   Users,
@@ -93,9 +93,11 @@ export default function NotificacionesPage() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      await configService.updateConfig({
-        notificaciones_enabled: gymConfig.notificaciones_enabled,
-      } as Partial<GymConfig>);
+      await fetch("/api/config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ config: { notificaciones_enabled: gymConfig.notificaciones_enabled } }),
+      });
 
       for (const config of configs) {
         await notificacionesService.updateNotificacionConfig(config.id, {

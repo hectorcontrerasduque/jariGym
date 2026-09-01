@@ -173,28 +173,11 @@ export class PagosService {
   }
 
   async eliminarPago(pagoId: string): Promise<void> {
-    const {
-      data: { user },
-    } = await this.supabase.auth.getUser();
-    if (!user) throw new Error(messages.toast.noAutenticado);
-
-    const { data: profile } = await this.supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .single();
-    const isAdmin = profile?.role === "super_admin";
-
-    const query = this.supabase.from("payments").delete().eq("id", pagoId);
-
-    if (isAdmin) {
-      query.eq("status", "pendiente");
-    } else {
-      query.eq("user_id", user.id).eq("status", "pendiente");
+    const res = await fetch(`/api/pagos?id=${pagoId}`, { method: "DELETE" });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.error || messages.toast.pagoEliminadoError);
     }
-
-    const { error } = await query;
-    if (error) throw error;
   }
 
   async listarMisPagos(anio?: number, mes?: number, supabaseClient?: ReturnType<typeof createClient>): Promise<Pago[]> {

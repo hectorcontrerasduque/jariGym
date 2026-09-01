@@ -480,7 +480,7 @@ export default function MiembrosPage() {
       {/* Mobile floating button */}
       <button
         onClick={() => setModalNuevo(true)}
-        className="sm:hidden fixed bottom-24 right-4 z-40 w-14 h-14 rounded-full bg-gym-success/80 text-white shadow-lg shadow-gym-success/20 flex items-center justify-center active:scale-95 transition-all"
+        className="sm:hidden fixed bottom-24 right-4 z-[60] w-14 h-14 rounded-full bg-gym-success/80 text-white shadow-lg shadow-gym-success/20 flex items-center justify-center active:scale-95 transition-all"
       >
         <Plus className="w-6 h-6" />
       </button>
@@ -488,14 +488,14 @@ export default function MiembrosPage() {
       {/* Stats */}
       <div className="grid grid-cols-2 gap-3 relative z-10">
         <Card className="neon-card">
-          <CardContent className="p-3 text-center">
+          <CardContent className="p-4 text-center">
             <Users className="w-5 h-5 text-gym-primary mx-auto mb-1" />
             <p className="text-xl font-bold text-gym-text neon-text">{stats.totalMiembros}/{stats.maxMiembros}</p>
             <p className="text-xs text-gym-muted">Total</p>
           </CardContent>
         </Card>
         <Card className="neon-card">
-          <CardContent className="p-3 text-center">
+          <CardContent className="p-4 text-center">
             <p className="text-xl font-bold text-gym-secondary neon-text-secondary">{stats.membresiaLibre}</p>
             <p className="text-xs text-gym-muted">Libres</p>
           </CardContent>
@@ -581,7 +581,7 @@ export default function MiembrosPage() {
                 <div className="flex items-center gap-3 min-w-0">
                   <Avatar src={miembro.avatar_url} alt={miembro.full_name} size="md" />
                   <div className="min-w-0">
-                    <p className="font-medium text-gym-text truncate">{miembro.full_name}</p>
+                    <p className="font-medium text-gym-text">{miembro.full_name}</p>
                     <p className="text-xs text-gym-muted">{miembro.email || "Sin email"}</p>
                   </div>
                 </div>

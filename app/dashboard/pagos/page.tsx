@@ -11,6 +11,7 @@ import { formatCurrency, getMonthName } from "@/lib/utils";
 import { Check, X, Eye, CreditCard, Clock, CheckCircle, AlertTriangle, Bell, Search, Plus } from "lucide-react";
 import { showToast } from "@/components/ui/toast";
 import { messages } from "@/lib/messages";
+import { PageLoader } from "@/components/ui/page-loader";
 import type { Payment, MetodoPago, Profile } from "@/lib/types";
 import Link from "next/link";
 
@@ -173,11 +174,7 @@ export default function PagosPage() {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="animate-spin w-8 h-8 border-2 border-gym-primary border-t-transparent rounded-full" />
-      </div>
-    );
+    return <PageLoader />;
   }
 
   return (

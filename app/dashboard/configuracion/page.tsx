@@ -9,6 +9,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Save, Building2, User, CreditCard, Upload, Dumbbell, Trash2 } from "lucide-react";
 import { showToast } from "@/components/ui/toast";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
+import { PageLoader } from "@/components/ui/page-loader";
 import { messages } from "@/lib/messages";
 import type { GymConfig, MetodoPago, PaymentMethod } from "@/lib/types";
 
@@ -167,11 +168,7 @@ export default function ConfiguracionPage() {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="animate-spin w-8 h-8 border-2 border-gym-primary border-t-transparent rounded-full" />
-      </div>
-    );
+    return <PageLoader />;
   }
 
   return (

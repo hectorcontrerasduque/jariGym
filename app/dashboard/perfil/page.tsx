@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { createClient } from "@/lib/supabase/client";
 import { showToast } from "@/components/ui/toast";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
+import { PageLoader } from "@/components/ui/page-loader";
 import { messages } from "@/lib/messages";
 import {
   Save,
@@ -22,11 +23,7 @@ import type { Profile } from "@/lib/types";
 
 export default function PerfilPage() {
   return (
-    <Suspense fallback={
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="animate-spin w-8 h-8 border-2 border-gym-primary border-t-transparent rounded-full" />
-      </div>
-    }>
+    <Suspense fallback={<PageLoader />}>
       <PerfilContent />
     </Suspense>
   );
@@ -181,11 +178,7 @@ function PerfilContent() {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="animate-spin w-8 h-8 border-2 border-gym-primary border-t-transparent rounded-full" />
-      </div>
-    );
+    return <PageLoader />;
   }
 
   if (!profile) return null;

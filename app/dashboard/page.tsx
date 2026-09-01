@@ -28,6 +28,7 @@ import { miembrosService } from "@/lib/services/miembros/miembros.service";
 import { formatCurrency, getMonthName } from "@/lib/utils";
 import type { Payment, Profile } from "@/lib/types";
 import { showToast } from "@/components/ui/toast";
+import { PageLoader } from "@/components/ui/page-loader";
 import { messages } from "@/lib/messages";
 
 interface MonthlyStat {
@@ -168,19 +169,7 @@ export default function DashboardPage() {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh] relative z-10">
-        <div className="text-center">
-          <div className="relative mb-6">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-gym-primary/30 to-gym-secondary/20 flex items-center justify-center mx-auto animate-pulse-glow">
-              <Zap className="w-8 h-8 text-gym-primary" />
-            </div>
-          </div>
-          <div className="animate-spin w-10 h-10 border-2 border-gym-primary border-t-transparent rounded-full mx-auto" />
-          <p className="text-gym-muted text-sm mt-4">Cargando dashboard</p>
-        </div>
-      </div>
-    );
+    return <PageLoader message="Cargando dashboard" />;
   }
 
   const maxMiembros = monthlyStats ? Math.max(...monthlyStats.meses.map(m => m.pagados + m.sinPago + m.libres), 1) : 1;

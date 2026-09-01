@@ -14,6 +14,7 @@ import { Modal } from "@/components/ui/modal";
 import { messages } from "@/lib/messages";
 import { Avatar } from "@/components/ui/avatar";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
+import { PageLoader } from "@/components/ui/page-loader";
 import type { Payment, Profile, MetodoPago, PaymentMethod, GymConfig } from "@/lib/types";
 
 const metodoLabels: Record<MetodoPago, string> = {
@@ -592,11 +593,7 @@ setMembresiaLibre(!!libre.data);
   const mesesParaSuspender = [...mesesDisponiblesParaPagar].sort((a, b) => a.year_number - b.year_number || a.month_number - b.month_number);
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="animate-spin w-8 h-8 border-2 border-gym-primary border-t-transparent rounded-full" />
-      </div>
-    );
+    return <PageLoader />;
   }
 
   return (

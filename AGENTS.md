@@ -169,12 +169,28 @@ showToast(messages.toast.success, "success"); // or "error", "warning", "info"
 
 ### Modal Component
 - Auto-scrollable (`max-h-[90vh] overflow-y-auto`)
-- Sticky title bar
 - Escape key closes
+- Overlay: `bg-black/70 backdrop-blur-sm` (not 50 — too transparent)
+
+### Profile Creation (Centralized)
+```ts
+import { createOrUpdateProfile } from "@/lib/services/miembros/profile.service";
+// Always use this function. Never call .from("profiles").insert() or .upsert() directly.
+const profile = await createOrUpdateProfile(supabase, {
+  id: userId,        // required
+  email: email,      // required
+  full_name: name,   // required
+  role: "miembro",   // default: "miembro"
+  // optional: activo, registered, inscription_paid, inscription_date,
+  // start_date, avatar_url, phone_number
+});
+```
+- Uses `upsert` with `onConflict: "id"` — safe if `handle_new_user` trigger already created the row
+- **DO NOT** use for updating existing profiles (use `.update()` directly to preserve fields like `role`)
 
 ### Profile Type
 ```ts
-role: "super_admin" | "admin" | "miembro"
+role: "super_admin" | "miembro"
 activo: boolean | null  // null = active (DO NOT use `if (profile.activo)` — null is active!)
 registered: boolean  // must be true to login (except admin/owner emails)
 notas_admin: string | null

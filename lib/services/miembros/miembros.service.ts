@@ -122,13 +122,12 @@ export class MiembrosService {
 
     const hoy = new Date().toISOString().split("T")[0];
 
-    // Cancelar membresía perpetua activa anterior si existe
+    // Cancelar membresía activa anterior si existe
     const { data: oldMembership } = await this.supabase
       .from("memberships")
       .select("id")
       .eq("user_id", userId)
       .eq("status", "activa")
-      .is("end_date", null)
       .maybeSingle();
 
     if (oldMembership) {
@@ -158,8 +157,7 @@ export class MiembrosService {
       .from("memberships")
       .update({ status: "cancelada", end_date: hoy })
       .eq("user_id", userId)
-      .eq("status", "activa")
-      .is("end_date", null);
+      .eq("status", "activa");
     if (error) throw error;
   }
 

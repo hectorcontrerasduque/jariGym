@@ -287,9 +287,8 @@ export default function MiembrosPage() {
         await miembrosService.activarMembresia(miembro.id, currentUser.id);
         setIsMembresiaLibre(true);
       }
-      await loadHistorialMembresias(miembro.id);
-      // Set form values from latest membership
-      const latest = historialMembresias[0];
+      const historial = await loadHistorialMembresias(miembro.id);
+      const latest = historial[0];
       if (latest) {
         setMembresiaStartDate(latest.start_date);
         setMembresiaEndDate(latest.end_date || "");

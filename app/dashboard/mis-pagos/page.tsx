@@ -72,6 +72,7 @@ function MisPagosContent() {
   const [anios, setAnios] = useState<number[]>([]);
   const [anioSeleccionado, setAnioSeleccionado] = useState(new Date().getFullYear());
   const [gymConfig, setGymConfig] = useState<GymConfig | null>(null);
+  const [homeAnioSeleccionado, setHomeAnioSeleccionado] = useState(new Date().getFullYear());
 
   const isSuperAdmin = profile?.role === "super_admin";
   const isAdmin = profile?.role === "super_admin";
@@ -505,9 +506,25 @@ setMembresiaLibre(!!libre.data);
   const montoAprobado = aprobados.reduce((sum, p) => sum + (p.detail?.reduce((s, d) => s + d.payment_amount, 0) || 0), 0);
   const montoPendiente = pendientes.reduce((sum, p) => sum + (p.detail?.reduce((s, d) => s + d.payment_amount, 0) || 0), 0);
 
-  // Pagos pendientes / suspendido_pendiente
-  const pagosPendientes = pagos.filter(p => p.status === "pendiente" || p.status === "suspendido_pendiente");
-  const totalPendientes = pagosPendientes.reduce((sum, p) => sum + (p.detail?.reduce((s, d) => s + d.payment_amount, 0) || 0), 0);
+  // Home tab: filtered by year
+  const pagosHome = useMemo(() => {
+    return pagos.filter(p => {
+      const hasDetailInYear = p.detail?.some(d => d.year_number === homeAnioSeleccionado);
+      return hasDetailInYear;
+    });
+  }, [pagos, homeAnioSeleccionado]);
+
+  const aprobadosHome = pagosHome.filter(p => p.status === "aprobado");
+  const aprobadosMensualidad = aprobadosHome.filter(p => p.detail?.some(d => d.payment_type === "mensualidad"));
+  const aprobadosInscripcion = aprobadosHome.filter(p => p.detail?.some(d => d.payment_type === "inscripcion"));
+  const montoAprobadoMensualidad = aprobadosMensualidad.reduce((sum, p) => sum + (p.detail?.filter(d => d.payment_type === "mensualidad").reduce((s, d) => s + d.payment_amount, 0) || 0), 0);
+  const montoAprobadoInscripcion = aprobadosInscripcion.reduce((sum, p) => sum + (p.detail?.filter(d => d.payment_type === "inscripcion").reduce((s, d) => s + d.payment_amount, 0) || 0), 0);
+
+  const pendientesHome = pagosHome.filter(p => p.status === "pendiente" || p.status === "suspendido_pendiente");
+  const totalPendientesHome = pendientesHome.reduce((sum, p) => sum + (p.detail?.reduce((s, d) => s + d.payment_amount, 0) || 0), 0);
+
+  const rechazadosSuspensosHome = pagosHome.filter(p => p.status === "rechazado" || p.status === "suspendido");
+  const totalRechazadosSuspensosHome = rechazadosSuspensosHome.reduce((sum, p) => sum + (p.detail?.reduce((s, d) => s + d.payment_amount, 0) || 0), 0);
 
   // Morosidad (client-side)
   const morosidad = useMemo(() => {
@@ -697,29 +714,96 @@ setMembresiaLibre(!!libre.data);
           </div>
 
           {/* Quick stats */}
-          <div className="grid grid-cols-3 gap-3">
-            <div className="relative overflow-hidden rounded-xl border border-gym-border bg-gym-surface p-4 text-center">
-              <div className="absolute inset-0 bg-gradient-to-b from-gym-success/5 to-transparent" />
-              <div className="relative z-10">
-                <p className="text-2xl font-bold text-gym-success neon-text-success">{pagos.length}</p>
-                <p className="text-[10px] text-gym-muted mt-1 uppercase tracking-wide">Pagos</p>
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-xs text-gym-muted font-medium uppercase tracking-wide">Resumen</span>
+            <select
+              value={homeAnioSeleccionado}
+              onChange={(e) => setHomeAnioSeleccionado(Number(e.target.value))}
+              className="text-xs bg-gym-bg border border-gym-border rounded-lg px-2 py-1 text-gym-text"
+            >
+              {anios.map(a => <option key={a} value={a}>{a}</option>)}
+            </select>
+          </div>
+
+          {/* Card 1: Pagos aprobados */}
+          <div className="rounded-xl border border-gym-border bg-gym-surface p-4">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <CheckCircle className="w-4 h-4 text-gym-success" />
+                <span className="text-xs font-medium text-gym-muted uppercase tracking-wide">Pagos</span>
               </div>
+              <span className="text-lg font-bold text-gym-success">{aprobadosHome.length}</span>
             </div>
-            <div className="relative overflow-hidden rounded-xl border border-gym-border bg-gym-surface p-4 text-center">
-              <div className="absolute inset-0 bg-gradient-to-b from-gym-warning/5 to-transparent" />
-              <div className="relative z-10">
-                <p className="text-2xl font-bold text-gym-warning">{mesesDisponiblesParaPagar.length}</p>
-                <p className="text-[10px] text-gym-muted mt-1 uppercase tracking-wide">Pendientes</p>
+            <div className="space-y-1.5">
+              {aprobadosMensualidad.length > 0 && (
+                <div className="flex items-center justify-between px-2 py-1.5 bg-gym-bg/60 rounded-lg">
+                  <span className="text-xs text-gym-muted">Mensualidad ({aprobadosMensualidad.length})</span>
+                  <span className="text-xs font-semibold text-gym-success">{formatCurrency(montoAprobadoMensualidad)}</span>
+                </div>
+              )}
+              {aprobadosInscripcion.length > 0 && (
+                <div className="flex items-center justify-between px-2 py-1.5 bg-gym-bg/60 rounded-lg">
+                  <span className="text-xs text-gym-muted">Inscripción ({aprobadosInscripcion.length})</span>
+                  <span className="text-xs font-semibold text-gym-success">{formatCurrency(montoAprobadoInscripcion)}</span>
+                </div>
+              )}
+              {aprobadosHome.length === 0 && (
+                <p className="text-xs text-gym-muted text-center py-1">Sin pagos aprobados este año</p>
+              )}
+            </div>
+          </div>
+
+          {/* Card 2: Pendientes */}
+          <div className="rounded-xl border border-gym-border bg-gym-surface p-4">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <Clock className="w-4 h-4 text-gym-warning" />
+                <span className="text-xs font-medium text-gym-muted uppercase tracking-wide">Pendientes</span>
               </div>
-            </div>
-            <div className="relative overflow-hidden rounded-xl border border-gym-border bg-gym-surface p-4 text-center">
-              <div className="absolute inset-0 bg-gradient-to-b from-gym-primary/5 to-transparent" />
-              <div className="relative z-10">
-                <p className="text-lg font-bold text-gym-primary neon-text">{formatCurrency(montoAprobado)}</p>
-                <p className="text-[10px] text-gym-muted mt-1 uppercase tracking-wide">Pagado</p>
+              <div className="text-right">
+                <span className="text-lg font-bold text-gym-warning">{pendientesHome.length}</span>
+                {totalPendientesHome > 0 && (
+                  <p className="text-[10px] text-gym-warning">{formatCurrency(totalPendientesHome)}</p>
+                )}
               </div>
             </div>
           </div>
+
+          {/* Card 3: Suspendidos / Rechazados */}
+          {rechazadosSuspensosHome.length > 0 && (
+            <div className="rounded-xl border border-gym-border bg-gym-surface p-4">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-gym-danger" />
+                  <span className="text-xs font-medium text-gym-muted uppercase tracking-wide">Suspendidos / Rechazados</span>
+                </div>
+                <div className="text-right">
+                  <span className="text-lg font-bold text-gym-danger">{rechazadosSuspensosHome.length}</span>
+                  {totalRechazadosSuspensosHome > 0 && (
+                    <p className="text-[10px] text-gym-danger">{formatCurrency(totalRechazadosSuspensosHome)}</p>
+                  )}
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                {rechazadosSuspensosHome.filter(p => p.status === "rechazado").length > 0 && (
+                  <div className="flex items-center justify-between px-2 py-1.5 bg-gym-bg/60 rounded-lg">
+                    <span className="text-xs text-gym-muted">Rechazados ({rechazadosSuspensosHome.filter(p => p.status === "rechazado").length})</span>
+                    <span className="text-xs font-semibold text-gym-danger">
+                      {formatCurrency(rechazadosSuspensosHome.filter(p => p.status === "rechazado").reduce((sum, p) => sum + (p.detail?.reduce((s, d) => s + d.payment_amount, 0) || 0), 0))}
+                    </span>
+                  </div>
+                )}
+                {rechazadosSuspensosHome.filter(p => p.status === "suspendido").length > 0 && (
+                  <div className="flex items-center justify-between px-2 py-1.5 bg-gym-bg/60 rounded-lg">
+                    <span className="text-xs text-gym-muted">Suspendidos ({rechazadosSuspensosHome.filter(p => p.status === "suspendido").length})</span>
+                    <span className="text-xs font-semibold text-gym-danger">
+                      {formatCurrency(rechazadosSuspensosHome.filter(p => p.status === "suspendido").reduce((sum, p) => sum + (p.detail?.reduce((s, d) => s + d.payment_amount, 0) || 0), 0))}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Info del gym */}
           {gymConfig && (gymConfig.schedule || gymConfig.phone_number || gymConfig.contact_email || gymConfig.address) && (
@@ -842,7 +926,7 @@ setMembresiaLibre(!!libre.data);
           </Card>
 
           {/* Pendientes */}
-          {pagosPendientes.length > 0 && (
+          {pendientesHome.length > 0 && (
             <Card className="neon-card overflow-hidden">
               <div className="absolute inset-0 bg-gradient-to-br from-gym-warning/5 to-transparent pointer-events-none" />
               <button
@@ -856,11 +940,11 @@ setMembresiaLibre(!!libre.data);
                       <div className="w-7 h-7 rounded-lg bg-gym-warning/15 flex items-center justify-center">
                         <AlertTriangle className="w-4 h-4 text-gym-warning" />
                       </div>
-                      <span>Pendientes</span>
-                      <Badge variant="warning" className="text-[10px]">{pagosPendientes.length}</Badge>
+                      <span>Detalle Pendientes</span>
+                      <Badge variant="warning" className="text-[10px]">{pendientesHome.length}</Badge>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-semibold text-gym-warning">{formatCurrency(totalPendientes)}</span>
+                      <span className="text-sm font-semibold text-gym-warning">{formatCurrency(totalPendientesHome)}</span>
                       {expandedPendientes ? <ChevronDown className="w-4 h-4 text-gym-muted" /> : <ChevronRight className="w-4 h-4 text-gym-muted" />}
                     </div>
                   </CardTitle>
@@ -869,7 +953,7 @@ setMembresiaLibre(!!libre.data);
               {expandedPendientes && (
                 <CardContent className="relative">
                   <div className="space-y-2">
-                    {pagosPendientes.map(p => (
+                    {pendientesHome.map(p => (
                       <button
                         key={p.id}
                         type="button"

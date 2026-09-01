@@ -1,18 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Modal } from "@/components/ui/modal";
-import { createClient } from "@/lib/supabase/client";
-import { pagosService } from "@/lib/services/pagos/pagos.service";
-import { miembrosService } from "@/lib/services/miembros/miembros.service";
-
-
-import { formatCurrency, getMonthName } from "@/lib/utils";
-import type { Payment, Profile } from "@/lib/types";
-import { showToast } from "@/components/ui/toast";
-import { messages } from "@/lib/messages";
 import {
   Users,
   CheckCircle,
@@ -22,7 +10,25 @@ import {
   Gift,
   ChevronDown,
   ChevronRight,
+  TrendingUp,
+  BarChart3,
+  Zap,
 } from "lucide-react";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Modal } from "@/components/ui/modal";
+import { createClient } from "@/lib/supabase/client";
+import { pagosService } from "@/lib/services/pagos/pagos.service";
+import { miembrosService } from "@/lib/services/miembros/miembros.service";
+import { formatCurrency, getMonthName } from "@/lib/utils";
+import type { Payment, Profile } from "@/lib/types";
+import { showToast } from "@/components/ui/toast";
+import { messages } from "@/lib/messages";
 
 interface MonthlyStat {
   month_number: number;
@@ -34,6 +40,43 @@ interface MonthlyStat {
   libres: number;
   montoAcumulado: number;
   montoAdeudado: number;
+}
+
+const particleCount = 12;
+
+function generateParticles() {
+  return Array.from({ length: particleCount }, () => ({
+    left: Math.random() * 100,
+    top: Math.random() * 100,
+    delay: Math.random() * 6,
+    duration: 4 + Math.random() * 4,
+    size: 2 + Math.random() * 3,
+    colorIndex: Math.floor(Math.random() * 3),
+  }));
+}
+
+const particles = generateParticles();
+
+function FloatingParticles() {
+  return (
+    <div className="particles-container">
+      {particles.map((p, i) => (
+        <div
+          key={i}
+          className="particle"
+          style={{
+            left: `${p.left}%`,
+            top: `${p.top}%`,
+            animationDelay: `${p.delay}s`,
+            animationDuration: `${p.duration}s`,
+            width: `${p.size}px`,
+            height: `${p.size}px`,
+            background: p.colorIndex === 0 ? "rgba(56, 189, 248, 0.3)" : p.colorIndex === 1 ? "rgba(129, 140, 248, 0.2)" : "rgba(52, 211, 153, 0.2)",
+          }}
+        />
+      ))}
+    </div>
+  );
 }
 
 export default function DashboardPage() {
@@ -64,6 +107,7 @@ export default function DashboardPage() {
   const [collapsePagosMes, setCollapsePagosMes] = useState(true);
   const [collapsePagosRecientes, setCollapsePagosRecientes] = useState(true);
   const [collapseDistHoras, setCollapseDistHoras] = useState(true);
+  const [particleReady] = useState(true);
   const [miembros, setMiembros] = useState<Profile[]>([]);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [showBanner, setShowBanner] = useState(true);
@@ -117,7 +161,6 @@ export default function DashboardPage() {
     return () => { cancelled = true; };
   }, [anioSeleccionado]);
 
-
   const getNombreMiembro = (pago: Payment): string => {
     if (pago.profile?.full_name) return pago.profile.full_name;
     const miembro = miembros.find((m) => m.id === pago.user_id);
@@ -126,8 +169,16 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="animate-spin w-8 h-8 border-2 border-gym-primary border-t-transparent rounded-full" />
+      <div className="flex items-center justify-center min-h-[60vh] relative z-10">
+        <div className="text-center">
+          <div className="relative mb-6">
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-gym-primary/30 to-gym-secondary/20 flex items-center justify-center mx-auto animate-pulse-glow">
+              <Zap className="w-8 h-8 text-gym-primary" />
+            </div>
+          </div>
+          <div className="animate-spin w-10 h-10 border-2 border-gym-primary border-t-transparent rounded-full mx-auto" />
+          <p className="text-gym-muted text-sm mt-4">Cargando dashboard</p>
+        </div>
       </div>
     );
   }
@@ -142,7 +193,6 @@ export default function DashboardPage() {
       if (!isNaN(startH) && !isNaN(endH)) {
         for (let h = startH; h <= endH; h++) {
           const key = `${String(h).padStart(2, "0")}:00`;
-          // eslint-disable-next-line security/detect-object-injection
           hourCounts[key] = (hourCounts[key] || 0) + 1;
         }
       }
@@ -180,7 +230,6 @@ export default function DashboardPage() {
         .from("payments")
         .select("id, user_id")
         .eq("status", "aprobado");
-
       const pagoIds = (pagosHeader || []).map((p) => p.id);
       const { data: pagosDetalles } = await supabase
         .from("payment_detail")
@@ -189,7 +238,6 @@ export default function DashboardPage() {
         .eq("month_number", mesActual)
         .eq("year_number", anioActual)
         .eq("payment_type", "mensualidad");
-
       const pagoUsuarioMap = new Map((pagosHeader || []).map((p) => [p.id, p.user_id]));
       const idsAlDia = Array.from(new Set(
         (pagosDetalles || []).map((d) => pagoUsuarioMap.get(d.payment_id)).filter(Boolean)
@@ -239,300 +287,364 @@ export default function DashboardPage() {
     });
   };
 
-  return (
-    <div className="space-y-6 animate-fadeIn relative">
-      <div className="absolute top-0 right-0 w-72 h-72 bg-gym-primary/5 rounded-full blur-3xl animate-pulse" />
-      <div className="absolute bottom-0 left-0 w-72 h-72 bg-gym-secondary/5 rounded-full blur-3xl animate-pulse" style={{ animationDelay: "1s" }} />
+  const trendPercent = stats && stats.miembrosActivos > 0
+    ? Math.round(((stats.alDiaMensualidad || 0) / stats.miembrosActivos) * 100)
+    : 0;
 
-      {isSuperAdmin && showBanner && (
-        <div className="admin-welcome-banner rounded-2xl p-4 sm:p-5 relative z-10 overflow-hidden transition-opacity duration-1000" style={{ opacity: showBanner ? 1 : 0 }}>
-          <div className="absolute top-2 right-4 w-2 h-2 bg-yellow-400 rounded-full animate-float" style={{ animationDelay: "0s" }} />
-          <div className="absolute top-4 right-10 w-1.5 h-1.5 bg-amber-300 rounded-full animate-float" style={{ animationDelay: "0.5s" }} />
-          <div className="absolute bottom-3 right-6 w-1 h-1 bg-yellow-500 rounded-full animate-float" style={{ animationDelay: "1s" }} />
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-yellow-400 to-amber-500 flex items-center justify-center shadow-lg shadow-yellow-500/30">
-              <span className="text-lg">👑</span>
+  return (
+    <div className="relative min-h-screen bg-gym-bg">
+      {particleReady && <FloatingParticles />}
+
+      <div className="relative z-10 dashboard-container">
+        {isSuperAdmin && showBanner && (
+          <div className="admin-welcome-banner rounded-2xl p-4 sm:p-5 relative z-20 overflow-hidden mb-6 animate-slideUp">
+            <div className="absolute top-2 right-4 w-2 h-2 bg-yellow-400 rounded-full animate-float" style={{ animationDelay: "0s" }} />
+            <div className="absolute top-4 right-10 w-1.5 h-1.5 bg-amber-300 rounded-full animate-float" style={{ animationDelay: "0.5s" }} />
+            <div className="absolute bottom-3 right-6 w-1 h-1 bg-yellow-500 rounded-full animate-float" style={{ animationDelay: "1s" }} />
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-yellow-400 to-amber-500 flex items-center justify-center shadow-lg shadow-yellow-500/30">
+                <span className="text-lg">👑</span>
+              </div>
+              <div>
+                <p className="text-sm font-display font-bold">
+                  <span className="neon-text-warning">Bienvenido, Administrador</span>
+                </p>
+                <p className="text-xs text-gym-muted">Acceso total al sistema</p>
+              </div>
             </div>
-            <div>
-              <p className="text-sm font-display font-bold">
-                <span className="neon-gold">Bienvenido, Administrador</span>
-              </p>
-              <p className="text-xs text-gym-muted">Acceso total al sistema</p>
+          </div>
+        )}
+
+        {/* Hero Section */}
+        <div className="hero-section mb-6 animate-slideUp">
+          <div className="relative z-10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className="gym-logo-icon">
+                <Zap className="w-6 h-6 text-gym-primary" />
+              </div>
+              <div>
+                <h1 className="text-2xl sm:text-3xl font-display font-bold text-gym-text neon-text leading-tight">
+                  Dashboard
+                </h1>
+                <p className="text-gym-muted text-sm mt-1 flex items-center gap-2">
+                  <BarChart3 className="w-3 h-3" />
+                  Resumen general del gym
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-gym-bg/60 border border-gym-border">
+                <TrendingUp className="w-4 h-4 text-gym-success" />
+                <span className="text-xs text-gym-muted">Tendencia:</span>
+                <span className="text-sm font-bold text-gym-success">{trendPercent}% al día</span>
+              </div>
+              <select
+                value={anioSeleccionado}
+                onChange={(e) => setAnioSeleccionado(Number(e.target.value))}
+                className="px-4 py-2 bg-gym-surface border border-gym-border rounded-xl text-gym-text focus:outline-none focus:ring-2 focus:ring-gym-primary text-sm"
+              >
+                {anios.map((a) => (
+                  <option key={a} value={a}>{a}</option>
+                ))}
+              </select>
             </div>
           </div>
         </div>
-      )}
 
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 relative z-10">
-        <div>
-          <h1 className="text-2xl font-display font-bold text-gym-text neon-text">Dashboard</h1>
-          <p className="text-gym-muted text-sm">Resumen general del gym</p>
-        </div>
-        <select
-          value={anioSeleccionado}
-          onChange={(e) => setAnioSeleccionado(Number(e.target.value))}
-          className="px-4 py-2 bg-gym-surface border border-gym-border rounded-xl text-gym-text focus:outline-none focus:ring-2 focus:ring-gym-primary"
-        >
-          {anios.map((a) => (
-            <option key={a} value={a}>{a}</option>
-          ))}
-        </select>
-      </div>
-
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4 relative z-10">
-        {/* Miembros Activos */}
-        <Card className="neon-card hover:border-gym-primary/50 transition-all hover:shadow-[0_0_20px_rgba(56,189,248,0.15)] cursor-pointer" onClick={handleClickActivos}>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gym-primary/20 rounded-xl flex items-center justify-center">
-                <Users className="w-5 h-5 text-gym-primary" />
-              </div>
-              <div>
-                <p className="text-xs text-gym-muted">Miembros Activos</p>
-                <p className="text-xl font-bold text-gym-text neon-text">{stats?.miembrosActivos || 0}</p>
-              </div>
-            </div>
-            <div className="mt-3 space-y-1 text-xs">
-              <span className="text-gym-success flex items-center gap-1">
-                <CheckCircle className="w-3 h-3" /> {stats?.inscritosPagados || 0} inscritos
-              </span>
-              <span className="text-gym-warning flex items-center gap-1">
-                <Clock className="w-3 h-3" /> {stats?.inscritosPendientes || 0} pendientes
-              </span>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Morosos - inscripciones y mensualidades pendientes */}
-        <Card className="neon-card hover:border-gym-danger/50 transition-all hover:shadow-[0_0_20px_rgba(251,113,133,0.15)] cursor-pointer" onClick={handleClickMorosos}>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gym-danger/20 rounded-xl flex items-center justify-center">
-                <AlertTriangle className="w-5 h-5 text-gym-danger" />
-              </div>
-              <div>
-                <p className="text-xs text-gym-muted">Morosos</p>
-                <p className="text-xl font-bold text-gym-danger neon-text-danger">{stats?.deudoresTotal || 0}</p>
-              </div>
-            </div>
-            <div className="mt-3 space-y-1 text-xs">
-              {(stats?.deudoresInscripcion ?? 0) > 0 && (
-                <p className="text-gym-warning">{stats!.deudoresInscripcion} inscripciones</p>
-              )}
-              {(stats?.deudoresMensualidad ?? 0) > 0 && (
-                <p className="text-gym-danger">{stats!.deudoresMensualidad} mensualidades</p>
-              )}
-              <p className="text-gym-muted font-medium">{formatCurrency(stats?.montoDeuda || 0)} en deuda</p>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Al día - pagaron mes actual */}
-        <Card className="neon-card hover:border-gym-success/50 transition-all hover:shadow-[0_0_20px_rgba(52,211,153,0.15)] cursor-pointer" onClick={handleClickAlDia}>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gym-success/20 rounded-xl flex items-center justify-center">
-                <UserCheck className="w-5 h-5 text-gym-success" />
-              </div>
-              <div>
-                <p className="text-xs text-gym-muted">Al día</p>
-                <p className="text-xl font-bold text-gym-success neon-text-success">{stats?.alDiaMensualidad || 0}/{stats?.miembrosActivos || 0}</p>
-              </div>
-            </div>
-            <div className="mt-3 text-xs text-gym-muted">
-              {formatCurrency(stats?.montoPagado || 0)} cobrado
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Membresía Libre */}
-        <Card className="neon-card hover:border-gym-secondary/50 transition-all hover:shadow-[0_0_20px_rgba(129,140,248,0.15)] cursor-pointer" onClick={handleClickMembresiaLibre}>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gym-secondary/20 rounded-xl flex items-center justify-center">
-                <Gift className="w-5 h-5 text-gym-secondary" />
-              </div>
-              <div>
-                <p className="text-xs text-gym-muted">Membresía Libre</p>
-                <p className="text-xl font-bold text-gym-secondary neon-text-secondary">{stats?.membresiaLibre || 0}</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Bar Chart */}
-      {monthlyStats && (
-        <Card className="neon-card relative z-10">
-          <CardHeader className="pb-2 cursor-pointer select-none" onClick={() => setCollapsePagosMes(!collapsePagosMes)}>
-            <CardTitle className="flex items-center gap-2">
-              {collapsePagosMes ? <ChevronRight className="w-5 h-5 text-gym-primary" /> : <ChevronDown className="w-5 h-5 text-gym-primary" />}
-              Pagos por Mes - {anioSeleccionado}
-            </CardTitle>
-          </CardHeader>
-          {!collapsePagosMes && (
-          <CardContent>
-            <div className="space-y-4">
-              {(showAllMonths ? [...monthlyStats.meses].reverse() : [...monthlyStats.meses].reverse().slice(0, 3)).map((m) => {
-                const total = m.pagados + m.sinPago + m.libres;
-                const pagadosWidth = total > 0 ? (m.pagados / maxMiembros) * 100 : 0;
-                const sinPagoWidth = total > 0 ? (m.sinPago / maxMiembros) * 100 : 0;
-                const libresWidth = total > 0 ? (m.libres / maxMiembros) * 100 : 0;
-
-                return (
-                  <div key={`${m.year_number}-${m.month_number}`} className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-gym-text">{m.nombre} {m.year_number}</span>
-                      <div className="flex items-center gap-4 text-xs">
-                        <span className="flex items-center gap-1">
-                          <span className="w-3 h-3 rounded-sm bg-gym-success" />
-                          {m.pagados} pagados
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <span className="w-3 h-3 rounded-sm bg-gym-danger" />
-                          {m.sinPago} sin pago
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <span className="w-3 h-3 rounded-sm bg-gym-secondary" />
-                          {m.libres} libres
-                        </span>
-                      </div>
-                    </div>
-                    <div className="h-6 bg-gym-bg rounded-lg overflow-hidden flex">
-                      {pagadosWidth > 0 && (
-                        <div
-                          className="h-full bg-gym-success transition-all duration-500"
-                          style={{ width: `${pagadosWidth}%` }}
-                        />
-                      )}
-                      {sinPagoWidth > 0 && (
-                        <div
-                          className="h-full bg-gym-danger transition-all duration-500"
-                          style={{ width: `${sinPagoWidth}%` }}
-                        />
-                      )}
-                      {libresWidth > 0 && (
-                        <div
-                          className="h-full bg-gym-secondary transition-all duration-500"
-                          style={{ width: `${libresWidth}%` }}
-                        />
-                      )}
-                    </div>
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-gym-success font-medium">{formatCurrency(m.montoAcumulado)} cobrado</span>
-                      {m.sinPago > 0 && (
-                        <span className="text-gym-danger">{formatCurrency(m.montoAdeudado)} adeudado</span>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            <div className="flex items-center justify-center gap-6 mt-4 text-xs text-gym-muted">
-              <span className="flex items-center gap-1">
-                <span className="w-3 h-3 rounded-sm bg-gym-success" />
-                Pagado
-              </span>
-              <span className="flex items-center gap-1">
-                <span className="w-3 h-3 rounded-sm bg-gym-danger" />
-                Sin pago
-              </span>
-              <span className="flex items-center gap-1">
-                <span className="w-3 h-3 rounded-sm bg-gym-secondary" />
-                Membresía Libre
-              </span>
-            </div>
-            {monthlyStats.meses.length > 3 && (
-              <div className="text-center mt-3">
-                <button
-                  onClick={() => setShowAllMonths(!showAllMonths)}
-                  className="text-sm text-gym-primary hover:text-gym-primary/80 transition-colors font-medium"
-                >
-                  {showAllMonths ? "Ver menos" : `Ver todos los meses (${monthlyStats.meses.length})`}
-                </button>
-              </div>
-            )}
-          </CardContent>
-          )}
-        </Card>
-      )}
-
-      {/* Pagos recientes - solo aprobados */}
-      <Card className="neon-card relative z-10">
-        <CardHeader className="pb-2 cursor-pointer select-none" onClick={() => setCollapsePagosRecientes(!collapsePagosRecientes)}>
-          <CardTitle className="flex items-center gap-2">
-            {collapsePagosRecientes ? <ChevronRight className="w-5 h-5 text-gym-primary" /> : <ChevronDown className="w-5 h-5 text-gym-primary" />}
-            Pagos Recientes
-          </CardTitle>
-        </CardHeader>
-        {!collapsePagosRecientes && (
-        <CardContent>
-          {pagosRecientes.length === 0 ? (
-            <p className="text-center text-gym-muted py-8">{messages.dashboard.noPagosRegistrados}</p>
-          ) : (
-            <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
-              {pagosRecientes.map((pago: Payment) => {
-                const detailInfo = pago.detail?.map(d => {
-                  const mes = d.month_number ? getMonthName(d.month_number).slice(0, 3) : "";
-                  const anio = d.year_number || "";
-                  const tipo = d.payment_type === "inscripcion" ? "Insc." : "Mens.";
-                  return d.month_number ? `${mes} ${anio} (${tipo})` : tipo;
-                }).join(" | ") || "—";
-                const statusLabel = pago.status === "aprobado" ? "Aprobado" : pago.status === "rechazado" ? "Rechazado" : pago.status === "suspendido" ? "Suspendido" : "Pendiente";
-                return (
-                  <div key={pago.id} className="flex items-center justify-between p-3 bg-gym-bg rounded-xl hover:bg-gym-surface transition-colors">
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="font-medium text-gym-text text-sm truncate">{getNombreMiembro(pago)}</p>
-                        <Badge
-                          variant={pago.status === "aprobado" ? "success" : pago.status === "rechazado" ? "danger" : pago.status === "suspendido" ? "secondary" : "warning"}
-                          className="text-[10px] px-1.5 py-0 flex-shrink-0"
-                        >
-                          {statusLabel}
-                        </Badge>
-                      </div>
-                      <p className="text-xs text-gym-muted truncate">{detailInfo}</p>
-                    </div>
-                    <p className="font-semibold text-gym-text text-sm flex-shrink-0 ml-3">
-                      {formatCurrency(pago.detail?.reduce((s, d) => s + d.payment_amount, 0) || 0)}
-                    </p>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </CardContent>
-        )}
-      </Card>
-
-      {/* Distribución por hora de entrenamiento */}
-      <details open={!collapseDistHoras} onToggle={(e) => setCollapseDistHoras(!(e.target as HTMLDetailsElement).open)} className="neon-card relative z-10 rounded-2xl border border-gym-border bg-gym-surface">
-        <summary className="p-6 cursor-pointer select-none list-none flex items-center gap-2 font-semibold text-lg text-gym-text [&::-webkit-details-marker]:hidden">
-          {collapseDistHoras ? <ChevronRight className="w-5 h-5 text-gym-primary" /> : <ChevronDown className="w-5 h-5 text-gym-primary" />}
-          Distribución por hora
-        </summary>
-        <div className="px-6 pb-6">
-          {hourEntries.length === 0 ? (
-            <p className="text-center text-gym-muted py-6">Sin datos de horarios — configura hora de llegada y salida en los perfiles de los miembros</p>
-          ) : (
-            <div className="space-y-2">
-              {hourEntries.map(([hour, count]) => (
-                <div key={hour} className="flex items-center gap-3">
-                  <span className="text-xs text-gym-muted w-12 text-right font-mono">{hour}</span>
-                  <div className="flex-1 h-5 bg-gym-bg rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-gym-primary/70 rounded-full transition-all"
-                      style={{ width: `${(count / maxHourCount) * 100}%` }}
-                    />
-                  </div>
-                  <span className="text-xs text-gym-text w-6 text-right">{count}</span>
+        {/* Top Stats Row - 2 big cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+          <Card className="stat-card" onClick={handleClickActivos}>
+            <CardContent className="p-5">
+              <div className="flex items-start justify-between mb-4">
+                <div className="stat-icon stat-icon-primary">
+                  <Users className="w-5 h-5 text-gym-primary" />
                 </div>
-              ))}
-            </div>
-          )}
+                <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-gym-success/10 border border-gym-success/20">
+                  <CheckCircle className="w-3 h-3 text-gym-success" />
+                  <span className="text-[10px] font-medium text-gym-success">Activo</span>
+                </div>
+              </div>
+              <div className="flex items-end justify-between">
+                <div>
+                  <p className="text-xs text-gym-muted mb-1 uppercase tracking-wider">Miembros Activos</p>
+                  <div className="stat-number text-gym-text">{stats?.miembrosActivos || 0}</div>
+                </div>
+                <div className="flex flex-col items-end gap-0.5">
+                  <span className="text-[10px] text-gym-muted">{stats?.inscritosPagados || 0} inscritos</span>
+                  <span className="text-[10px] text-gym-warning">{stats?.inscritosPendientes || 0} pendientes</span>
+                </div>
+              </div>
+              <div className="mt-4 progress-bar">
+                <div
+                  className="progress-bar-fill bg-gradient-to-r from-gym-success to-gym-success/60"
+                  style={{ width: `${stats?.miembrosActivos ? (stats.inscritosPagados / stats.miembrosActivos) * 100 : 0}%` }}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="stat-card" onClick={handleClickMorosos}>
+            <CardContent className="p-5">
+              <div className="flex items-start justify-between mb-4">
+                <div className="stat-icon stat-icon-danger">
+                  <AlertTriangle className="w-5 h-5 text-gym-danger" />
+                </div>
+                <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-gym-danger/10 border border-gym-danger/20">
+                  <Clock className="w-3 h-3 text-gym-danger" />
+                  <span className="text-[10px] font-medium text-gym-danger">Deuda</span>
+                </div>
+              </div>
+              <div className="flex items-end justify-between">
+                <div>
+                  <p className="text-xs text-gym-muted mb-1 uppercase tracking-wider">Morosos</p>
+                  <div className="stat-number text-gym-danger">{stats?.deudoresTotal || 0}</div>
+                </div>
+                <div className="flex flex-col items-end gap-0.5">
+                  <span className="text-[10px] text-gym-danger">{stats?.deudoresMensualidad || 0} mens.</span>
+                  <span className="text-[10px] text-gym-warning">{stats?.deudoresInscripcion || 0} inscr.</span>
+                </div>
+              </div>
+              <div className="mt-4 flex items-center justify-between">
+                <span className="text-xs font-bold text-gym-danger">{formatCurrency(stats?.montoDeuda || 0)}</span>
+                <span className="text-[10px] text-gym-muted">en deuda total</span>
+              </div>
+            </CardContent>
+          </Card>
         </div>
-      </details>
+
+        {/* Second Stats Row - 2 cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+          <Card className="stat-card" onClick={handleClickAlDia}>
+            <CardContent className="p-5">
+              <div className="flex items-start justify-between mb-4">
+                <div className="stat-icon stat-icon-success">
+                  <UserCheck className="w-5 h-5 text-gym-success" />
+                </div>
+                <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-gym-success/10 border border-gym-success/20">
+                  <Zap className="w-3 h-3 text-gym-success" />
+                  <span className="text-[10px] font-medium text-gym-success">Al día</span>
+                </div>
+              </div>
+              <div className="flex items-end justify-between">
+                <div>
+                  <p className="text-xs text-gym-muted mb-1 uppercase tracking-wider">Al Día</p>
+                  <div className="stat-number text-gym-success">
+                    <span className="text-gym-text">{stats?.alDiaMensualidad || 0}</span>
+                    <span className="text-lg text-gym-muted mx-1">/</span>
+                    <span className="text-gym-text">{stats?.miembrosActivos || 0}</span>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-lg font-bold text-gym-text">{formatCurrency(stats?.montoPagado || 0)}</p>
+                  <p className="text-[10px] text-gym-muted">cobrado este mes</p>
+                </div>
+              </div>
+              <div className="mt-4 progress-bar">
+                <div
+                  className="progress-bar-fill bg-gradient-to-r from-gym-success to-gym-success/60"
+                  style={{ width: `${trendPercent}%` }}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="stat-card" onClick={handleClickMembresiaLibre}>
+            <CardContent className="p-5">
+              <div className="flex items-start justify-between mb-4">
+                <div className="stat-icon stat-icon-secondary">
+                  <Gift className="w-5 h-5 text-gym-secondary" />
+                </div>
+                <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-gym-secondary/10 border border-gym-secondary/20">
+                  <span className="text-[10px] font-medium text-gym-secondary">Libre</span>
+                </div>
+              </div>
+              <div className="flex items-end justify-between">
+                <div>
+                  <p className="text-xs text-gym-muted mb-1 uppercase tracking-wider">Membresía Libre</p>
+                  <div className="stat-number text-gym-secondary">{stats?.membresiaLibre || 0}</div>
+                </div>
+                <div className="flex flex-col items-end gap-0.5">
+                  <span className="text-[10px] text-gym-secondary">{stats?.totalMiembros || 0} total</span>
+                  <span className="text-[10px] text-gym-muted">miembros</span>
+                </div>
+              </div>
+              <div className="mt-4 flex items-center gap-2">
+                <div className="flex-1 h-2 bg-gym-bg rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-gym-secondary to-gym-secondary/60 rounded-full transition-all"
+                    style={{ width: `${stats?.totalMiembros ? (stats.membresiaLibre / stats.totalMiembros) * 100 : 0}%` }}
+                  />
+                </div>
+                <span className="text-[10px] text-gym-muted">{stats?.totalMiembros ? Math.round((stats.membresiaLibre / stats.totalMiembros) * 100) : 0}%</span>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Bar Chart */}
+        {monthlyStats && (
+          <Card className="chart-section mb-4 animate-slideUp" style={{ animationDelay: "0.1s" }}>
+            <CardHeader className="pb-2 cursor-pointer select-none" onClick={() => setCollapsePagosMes(!collapsePagosMes)}>
+              <CardTitle className="flex items-center gap-2">
+                {collapsePagosMes ? <ChevronRight className="w-5 h-5 text-gym-primary" /> : <ChevronDown className="w-5 h-5 text-gym-primary" />}
+                <BarChart3 className="w-4 h-4 text-gym-primary" />
+                Pagos por Mes - {anioSeleccionado}
+              </CardTitle>
+            </CardHeader>
+            {!collapsePagosMes && (
+              <CardContent>
+                <div className="space-y-4">
+                  {(showAllMonths ? [...monthlyStats.meses].reverse() : [...monthlyStats.meses].reverse().slice(0, 3)).map((m) => {
+                    const total = m.pagados + m.sinPago + m.libres;
+                    const pagadosWidth = total > 0 ? (m.pagados / maxMiembros) * 100 : 0;
+                    const sinPagoWidth = total > 0 ? (m.sinPago / maxMiembros) * 100 : 0;
+                    const libresWidth = total > 0 ? (m.libres / maxMiembros) * 100 : 0;
+
+                    return (
+                      <div key={`${m.year_number}-${m.month_number}`} className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium text-gym-text">{m.nombre} {m.year_number}</span>
+                          <div className="flex items-center gap-4 text-xs">
+                            <span className="flex items-center gap-1.5">
+                              <span className="w-2.5 h-2.5 rounded-sm bg-gym-success" />
+                              {m.pagados} pagados
+                            </span>
+                            <span className="flex items-center gap-1.5">
+                              <span className="w-2.5 h-2.5 rounded-sm bg-gym-danger" />
+                              {m.sinPago} sin pago
+                            </span>
+                            <span className="flex items-center gap-1.5">
+                              <span className="w-2.5 h-2.5 rounded-sm bg-gym-secondary" />
+                              {m.libres} libres
+                            </span>
+                          </div>
+                        </div>
+                        <div className="progress-bar">
+                          {pagadosWidth > 0 && (
+                            <div className="progress-bar-fill bg-gradient-to-r from-gym-success to-gym-success/70" style={{ width: `${pagadosWidth}%` }} />
+                          )}
+                          {sinPagoWidth > 0 && (
+                            <div className="progress-bar-fill bg-gradient-to-r from-gym-danger to-gym-danger/70" style={{ width: `${sinPagoWidth}%` }} />
+                          )}
+                          {libresWidth > 0 && (
+                            <div className="progress-bar-fill bg-gradient-to-r from-gym-secondary to-gym-secondary/70" style={{ width: `${libresWidth}%` }} />
+                          )}
+                        </div>
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-gym-success font-medium">{formatCurrency(m.montoAcumulado)} cobrado</span>
+                          {m.sinPago > 0 && (
+                            <span className="text-gym-danger">{formatCurrency(m.montoAdeudado)} adeudado</span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="flex items-center justify-center gap-6 mt-4 text-xs text-gym-muted">
+                  <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-gym-success" /> Pagado</span>
+                  <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-gym-danger" /> Sin pago</span>
+                  <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-gym-secondary" /> Libre</span>
+                </div>
+                {monthlyStats.meses.length > 3 && (
+                  <div className="text-center mt-3">
+                    <button
+                      onClick={() => setShowAllMonths(!showAllMonths)}
+                      className="text-sm text-gym-primary hover:text-gym-primary/80 transition-colors font-medium"
+                    >
+                      {showAllMonths ? "Ver menos" : `Ver todos los meses (${monthlyStats.meses.length})`}
+                    </button>
+                  </div>
+                )}
+              </CardContent>
+            )}
+          </Card>
+        )}
+
+        {/* Pagos recientes + Distribución hora */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+          <Card className="chart-section animate-slideUp" style={{ animationDelay: "0.2s" }}>
+            <CardHeader className="pb-2 cursor-pointer select-none" onClick={() => setCollapsePagosRecientes(!collapsePagosRecientes)}>
+              <CardTitle className="flex items-center gap-2">
+                {collapsePagosRecientes ? <ChevronRight className="w-5 h-5 text-gym-primary" /> : <ChevronDown className="w-5 h-5 text-gym-primary" />}
+                Pagos Recientes
+              </CardTitle>
+            </CardHeader>
+            {!collapsePagosRecientes && (
+              <CardContent>
+                {pagosRecientes.length === 0 ? (
+                  <p className="text-center text-gym-muted py-8">{messages.dashboard.noPagosRegistrados}</p>
+                ) : (
+                  <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+                    {pagosRecientes.map((pago: Payment) => {
+                      const detailInfo = pago.detail?.map(d => {
+                        const mes = d.month_number ? getMonthName(d.month_number).slice(0, 3) : "";
+                        const anio = d.year_number || "";
+                        const tipo = d.payment_type === "inscripcion" ? "Insc." : "Mens.";
+                        return d.month_number ? `${mes} ${anio} (${tipo})` : tipo;
+                      }).join(" | ") || "—";
+                      const statusLabel = pago.status === "aprobado" ? "Aprobado" : pago.status === "rechazado" ? "Rechazado" : pago.status === "suspendido" ? "Suspendido" : "Pendiente";
+                      return (
+                        <div key={pago.id} className="flex items-center justify-between p-3 bg-gym-bg rounded-xl hover:bg-gym-surface/80 transition-colors">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <p className="font-medium text-gym-text text-sm truncate">{getNombreMiembro(pago)}</p>
+                              <Badge
+                                variant={pago.status === "aprobado" ? "success" : pago.status === "rechazado" ? "danger" : pago.status === "suspendido" ? "secondary" : "warning"}
+                                className="text-[10px] px-1.5 py-0 flex-shrink-0"
+                              >
+                                {statusLabel}
+                              </Badge>
+                            </div>
+                            <p className="text-xs text-gym-muted truncate">{detailInfo}</p>
+                          </div>
+                          <p className="font-semibold text-gym-text text-sm flex-shrink-0 ml-3">
+                            {formatCurrency(pago.detail?.reduce((s, d) => s + d.payment_amount, 0) || 0)}
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardContent>
+            )}
+          </Card>
+
+          <details
+            open={!collapseDistHoras}
+            onToggle={(e) => setCollapseDistHoras(!(e.target as HTMLDetailsElement).open)}
+            className="chart-section mb-4 lg:mb-0 animate-slideUp"
+            style={{ animationDelay: "0.3s" }}
+          >
+            <summary className="p-6 cursor-pointer select-none list-none flex items-center gap-2 font-semibold text-lg text-gym-text [&::-webkit-details-marker]:hidden">
+              {collapseDistHoras ? <ChevronRight className="w-5 h-5 text-gym-primary" /> : <ChevronDown className="w-5 h-5 text-gym-primary" />}
+              <Zap className="w-4 h-4 text-gym-primary" />
+              Distribución por hora
+            </summary>
+            <div className="px-6 pb-6">
+              {hourEntries.length === 0 ? (
+                <p className="text-center text-gym-muted py-6">Sin datos de horarios</p>
+              ) : (
+                <div className="space-y-3">
+                  {hourEntries.map(([hour, count]) => (
+                    <div key={hour} className="flex items-center gap-3">
+                      <span className="text-xs text-gym-muted w-12 text-right font-mono">{hour}</span>
+                      <div className="flex-1 h-6 bg-gym-bg rounded-full overflow-hidden relative">
+                        <div
+                          className="h-full bg-gradient-to-r from-gym-primary to-gym-secondary rounded-full transition-all duration-700 relative overflow-hidden"
+                          style={{ width: `${(count / maxHourCount) * 100}%` }}
+                        >
+                          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer" />
+                        </div>
+                      </div>
+                      <span className="text-xs text-gym-text w-6 text-right font-bold">{count}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </details>
+        </div>
+      </div>
 
       <Modal isOpen={!!modalData} onClose={() => setModalData(null)} title={modalData?.title}>
         {loadingModal ? (

@@ -7,12 +7,13 @@ export async function GET() {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 
-  const { data, error } = await supabase
-    .from("gym_config")
-    .select("gym_name, logo_url, owner_email")
-    .limit(1)
-    .maybeSingle();
+  const [configResult, metodosResult] = await Promise.all([
+    supabase.from("gym_config").select("*").limit(1).maybeSingle(),
+    supabase.from("gym_config_payment_methods").select("*").order("payment_method"),
+  ]);
 
-  if (error || !data) return NextResponse.json({ gym_name: "GymApp" });
-  return NextResponse.json(data);
+  return NextResponse.json({
+    config: configResult.data || null,
+    metodos: metodosResult.data || [],
+  });
 }

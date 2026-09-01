@@ -47,10 +47,8 @@ export default function ConfiguracionPage() {
 
   const loadData = async () => {
     try {
-      const [configData, metodosData] = await Promise.all([
-        configService.getConfig(),
-        configService.getMetodosPago(),
-      ]);
+      const res = await fetch("/api/config/public");
+      const { config: configData, metodos: metodosData } = await res.json();
       if (configData) setConfig(configData);
       setMetodos(buildMetodosState(metodosData));
     } catch {

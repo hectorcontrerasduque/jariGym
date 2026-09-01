@@ -32,7 +32,7 @@ const [password, setPassword] = useState("");
   useEffect(() => {
     fetch("/api/config/public")
       .then((res) => res.json())
-      .then((config) => {
+      .then(({ config }) => {
         if (config?.gym_name) setGymName(config.gym_name);
         if (config?.logo_url) setGymLogo(config.logo_url);
       })

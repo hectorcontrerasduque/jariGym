@@ -60,7 +60,7 @@ export default function NotificacionesPage() {
   useEffect(() => {
     let active = true;
     Promise.all([
-      configService.getConfig(),
+      fetch("/api/config/public").then((r) => r.json()).then(({ config }) => config as GymConfig | null),
       notificacionesService.getNotificacionesConfig(),
       notificacionesService.getHistorial(4),
     ])

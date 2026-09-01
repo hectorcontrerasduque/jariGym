@@ -4,6 +4,7 @@ import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { messages } from "@/lib/messages";
 import { randomBytes } from "crypto";
 import { applyRateLimit } from "@/lib/middleware/rate-limit";
+import { createOrUpdateProfile } from "@/lib/services/miembros/profile.service";
 
 export async function POST(request: Request) {
   try {
@@ -81,36 +82,30 @@ export async function POST(request: Request) {
     if (existingAuthUser) {
       const orphanedUserId = existingAuthUser.id;
 
-      const { data: profileData, error: profileError } = await serviceSupabase
-        .from("profiles")
-        .upsert({
+      try {
+        const profileData = await createOrUpdateProfile(serviceSupabase, {
           id: orphanedUserId,
+          email,
           full_name: nombre,
-          email: email,
-          role: "miembro",
-          inscription_paid: false,
-        }, { onConflict: "id" })
-        .select()
-        .single();
+        });
 
-      if (profileError) {
+        if (password) {
+          try {
+            await serviceSupabase.auth.admin.updateUserById(orphanedUserId, { password });
+          } catch {
+            // silent
+          }
+        }
+
+        return NextResponse.json({
+          miembro: profileData,
+          password,
+          loginEmail: email,
+          welcomeEmailSent: false,
+        });
+      } catch {
         return NextResponse.json({ error: messages.toast.miembroError }, { status: 400 });
       }
-
-      if (password) {
-        try {
-          await serviceSupabase.auth.admin.updateUserById(orphanedUserId, { password });
-        } catch {
-          // silent
-        }
-      }
-
-      return NextResponse.json({
-        miembro: profileData,
-        password,
-        loginEmail: email,
-        welcomeEmailSent: false,
-      });
     }
 
     const { data: authUser, error: authError } = await serviceSupabase.auth.admin.createUser({
@@ -130,51 +125,45 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: messages.miembros.errorObtenerUsuario }, { status: 500 });
     }
 
-    const { data: profileData, error: profileError } = await serviceSupabase
-      .from("profiles")
-      .upsert({
+    try {
+      const profileData = await createOrUpdateProfile(serviceSupabase, {
         id: userId,
+        email,
         full_name: nombre,
-        email: email,
-        role: "miembro",
-        inscription_paid: false,
-      }, { onConflict: "id" })
-      .select()
-      .single();
+      });
 
-    if (profileError) {
+      let welcomeEmailSent = false;
+      try {
+        const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
+        const { error: inviteError } = await serviceSupabase.auth.admin.inviteUserByEmail(email, {
+          data: { full_name: nombre },
+          redirectTo: `${siteUrl}/login`,
+        });
+        if (!inviteError) {
+          welcomeEmailSent = true;
+        } else {
+          const { error: resetError } = await serviceSupabase.auth.admin.generateLink({
+            type: "magiclink",
+            email: email,
+          });
+          if (!resetError) {
+            welcomeEmailSent = true;
+          }
+        }
+      } catch {
+        // silent
+      }
+
+      return NextResponse.json({
+        miembro: profileData,
+        password: userPassword,
+        loginEmail: email,
+        welcomeEmailSent,
+      });
+    } catch {
       await serviceSupabase.auth.admin.deleteUser(userId);
       return NextResponse.json({ error: messages.toast.miembroError }, { status: 400 });
     }
-
-    let welcomeEmailSent = false;
-    try {
-      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-      const { error: inviteError } = await serviceSupabase.auth.admin.inviteUserByEmail(email, {
-        data: { full_name: nombre },
-        redirectTo: `${siteUrl}/login`,
-      });
-      if (!inviteError) {
-        welcomeEmailSent = true;
-      } else {
-        const { error: resetError } = await serviceSupabase.auth.admin.generateLink({
-          type: "magiclink",
-          email: email,
-        });
-        if (!resetError) {
-          welcomeEmailSent = true;
-        }
-      }
-    } catch {
-      // silent
-    }
-
-    return NextResponse.json({
-      miembro: profileData,
-      password: userPassword,
-      loginEmail: email,
-      welcomeEmailSent,
-    });
   } catch {
     return NextResponse.json({ error: messages.toast.errorGenerico }, { status: 500 });
   }

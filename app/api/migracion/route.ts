@@ -5,6 +5,7 @@ import { sendWelcomeEmail } from "@/lib/services/email/email.service";
 import { randomBytes } from "crypto";
 import { sanitizeOrFilter } from "@/lib/utils/sanitize";
 import { applyRateLimit } from "@/lib/middleware/rate-limit";
+import { createOrUpdateProfile } from "@/lib/services/miembros/profile.service";
 
 export async function POST(request: Request) {
   const rateLimitResponse = await applyRateLimit(request, {
@@ -164,18 +165,15 @@ export async function POST(request: Request) {
 
       if (existingAuth) {
         userId = existingAuth.id;
-        const { error: profileError } = await supabase.from("profiles").insert({
-          id: userId,
-          email,
-          full_name: profileNombre,
-          phone_number: whatsappFormatted,
-          role: "miembro",
-          activo: true,
-          registered: true,
-          start_date: fechaInicioCalc,
-          inscription_paid: false,
-        });
-        if (profileError) {
+        try {
+          await createOrUpdateProfile(supabase, {
+            id: userId,
+            email,
+            full_name: profileNombre,
+            phone_number: whatsappFormatted,
+            start_date: fechaInicioCalc,
+          });
+        } catch {
           return NextResponse.json({ error: messages.migracion.errorServidor }, { status: 500 });
         }
         isNewUser = true;
@@ -197,39 +195,16 @@ export async function POST(request: Request) {
         }
         userId = authUser.user.id;
 
-        // The handle_new_user trigger may have auto-created the profile row.
-        const { data: triggeredProfile } = await supabase
-          .from("profiles")
-          .select("id")
-          .eq("id", userId)
-          .maybeSingle();
-
-        const profileFields = {
-          email,
-          full_name: profileNombre,
-          phone_number: whatsappFormatted,
-          role: "miembro" as const,
-          activo: true,
-          registered: true,
-          start_date: fechaInicioCalc,
-          inscription_paid: false,
-        };
-
-        if (triggeredProfile) {
-          const { error: profileError } = await supabase
-            .from("profiles")
-            .update(profileFields)
-            .eq("id", userId);
-          if (profileError) {
-            return NextResponse.json({ error: messages.migracion.errorServidor }, { status: 500 });
-          }
-        } else {
-          const { error: profileError } = await supabase
-            .from("profiles")
-            .insert({ id: userId, ...profileFields });
-          if (profileError) {
-            return NextResponse.json({ error: messages.migracion.errorServidor }, { status: 500 });
-          }
+        try {
+          await createOrUpdateProfile(supabase, {
+            id: userId,
+            email,
+            full_name: profileNombre,
+            phone_number: whatsappFormatted,
+            start_date: fechaInicioCalc,
+          });
+        } catch {
+          return NextResponse.json({ error: messages.migracion.errorServidor }, { status: 500 });
         }
         isNewUser = true;
       }

@@ -34,7 +34,7 @@ vi.mock("@/lib/utils/sanitize", () => ({
 function chainReturn(data: unknown, error: unknown = null) {
   const chain: Record<string, ReturnType<typeof vi.fn>> = {};
   const methods = [
-    "select", "insert", "update", "delete",
+    "select", "insert", "update", "upsert", "delete",
     "eq", "ilike", "or", "in", "order", "limit",
     "maybeSingle", "single",
   ];

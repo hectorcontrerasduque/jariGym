@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { applyRateLimit } from "@/lib/middleware/rate-limit";
+import { createOrUpdateProfile } from "@/lib/services/miembros/profile.service";
 import type { NextRequest } from "next/server";
 
 export async function POST(request: NextRequest) {
@@ -117,29 +118,17 @@ export async function POST(request: NextRequest) {
       userId = newUser!.user!.id;
     }
 
-    const { error: profileError } = await serviceSupabase
-      .from("profiles")
-      .insert({
+    try {
+      await createOrUpdateProfile(serviceSupabase, {
         id: userId,
         email: emailLower,
         full_name: nombreCompleto,
         role: "super_admin",
-        activo: true,
-        registered: true,
-        start_date: new Date().toISOString().split("T")[0],
         inscription_paid: isOwner,
         inscription_date: isOwner ? new Date().toISOString().split("T")[0] : null,
       });
-
-    if (profileError) {
-      if (profileError.code === "23505") {
-        await serviceSupabase
-          .from("profiles")
-          .update({ role: "super_admin", activo: true, registered: true, full_name: nombreCompleto })
-          .eq("email", emailLower);
-        return NextResponse.json({ created: false, promoted: true });
-      }
-      return NextResponse.json({ created: false, error: profileError.message });
+    } catch {
+      return NextResponse.json({ created: false });
     }
 
     return NextResponse.json({ created: true });

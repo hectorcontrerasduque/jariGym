@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { messages } from "@/lib/messages";
+import { createOrUpdateProfile } from "@/lib/services/miembros/profile.service";
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
@@ -73,20 +74,15 @@ export async function GET(request: Request) {
           });
 
           if (newUser?.user?.id) {
-            await serviceSupabase
-              .from("profiles")
-              .insert({
-                id: newUser.user.id,
-                email: user.email,
-                full_name: user.user_metadata?.full_name || user.email,
-                avatar_url: avatarUrl,
-                role: "super_admin",
-                activo: true,
-                registered: true,
-                start_date: new Date().toISOString().split("T")[0],
-                inscription_paid: isGymOwner,
-                inscription_date: isGymOwner ? new Date().toISOString().split("T")[0] : null,
-              });
+            await createOrUpdateProfile(serviceSupabase, {
+              id: newUser.user.id,
+              email: user.email || "",
+              full_name: user.user_metadata?.full_name || user.email || "",
+              avatar_url: avatarUrl,
+              role: "super_admin",
+              inscription_paid: isGymOwner,
+              inscription_date: isGymOwner ? new Date().toISOString().split("T")[0] : null,
+            });
 
             const { data: retry } = await supabase
               .from("profiles")

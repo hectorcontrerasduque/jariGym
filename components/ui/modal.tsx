@@ -2,6 +2,7 @@
 
 import { cn } from "@/lib/utils";
 import { useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 
 interface ModalProps {
@@ -38,7 +39,7 @@ export function Modal({ isOpen, onClose, title, children, className, overlayClas
 
   if (!isOpen) return null;
 
-  return (
+  return createPortal(
     <div
       ref={overlayRef}
       className={cn(
@@ -70,6 +71,7 @@ export function Modal({ isOpen, onClose, title, children, className, overlayClas
         )}
         <div className="p-4 sm:p-6">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

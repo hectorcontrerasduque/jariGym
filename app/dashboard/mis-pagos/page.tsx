@@ -6,7 +6,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { pagosService } from "@/lib/services/pagos/pagos.service";
-import { configService } from "@/lib/services/config/config.service";
 import { createClient } from "@/lib/supabase/client";
 import { formatCurrency, getMonthName, getDiaCobro } from "@/lib/utils";
 import { CreditCard, CheckCircle, Clock, Calendar, Eye, Trash2, FileText, Plus, Search, Upload, Gift, AlertTriangle, ChevronDown, ChevronRight, X, Save, Home, Phone, Mail, MapPin } from "lucide-react";
@@ -178,37 +177,19 @@ function MisPagosContent() {
       aniosData = [new Date().getFullYear()];
     }
 
-    // 3. Cargar config
+    // 3. Cargar config + métodos via API route
     try {
-      const { data: cfg, error: cfgError } = await supabase
-        .from("gym_config")
-        .select("*")
-        .limit(1)
-        .single();
-      if (cfgError) {
-        // gym_config puede no existir aún - eso está bien
-        config = null;
-      } else {
-        config = cfg;
-      }
-    } catch (err) {
-      console.error("Error cargando config:", err);
+      const res = await fetch("/api/config/public");
+      const { config: cfg, metodos } = await res.json();
+      config = cfg;
+      setMetodosPago(metodos);
+    } catch {
       config = null;
     }
 
     setPagos(pagosData);
     setAnios(aniosData);
     setGymConfig(config);
-
-    // 4. Cargar métodos de pago
-    try {
-      const metodos = await configService.getMetodosPago();
-      setMetodosPago(metodos);
-    } catch (err) {
-      console.error("Error cargando métodos de pago:", err);
-      showToast(messages.toast.errorCargaDatos, "error");
-      setMetodosPago([]);
-    }
 
     // 5. Cargar miembros (para distribucion por hora en Home)
     try {

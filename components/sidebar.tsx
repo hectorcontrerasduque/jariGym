@@ -8,7 +8,6 @@ import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { useEffect, useState } from "react";
 import { Avatar } from "@/components/ui/avatar";
-import { configService } from "@/lib/services/config/config.service";
 import {
   LayoutDashboard,
   CreditCard,
@@ -101,7 +100,8 @@ export function Sidebar() {
     };
     const getGymConfig = async () => {
       try {
-        const config = await configService.getConfig();
+        const res = await fetch("/api/config/public");
+        const { config } = await res.json();
         if (config) {
           setHasConfig(true);
           if (config.gym_name) setGymName(config.gym_name);
@@ -110,7 +110,6 @@ export function Sidebar() {
           setHasConfig(false);
         }
       } catch {
-        // Non-critical: silent - fallback to no config
         setHasConfig(false);
       }
     };

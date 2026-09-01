@@ -6,7 +6,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { pagosService } from "@/lib/services/pagos/pagos.service";
-import { configService } from "@/lib/services/config/config.service";
 import { miembrosService } from "@/lib/services/miembros/miembros.service";
 import { createClient } from "@/lib/supabase/client";
 import { Upload, CheckCircle, DollarSign, User, FileText, Gift, Calendar, ArrowLeft, AlertTriangle, Send } from "lucide-react";
@@ -118,10 +117,9 @@ function ReportarPagoForm() {
           }
         }
 
-        const config = await configService.getConfig();
+        const res = await fetch("/api/config/public");
+        const { config, metodos } = await res.json();
         if (!cancelled) setGymConfig(config);
-
-        const metodos = await configService.getMetodosPago();
         if (!cancelled) setMetodosPago(metodos);
       } catch {
         if (!cancelled) showToast(messages.toast.errorCargaDatos, "error");

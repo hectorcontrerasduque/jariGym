@@ -70,13 +70,13 @@ export default function MiembrosPage() {
       setCurrentUser(profile);
     }
 
-    const [data, statsData, configData] = await Promise.all([
+    const [data, statsData, configRes] = await Promise.all([
       miembrosService.listarMiembros(),
       miembrosService.stats(),
-      supabase.from("gym_config").select("max_members").maybeSingle(),
+      fetch("/api/config/public").then((r) => r.json()),
     ]);
     setMiembros(data);
-    setStats({ ...statsData, maxMiembros: configData?.data?.max_members || 50 });
+    setStats({ ...statsData, maxMiembros: configRes?.config?.max_members || 50 });
   };
 
   useEffect(() => {
@@ -94,14 +94,14 @@ export default function MiembrosPage() {
           if (!cancelled) setCurrentUser(profile);
         }
 
-        const [data, statsData, configData] = await Promise.all([
+        const [data, statsData, configRes] = await Promise.all([
           miembrosService.listarMiembros(),
           miembrosService.stats(),
-          supabase.from("gym_config").select("max_members").maybeSingle(),
+          fetch("/api/config/public").then((r) => r.json()),
         ]);
         if (!cancelled) {
           setMiembros(data);
-          setStats({ ...statsData, maxMiembros: configData?.data?.max_members || 50 });
+          setStats({ ...statsData, maxMiembros: configRes?.config?.max_members || 50 });
         }
       } catch {
         if (!cancelled) showToast(messages.toast.errorCargaDatos, "error");

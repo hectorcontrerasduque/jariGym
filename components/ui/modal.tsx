@@ -15,6 +15,7 @@ interface ModalProps {
 
 export function Modal({ isOpen, onClose, title, children, className, overlayClassName }: ModalProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
@@ -24,6 +25,9 @@ export function Modal({ isOpen, onClose, title, children, className, overlayClas
     if (isOpen) {
       document.addEventListener("keydown", handleEscape);
       document.body.style.overflow = "hidden";
+      if (contentRef.current) {
+        contentRef.current.scrollTop = 0;
+      }
     }
 
     return () => {
@@ -37,20 +41,24 @@ export function Modal({ isOpen, onClose, title, children, className, overlayClas
   return (
     <div
       ref={overlayRef}
-      className={cn("fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm", overlayClassName)}
+      className={cn(
+        "fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm select-none",
+        overlayClassName
+      )}
       onClick={(e) => {
         if (e.target === overlayRef.current) onClose();
       }}
     >
       <div
+        ref={contentRef}
         className={cn(
-          "bg-gym-surface border border-gym-border rounded-2xl w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto",
+          "bg-gym-surface border border-gym-border rounded-2xl w-full max-w-md mx-4 max-h-[85vh] sm:max-h-[90vh] overflow-y-auto",
           "animate-in fade-in zoom-in-95 duration-200",
           className
         )}
       >
         {title && (
-          <div className="flex items-center justify-between p-6 border-b border-gym-border bg-gym-surface">
+          <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gym-border bg-gym-surface sticky top-0 z-10">
             <h2 className="text-lg font-semibold text-gym-text">{title}</h2>
             <button
               onClick={onClose}
@@ -60,7 +68,7 @@ export function Modal({ isOpen, onClose, title, children, className, overlayClas
             </button>
           </div>
         )}
-        <div className="p-6">{children}</div>
+        <div className="p-4 sm:p-6">{children}</div>
       </div>
     </div>
   );

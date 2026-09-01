@@ -11,11 +11,48 @@ import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { authService } from "@/lib/services/auth/auth.service";
 import { migracionService, type MigracionRecord } from "@/lib/services/migracion/migracion.service";
 import { createClient } from "@/lib/supabase/client";
-import { Dumbbell, CheckCircle, Mail } from "lucide-react";
+import { Dumbbell, CheckCircle, Mail, Zap } from "lucide-react";
 
 import { messages } from "@/lib/messages";
 import { showToast } from "@/components/ui/toast";
 import { AuthFooter } from "@/components/auth-footer";
+
+const particleCount = 10;
+
+function generateParticles() {
+  return Array.from({ length: particleCount }, () => ({
+    left: Math.random() * 100,
+    top: Math.random() * 100,
+    delay: Math.random() * 6,
+    duration: 4 + Math.random() * 4,
+    size: 2 + Math.random() * 3,
+    colorIndex: Math.floor(Math.random() * 3),
+  }));
+}
+
+const particles = generateParticles();
+
+function FloatingParticles() {
+  return (
+    <div className="particles-container">
+      {particles.map((p, i) => (
+        <div
+          key={i}
+          className="particle"
+          style={{
+            left: `${p.left}%`,
+            top: `${p.top}%`,
+            animationDelay: `${p.delay}s`,
+            animationDuration: `${p.duration}s`,
+            width: `${p.size}px`,
+            height: `${p.size}px`,
+            background: p.colorIndex === 0 ? "rgba(56, 189, 248, 0.25)" : p.colorIndex === 1 ? "rgba(129, 140, 248, 0.15)" : "rgba(52, 211, 153, 0.15)",
+          }}
+        />
+      ))}
+    </div>
+  );
+}
 
 export default function LoginPage() {
   return (
@@ -367,11 +404,13 @@ function LoginForm() {
   return (
     <div className="min-h-screen flex items-center justify-center p-4 pb-16 relative overflow-hidden">
       <LoadingOverlay show={loading} message={messages.common.procesando} />
+      <FloatingParticles />
       <div className="absolute inset-0 bg-gradient-to-br from-gym-primary/5 via-transparent to-gym-secondary/5" />
-      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-gym-primary/10 rounded-full blur-3xl animate-pulse" />
-      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-gym-secondary/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: "1s" }} />
+      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-gym-primary/8 rounded-full blur-3xl animate-pulse" />
+      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-gym-secondary/8 rounded-full blur-3xl animate-pulse" style={{ animationDelay: "1s" }} />
+      <div className="absolute top-[15%] right-[10%] w-64 h-64 bg-gym-success/5 rounded-full blur-3xl animate-pulse" style={{ animationDelay: "2s" }} />
 
-      <Card className="w-full max-w-md relative z-10 border-gym-primary/20 shadow-[0_0_40px_rgba(56,189,248,0.15)]">
+      <Card className="w-full max-w-md relative z-10 border-gym-primary/20 shadow-[0_0_40px_rgba(56,189,248,0.15)] animate-slideUp">
         <CardHeader className="text-center">
           <div className="mx-auto w-16 h-16 bg-gym-primary/20 rounded-2xl flex items-center justify-center mb-4 animate-pulse-glow overflow-hidden">
             {gymLogo ? (
@@ -391,7 +430,7 @@ function LoginForm() {
           <p className="text-gym-muted text-sm">{messages.auth.loginSubtitle}</p>
         </CardHeader>
         <CardContent className="space-y-4">
-          <Button variant="secondary" className="w-full border-gym-border hover:border-gym-primary/50 hover:shadow-[0_0_15px_rgba(56,189,248,0.2)]" onClick={handleGoogleLogin} disabled={loading} loading={loading}>
+          <Button variant="secondary" className="w-full border-gym-border hover:border-gym-primary/50 hover:shadow-[0_0_15px_rgba(56,189,248,0.2)] transition-all duration-300" onClick={handleGoogleLogin} disabled={loading} loading={loading}>
             <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
               <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
               <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
@@ -432,6 +471,7 @@ function LoginForm() {
               </button>
             </div>
             <Button type="submit" className="w-full" loading={loading}>
+              <Zap className="w-4 h-4 mr-2" />
               {messages.auth.loginButton}
             </Button>
           </form>

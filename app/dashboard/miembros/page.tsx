@@ -483,7 +483,7 @@ export default function MiembrosPage() {
       {/* Mobile floating button */}
       <button
         onClick={() => setModalNuevo(true)}
-        className="sm:hidden fixed bottom-20 right-4 z-40 w-14 h-14 rounded-full bg-gym-success/80 text-white shadow-lg shadow-gym-success/20 flex items-center justify-center active:scale-95 transition-all"
+        className="sm:hidden fixed bottom-24 right-4 z-40 w-14 h-14 rounded-full bg-gym-success/80 text-white shadow-lg shadow-gym-success/20 flex items-center justify-center active:scale-95 transition-all"
       >
         <Plus className="w-6 h-6" />
       </button>
@@ -955,7 +955,7 @@ export default function MiembrosPage() {
         <button
           onClick={handleCrearMiembro}
           disabled={!nuevoNombre || !nuevoEmail || (!!nuevoEmail && !isGmail(nuevoEmail) && !nuevoPassword.trim())}
-          className="sm:hidden fixed bottom-20 right-4 z-[70] w-14 h-14 rounded-full bg-gym-success/80 text-white shadow-lg shadow-gym-success/20 flex items-center justify-center disabled:opacity-40 active:scale-95 transition-all"
+          className="sm:hidden fixed bottom-24 right-4 z-[70] w-14 h-14 rounded-full bg-gym-success/80 text-white shadow-lg shadow-gym-success/20 flex items-center justify-center disabled:opacity-40 active:scale-95 transition-all"
         >
           <Save className="w-6 h-6" />
         </button>

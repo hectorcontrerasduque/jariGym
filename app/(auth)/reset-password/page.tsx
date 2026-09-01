@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { PasswordInput } from "@/components/ui/password-input";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { Dumbbell, CheckCircle } from "lucide-react";
-import { configService } from "@/lib/services/config/config.service";
+
 import { messages } from "@/lib/messages";
 import { AuthFooter } from "@/components/auth-footer";
 import { showToast } from "@/components/ui/toast";
@@ -30,10 +30,13 @@ const [password, setPassword] = useState("");
   const [gymLogo, setGymLogo] = useState("");
 
   useEffect(() => {
-    configService.getConfig().then((config) => {
-      if (config?.gym_name) setGymName(config.gym_name);
-      if (config?.logo_url) setGymLogo(config.logo_url);
-    }).catch(() => {});
+    fetch("/api/config/public")
+      .then((res) => res.json())
+      .then((config) => {
+        if (config?.gym_name) setGymName(config.gym_name);
+        if (config?.logo_url) setGymLogo(config.logo_url);
+      })
+      .catch(() => {});
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {

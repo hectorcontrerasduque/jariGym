@@ -12,7 +12,7 @@ import { authService } from "@/lib/services/auth/auth.service";
 import { migracionService, type MigracionRecord } from "@/lib/services/migracion/migracion.service";
 import { createClient } from "@/lib/supabase/client";
 import { Dumbbell, CheckCircle, Mail } from "lucide-react";
-import { configService } from "@/lib/services/config/config.service";
+
 import { messages } from "@/lib/messages";
 import { showToast } from "@/components/ui/toast";
 import { AuthFooter } from "@/components/auth-footer";
@@ -92,11 +92,14 @@ function LoginForm() {
       showToast(initialError, "error");
     }
 
-    configService.getConfig().then((config) => {
-      if (config?.gym_name) setGymName(config.gym_name);
-      if (config?.owner_email) setGymOwnerEmail(config.owner_email);
-      if (config?.logo_url) setGymLogo(config.logo_url);
-    }).catch(() => {});
+    fetch("/api/config/public")
+      .then((res) => res.json())
+      .then((config) => {
+        if (config?.gym_name) setGymName(config.gym_name);
+        if (config?.owner_email) setGymOwnerEmail(config.owner_email);
+        if (config?.logo_url) setGymLogo(config.logo_url);
+      })
+      .catch(() => {});
 
     // Check if there are pending migration records
     fetch("/api/migracion/pending")

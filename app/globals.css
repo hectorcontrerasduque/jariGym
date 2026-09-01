@@ -319,10 +319,16 @@ option {
 
 /* ===== Número animado ===== */
 .stat-number {
-  font-size: 2rem;
+  font-size: 2.5rem;
   font-weight: 800;
   line-height: 1.1;
   animation: countUp 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@media (min-width: 1024px) {
+  .stat-number {
+    font-size: 3rem;
+  }
 }
 
 /* ===== Partículas flotantes ===== */
@@ -344,6 +350,28 @@ option {
   border-radius: 50%;
   background: rgba(56, 189, 248, 0.3);
   animation: float 6s ease-in-out infinite;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.25rem;
+}
+
+@media (min-width: 640px) {
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .stats-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.section-gap {
+  margin-bottom: 1.5rem;
 }
 
 /* ===== Barra de progreso ===== */

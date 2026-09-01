@@ -351,8 +351,8 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Top Stats Row - 2 big cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+        {/* Stats Grid - 4 cards */}
+        <div className="stats-grid section-gap">
           <Card className="stat-card" onClick={handleClickActivos}>
             <CardContent className="p-5">
               <div className="flex items-start justify-between mb-4">
@@ -410,10 +410,7 @@ export default function DashboardPage() {
               </div>
             </CardContent>
           </Card>
-        </div>
 
-        {/* Second Stats Row - 2 cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
           <Card className="stat-card" onClick={handleClickAlDia}>
             <CardContent className="p-5">
               <div className="flex items-start justify-between mb-4">

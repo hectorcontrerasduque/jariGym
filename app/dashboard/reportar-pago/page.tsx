@@ -10,7 +10,7 @@ import { miembrosService } from "@/lib/services/miembros/miembros.service";
 import { createClient } from "@/lib/supabase/client";
 import { Upload, CheckCircle, DollarSign, User, FileText, Gift, Calendar, ArrowLeft, AlertTriangle, Send } from "lucide-react";
 import { getMonthName, formatCurrency } from "@/lib/utils";
-import { LoadingOverlay } from "@/components/ui/loading-overlay";
+import { Loader } from "@/components/ui/loader";
 import { showToast } from "@/components/ui/toast";
 import { messages } from "@/lib/messages";
 import type { MetodoPago, GymConfig, PaymentMethod, Profile } from "@/lib/types";
@@ -303,7 +303,7 @@ function ReportarPagoForm() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-6 animate-fadeIn">
-      <LoadingOverlay show={loading} message="Enviando pago..." />
+      <Loader show={loading} message={messages.common.enviandoPago} variant="overlay" />
       <div className="flex items-center gap-3">
         <Link href={isAdmin ? "/dashboard/pagos" : "/dashboard/mis-pagos"} className="p-2 hover:bg-gym-bg/50 rounded-xl transition-colors">
           <ArrowLeft className="w-5 h-5 text-gym-muted" />

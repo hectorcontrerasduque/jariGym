@@ -28,7 +28,7 @@ import { miembrosService } from "@/lib/services/miembros/miembros.service";
 import { formatCurrency, getMonthName } from "@/lib/utils";
 import type { Payment, Profile } from "@/lib/types";
 import { showToast } from "@/components/ui/toast";
-import { PageLoader } from "@/components/ui/page-loader";
+import { Loader } from "@/components/ui/loader";
 import { messages } from "@/lib/messages";
 
 interface MonthlyStat {
@@ -169,7 +169,7 @@ export default function DashboardPage() {
   };
 
   if (loading) {
-    return <PageLoader message="Cargando dashboard" />;
+    return <Loader show={true} message={messages.common.cargandoDashboard} />;
   }
 
   const maxMiembros = monthlyStats ? Math.max(...monthlyStats.meses.map(m => m.pagados + m.sinPago + m.libres), 1) : 1;

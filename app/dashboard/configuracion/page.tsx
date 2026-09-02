@@ -8,8 +8,7 @@ import { METODOS_PAGO_DEFAULT } from "@/lib/services/config/config.service";
 import { createClient } from "@/lib/supabase/client";
 import { Save, Building2, User, CreditCard, Upload, Dumbbell, Trash2 } from "lucide-react";
 import { showToast } from "@/components/ui/toast";
-import { LoadingOverlay } from "@/components/ui/loading-overlay";
-import { PageLoader } from "@/components/ui/page-loader";
+import { Loader } from "@/components/ui/loader";
 import { messages } from "@/lib/messages";
 import type { GymConfig, MetodoPago, PaymentMethod } from "@/lib/types";
 
@@ -168,12 +167,12 @@ export default function ConfiguracionPage() {
   };
 
   if (loading) {
-    return <PageLoader />;
+    return <Loader show={true} />;
   }
 
   return (
     <div className="space-y-4 animate-fadeIn relative">
-      <LoadingOverlay show={saving} message={messages.common.guardando} />
+      <Loader show={saving} message={messages.common.guardando} variant="overlay" />
       <div className="absolute top-0 right-0 w-72 h-72 bg-gym-primary/5 rounded-full blur-3xl animate-pulse" />
 
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 relative z-10">

@@ -6,7 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PasswordInput } from "@/components/ui/password-input";
-import { LoadingOverlay } from "@/components/ui/loading-overlay";
+import { Loader } from "@/components/ui/loader";
 import { Dumbbell, CheckCircle } from "lucide-react";
 
 import { messages } from "@/lib/messages";
@@ -81,7 +81,7 @@ const [password, setPassword] = useState("");
   if (validating) {
     return (
       <>
-        <LoadingOverlay show={true} message={messages.common.cargar} />
+        <Loader show={true} message={messages.common.cargar} />
         <div className="min-h-screen flex items-center justify-center p-4 pb-16 relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-gym-primary/5 via-transparent to-gym-secondary/5" />
         </div>
@@ -164,7 +164,7 @@ const [password, setPassword] = useState("");
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 pb-16 relative overflow-hidden">
-      <LoadingOverlay show={loading} message={messages.common.procesando} />
+      <Loader show={loading} message={messages.common.procesando} variant="overlay" />
       <div className="absolute inset-0 bg-gradient-to-br from-gym-primary/5 via-transparent to-gym-secondary/5" />
       <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-gym-primary/10 rounded-full blur-3xl animate-pulse" />
       <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-gym-secondary/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: "1s" }} />

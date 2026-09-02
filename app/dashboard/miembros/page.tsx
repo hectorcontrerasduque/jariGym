@@ -12,8 +12,7 @@ import { miembrosService } from "@/lib/services/miembros/miembros.service";
 import { formatDate, formatCurrency } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { Users, Search, Plus, Settings, Save, Pencil, ChevronDown, ChevronUp } from "lucide-react";
-import { LoadingOverlay } from "@/components/ui/loading-overlay";
-import { PageLoader } from "@/components/ui/page-loader";
+import { Loader } from "@/components/ui/loader";
 import { Pagination } from "@/components/ui/pagination";
 import { usePagination } from "@/hooks/usePagination";
 import { showToast } from "@/components/ui/toast";
@@ -502,18 +501,18 @@ export default function MiembrosPage() {
   const miembrosFiltrados = miembros;
 
   if (loading) {
-    return <PageLoader />;
+    return <Loader show={true} />;
   }
 
   return (
     <>
     <div className="space-y-6 animate-fadeIn relative">
-      <LoadingOverlay show={saving} message="Creando miembro..." />
-      <LoadingOverlay show={togglingMembresia} message="Actualizando membresía..." />
-      <LoadingOverlay show={togglingSuperAdmin} message="Cambiando rol..." />
-      <LoadingOverlay show={togglingActivar} message="Actualizando estado..." />
-      <LoadingOverlay show={savingMembresia} message="Guardando membresía..." />
-      <LoadingOverlay show={savingNotaAdmin} message="Guardando nota..." />
+      <Loader show={saving} message={messages.common.creandoMiembro} variant="overlay" />
+      <Loader show={togglingMembresia} message={messages.common.actualizandoMembresia} variant="overlay" />
+      <Loader show={togglingSuperAdmin} message={messages.common.cambiandoRol} variant="overlay" />
+      <Loader show={togglingActivar} message={messages.common.actualizandoEstado} variant="overlay" />
+      <Loader show={savingMembresia} message={messages.common.guardandoMembresia} variant="overlay" />
+      <Loader show={savingNotaAdmin} message={messages.common.guardandoNota} variant="overlay" />
       <div className="absolute top-0 right-0 w-72 h-72 bg-gym-secondary/5 rounded-full blur-3xl animate-pulse" />
 
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 relative z-10">

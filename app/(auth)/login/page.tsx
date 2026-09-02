@@ -7,7 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
-import { LoadingOverlay } from "@/components/ui/loading-overlay";
+import { Modal } from "@/components/ui/modal";
+import { Loader } from "@/components/ui/loader";
 import { authService } from "@/lib/services/auth/auth.service";
 import { migracionService, type MigracionRecord } from "@/lib/services/migracion/migracion.service";
 import { createClient } from "@/lib/supabase/client";
@@ -403,7 +404,7 @@ function LoginForm() {
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 pb-16 relative overflow-hidden">
-      <LoadingOverlay show={loading} message={messages.common.procesando} />
+      <Loader show={loading} message={messages.common.procesando} variant="overlay" />
       <FloatingParticles />
       <div className="absolute inset-0 bg-gradient-to-br from-gym-primary/5 via-transparent to-gym-secondary/5" />
       <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-gym-primary/8 rounded-full blur-3xl animate-pulse" />
@@ -417,8 +418,8 @@ function LoginForm() {
               <Image
                 src={gymLogo}
                 alt={gymName}
-                width={16}
-                height={16}
+                width={64}
+                height={64}
                 className="w-full h-full object-cover"
                 loading="lazy"
               />
@@ -479,121 +480,113 @@ function LoginForm() {
       </Card>
 
       {/* Forgot Password Modal */}
-      {showResetForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <LoadingOverlay show={resetLoading} message={messages.common.procesando} />
-          <Card className="w-full max-w-md border-gym-primary/20">
-            <CardHeader className="text-center">
-              <div className="mx-auto w-12 h-12 bg-gym-primary/20 rounded-xl flex items-center justify-center mb-3 overflow-hidden">
-                {gymLogo ? (
+      <Modal isOpen={showResetForm} onClose={() => { setShowResetForm(false); setResetSent(false); }} className="max-w-md border-gym-primary/20">
+        <Loader show={resetLoading} message={messages.common.procesando} variant="overlay" />
+        <div className="text-center mb-4">
+          <div className="mx-auto w-12 h-12 bg-gym-primary/20 rounded-xl flex items-center justify-center mb-3 overflow-hidden">
+            {gymLogo ? (
               <Image
                 src={gymLogo}
                 alt={gymName}
-                width={16}
-                height={16}
+                width={48}
+                height={48}
                 className="w-full h-full object-cover"
                 loading="lazy"
               />
             ) : (
-                  <Dumbbell className="w-6 h-6 text-gym-primary" />
-                )}
-              </div>
-              <CardTitle className="text-lg font-display text-gym-text">
-                {resetSent ? messages.auth.resetPasswordSent : messages.auth.resetPasswordTitle}
-              </CardTitle>
-              {!resetSent && (
-                <p className="text-xs text-gym-muted mt-1">{gymName}</p>
-              )}
-            </CardHeader>
-            <CardContent>
-              {resetSent ? (
-                <div className="text-center space-y-4">
-                  <div className="w-16 h-16 bg-gym-success/20 rounded-full flex items-center justify-center mx-auto">
-                    <Mail className="w-8 h-8 text-gym-success" />
-                  </div>
-                  <div className="space-y-2">
-                    <p className="text-sm text-gym-text font-medium">
-                      {messages.auth.resetPasswordSentTo}
-                    </p>
-                    <p className="text-sm text-gym-primary font-semibold bg-gym-primary/10 p-2 rounded-lg">
-                      {resetEmail}
-                    </p>
-                    <p className="text-sm text-gym-muted">
-                      {messages.auth.resetPasswordSentInstructions}
-                    </p>
-                  </div>
-                  <div className="p-3 bg-gym-bg rounded-xl">
-                    <p className="text-xs text-gym-muted">
-                      {messages.auth.resetPasswordSpamWarning} <strong className="text-gym-text">{gymName}</strong>.
-                    </p>
-                  </div>
-                  <Button
-                    variant="secondary"
-                    className="w-full"
-                    onClick={() => { setShowResetForm(false); setResetSent(false); }}
-                  >
-                    {messages.auth.resetPasswordCloseButton}
-                  </Button>
-                </div>
-              ) : (
-                <form onSubmit={handleResetPassword} className="space-y-4">
-                  <p className="text-sm text-gym-muted text-center">
-                    {messages.auth.resetPasswordSubtitle}
-                  </p>
-                  <Input
-                    type="email"
-                    placeholder="tu@email.com"
-                    value={resetEmail}
-                    onChange={(e) => setResetEmail(e.target.value)}
-                    required
-                  />
-                  <div className="flex gap-2">
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      className="flex-1"
-                      onClick={() => { setShowResetForm(false); }}
-                    >
-                      {messages.auth.resetPasswordCancelButton}
-                    </Button>
-                    <Button type="submit" className="flex-1" loading={resetLoading}>
-                      {messages.auth.resetPasswordButton}
-                    </Button>
-                  </div>
-                </form>
-              )}
-            </CardContent>
-          </Card>
+              <Dumbbell className="w-6 h-6 text-gym-primary" />
+            )}
+          </div>
+          <h2 className="text-lg font-display font-semibold text-gym-text">
+            {resetSent ? messages.auth.resetPasswordSent : messages.auth.resetPasswordTitle}
+          </h2>
+          {!resetSent && (
+            <p className="text-xs text-gym-muted mt-1">{gymName}</p>
+          )}
         </div>
-      )}
+        {resetSent ? (
+          <div className="text-center space-y-4">
+            <div className="w-16 h-16 bg-gym-success/20 rounded-full flex items-center justify-center mx-auto">
+              <Mail className="w-8 h-8 text-gym-success" />
+            </div>
+            <div className="space-y-2">
+              <p className="text-sm text-gym-text font-medium">
+                {messages.auth.resetPasswordSentTo}
+              </p>
+              <p className="text-sm text-gym-primary font-semibold bg-gym-primary/10 p-2 rounded-lg">
+                {resetEmail}
+              </p>
+              <p className="text-sm text-gym-muted">
+                {messages.auth.resetPasswordSentInstructions}
+              </p>
+            </div>
+            <div className="p-3 bg-gym-bg rounded-xl">
+              <p className="text-xs text-gym-muted">
+                {messages.auth.resetPasswordSpamWarning} <strong className="text-gym-text">{gymName}</strong>.
+              </p>
+            </div>
+            <Button
+              variant="secondary"
+              className="w-full"
+              onClick={() => { setShowResetForm(false); setResetSent(false); }}
+            >
+              {messages.auth.resetPasswordCloseButton}
+            </Button>
+          </div>
+        ) : (
+          <form onSubmit={handleResetPassword} className="space-y-4">
+            <p className="text-sm text-gym-muted text-center">
+              {messages.auth.resetPasswordSubtitle}
+            </p>
+            <Input
+              type="email"
+              placeholder="tu@email.com"
+              value={resetEmail}
+              onChange={(e) => setResetEmail(e.target.value)}
+              required
+            />
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="secondary"
+                className="flex-1"
+                onClick={() => { setShowResetForm(false); }}
+              >
+                {messages.auth.resetPasswordCancelButton}
+              </Button>
+              <Button type="submit" className="flex-1" loading={resetLoading}>
+                {messages.auth.resetPasswordButton}
+              </Button>
+            </div>
+          </form>
+        )}
+      </Modal>
 
       {/* Migrate Modal */}
-      {showMigrateForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <LoadingOverlay show={migrateStep === "loading"} message={messages.migracion.loading} />
-          <Card className="w-full max-w-md border-gym-secondary/20">
-            <CardHeader className="text-center">
-              <div className="mx-auto w-12 h-12 bg-gym-secondary/20 rounded-xl flex items-center justify-center mb-3 overflow-hidden">
-                {gymLogo ? (
-              <Image
-                src={gymLogo}
-                alt={gymName}
-                width={16}
-                height={16}
-                className="w-full h-full object-cover"
-                loading="lazy"
-              />
-            ) : (
-                  <Dumbbell className="w-6 h-6 text-gym-secondary" />
-                )}
-              </div>
-              <CardTitle className="text-lg font-display text-gym-text">
-                {migrateStep === "form" && messages.migracion.title}
-                {migrateStep === "success" && messages.migracion.successTitle}
-              </CardTitle>
-              <p className="text-xs text-gym-muted mt-1">{gymName}</p>
-            </CardHeader>
-            <CardContent>
+      <Modal isOpen={showMigrateForm} onClose={resetMigrateForm} className="max-w-md border-gym-secondary/20">
+        <Loader show={migrateStep === "loading"} message={messages.migracion.loading} variant="overlay" />
+        <div className="max-h-[80vh] overflow-y-auto">
+          <div className="text-center mb-4">
+            <div className="mx-auto w-12 h-12 bg-gym-secondary/20 rounded-xl flex items-center justify-center mb-3 overflow-hidden">
+              {gymLogo ? (
+                <Image
+                  src={gymLogo}
+                  alt={gymName}
+                  width={48}
+                  height={48}
+                  className="w-full h-full object-cover"
+                  loading="lazy"
+                />
+              ) : (
+                <Dumbbell className="w-6 h-6 text-gym-secondary" />
+              )}
+            </div>
+            <h2 className="text-lg font-display font-semibold text-gym-text">
+              {migrateStep === "form" && messages.migracion.title}
+              {migrateStep === "success" && messages.migracion.successTitle}
+            </h2>
+            <p className="text-xs text-gym-muted mt-1">{gymName}</p>
+          </div>
               {/* Step: Form */}
               {migrateStep === "form" && (
                 <form onSubmit={handleMigrateSubmit} className="space-y-3">
@@ -693,7 +686,7 @@ function LoginForm() {
                     error={migPasswordConfirm && migPassword !== migPasswordConfirm ? messages.migracion.passwordMismatchError : undefined}
                     required={!!migCorreo && !migCorreo.toLowerCase().endsWith("@gmail.com")}
                   />
-                  <div className="flex gap-2">
+                  <div className="sticky bottom-0 bg-gym-surface pt-3 border-t border-gym-border flex gap-2">
                     <Button
                       type="button"
                       variant="secondary"
@@ -745,10 +738,8 @@ function LoginForm() {
                   </Button>
                 </div>
               )}
-            </CardContent>
-          </Card>
-        </div>
-      )}
+          </div>
+      </Modal>
       <AuthFooter />
     </div>
   );

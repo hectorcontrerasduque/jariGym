@@ -13,8 +13,7 @@ import { showToast } from "@/components/ui/toast";
 import { Modal } from "@/components/ui/modal";
 import { messages } from "@/lib/messages";
 import { Avatar } from "@/components/ui/avatar";
-import { LoadingOverlay } from "@/components/ui/loading-overlay";
-import { PageLoader } from "@/components/ui/page-loader";
+import { Loader } from "@/components/ui/loader";
 import type { Payment, Profile, MetodoPago, PaymentMethod, GymConfig } from "@/lib/types";
 
 const metodoLabels: Record<MetodoPago, string> = {
@@ -593,12 +592,12 @@ setMembresiaLibre(!!libre.data);
   const mesesParaSuspender = [...mesesDisponiblesParaPagar].sort((a, b) => a.year_number - b.year_number || a.month_number - b.month_number);
 
   if (loading) {
-    return <PageLoader />;
+    return <Loader show={true} />;
   }
 
   return (
     <div className="space-y-4 animate-fadeIn">
-      <LoadingOverlay show={savingPago || !!deleting} message={savingPago ? messages.common.guardando : messages.common.eliminando} />
+      <Loader show={savingPago || !!deleting} message={savingPago ? messages.common.guardando : messages.common.eliminando} variant="overlay" />
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>

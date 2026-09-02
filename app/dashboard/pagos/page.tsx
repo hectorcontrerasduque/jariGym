@@ -11,7 +11,7 @@ import { formatCurrency, getMonthName } from "@/lib/utils";
 import { Check, X, Eye, CreditCard, Clock, CheckCircle, AlertTriangle, Bell, Search, Plus } from "lucide-react";
 import { showToast } from "@/components/ui/toast";
 import { messages } from "@/lib/messages";
-import { PageLoader } from "@/components/ui/page-loader";
+import { Loader } from "@/components/ui/loader";
 import { Pagination } from "@/components/ui/pagination";
 import { usePagination } from "@/hooks/usePagination";
 import type { Payment, MetodoPago, Profile } from "@/lib/types";
@@ -188,7 +188,7 @@ export default function PagosPage() {
   };
 
   if (loading) {
-    return <PageLoader />;
+    return <Loader show={true} />;
   }
 
   return (

@@ -10,8 +10,7 @@ import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { createClient } from "@/lib/supabase/client";
 import { showToast } from "@/components/ui/toast";
-import { LoadingOverlay } from "@/components/ui/loading-overlay";
-import { PageLoader } from "@/components/ui/page-loader";
+import { Loader } from "@/components/ui/loader";
 import { messages } from "@/lib/messages";
 import {
   Save,
@@ -23,7 +22,7 @@ import type { Profile } from "@/lib/types";
 
 export default function PerfilPage() {
   return (
-    <Suspense fallback={<PageLoader />}>
+    <Suspense fallback={<Loader show={true} />}>
       <PerfilContent />
     </Suspense>
   );
@@ -178,7 +177,7 @@ function PerfilContent() {
   };
 
   if (loading) {
-    return <PageLoader />;
+    return <Loader show={true} />;
   }
 
   if (!profile) return null;
@@ -187,7 +186,7 @@ function PerfilContent() {
 
   return (
     <div className="space-y-6 animate-fadeIn relative">
-      <LoadingOverlay show={saving} message={messages.common.guardando} />
+      <Loader show={saving} message={messages.common.guardando} variant="overlay" />
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 relative z-10">
         <div>
           <h1 className="text-2xl font-display font-bold text-gym-text neon-text">Mi Perfil</h1>

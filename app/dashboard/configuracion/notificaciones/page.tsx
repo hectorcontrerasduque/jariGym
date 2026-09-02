@@ -18,8 +18,7 @@ import {
   Send,
 } from "lucide-react";
 import { showToast } from "@/components/ui/toast";
-import { LoadingOverlay } from "@/components/ui/loading-overlay";
-import { PageLoader } from "@/components/ui/page-loader";
+import { Loader } from "@/components/ui/loader";
 import { messages } from "@/lib/messages";
 import type { GymConfig, NotificacionConfig, NotificacionLog } from "@/lib/types";
 
@@ -179,12 +178,12 @@ export default function NotificacionesPage() {
   const isLoading = saving || executing || diagnosticing || executingTipo !== null;
 
   if (loading) {
-    return <PageLoader />;
+    return <Loader show={true} />;
   }
 
   return (
     <div className="space-y-4 animate-fadeIn relative">
-      <LoadingOverlay show={isLoading} message={saving ? messages.common.guardando : executing || executingTipo ? "Enviando notificaciones..." : diagnosticing ? "Ejecutando diagnóstico..." : undefined} />
+      <Loader show={isLoading} message={saving ? messages.common.guardando : executing || executingTipo ? messages.common.enviandoNotificaciones : diagnosticing ? messages.common.ejecutandoDiagnostico : undefined} variant="overlay" />
 
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 relative z-10">

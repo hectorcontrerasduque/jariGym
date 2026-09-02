@@ -251,6 +251,14 @@ export function Sidebar() {
             <LogOut className="w-4 h-4" />
             Cerrar Sesión
           </button>
+          <a
+            href="https://hcontrer.org"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block text-center text-[10px] text-gym-muted/60 hover:text-gym-primary transition-colors mt-2"
+          >
+            hcontrer.org
+          </a>
         </div>
       </aside>
 

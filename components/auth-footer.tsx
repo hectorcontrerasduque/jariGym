@@ -1,15 +1,17 @@
+"use client";
+
+import Link from "next/link";
+
 export function AuthFooter() {
   return (
-    <div className="relative w-full py-4 pb-24 md:pb-4 text-center text-xs text-gym-muted bg-gym-surface/50 backdrop-blur-sm border-t border-gym-border/30 mt-auto">
+    <div className="absolute bottom-0 left-0 right-0 p-4 text-center text-xs text-gym-muted z-10">
       &copy; {new Date().getFullYear()} Derechos reservados{" "}
-      <a
-        href="https://hcontrer.org"
-        target="_blank"
-        rel="noopener noreferrer"
+      <Link
+        href="/"
         className="text-gym-primary hover:underline"
       >
         hcontrer.org
-      </a>
+      </Link>
     </div>
   );
 }

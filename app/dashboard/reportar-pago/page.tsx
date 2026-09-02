@@ -674,30 +674,30 @@ function ReportarPagoForm() {
             </Button>
           </form>
           )}
-
-          {/* Mobile floating button */}
-          <button
-            onClick={() => {
-              const form = document.getElementById("pago-form") as HTMLFormElement | null;
-              form?.requestSubmit();
-            }}
-            disabled={
-              loading ||
-              (isAdmin && !miembroSeleccionado) ||
-              (!formData.pagar_inscripcion && !formData.pagar_mensualidad) ||
-              (formData.pagar_mensualidad && formData.meses.length === 0) ||
-              montoTotal === 0
-            }
-            className="sm:hidden fixed bottom-20 right-4 z-40 w-14 h-14 rounded-full bg-gym-primary text-gym-bg shadow-lg shadow-gym-primary/30 flex items-center justify-center disabled:opacity-40 disabled:shadow-none active:scale-95 transition-all"
-          >
-            {loading ? (
-              <div className="w-5 h-5 border-2 border-gym-bg border-t-transparent rounded-full animate-spin" />
-            ) : (
-              <Send className="w-6 h-6" />
-            )}
-          </button>
         </CardContent>
       </Card>
+
+      {/* Mobile floating button */}
+      <button
+        onClick={() => {
+          const form = document.getElementById("pago-form") as HTMLFormElement | null;
+          form?.requestSubmit();
+        }}
+        disabled={
+          loading ||
+          (isAdmin && !miembroSeleccionado) ||
+          (!formData.pagar_inscripcion && !formData.pagar_mensualidad) ||
+          (formData.pagar_mensualidad && formData.meses.length === 0) ||
+          montoTotal === 0
+        }
+        className="sm:hidden fixed bottom-24 right-4 z-[60] w-14 h-14 rounded-full bg-gym-primary text-gym-bg shadow-lg shadow-gym-primary/30 flex items-center justify-center disabled:opacity-40 disabled:shadow-none active:scale-95 transition-all"
+      >
+        {loading ? (
+          <div className="w-5 h-5 border-2 border-gym-bg border-t-transparent rounded-full animate-spin" />
+        ) : (
+          <Send className="w-6 h-6" />
+        )}
+      </button>
     </div>
   );
 }

@@ -459,7 +459,7 @@ export default function PagosPage() {
       </Modal>
 
       {/* Mobile floating Generar pagos button */}
-      <Link href="/dashboard/mis-pagos" className="sm:hidden fixed bottom-20 right-4 z-40">
+      <Link href="/dashboard/mis-pagos" className="sm:hidden fixed bottom-24 right-4 z-[60]">
         <div className="w-14 h-14 rounded-full bg-gym-success text-white shadow-lg shadow-gym-success/30 flex items-center justify-center active:scale-95 transition-all">
           <Plus className="w-6 h-6" />
         </div>

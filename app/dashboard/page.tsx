@@ -174,7 +174,7 @@ export default function DashboardPage() {
 
   const maxMiembros = monthlyStats ? Math.max(...monthlyStats.meses.map(m => m.pagados + m.sinPago + m.libres), 1) : 1;
 
-  const hourCounts: Record<string, number> = {};
+  const hourCounts = new Map<string, number>();
   for (const m of miembros) {
     if (m.arrival_time && m.departure_time && m.arrival_time !== "--:--" && m.departure_time !== "--:--") {
       const startH = parseInt(m.arrival_time.split(":")[0], 10);
@@ -182,12 +182,12 @@ export default function DashboardPage() {
       if (!isNaN(startH) && !isNaN(endH)) {
         for (let h = startH; h <= endH; h++) {
           const key = `${String(h).padStart(2, "0")}:00`;
-          hourCounts[key] = (hourCounts[key] || 0) + 1;
+          hourCounts.set(key, (hourCounts.get(key) || 0) + 1);
         }
       }
     }
   }
-  const hourEntries = Object.entries(hourCounts).sort((a, b) => a[0].localeCompare(b[0]));
+  const hourEntries = Array.from(hourCounts.entries()).sort((a, b) => a[0].localeCompare(b[0]));
   const maxHourCount = Math.max(...hourEntries.map((e) => e[1]), 1);
 
   const handleClickMorosos = async () => {

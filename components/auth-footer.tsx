@@ -1,6 +1,6 @@
 export function AuthFooter() {
   return (
-    <div className="fixed bottom-0 left-0 right-0 p-4 text-center text-xs text-gym-muted z-10">
+    <div className="relative w-full py-4 pb-24 md:pb-4 text-center text-xs text-gym-muted bg-gym-surface/50 backdrop-blur-sm border-t border-gym-border/30 mt-auto">
       &copy; {new Date().getFullYear()} Derechos reservados{" "}
       <a
         href="https://hcontrer.org"

@@ -13,10 +13,17 @@ const spaceGrotesk = Space_Grotesk({
 });
 
 export const metadata: Metadata = {
-  title: "GymApp - Gestión de Gym",
-  description: "Sistema de gestión de pagos y miembros para gimnasios",
+  title: "hcontrer.org — Sistemas a la Medida",
+  description: "Desarrollo de páginas web, aplicaciones móviles, sistemas de facturación, contabilidad, nómina y más. Soluciones tecnológicas a la medida.",
   icons: {
     icon: "/favicon.svg",
+  },
+  openGraph: {
+    title: "hcontrer.org — Sistemas a la Medida",
+    description: "Desarrollo de páginas web, aplicaciones móviles, sistemas de facturación, contabilidad, nómina y más.",
+    url: "https://hcontrer.org",
+    siteName: "hcontrer.org",
+    type: "website",
   },
 };
 

@@ -1,5 +1,12 @@
-import { redirect } from "next/navigation";
+"use client";
 
-export default function Home() {
-  redirect("/login");
+import { Suspense } from "react";
+import { BusinessCard } from "@/components/business-card";
+
+export default function HomePage() {
+  return (
+    <Suspense>
+      <BusinessCard />
+    </Suspense>
+  );
 }

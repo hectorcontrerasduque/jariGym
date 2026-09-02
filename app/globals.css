@@ -369,24 +369,19 @@ option {
 
 .stats-grid {
   display: grid;
-  grid-template-columns: 1fr;
-  gap: 1.25rem;
-}
-
-@media (min-width: 640px) {
-  .stats-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.75rem;
 }
 
 @media (min-width: 1024px) {
   .stats-grid {
     grid-template-columns: repeat(4, 1fr);
+    gap: 1.25rem;
   }
 }
 
 .section-gap {
-  margin-bottom: 1.5rem;
+  margin-bottom: 0.75rem;
 }
 
 /* ===== Barra de progreso ===== */
@@ -448,20 +443,24 @@ option {
 /* ===== Mobile improvements ===== */
 @media (max-width: 640px) {
   .stat-number {
-    font-size: 1.5rem;
+    font-size: 1.25rem;
   }
 
   .stat-card {
-    padding: 1rem;
+    padding: 0.75rem;
   }
 
   .hero-section {
-    padding: 1.5rem 1rem;
+    padding: 1rem;
   }
 
   .gym-logo-icon {
-    width: 3rem;
-    height: 3rem;
+    width: 2.5rem;
+    height: 2.5rem;
+  }
+
+  .dashboard-container {
+    padding: 0;
   }
 }
 

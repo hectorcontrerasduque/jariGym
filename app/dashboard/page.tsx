@@ -10,7 +10,6 @@ import {
   Gift,
   ChevronDown,
   ChevronRight,
-  TrendingUp,
   BarChart3,
   Zap,
 } from "lucide-react";
@@ -305,65 +304,60 @@ export default function DashboardPage() {
         )}
 
         {/* Hero Section */}
-        <div className="hero-section mb-6 animate-slideUp">
-          <div className="relative z-10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div className="flex items-center gap-4">
+        <div className="hero-section mb-4 sm:mb-6 animate-slideUp">
+          <div className="relative z-10 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-3">
               <div className="gym-logo-icon">
-                <Zap className="w-6 h-6 text-gym-primary" />
+                <Zap className="w-5 h-5 sm:w-6 sm:h-6 text-gym-primary" />
               </div>
               <div>
-                <h1 className="text-2xl sm:text-3xl font-display font-bold text-gym-text neon-text leading-tight">
+                <h1 className="text-xl sm:text-3xl font-display font-bold text-gym-text neon-text leading-tight">
                   Dashboard
                 </h1>
-                <p className="text-gym-muted text-sm mt-1 flex items-center gap-2">
+                <p className="text-gym-muted text-xs sm:text-sm flex items-center gap-1.5">
                   <BarChart3 className="w-3 h-3" />
-                  Resumen general del gym
+                  <span className="hidden sm:inline">Resumen general del gym</span>
+                  <span className="sm:hidden">Resumen</span>
+                  <span className="text-gym-success font-semibold text-xs ml-1">{trendPercent}%</span>
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-3 flex-wrap">
-              <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-gym-bg/60 border border-gym-border">
-                <TrendingUp className="w-4 h-4 text-gym-success" />
-                <span className="text-xs text-gym-muted">Tendencia:</span>
-                <span className="text-sm font-bold text-gym-success">{trendPercent}% al día</span>
-              </div>
-              <select
-                value={anioSeleccionado}
-                onChange={(e) => setAnioSeleccionado(Number(e.target.value))}
-                className="px-4 py-2 bg-gym-surface border border-gym-border rounded-xl text-gym-text focus:outline-none focus:ring-2 focus:ring-gym-primary text-sm"
-              >
-                {anios.map((a) => (
-                  <option key={a} value={a}>{a}</option>
-                ))}
-              </select>
-            </div>
+            <select
+              value={anioSeleccionado}
+              onChange={(e) => setAnioSeleccionado(Number(e.target.value))}
+              className="px-3 py-1.5 bg-gym-surface border border-gym-border rounded-xl text-gym-text focus:outline-none focus:ring-2 focus:ring-gym-primary text-xs sm:text-sm"
+            >
+              {anios.map((a) => (
+                <option key={a} value={a}>{a}</option>
+              ))}
+            </select>
           </div>
         </div>
 
         {/* Stats Grid - 4 cards */}
         <div className="stats-grid section-gap">
           <Card className="stat-card" onClick={handleClickActivos}>
-            <CardContent className="p-5">
-              <div className="flex items-start justify-between mb-4">
+            <CardContent className="p-3 sm:p-5">
+              <div className="flex items-start justify-between mb-2 sm:mb-4">
                 <div className="stat-icon stat-icon-primary">
-                  <Users className="w-5 h-5 text-gym-primary" />
+                  <Users className="w-4 h-4 sm:w-5 sm:h-5 text-gym-primary" />
                 </div>
-                <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-gym-success/10 border border-gym-success/20">
+                <div className="hidden sm:flex items-center gap-1.5 px-2 py-1 rounded-full bg-gym-success/10 border border-gym-success/20">
                   <CheckCircle className="w-3 h-3 text-gym-success" />
                   <span className="text-[10px] font-medium text-gym-success">Activo</span>
                 </div>
               </div>
               <div className="flex items-end justify-between">
                 <div>
-                  <p className="text-xs text-gym-muted mb-1 uppercase tracking-wider">Miembros Activos</p>
+                  <p className="text-[10px] sm:text-xs text-gym-muted mb-0.5 sm:mb-1 uppercase tracking-wider">Miembros Activos</p>
                   <div className="stat-number text-gym-text">{stats?.miembrosActivos || 0}</div>
                 </div>
                 <div className="flex flex-col items-end gap-0.5">
-                  <span className="text-[10px] text-gym-muted">{stats?.inscritosPagados || 0} inscritos</span>
-                  <span className="text-[10px] text-gym-warning">{stats?.inscritosPendientes || 0} pendientes</span>
+                  <span className="text-[9px] sm:text-[10px] text-gym-muted">{stats?.inscritosPagados || 0} inscritos</span>
+                  <span className="text-[9px] sm:text-[10px] text-gym-warning">{stats?.inscritosPendientes || 0} pendientes</span>
                 </div>
               </div>
-              <div className="mt-4 progress-bar">
+              <div className="mt-2 sm:mt-4 progress-bar">
                 <div
                   className="progress-bar-fill bg-gradient-to-r from-gym-success to-gym-success/60"
                   style={{ width: `${stats?.miembrosActivos ? (stats.inscritosPagados / stats.miembrosActivos) * 100 : 0}%` }}
@@ -373,59 +367,59 @@ export default function DashboardPage() {
           </Card>
 
           <Card className="stat-card" onClick={handleClickMorosos}>
-            <CardContent className="p-5">
-              <div className="flex items-start justify-between mb-4">
+            <CardContent className="p-3 sm:p-5">
+              <div className="flex items-start justify-between mb-2 sm:mb-4">
                 <div className="stat-icon stat-icon-danger">
-                  <AlertTriangle className="w-5 h-5 text-gym-danger" />
+                  <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5 text-gym-danger" />
                 </div>
-                <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-gym-danger/10 border border-gym-danger/20">
+                <div className="hidden sm:flex items-center gap-1.5 px-2 py-1 rounded-full bg-gym-danger/10 border border-gym-danger/20">
                   <Clock className="w-3 h-3 text-gym-danger" />
                   <span className="text-[10px] font-medium text-gym-danger">Deuda</span>
                 </div>
               </div>
               <div className="flex items-end justify-between">
                 <div>
-                  <p className="text-xs text-gym-muted mb-1 uppercase tracking-wider">Morosos</p>
+                  <p className="text-[10px] sm:text-xs text-gym-muted mb-0.5 sm:mb-1 uppercase tracking-wider">Morosos</p>
                   <div className="stat-number text-gym-danger">{stats?.deudoresTotal || 0}</div>
                 </div>
                 <div className="flex flex-col items-end gap-0.5">
-                  <span className="text-[10px] text-gym-danger">{stats?.deudoresMensualidad || 0} mens.</span>
-                  <span className="text-[10px] text-gym-warning">{stats?.deudoresInscripcion || 0} inscr.</span>
+                  <span className="text-[9px] sm:text-[10px] text-gym-danger">{stats?.deudoresMensualidad || 0} mens.</span>
+                  <span className="text-[9px] sm:text-[10px] text-gym-warning">{stats?.deudoresInscripcion || 0} inscr.</span>
                 </div>
               </div>
-              <div className="mt-4 flex items-center justify-between">
-                <span className="text-xs font-bold text-gym-danger">{formatCurrency(stats?.montoDeuda || 0)}</span>
-                <span className="text-[10px] text-gym-muted">en deuda total</span>
+              <div className="mt-2 sm:mt-4 flex items-center justify-between">
+                <span className="text-xs sm:text-sm font-bold text-gym-danger">{formatCurrency(stats?.montoDeuda || 0)}</span>
+                <span className="text-[9px] sm:text-[10px] text-gym-muted">deuda</span>
               </div>
             </CardContent>
           </Card>
 
           <Card className="stat-card" onClick={handleClickAlDia}>
-            <CardContent className="p-5">
-              <div className="flex items-start justify-between mb-4">
+            <CardContent className="p-3 sm:p-5">
+              <div className="flex items-start justify-between mb-2 sm:mb-4">
                 <div className="stat-icon stat-icon-success">
-                  <UserCheck className="w-5 h-5 text-gym-success" />
+                  <UserCheck className="w-4 h-4 sm:w-5 sm:h-5 text-gym-success" />
                 </div>
-                <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-gym-success/10 border border-gym-success/20">
+                <div className="hidden sm:flex items-center gap-1.5 px-2 py-1 rounded-full bg-gym-success/10 border border-gym-success/20">
                   <Zap className="w-3 h-3 text-gym-success" />
                   <span className="text-[10px] font-medium text-gym-success">Al día</span>
                 </div>
               </div>
               <div className="flex items-end justify-between">
                 <div>
-                  <p className="text-xs text-gym-muted mb-1 uppercase tracking-wider">Al Día</p>
+                  <p className="text-[10px] sm:text-xs text-gym-muted mb-0.5 sm:mb-1 uppercase tracking-wider">Al Día</p>
                   <div className="stat-number text-gym-success">
                     <span className="text-gym-text">{stats?.alDiaMensualidad || 0}</span>
-                    <span className="text-lg text-gym-muted mx-1">/</span>
+                    <span className="text-xs sm:text-lg text-gym-muted mx-0.5 sm:mx-1">/</span>
                     <span className="text-gym-text">{stats?.miembrosActivos || 0}</span>
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-lg font-bold text-gym-text">{formatCurrency(stats?.montoPagado || 0)}</p>
-                  <p className="text-[10px] text-gym-muted">cobrado este mes</p>
+                  <p className="text-sm sm:text-lg font-bold text-gym-text">{formatCurrency(stats?.montoPagado || 0)}</p>
+                  <p className="text-[9px] sm:text-[10px] text-gym-muted">cobrado</p>
                 </div>
               </div>
-              <div className="mt-4 progress-bar">
+              <div className="mt-2 sm:mt-4 progress-bar">
                 <div
                   className="progress-bar-fill bg-gradient-to-r from-gym-success to-gym-success/60"
                   style={{ width: `${trendPercent}%` }}
@@ -435,33 +429,33 @@ export default function DashboardPage() {
           </Card>
 
           <Card className="stat-card" onClick={handleClickMembresiaLibre}>
-            <CardContent className="p-5">
-              <div className="flex items-start justify-between mb-4">
+            <CardContent className="p-3 sm:p-5">
+              <div className="flex items-start justify-between mb-2 sm:mb-4">
                 <div className="stat-icon stat-icon-secondary">
-                  <Gift className="w-5 h-5 text-gym-secondary" />
+                  <Gift className="w-4 h-4 sm:w-5 sm:h-5 text-gym-secondary" />
                 </div>
-                <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-gym-secondary/10 border border-gym-secondary/20">
+                <div className="hidden sm:flex items-center gap-1.5 px-2 py-1 rounded-full bg-gym-secondary/10 border border-gym-secondary/20">
                   <span className="text-[10px] font-medium text-gym-secondary">Libre</span>
                 </div>
               </div>
               <div className="flex items-end justify-between">
                 <div>
-                  <p className="text-xs text-gym-muted mb-1 uppercase tracking-wider">Membresía Libre</p>
+                  <p className="text-[10px] sm:text-xs text-gym-muted mb-0.5 sm:mb-1 uppercase tracking-wider">Membresía Libre</p>
                   <div className="stat-number text-gym-secondary">{stats?.membresiaLibre || 0}</div>
                 </div>
                 <div className="flex flex-col items-end gap-0.5">
-                  <span className="text-[10px] text-gym-secondary">{stats?.totalMiembros || 0} total</span>
-                  <span className="text-[10px] text-gym-muted">miembros</span>
+                  <span className="text-[9px] sm:text-[10px] text-gym-secondary">{stats?.totalMiembros || 0} total</span>
+                  <span className="text-[9px] sm:text-[10px] text-gym-muted">miembros</span>
                 </div>
               </div>
-              <div className="mt-4 flex items-center gap-2">
-                <div className="flex-1 h-2 bg-gym-bg rounded-full overflow-hidden">
+              <div className="mt-2 sm:mt-4 flex items-center gap-2">
+                <div className="flex-1 h-1.5 sm:h-2 bg-gym-bg rounded-full overflow-hidden">
                   <div
                     className="h-full bg-gradient-to-r from-gym-secondary to-gym-secondary/60 rounded-full transition-all"
                     style={{ width: `${stats?.totalMiembros ? (stats.membresiaLibre / stats.totalMiembros) * 100 : 0}%` }}
                   />
                 </div>
-                <span className="text-[10px] text-gym-muted">{stats?.totalMiembros ? Math.round((stats.membresiaLibre / stats.totalMiembros) * 100) : 0}%</span>
+                <span className="text-[9px] sm:text-[10px] text-gym-muted">{stats?.totalMiembros ? Math.round((stats.membresiaLibre / stats.totalMiembros) * 100) : 0}%</span>
               </div>
             </CardContent>
           </Card>

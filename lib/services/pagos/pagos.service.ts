@@ -451,6 +451,51 @@ export class PagosService {
     return pagos;
   }
 
+  async listarPaginated(opts: { from: number; to: number; status?: string; anio?: number; mes?: number; userId?: string; supabaseClient?: ReturnType<typeof createClient> }): Promise<{ data: Pago[]; count: number }> {
+    const { from, to, status, anio, mes, userId, supabaseClient } = opts;
+    const supabase = supabaseClient || this.supabase;
+
+    let pagoIdsToFilter: string[] | null = null;
+
+    if (anio || mes) {
+      let detalleQuery = supabase.from("payment_detail").select("payment_id");
+      if (anio) detalleQuery = detalleQuery.eq("year_number", anio);
+      if (mes) detalleQuery = detalleQuery.eq("month_number", mes);
+      const { data: detalleMatches } = await detalleQuery;
+      pagoIdsToFilter = Array.from(new Set((detalleMatches || []).map((d) => d.payment_id)));
+      if (pagoIdsToFilter.length === 0) return { data: [], count: 0 };
+    }
+
+    let query = supabase
+      .from("payments")
+      .select("*, detail:payment_detail(*)", { count: "exact" })
+      .order("created_at", { ascending: false });
+
+    if (status) query = query.eq("status", status);
+    if (userId) query = query.eq("user_id", userId);
+    if (pagoIdsToFilter) query = query.in("id", pagoIdsToFilter);
+
+    const { data, error, count } = await query.range(from, to);
+    if (error) throw error;
+
+    const pagos = data || [];
+    const approvedIds = Array.from(new Set(pagos.filter(p => p.approved_by).map(p => p.approved_by as string)));
+    if (approvedIds.length > 0) {
+      const { data: approvers } = await supabase
+        .from("profiles")
+        .select("id, full_name")
+        .in("id", approvedIds);
+      const approverMap = new Map((approvers || []).map(a => [a.id, a.full_name]));
+      for (const pago of pagos) {
+        if (pago.approved_by) {
+          pago.approved_by_profile = { full_name: approverMap.get(pago.approved_by) || "—" } as Profile;
+        }
+      }
+    }
+
+    return { data: pagos, count: count || 0 };
+  }
+
   async pagosPendientes(supabaseClient?: ReturnType<typeof createClient>): Promise<Pago[]> {
     return this.listarPagos("pendiente", undefined, undefined, supabaseClient);
   }

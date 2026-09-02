@@ -15,6 +15,26 @@ export class MiembrosService {
     return (data || []) as Profile[];
   }
 
+  private static readonly SELECT_COLUMNS = "id, full_name, email, avatar_url, activo, role, start_date, inscription_admin_note, inscription_paid, arrival_time, departure_time";
+
+  async listarPaginated(opts: { from: number; to: number; search?: string }): Promise<{ data: Profile[]; count: number }> {
+    const { from, to, search } = opts;
+    let query = this.supabase
+      .from("profiles")
+      .select(MiembrosService.SELECT_COLUMNS, { count: "exact" });
+
+    if (search) {
+      query = query.or(`full_name.ilike.%${search}%,email.ilike.%${search}%`);
+    }
+
+    const { data, error, count } = await query
+      .order("start_date", { ascending: false })
+      .range(from, to);
+
+    if (error) throw error;
+    return { data: (data || []) as Profile[], count: count || 0 };
+  }
+
   async buscarMiembros(busqueda: string): Promise<Profile[]> {
     const { data, error } = await this.supabase
       .from("profiles")

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +12,8 @@ import { Check, X, Eye, CreditCard, Clock, CheckCircle, AlertTriangle, Bell, Sea
 import { showToast } from "@/components/ui/toast";
 import { messages } from "@/lib/messages";
 import { PageLoader } from "@/components/ui/page-loader";
+import { Pagination } from "@/components/ui/pagination";
+import { usePagination } from "@/hooks/usePagination";
 import type { Payment, MetodoPago, Profile } from "@/lib/types";
 import Link from "next/link";
 
@@ -65,6 +67,7 @@ export default function PagosPage() {
   const [miembros, setMiembros] = useState<Profile[]>([]);
   const [miembroSeleccionado] = useState<string>("");
   const [busquedaMiembro, setBusquedaMiembro] = useState("");
+  const pagination = usePagination(25);
 
   const fetchAllData = useCallback(async () => {
     return await Promise.allSettled([
@@ -84,16 +87,14 @@ export default function PagosPage() {
           if (pagosResult.status === "fulfilled") setPagos(pagosResult.value);
           if (aniosResult.status === "fulfilled") {
             setAnios(aniosResult.value);
-            // Auto-select a year that has payments if the current year has none
             if (aniosResult.value.length > 0 && !aniosResult.value.includes(anioSeleccionado)) {
               setAnioSeleccionado(aniosResult.value[0]);
             }
           }
           if (miembrosResult.status === "fulfilled") setMiembros(miembrosResult.value);
         }
-      } catch (err) {
+      } catch {
         if (!cancelled) {
-          console.error("Error cargando datos de pagos:", err);
           showToast(messages.toast.errorCargaDatos, "error");
         }
       } finally {
@@ -103,6 +104,9 @@ export default function PagosPage() {
     load();
     return () => { cancelled = true; };
   }, [fetchAllData, anioSeleccionado]);
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { pagination.resetPage(); }, [filtro, busquedaMiembro]);
 
   const loadData = async () => {
     setLoading(true);
@@ -140,7 +144,7 @@ export default function PagosPage() {
     }
   };
 
-  const pagosFiltrados = (() => {
+  const pagosFiltrados = useMemo(() => {
     let result = filtro === "todos"
       ? pagos
       : filtro === "rechazados_suspendidos"
@@ -157,7 +161,17 @@ export default function PagosPage() {
       result = result.filter((p) => p.user_id === miembroSeleccionado);
     }
     return result;
-  })();
+  }, [pagos, filtro, busquedaMiembro, miembroSeleccionado, miembros]);
+
+  const pagosPaginados = useMemo(() => {
+    const start = (pagination.page - 1) * pagination.pageSize;
+    return pagosFiltrados.slice(start, start + pagination.pageSize);
+  }, [pagosFiltrados, pagination.page, pagination.pageSize]);
+
+  useEffect(() => {
+    pagination.setTotalItems(pagosFiltrados.length);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pagosFiltrados.length]);
 
   const selectedMiembroData = miembros.find((m) => m.id === miembroSeleccionado);
   const isActive = selectedMiembroData?.activo !== false;
@@ -317,7 +331,7 @@ export default function PagosPage() {
             </div>
           ) : (
             <div className="space-y-2">
-              {pagosFiltrados.map((pago) => (
+              {pagosPaginados.map((pago) => (
                 <div
                   key={pago.id}
                   className="p-3 bg-gym-bg rounded-xl hover:bg-gym-surface transition-colors"
@@ -371,6 +385,14 @@ export default function PagosPage() {
               ))}
             </div>
           )}
+          <Pagination
+            currentPage={pagination.page}
+            totalPages={pagination.totalPages}
+            totalItems={pagination.totalItems}
+            pageSize={pagination.pageSize}
+            onPageChange={pagination.setPage}
+            onPageSizeChange={pagination.setPageSize}
+          />
         </CardContent>
       </Card>
 

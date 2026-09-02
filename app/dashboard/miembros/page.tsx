@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,8 @@ import { createClient } from "@/lib/supabase/client";
 import { Users, Search, Plus, Settings, Save, Pencil, ChevronDown, ChevronUp } from "lucide-react";
 import { LoadingOverlay } from "@/components/ui/loading-overlay";
 import { PageLoader } from "@/components/ui/page-loader";
+import { Pagination } from "@/components/ui/pagination";
+import { usePagination } from "@/hooks/usePagination";
 import { showToast } from "@/components/ui/toast";
 import { messages } from "@/lib/messages";
 import type { Profile, Payment, Membership } from "@/lib/types";
@@ -25,6 +27,8 @@ export default function MiembrosPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [stats, setStats] = useState({ totalMiembros: 0, membresiaLibre: 0, maxMiembros: 50 });
+  const pagination = usePagination(25);
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>(null);
 
   const [selectedMiembro, setSelectedMiembro] = useState<Profile | null>(null);
   const [modalGestion, setModalGestion] = useState(false);
@@ -71,14 +75,24 @@ export default function MiembrosPage() {
       setCurrentUser(profile);
     }
 
-    const [data, statsData, configRes] = await Promise.all([
-      miembrosService.listarMiembros(),
+    const from = (pagination.page - 1) * pagination.pageSize;
+    const to = from + pagination.pageSize - 1;
+    const [{ data, count }, statsData, configRes] = await Promise.all([
+      miembrosService.listarPaginated({ from, to, search: busqueda || undefined }),
       miembrosService.stats(),
       fetch("/api/config/public").then((r) => r.json()),
     ]);
     setMiembros(data);
+    pagination.setTotalItems(count);
     setStats({ ...statsData, maxMiembros: configRes?.config?.max_members || 50 });
   };
+
+  const fetchPage = useCallback(async (page: number, pageSize: number, search: string) => {
+    const from = (page - 1) * pageSize;
+    const to = from + pageSize - 1;
+    const { data, count } = await miembrosService.listarPaginated({ from, to, search: search || undefined });
+    return { data, count };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -95,13 +109,14 @@ export default function MiembrosPage() {
           if (!cancelled) setCurrentUser(profile);
         }
 
-        const [data, statsData, configRes] = await Promise.all([
-          miembrosService.listarMiembros(),
+        const [pageResult, statsData, configRes] = await Promise.all([
+          fetchPage(1, pagination.pageSize, ""),
           miembrosService.stats(),
           fetch("/api/config/public").then((r) => r.json()),
         ]);
         if (!cancelled) {
-          setMiembros(data);
+          setMiembros(pageResult.data);
+          pagination.setTotalItems(pageResult.count);
           setStats({ ...statsData, maxMiembros: configRes?.config?.max_members || 50 });
         }
       } catch {
@@ -112,7 +127,43 @@ export default function MiembrosPage() {
     };
     loadInitial();
     return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (loading) return;
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const { data, count } = await fetchPage(pagination.page, pagination.pageSize, busqueda);
+        if (!cancelled) {
+          setMiembros(data);
+          pagination.setTotalItems(count);
+        }
+      } catch {
+        if (!cancelled) showToast(messages.toast.errorCargaDatos, "error");
+      }
+    };
+    load();
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pagination.page, pagination.pageSize]);
+
+  const handleSearch = useCallback((value: string) => {
+    setBusqueda(value);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(async () => {
+      pagination.resetPage();
+      try {
+        const { data, count } = await fetchPage(1, pagination.pageSize, value);
+        setMiembros(data);
+        pagination.setTotalItems(count);
+      } catch {
+        showToast(messages.toast.errorCargaDatos, "error");
+      }
+    }, 350);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pagination.pageSize]);
 
   const loadMiembros = async () => {
     setLoading(true);
@@ -448,16 +499,14 @@ export default function MiembrosPage() {
     }
   };
 
-  const miembrosFiltrados = miembros.filter((m) =>
-    m.full_name.toLowerCase().includes(busqueda.toLowerCase()) ||
-    (m.email && m.email.toLowerCase().includes(busqueda.toLowerCase()))
-  );
+  const miembrosFiltrados = miembros;
 
   if (loading) {
     return <PageLoader />;
   }
 
   return (
+    <>
     <div className="space-y-6 animate-fadeIn relative">
       <LoadingOverlay show={saving} message="Creando miembro..." />
       <LoadingOverlay show={togglingMembresia} message="Actualizando membresía..." />
@@ -476,14 +525,6 @@ export default function MiembrosPage() {
           <Plus className="w-4 h-4 mr-2" /> Nuevo Miembro
         </Button>
       </div>
-
-      {/* Mobile floating button */}
-      <button
-        onClick={() => setModalNuevo(true)}
-        className="sm:hidden fixed bottom-24 right-4 z-[60] w-14 h-14 rounded-full bg-gym-success/80 text-white shadow-lg shadow-gym-success/20 flex items-center justify-center active:scale-95 transition-all"
-      >
-        <Plus className="w-6 h-6" />
-      </button>
 
       {/* Stats */}
       <div className="grid grid-cols-2 gap-3 relative z-10">
@@ -508,7 +549,7 @@ export default function MiembrosPage() {
           type="text"
           placeholder="Buscar por nombre o correo..."
           value={busqueda}
-          onChange={(e) => setBusqueda(e.target.value)}
+          onChange={(e) => handleSearch(e.target.value)}
           className="w-full pl-10 pr-4 py-3 bg-gym-surface border border-gym-border rounded-xl text-gym-text placeholder:text-gym-muted focus:outline-none focus:ring-2 focus:ring-gym-primary"
         />
       </div>
@@ -616,6 +657,16 @@ export default function MiembrosPage() {
           </CardContent>
         </Card>
       )}
+
+      <Pagination
+        currentPage={pagination.page}
+        totalPages={pagination.totalPages}
+        totalItems={pagination.totalItems}
+        pageSize={pagination.pageSize}
+        onPageChange={pagination.setPage}
+        onPageSizeChange={pagination.setPageSize}
+        className="relative z-10"
+      />
 
       {/* Modal Gestión */}
       <Modal isOpen={modalGestion} onClose={() => setModalGestion(false)} title="Gestión">
@@ -958,5 +1009,14 @@ export default function MiembrosPage() {
         </button>
       )}
     </div>
+
+    {/* Mobile floating button — outside animated div for correct fixed positioning */}
+    <button
+      onClick={() => setModalNuevo(true)}
+      className="sm:hidden fixed bottom-24 right-4 z-[60] w-14 h-14 rounded-full bg-gym-success/80 text-white shadow-lg shadow-gym-success/20 flex items-center justify-center active:scale-95 transition-all"
+    >
+      <Plus className="w-6 h-6" />
+    </button>
+  </>
   );
 }

@@ -477,11 +477,12 @@ function LoginForm() {
             </Button>
           </form>
         </CardContent>
+        <div className="px-6 pb-5 text-center">
+          <Link href="/" className="text-[10px] text-gym-muted/50 hover:text-gym-primary transition-colors">
+            hcontrer.org
+          </Link>
+        </div>
       </Card>
-
-      <Link href="/" className="block text-center text-[10px] text-gym-muted/50 hover:text-gym-primary transition-colors mt-4 relative z-10">
-        hcontrer.org
-      </Link>
 
       {/* Forgot Password Modal */}
       <Modal isOpen={showResetForm} onClose={() => { setShowResetForm(false); setResetSent(false); }} className="max-w-md border-gym-primary/20">

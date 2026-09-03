@@ -84,9 +84,6 @@ const [password, setPassword] = useState("");
         <div className="min-h-screen flex items-center justify-center p-4 pb-16 relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-gym-primary/5 via-transparent to-gym-secondary/5" />
         </div>
-        <Link href="/" className="block text-center text-[10px] text-gym-muted/50 hover:text-gym-primary transition-colors mt-4 relative z-10">
-          hcontrer.org
-        </Link>
       </>
     );
   }
@@ -124,10 +121,12 @@ const [password, setPassword] = useState("");
               </Button>
             </Link>
           </CardContent>
+          <div className="px-6 pb-5 text-center">
+            <Link href="/" className="text-[10px] text-gym-muted/50 hover:text-gym-primary transition-colors">
+              hcontrer.org
+            </Link>
+          </div>
         </Card>
-        <Link href="/" className="block text-center text-[10px] text-gym-muted/50 hover:text-gym-primary transition-colors mt-4 relative z-10">
-          hcontrer.org
-        </Link>
       </div>
     );
   }
@@ -159,10 +158,12 @@ const [password, setPassword] = useState("");
               </Button>
             </Link>
           </CardContent>
+          <div className="px-6 pb-5 text-center">
+            <Link href="/" className="text-[10px] text-gym-muted/50 hover:text-gym-primary transition-colors">
+              hcontrer.org
+            </Link>
+          </div>
         </Card>
-        <Link href="/" className="block text-center text-[10px] text-gym-muted/50 hover:text-gym-primary transition-colors mt-4 relative z-10">
-          hcontrer.org
-        </Link>
       </div>
     );
   }
@@ -233,10 +234,12 @@ const [password, setPassword] = useState("");
             </Link>
           </div>
         </CardContent>
+        <div className="px-6 pb-5 text-center">
+          <Link href="/" className="text-[10px] text-gym-muted/50 hover:text-gym-primary transition-colors">
+            hcontrer.org
+          </Link>
+        </div>
       </Card>
-      <Link href="/" className="block text-center text-[10px] text-gym-muted/50 hover:text-gym-primary transition-colors mt-4 relative z-10">
-        hcontrer.org
-      </Link>
     </div>
   );
 }

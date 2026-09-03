@@ -677,7 +677,7 @@ export class PagosService {
     const montoDeuda = montoDeudaInscripcion + montoDeudaMensualidad;
 
     const pagosMesActual = pagosConDetalle.filter(
-      (p) => p.status === "aprobado" && p.month_number === mesActual && p.year_number === anioConsulta && p.payment_type === "mensualidad"
+      (p) => ["aprobado", "suspendido"].includes(p.status) && p.month_number === mesActual && p.year_number === anioConsulta && p.payment_type === "mensualidad"
     );
     const usuariosAlDia = new Set(
       pagosMesActual.filter((p) => miembrosConInscripcionPagada.has(p.user_id)).map((p) => p.user_id)
@@ -778,6 +778,8 @@ export class PagosService {
       totalDeuda: number;
       debeInscripcion: boolean;
       mesesDeuda: number[];
+      pagosPendientes: number;
+      montoPendiente: number;
     }>
   > {
     const supabase = supabaseClient || this.supabase;
@@ -834,6 +836,8 @@ export class PagosService {
       totalDeuda: number;
       debeInscripcion: boolean;
       mesesDeuda: number[];
+      pagosPendientes: number;
+      montoPendiente: number;
     }> = [];
 
     for (const miembro of miembros) {
@@ -883,22 +887,19 @@ export class PagosService {
         mesesDeuda.push(mes);
       }
 
-      if (!debeInscripcion && mesesDeuda.length === 0) continue;
-
-      const pagosPendientes = todosPagos.filter(
+      const pagosPendientesMiembro = todosPagos.filter(
         (p) => p.user_id === miembro.id && p.year_number === anioConsulta &&
-          p.payment_type === "mensualidad" &&
-          ["pendiente", "rechazado"].includes(p.status)
+          p.payment_type === "mensualidad" && p.status === "pendiente"
       );
-      const montoByMes = new Map<number, number>();
-      for (const p of pagosPendientes) {
-        if (!montoByMes.has(p.month_number!)) montoByMes.set(p.month_number!, p.payment_amount);
-      }
+      const mesesPendientes = pagosPendientesMiembro.map(p => p.month_number!).filter(Boolean);
+      const montoPendiente = pagosPendientesMiembro.reduce((sum, p) => sum + (p.payment_amount || montoMensual), 0);
+
+      if (!debeInscripcion && mesesDeuda.length === 0 && pagosPendientesMiembro.length === 0) continue;
 
       const deudas = mesesDeuda.map((mes) => ({
         month_number: mes,
         year_number: anioConsulta,
-        payment_amount: montoByMes.get(mes) || montoMensual,
+        payment_amount: montoMensual,
       }));
 
       const totalDeuda = mesesDeuda.length * montoMensual + (debeInscripcion ? montoInscripcion : 0);
@@ -911,6 +912,8 @@ export class PagosService {
         totalDeuda,
         debeInscripcion,
         mesesDeuda,
+        pagosPendientes: pagosPendientesMiembro.length,
+        montoPendiente,
       });
     }
 
@@ -987,13 +990,15 @@ export class PagosService {
         pagosMes.filter((p) => (p.status === "aprobado" || p.status === "suspendido") && m.idsMes.has(p.user_id)).map((p) => p.user_id)
       ).size;
 
+      const pendientes = new Set(
+        pagosMes.filter((p) => p.status === "pendiente" && m.idsMes.has(p.user_id)).map((p) => p.user_id)
+      ).size;
+
       const montoAcumulado = pagosMes
         .filter((p) => p.status === "aprobado")
         .reduce((sum, p) => sum + (p.payment_amount || 0), 0);
 
-      const libresMes = profiles.filter((p) => m.idsMes.has(p.id) && libresIds.has(p.id)).length;
-
-      const sinPago = Math.max(0, m.totalMiembrosMes - pagados - libresMes);
+      const sinPago = Math.max(0, m.totalMiembrosMes - pagados - pendientes);
       const montoAdeudado = sinPago * montoMensual;
 
       return {
@@ -1001,9 +1006,9 @@ export class PagosService {
         year_number: m.anio,
         nombre: m.nombre,
         pagados,
-        pendientes: 0,
+        pendientes,
         sinPago,
-        libres: libresMes,
+        libres: 0,
         montoAcumulado,
         montoAdeudado,
       };

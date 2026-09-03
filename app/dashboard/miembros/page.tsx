@@ -110,12 +110,14 @@ export default function MiembrosPage() {
       try {
         const supabase = createClient();
         const { data: { user } } = await supabase.auth.getUser();
+        let profile = null;
         if (user) {
-          const { data: profile } = await supabase
+          const { data } = await supabase
             .from("profiles")
             .select("*")
             .eq("id", user.id)
             .single();
+          profile = data;
           if (!cancelled) setCurrentUser(profile);
         }
 
@@ -128,6 +130,9 @@ export default function MiembrosPage() {
           setMiembros(pageResult.data);
           pagination.setTotalItems(pageResult.count);
           setStats({ ...statsData, maxMiembros: configRes?.config?.max_members || 50 });
+          if (user && profile?.role === "super_admin") {
+            setAdminLevel(getAdminLevel(user.email, configRes?.config?.owner_email || null, process.env.NEXT_PUBLIC_ADMIN_EMAIL));
+          }
         }
       } catch {
         if (!cancelled) showToast(messages.toast.errorCargaDatos, "error");

@@ -151,14 +151,43 @@ components/
 supabase/migrations/         # SQL migraciones (ejecutar manualmente)
 ```
 
-## Super Admin (Dueño del Gym)
+## Super Admin — Sub-roles
 
-El dueño del gym se identifica automáticamente por email:
-- El email configurado en `gym_config.dueno_email` obtiene rol `super_admin`
-- Funciona con **cualquier dominio** de correo (no solo Gmail)
-- Al cambiar el email en Config, el nuevo correo se promueve a super_admin automáticamente
-- Identidad visual **gold/neon**: anillo dorado en avatar, banner de bienvenida con corona, nombre con efecto neon dorado
-- Acceso total: puede reportar pagos, aprobarlos, gestionar miembros y configuración
+El rol `super_admin` se subdivide en 3 niveles, determinados automáticamente por email:
+
+| Nivel | Determinado por | Cantidad |
+|-------|----------------|----------|
+| **Propietario** | Email = `gym_config.owner_email` | Máx 1 |
+| **Técnico** | Email = `NEXT_PUBLIC_ADMIN_EMAIL` (.env) | Máx 1 |
+| **Normal** | Cualquier otro super_admin | Sin límite |
+
+### Permisos por nivel
+
+| Funcionalidad | Propietario | Técnico | Normal |
+|---------------|:-----------:|:-------:|:------:|
+| Dashboard completo | ✅ | ✅ | ✅ |
+| Tarjeta Membresía Libre | ✅ | ✅ | ❌ |
+| Página Configuración | ✅ | ✅ | ❌ |
+| Modificar config (API) | ✅ | ✅ | ❌ |
+| Botón Gestionar en Miembros | ✅ | ✅ | ❌ |
+| Cambiar roles de usuarios | ✅ | ✅ | ❌ |
+| Aprobar/rechazar pagos | ✅ | ✅ | ✅ |
+| Gestionar miembros (CRUD) | ✅ | ✅ | ✅ |
+| Notificaciones | ✅ | ✅ | ✅ |
+| Identidad visual gold/neon | ✅ | ✅ | ✅ |
+
+### Identidad visual
+
+Todos los super_admin comparten:
+- Anillo dorado en avatar (sidebar)
+- Banner de bienvenida "Bienvenido, Administrador" con corona
+- Nombre con efecto neon dorado
+
+### Flujo de autenticación
+
+- `NEXT_PUBLIC_ADMIN_EMAIL` y `gym_config.owner_email` se auto-crean como `super_admin` si no existen
+- Al cambiar `owner_email` en Config, se desactiva el perfil anterior y se crea uno nuevo para el nuevo email
+- Máx 1 propietario y 1 técnico: si ya existe uno con ese nivel, se bloquea el segundo
 
 ## Despliegue
 

@@ -349,6 +349,8 @@ function ReportarPagoForm() {
               <label className="text-sm font-medium text-gym-muted">Seleccionar Miembro</label>
             </div>
             <select
+              id="miembro-seleccionado"
+              name="miembro_seleccionado"
               value={miembroSeleccionado}
               onChange={(e) => setMiembroSeleccionado(e.target.value)}
               className="w-full px-4 py-3 bg-gym-bg border border-gym-border rounded-xl text-gym-text focus:outline-none focus:ring-2 focus:ring-gym-primary focus:border-gym-primary"

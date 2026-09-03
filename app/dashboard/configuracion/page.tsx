@@ -245,12 +245,12 @@ export default function ConfiguracionPage() {
             </div>
           </div>
 
-          <Input label={messages.configuracion.gymName} placeholder="Mi Gym" value={config.gym_name || ""} onChange={(e) => setConfig({ ...config, gym_name: e.target.value })} />
-          <Input label={messages.configuracion.maxMembers} type="number" placeholder="100" value={config.max_members || ""} onChange={(e) => setConfig({ ...config, max_members: parseInt(e.target.value) || 0 })} min="1" />
-          <Input label={messages.configuracion.address} placeholder="" value={config.address || ""} onChange={(e) => setConfig({ ...config, address: e.target.value })} />
-          <Input label={messages.configuracion.phoneNumber} placeholder="+584261234567" value={config.phone_number || ""} onChange={(e) => setConfig({ ...config, phone_number: e.target.value })} />
-          <Input label={messages.configuracion.contactEmail} placeholder="gym@email.com" type="email" value={config.contact_email || ""} onChange={(e) => setConfig({ ...config, contact_email: e.target.value })} />
-          <Input label={messages.configuracion.schedule} placeholder="Lun-Vie 6am-10pm" value={config.schedule || ""} onChange={(e) => setConfig({ ...config, schedule: e.target.value })} />
+          <Input id="gym-name" name="gym_name" label={messages.configuracion.gymName} placeholder="Mi Gym" value={config.gym_name || ""} onChange={(e) => setConfig({ ...config, gym_name: e.target.value })} />
+          <Input id="max-members" name="max_members" label={messages.configuracion.maxMembers} type="number" placeholder="100" value={config.max_members || ""} onChange={(e) => setConfig({ ...config, max_members: parseInt(e.target.value) || 0 })} min="1" />
+          <Input id="address" name="address" label={messages.configuracion.address} placeholder="" value={config.address || ""} onChange={(e) => setConfig({ ...config, address: e.target.value })} />
+          <Input id="phone-number" name="phone_number" label={messages.configuracion.phoneNumber} placeholder="+584261234567" value={config.phone_number || ""} onChange={(e) => setConfig({ ...config, phone_number: e.target.value })} />
+          <Input id="contact-email" name="contact_email" label={messages.configuracion.contactEmail} placeholder="gym@email.com" type="email" value={config.contact_email || ""} onChange={(e) => setConfig({ ...config, contact_email: e.target.value })} />
+          <Input id="schedule" name="schedule" label={messages.configuracion.schedule} placeholder="Lun-Vie 6am-10pm" value={config.schedule || ""} onChange={(e) => setConfig({ ...config, schedule: e.target.value })} />
         </CardContent>
       </Card>
 
@@ -263,9 +263,9 @@ export default function ConfiguracionPage() {
           <p className="text-xs text-gym-muted -mt-2">{messages.configuracion.propietarioDesc}</p>
         </CardHeader>
         <CardContent className="space-y-4">
-          <Input label={`${messages.configuracion.ownerName} *`} placeholder="Tu nombre" value={config.owner_name || ""} onChange={(e) => setConfig({ ...config, owner_name: e.target.value })} required />
-          <Input label={`${messages.configuracion.ownerEmail} *`} placeholder="tu@email.com" type="email" value={config.owner_email || ""} onChange={(e) => setConfig({ ...config, owner_email: e.target.value })} required />
-          <Input label={messages.configuracion.ownerPhone} placeholder="+584261234567" value={config.owner_phone || ""} onChange={(e) => setConfig({ ...config, owner_phone: e.target.value })} />
+          <Input id="owner-name" name="owner_name" label={`${messages.configuracion.ownerName} *`} placeholder="Tu nombre" value={config.owner_name || ""} onChange={(e) => setConfig({ ...config, owner_name: e.target.value })} required />
+          <Input id="owner-email" name="owner_email" label={`${messages.configuracion.ownerEmail} *`} placeholder="tu@email.com" type="email" value={config.owner_email || ""} onChange={(e) => setConfig({ ...config, owner_email: e.target.value })} required />
+          <Input id="owner-phone" name="owner_phone" label={messages.configuracion.ownerPhone} placeholder="+584261234567" value={config.owner_phone || ""} onChange={(e) => setConfig({ ...config, owner_phone: e.target.value })} />
         </CardContent>
       </Card>
 
@@ -314,6 +314,8 @@ export default function ConfiguracionPage() {
                 {metodo.is_active && (
                   <div className="grid grid-cols-2 gap-3">
                     <Input
+                      id={`monthly-${metodo.payment_method}`}
+                      name={`monthly_${metodo.payment_method}`}
                       label={messages.configuracion.mensualidad}
                       type="number"
                       placeholder="0"
@@ -323,6 +325,8 @@ export default function ConfiguracionPage() {
                       step="0.01"
                     />
                     <Input
+                      id={`inscription-${metodo.payment_method}`}
+                      name={`inscription_${metodo.payment_method}`}
                       label={messages.configuracion.inscripcion}
                       type="number"
                       placeholder="0"

@@ -237,6 +237,8 @@ function PerfilContent() {
           <div>
             <label className="text-xs text-gym-muted mb-1 block">Nombre completo (opcional)</label>
             <Input
+              id="full-name"
+              name="full_name"
               value={formData.full_name}
               onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
               placeholder="Nombre completo"
@@ -245,6 +247,8 @@ function PerfilContent() {
           <div>
             <label className="text-xs text-gym-muted mb-1 block">Email <span className="text-gym-danger">*</span></label>
             <Input
+              id="email"
+              name="email"
               type="email"
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
@@ -256,6 +260,8 @@ function PerfilContent() {
             <div>
               <label className="text-xs text-gym-muted mb-1 block">Hora llegada (opcional solo referencial, hora militar)</label>
               <input
+                id="arrival-time"
+                name="arrival_time"
                 type="time"
                 value={formData.arrival_time === "--:--" ? "" : formData.arrival_time}
                 onChange={(e) => setFormData({ ...formData, arrival_time: e.target.value || "--:--" })}
@@ -265,6 +271,8 @@ function PerfilContent() {
             <div>
               <label className="text-xs text-gym-muted mb-1 block">Hora salida (opcional solo referencial, hora militar)</label>
               <input
+                id="departure-time"
+                name="departure_time"
                 type="time"
                 value={formData.departure_time === "--:--" ? "" : formData.departure_time}
                 onChange={(e) => setFormData({ ...formData, departure_time: e.target.value || "--:--" })}
@@ -289,6 +297,8 @@ function PerfilContent() {
           <div>
             <label className="text-xs text-gym-muted mb-1 block">WhatsApp (opcional)</label>
             <Input
+              id="phone-number"
+              name="phone_number"
               value={formData.phone_number}
               onChange={(e) => setFormData({ ...formData, phone_number: e.target.value })}
               placeholder="+58 412 1234567"
@@ -297,6 +307,8 @@ function PerfilContent() {
           <div>
             <label className="text-xs text-gym-muted mb-1 block">Cédula (opcional)</label>
             <Input
+              id="document-id"
+              name="document_id"
               value={formData.document_id}
               onChange={(e) => setFormData({ ...formData, document_id: e.target.value })}
               placeholder="V-12345678"
@@ -306,6 +318,8 @@ function PerfilContent() {
             <div>
               <label className="text-xs text-gym-muted mb-1 block">Fecha de inicio</label>
               <Input
+                id="start-date"
+                name="start_date"
                 value={profile.start_date ? new Date(profile.start_date).toLocaleDateString("es-ES") : "—"}
                 disabled
                 className="bg-gym-surface/50"
@@ -314,6 +328,8 @@ function PerfilContent() {
             <div>
               <label className="text-xs text-gym-muted mb-1 block">Estado</label>
               <Input
+                id="activo"
+                name="activo"
                 value={profile.activo === false ? "Inactivo" : "Activo"}
                 disabled
                 className="bg-gym-surface/50"

@@ -183,7 +183,16 @@ function MisPagosContent() {
       const res = await fetch("/api/config/public");
       const { config: cfg, metodos } = await res.json();
       config = cfg;
-      setMetodosPago(metodos);
+      const deduped = Object.values(
+        (metodos as PaymentMethod[]).reduce((acc, m) => {
+          const existing = acc[m.payment_method];
+          if (!existing || new Date(m.created_at) > new Date(existing.created_at)) {
+            acc[m.payment_method] = m;
+          }
+          return acc;
+        }, {} as Record<string, PaymentMethod>)
+      );
+      setMetodosPago(deduped);
     } catch {
       config = null;
     }
@@ -610,6 +619,8 @@ setMembresiaLibre(!!libre.data);
         {activeTab === "pagos" && (
           <div className="flex items-center gap-2">
             <select
+              id="anio-mis-pagos"
+              name="anio"
               value={anioSeleccionado}
               onChange={(e) => setAnioSeleccionado(Number(e.target.value))}
               className="px-4 py-2 bg-gym-surface border border-gym-border rounded-xl text-gym-text focus:outline-none focus:ring-2 focus:ring-gym-primary"
@@ -714,6 +725,8 @@ setMembresiaLibre(!!libre.data);
           <div className="flex items-center justify-between mb-1">
             <span className="text-xs text-gym-muted font-medium uppercase tracking-wide">Resumen</span>
             <select
+              id="home-anio"
+              name="home_anio"
               value={homeAnioSeleccionado}
               onChange={(e) => setHomeAnioSeleccionado(Number(e.target.value))}
               className="text-xs bg-gym-bg border border-gym-border rounded-lg px-2 py-1 text-gym-text"
@@ -1115,7 +1128,7 @@ setMembresiaLibre(!!libre.data);
               <form id="pago-form" onSubmit={handleSubmitPago} className="space-y-4">
                 {/* Concepto de pago */}
                 <div>
-                  <label className="text-sm font-medium text-gym-muted mb-2 block">Concepto de pago</label>
+                  <p className="text-sm font-medium text-gym-muted mb-2 block">Concepto de pago</p>
                   <div className="space-y-2">
                     {showInscriptionCheckbox && (
                       <label className="flex items-center gap-3 p-3 bg-gym-bg rounded-xl cursor-pointer hover:bg-gym-surface transition-colors">
@@ -1173,7 +1186,7 @@ setMembresiaLibre(!!libre.data);
                 {(formData.pagar_mensualidad || formData.solicitar_suspension) && (
                   <div>
                     <div className="flex items-center justify-between mb-3">
-                      <label className="text-sm font-medium text-gym-muted">Meses a pagar</label>
+                      <p className="text-sm font-medium text-gym-muted">Meses a pagar</p>
                       {!loadingPendientes && (formData.solicitar_suspension ? mesesParaSuspender : mesesDisponiblesParaPagar).length > 0 && (
                         <Button type="button" variant="ghost" size="sm" onClick={() => {
                           const lista = formData.solicitar_suspension ? mesesParaSuspender : mesesDisponiblesParaPagar;
@@ -1229,7 +1242,7 @@ setMembresiaLibre(!!libre.data);
                 {/* Payment method */}
                 {!formData.solicitar_suspension && (
                   <div>
-                    <label className="block text-sm font-medium text-gym-muted mb-2">Método de pago</label>
+                    <p className="block text-sm font-medium text-gym-muted mb-2">Método de pago</p>
                     <div className="flex gap-2">
                       {metodosPago.filter(m => m.is_active || m.payment_method === "efectivo").map(m => (
                         <button
@@ -1252,10 +1265,12 @@ setMembresiaLibre(!!libre.data);
                 {/* Bill code for cash */}
                 {!formData.solicitar_suspension && formData.metodo_pago === "efectivo" && (
                   <div>
-                    <label className="block text-sm font-medium text-gym-muted mb-2">
+                    <label htmlFor="codigo-billete" className="block text-sm font-medium text-gym-muted mb-2">
                       <FileText className="w-4 h-4 inline mr-1" /> Código(s) del billete
                     </label>
                     <input
+                      id="codigo-billete"
+                      name="codigo_billete"
                       placeholder="Ej: A1B2C, D3E4F"
                       value={formData.codigo_billete}
                       onChange={(e) => setFormData({ ...formData, codigo_billete: e.target.value.toUpperCase() })}
@@ -1267,19 +1282,21 @@ setMembresiaLibre(!!libre.data);
                 {/* Comprobante for non-cash */}
                 {!formData.solicitar_suspension && needsComprobante(formData.metodo_pago) && (
                   <div>
-                    <label className="block text-sm font-medium text-gym-muted mb-2">Comprobante de pago</label>
+                    <label htmlFor="comprobante" className="block text-sm font-medium text-gym-muted mb-2">Comprobante de pago</label>
                     <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-gym-border rounded-xl cursor-pointer hover:border-gym-primary transition-colors">
                       <Upload className="w-6 h-6 text-gym-muted mb-1" />
                       <span className="text-xs text-gym-muted">{comprobante ? comprobante.name : "Adjuntar imagen o PDF"}</span>
-                      <input type="file" className="hidden" accept="image/*,.pdf" onChange={(e) => setComprobante(e.target.files?.[0] || null)} />
+                      <input id="comprobante" name="comprobante" type="file" className="hidden" accept="image/*,.pdf" onChange={(e) => setComprobante(e.target.files?.[0] || null)} />
                     </label>
                   </div>
                 )}
 
                 {/* Notes */}
                 <div>
-                  <label className="block text-sm font-medium text-gym-muted mb-2">Notas (opcional)</label>
+                  <label htmlFor="notas" className="block text-sm font-medium text-gym-muted mb-2">Notas (opcional)</label>
                   <textarea
+                    id="notas"
+                    name="notas"
                     placeholder="Algún comentario..."
                     value={formData.notas}
                     onChange={(e) => setFormData({ ...formData, notas: e.target.value })}
@@ -1290,10 +1307,12 @@ setMembresiaLibre(!!libre.data);
                 {/* Date */}
                 {!formData.solicitar_suspension && (
                   <div>
-                    <label className="block text-sm font-medium text-gym-muted mb-2">
+                    <label htmlFor="fecha-pago" className="block text-sm font-medium text-gym-muted mb-2">
                       <Calendar className="w-4 h-4 inline mr-1" /> Fecha de pago
                     </label>
                     <input
+                      id="fecha-pago"
+                      name="fecha_pago"
                       type="date"
                       value={formData.fecha_pago}
                       onChange={(e) => setFormData({ ...formData, fecha_pago: e.target.value })}

@@ -602,6 +602,8 @@ function LoginForm() {
                   </p>
                   <div className="relative">
                     <Input
+                      id="mig-nombre"
+                      name="mig_nombre"
                       label={messages.migracion.fullName}
                       placeholder={messages.migracion.nombrePlaceholder}
                       value={migNombre}
@@ -651,6 +653,8 @@ function LoginForm() {
                   )}
                   <div>
                     <Input
+                      id="mig-correo"
+                      name="mig_correo"
                       label={messages.migracion.correo}
                       type="email"
                       placeholder="tu@gmail.com"
@@ -673,6 +677,8 @@ function LoginForm() {
                     )}
                   </div>
                     <Input
+                      id="mig-whatsapp"
+                      name="mig_whatsapp"
                       label={messages.migracion.phoneNumber}
                       placeholder="+584261234567"
                       value={migWhatsapp}

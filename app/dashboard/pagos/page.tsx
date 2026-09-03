@@ -216,6 +216,8 @@ export default function PagosPage() {
           )}
           <div className="flex gap-2">
             <select
+              id="anio-pagos"
+              name="anio"
               value={anioSeleccionado}
               onChange={(e) => setAnioSeleccionado(Number(e.target.value))}
               className="px-3 py-2 bg-gym-primary/10 border border-gym-primary/30 rounded-xl text-gym-text text-sm font-medium focus:outline-none focus:ring-2 focus:ring-gym-primary"
@@ -225,6 +227,8 @@ export default function PagosPage() {
               ))}
             </select>
             <select
+              id="mes-pagos"
+              name="mes"
               value={mesSeleccionado}
               onChange={(e) => setMesSeleccionado(Number(e.target.value))}
               className="px-3 py-2 bg-gym-primary/10 border border-gym-primary/30 rounded-xl text-gym-text text-sm font-medium focus:outline-none focus:ring-2 focus:ring-gym-primary"

@@ -998,6 +998,10 @@ export class PagosService {
         .filter((p) => p.status === "aprobado")
         .reduce((sum, p) => sum + (p.payment_amount || 0), 0);
 
+      const montoPendiente = pagosMes
+        .filter((p) => p.status === "pendiente")
+        .reduce((sum, p) => sum + (p.payment_amount || 0), 0);
+
       const sinPago = Math.max(0, m.totalMiembrosMes - pagados - pendientes);
       const montoAdeudado = sinPago * montoMensual;
 
@@ -1011,6 +1015,7 @@ export class PagosService {
         libres: 0,
         montoAcumulado,
         montoAdeudado,
+        montoPendiente,
       };
     });
 

@@ -43,6 +43,7 @@ interface MonthlyStat {
   libres: number;
   montoAcumulado: number;
   montoAdeudado: number;
+  montoPendiente: number;
 }
 
 const particleCount = 12;
@@ -596,9 +597,14 @@ export default function DashboardPage() {
                         </div>
                         <div className="flex items-center justify-between text-xs">
                           <span className="text-gym-success font-medium">{formatCurrency(m.montoAcumulado)} cobrado</span>
-                          {m.sinPago > 0 && (
-                            <span className="text-gym-danger">{formatCurrency(m.montoAdeudado)} adeudado</span>
-                          )}
+                          <div className="flex items-center gap-3">
+                            {m.sinPago > 0 && (
+                              <span className="text-gym-danger">{formatCurrency(m.montoAdeudado)} adeudado</span>
+                            )}
+                            {m.pendientes > 0 && (
+                              <span className="text-gym-warning">{formatCurrency(m.montoPendiente)} pendiente</span>
+                            )}
+                          </div>
                         </div>
                       </div>
                     );

@@ -451,8 +451,8 @@ function LoginForm() {
           </div>
 
           <form onSubmit={handleEmailLogin} className="space-y-3">
-            <Input type="email" placeholder="tu@email.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
-            <PasswordInput placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required />
+            <Input id="email" name="email" type="email" placeholder="tu@email.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            <PasswordInput id="password" name="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required />
             <div className="flex justify-between items-center">
               {hasPendingMigration && (
                 <button
@@ -544,6 +544,8 @@ function LoginForm() {
               {messages.auth.resetPasswordSubtitle}
             </p>
             <Input
+              id="reset-email"
+              name="email"
               type="email"
               placeholder="tu@email.com"
               value={resetEmail}

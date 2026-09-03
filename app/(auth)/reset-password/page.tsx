@@ -204,6 +204,8 @@ const [password, setPassword] = useState("");
                 {messages.auth.resetPasswordNewPassword}
               </label>
               <PasswordInput
+                id="password"
+                name="password"
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -216,6 +218,8 @@ const [password, setPassword] = useState("");
                 {messages.auth.resetPasswordConfirmPassword}
               </label>
               <PasswordInput
+                id="confirm-password"
+                name="confirm-password"
                 placeholder="••••••••"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}

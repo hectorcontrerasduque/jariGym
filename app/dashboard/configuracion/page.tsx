@@ -11,6 +11,8 @@ import { showToast } from "@/components/ui/toast";
 import { Loader } from "@/components/ui/loader";
 import { messages } from "@/lib/messages";
 import type { GymConfig, MetodoPago, PaymentMethod } from "@/lib/types";
+import { getAdminLevel, isFullAdmin } from "@/lib/admin-level";
+import { useRouter } from "next/navigation";
 
 const metodoLabels: Record<MetodoPago, { label: string; icon: string; locked?: boolean }> = {
   efectivo: { label: messages.configuracion.metodoEfectivo, icon: "💵" },
@@ -37,6 +39,7 @@ function buildMetodosState(dbRecords: PaymentMethod[]): PaymentMethod[] {
 }
 
 export default function ConfiguracionPage() {
+  const router = useRouter();
   const [config, setConfig] = useState<Partial<GymConfig>>({});
   const [metodos, setMetodos] = useState<PaymentMethod[]>([]);
   const [loading, setLoading] = useState(true);
@@ -44,6 +47,25 @@ export default function ConfiguracionPage() {
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const logoInputRef = useRef<HTMLInputElement>(null);
   const metodosRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const checkAccess = async () => {
+      try {
+        const supabase = createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) { router.replace("/login"); return; }
+        const { data: profile } = await supabase.from("profiles").select("role, email").eq("id", user.id).single();
+        if (profile?.role !== "super_admin") { router.replace("/dashboard"); return; }
+        const res = await fetch("/api/config/public");
+        const { config: cfg } = await res.json();
+        const level = getAdminLevel(user.email, cfg?.owner_email || null, process.env.NEXT_PUBLIC_ADMIN_EMAIL);
+        if (!isFullAdmin(level)) { router.replace("/dashboard"); }
+      } catch {
+        router.replace("/dashboard");
+      }
+    };
+    checkAccess();
+  }, [router]);
 
   const loadData = async () => {
     try {

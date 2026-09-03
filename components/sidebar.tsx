@@ -20,6 +20,7 @@ import {
   Home,
 } from "lucide-react";
 import type { Profile } from "@/lib/types";
+import { getAdminLevel, isFullAdmin, type AdminLevel } from "@/lib/admin-level";
 
 const adminNavItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -75,6 +76,7 @@ export function Sidebar() {
   const [gymName, setGymName] = useState("GymApp");
   const [gymLogo, setGymLogo] = useState("");
   const [hasConfig, setHasConfig] = useState<boolean | null>(null);
+  const [ownerEmail, setOwnerEmail] = useState<string | null>(null);
 
   useEffect(() => {
     const supabase = createClient();
@@ -106,6 +108,7 @@ export function Sidebar() {
           setHasConfig(true);
           if (config.gym_name) setGymName(config.gym_name);
           if (config.logo_url) setGymLogo(config.logo_url);
+          if (config.owner_email) setOwnerEmail(config.owner_email);
         } else {
           setHasConfig(false);
         }
@@ -151,11 +154,13 @@ export function Sidebar() {
 
   const isAdmin = profile?.role === "super_admin";
   const isSuperAdmin = profile?.role === "super_admin";
+  const adminLevel = isSuperAdmin ? getAdminLevel(profile?.email, ownerEmail, process.env.NEXT_PUBLIC_ADMIN_EMAIL) : null;
+  const fullAdmin = isFullAdmin(adminLevel);
 
   const navItems = hasConfig === false
-    ? (isSuperAdmin ? [{ href: "/dashboard/configuracion", label: "Config", icon: Settings }] : [])
+    ? (fullAdmin ? [{ href: "/dashboard/configuracion", label: "Config", icon: Settings }] : [])
     : (isAdmin
-      ? adminNavItems
+      ? (fullAdmin ? adminNavItems : adminNavItems.filter((item) => item.href !== "/dashboard/configuracion"))
       : miembroNavItems);
 
   return (

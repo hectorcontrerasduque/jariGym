@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { createClient as createAuthClient } from "@/lib/supabase/server";
 import { messages } from "@/lib/messages";
+import { getAdminLevel, isFullAdmin } from "@/lib/admin-level";
 
 export async function POST(request: Request) {
   try {
@@ -24,6 +25,15 @@ export async function POST(request: Request) {
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
+
+    const { data: existingConfig } = await serviceSupabase
+      .from("gym_config")
+      .select("owner_email")
+      .single();
+    const adminLevel = getAdminLevel(user.email, existingConfig?.owner_email || null, process.env.NEXT_PUBLIC_ADMIN_EMAIL);
+    if (!isFullAdmin(adminLevel)) {
+      return NextResponse.json({ error: messages.toast.noAutorizado }, { status: 403 });
+    }
 
     const body = await request.json();
     const { config: configUpdates, metodos } = body;

@@ -18,6 +18,7 @@ import { usePagination } from "@/hooks/usePagination";
 import { showToast } from "@/components/ui/toast";
 import { messages } from "@/lib/messages";
 import type { Profile, Payment, Membership } from "@/lib/types";
+import { getAdminLevel, isFullAdmin, type AdminLevel } from "@/lib/admin-level";
 import Link from "next/link";
 
 export default function MiembrosPage() {
@@ -41,6 +42,8 @@ export default function MiembrosPage() {
   const [isMembresiaLibre, setIsMembresiaLibre] = useState(false);
   const [currentUser, setCurrentUser] = useState<Profile | null>(null);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [adminLevel, setAdminLevel] = useState<AdminLevel | null>(null);
+  const fullAdmin = isFullAdmin(adminLevel);
   const [historialMembresias, setHistorialMembresias] = useState<Membership[]>([]);
   const [isActivar, setIsActivar] = useState(false);
   const [togglingMembresia, setTogglingMembresia] = useState(false);
@@ -72,6 +75,14 @@ export default function MiembrosPage() {
         .eq("id", user.id)
         .single();
       setCurrentUser(profile);
+
+      if (profile?.role === "super_admin") {
+        try {
+          const res = await fetch("/api/config/public");
+          const { config } = await res.json();
+          setAdminLevel(getAdminLevel(user.email, config?.owner_email || null, process.env.NEXT_PUBLIC_ADMIN_EMAIL));
+        } catch {}
+      }
     }
 
     const from = (pagination.page - 1) * pagination.pageSize;
@@ -601,9 +612,11 @@ export default function MiembrosPage() {
                             <Pencil className="w-4 h-4" />
                           </Button>
                         </Link>
-                        <Button variant="ghost" size="sm" onClick={() => verDetalle(miembro)} title="Gestionar">
-                          <Settings className="w-4 h-4" />
-                        </Button>
+                        {fullAdmin && (
+                          <Button variant="ghost" size="sm" onClick={() => verDetalle(miembro)} title="Gestionar">
+                            <Settings className="w-4 h-4" />
+                          </Button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -641,9 +654,11 @@ export default function MiembrosPage() {
                     <Pencil className="w-4 h-4 mr-1" /> Editar
                   </Button>
                 </Link>
-                <Button variant="ghost" size="sm" className="flex-1" onClick={() => verDetalle(miembro)}>
-                  <Settings className="w-4 h-4 mr-1" /> Gestionar
-                </Button>
+                {fullAdmin && (
+                  <Button variant="ghost" size="sm" className="flex-1" onClick={() => verDetalle(miembro)}>
+                    <Settings className="w-4 h-4 mr-1" /> Gestionar
+                  </Button>
+                )}
               </div>
             </CardContent>
           </Card>

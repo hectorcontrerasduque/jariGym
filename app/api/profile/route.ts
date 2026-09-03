@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { messages } from "@/lib/messages";
 import { applyRateLimit } from "@/lib/middleware/rate-limit";
+import { getAdminLevel, isFullAdmin } from "@/lib/admin-level";
 
 export async function PUT(request: Request) {
   const rateLimitResponse = await applyRateLimit(request, {
@@ -42,6 +43,16 @@ export async function PUT(request: Request) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
+    let fullAdmin = false;
+    if (isAdmin) {
+      const { data: existingConfig } = await serviceSupabase
+        .from("gym_config")
+        .select("owner_email")
+        .single();
+      const level = getAdminLevel(user.email, existingConfig?.owner_email || null, process.env.NEXT_PUBLIC_ADMIN_EMAIL);
+      fullAdmin = isFullAdmin(level);
+    }
+
     const { data: currentData } = await serviceSupabase
       .from("profiles")
       .select("full_name, email, phone_number, document_id, arrival_time, departure_time, inscription_admin_note")
@@ -56,7 +67,7 @@ export async function PUT(request: Request) {
       arrival_time: updates.arrival_time ?? currentData?.arrival_time,
       departure_time: updates.departure_time ?? currentData?.departure_time,
     };
-    if (isAdmin) {
+    if (fullAdmin) {
       profileUpdates.role = updates.role;
       profileUpdates.inscription_admin_note = updates.inscription_admin_note ?? currentData?.inscription_admin_note;
     }

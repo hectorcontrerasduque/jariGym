@@ -13,6 +13,7 @@ import {
   BarChart3,
   Zap,
   Hourglass,
+  FileText,
 } from "lucide-react";
 import {
   Card,
@@ -30,6 +31,7 @@ import type { Payment, Profile } from "@/lib/types";
 import { showToast } from "@/components/ui/toast";
 import { Loader } from "@/components/ui/loader";
 import { messages } from "@/lib/messages";
+import { getAdminLevel, isFullAdmin, type AdminLevel } from "@/lib/admin-level";
 
 interface MonthlyStat {
   month_number: number;
@@ -116,6 +118,9 @@ export default function DashboardPage() {
   const [loadingModal, setLoadingModal] = useState(false);
   const [userProfile, setUserProfile] = useState<Profile | null>(null);
   const [misPagosPendientes, setMisPagosPendientes] = useState(0);
+  const [adminLevel, setAdminLevel] = useState<AdminLevel | null>(null);
+  const [ownerEmail, setOwnerEmail] = useState<string | null>(null);
+  const fullAdmin = isFullAdmin(adminLevel);
 
   useEffect(() => {
     if (isSuperAdmin) {
@@ -134,7 +139,7 @@ export default function DashboardPage() {
         if (user) {
           const { data: profile } = await supabase
             .from("profiles")
-            .select("role, arrival_time, departure_time, full_name")
+            .select("role, arrival_time, departure_time, full_name, email")
             .eq("id", user.id)
             .single();
           if (!cancelled && profile) {
@@ -149,6 +154,18 @@ export default function DashboardPage() {
               .eq("user_id", user.id)
               .eq("status", "pendiente");
             setMisPagosPendientes(misPagos?.length || 0);
+          }
+
+          if (!cancelled && profile?.role === "super_admin") {
+            try {
+              const res = await fetch("/api/config/public");
+              const { config } = await res.json();
+              const owner = config?.owner_email || null;
+              if (!cancelled) {
+                setOwnerEmail(owner);
+                setAdminLevel(getAdminLevel(user.email, owner, process.env.NEXT_PUBLIC_ADMIN_EMAIL));
+              }
+            } catch {}
           }
         }
 
@@ -213,7 +230,7 @@ export default function DashboardPage() {
         members: morosos.map((m) => ({
           id: m.id,
           nombre: m.full_name,
-          detalle: `${m.mesesDeuda.length} mes(es) sin pago${m.debeInscripcion ? " + inscripción" : ""} — ${formatCurrency(m.totalDeuda)}`,
+          detalle: `${m.mesesDeuda.length > 0 ? `${m.mesesDeuda.length} mes(es) sin pago` : ""}${m.debeInscripcion ? `${m.mesesDeuda.length > 0 ? " + " : ""}inscripción` : ""}${m.pagosPendientes > 0 ? `${m.mesesDeuda.length > 0 || m.debeInscripcion ? " + " : ""}${m.pagosPendientes} pago(s) pendiente(s)` : ""} — ${formatCurrency(m.totalDeuda + m.montoPendiente)}`,
         })),
       });
     } catch {
@@ -232,7 +249,7 @@ export default function DashboardPage() {
       const { data: pagosHeader } = await supabase
         .from("payments")
         .select("id, user_id")
-        .eq("status", "aprobado");
+        .in("status", ["aprobado", "suspendido"]);
       const pagoIds = (pagosHeader || []).map((p) => p.id);
       const { data: pagosDetalles } = await supabase
         .from("payment_detail")
@@ -493,37 +510,39 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          <Card className="stat-card" onClick={handleClickMembresiaLibre}>
-            <CardContent className="p-3 sm:p-5">
-              <div className="flex items-start justify-between mb-2 sm:mb-4">
-                <div className="stat-icon stat-icon-secondary">
-                  <Gift className="w-4 h-4 sm:w-5 sm:h-5 text-gym-secondary" />
+          {fullAdmin && (
+            <Card className="stat-card" onClick={handleClickMembresiaLibre}>
+              <CardContent className="p-3 sm:p-5">
+                <div className="flex items-start justify-between mb-2 sm:mb-4">
+                  <div className="stat-icon stat-icon-secondary">
+                    <Gift className="w-4 h-4 sm:w-5 sm:h-5 text-gym-secondary" />
+                  </div>
+                  <div className="hidden sm:flex items-center gap-1.5 px-2 py-1 rounded-full bg-gym-secondary/10 border border-gym-secondary/20">
+                    <span className="text-[10px] font-medium text-gym-secondary">Libre</span>
+                  </div>
                 </div>
-                <div className="hidden sm:flex items-center gap-1.5 px-2 py-1 rounded-full bg-gym-secondary/10 border border-gym-secondary/20">
-                  <span className="text-[10px] font-medium text-gym-secondary">Libre</span>
+                <div className="flex items-end justify-between">
+                  <div>
+                    <p className="text-[10px] sm:text-xs text-gym-muted mb-0.5 sm:mb-1 uppercase tracking-wider">Membresía Libre</p>
+                    <div className="stat-number text-gym-secondary">{stats?.membresiaLibre || 0}</div>
+                  </div>
+                  <div className="flex flex-col items-end gap-0.5">
+                    <span className="text-[9px] sm:text-[10px] text-gym-secondary">{stats?.totalMiembros || 0} total</span>
+                    <span className="text-[9px] sm:text-[10px] text-gym-muted">miembros</span>
+                  </div>
                 </div>
-              </div>
-              <div className="flex items-end justify-between">
-                <div>
-                  <p className="text-[10px] sm:text-xs text-gym-muted mb-0.5 sm:mb-1 uppercase tracking-wider">Membresía Libre</p>
-                  <div className="stat-number text-gym-secondary">{stats?.membresiaLibre || 0}</div>
+                <div className="mt-2 sm:mt-4 flex items-center gap-2">
+                  <div className="flex-1 h-1.5 sm:h-2 bg-gym-bg rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-gradient-to-r from-gym-secondary to-gym-secondary/60 rounded-full transition-all"
+                      style={{ width: `${stats?.totalMiembros ? (stats.membresiaLibre / stats.totalMiembros) * 100 : 0}%` }}
+                    />
+                  </div>
+                  <span className="text-[9px] sm:text-[10px] text-gym-muted">{stats?.totalMiembros ? Math.round((stats.membresiaLibre / stats.totalMiembros) * 100) : 0}%</span>
                 </div>
-                <div className="flex flex-col items-end gap-0.5">
-                  <span className="text-[9px] sm:text-[10px] text-gym-secondary">{stats?.totalMiembros || 0} total</span>
-                  <span className="text-[9px] sm:text-[10px] text-gym-muted">miembros</span>
-                </div>
-              </div>
-              <div className="mt-2 sm:mt-4 flex items-center gap-2">
-                <div className="flex-1 h-1.5 sm:h-2 bg-gym-bg rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-gradient-to-r from-gym-secondary to-gym-secondary/60 rounded-full transition-all"
-                    style={{ width: `${stats?.totalMiembros ? (stats.membresiaLibre / stats.totalMiembros) * 100 : 0}%` }}
-                  />
-                </div>
-                <span className="text-[9px] sm:text-[10px] text-gym-muted">{stats?.totalMiembros ? Math.round((stats.membresiaLibre / stats.totalMiembros) * 100) : 0}%</span>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {/* Bar Chart */}
@@ -540,10 +559,10 @@ export default function DashboardPage() {
               <CardContent>
                 <div className="space-y-4">
                   {(showAllMonths ? [...monthlyStats.meses].reverse() : [...monthlyStats.meses].reverse().slice(0, 3)).map((m) => {
-                    const total = m.pagados + m.sinPago + m.libres;
+                    const total = m.pagados + m.sinPago + m.pendientes;
                     const pagadosWidth = total > 0 ? (m.pagados / maxMiembros) * 100 : 0;
                     const sinPagoWidth = total > 0 ? (m.sinPago / maxMiembros) * 100 : 0;
-                    const libresWidth = total > 0 ? (m.libres / maxMiembros) * 100 : 0;
+                    const pendientesWidth = total > 0 ? (m.pendientes / maxMiembros) * 100 : 0;
 
                     return (
                       <div key={`${m.year_number}-${m.month_number}`} className="space-y-2">
@@ -552,15 +571,15 @@ export default function DashboardPage() {
                           <div className="flex items-center gap-4 text-xs">
                             <span className="flex items-center gap-1.5">
                               <span className="w-2.5 h-2.5 rounded-sm bg-gym-success" />
-                              {m.pagados} pagados
+                              {m.pagados}
                             </span>
                             <span className="flex items-center gap-1.5">
                               <span className="w-2.5 h-2.5 rounded-sm bg-gym-danger" />
-                              {m.sinPago} sin pago
+                              {m.sinPago}
                             </span>
                             <span className="flex items-center gap-1.5">
-                              <span className="w-2.5 h-2.5 rounded-sm bg-gym-secondary" />
-                              {m.libres} libres
+                              <span className="w-2.5 h-2.5 rounded-sm bg-gym-warning" />
+                              {m.pendientes}
                             </span>
                           </div>
                         </div>
@@ -571,8 +590,8 @@ export default function DashboardPage() {
                           {sinPagoWidth > 0 && (
                             <div className="progress-bar-fill bg-gradient-to-r from-gym-danger to-gym-danger/70" style={{ width: `${sinPagoWidth}%` }} />
                           )}
-                          {libresWidth > 0 && (
-                            <div className="progress-bar-fill bg-gradient-to-r from-gym-secondary to-gym-secondary/70" style={{ width: `${libresWidth}%` }} />
+                          {pendientesWidth > 0 && (
+                            <div className="progress-bar-fill bg-gradient-to-r from-gym-warning to-gym-warning/70" style={{ width: `${pendientesWidth}%` }} />
                           )}
                         </div>
                         <div className="flex items-center justify-between text-xs">
@@ -588,7 +607,7 @@ export default function DashboardPage() {
                 <div className="flex items-center justify-center gap-6 mt-4 text-xs text-gym-muted">
                   <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-gym-success" /> Pagado</span>
                   <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-gym-danger" /> Sin pago</span>
-                  <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-gym-secondary" /> Libre</span>
+                  <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-gym-warning" /> Pendiente</span>
                 </div>
                 {monthlyStats.meses.length > 3 && (
                   <div className="text-center mt-3">
@@ -611,6 +630,7 @@ export default function DashboardPage() {
             <CardHeader className="pb-2 cursor-pointer select-none" onClick={() => setCollapsePagosRecientes(!collapsePagosRecientes)}>
               <CardTitle className="flex items-center gap-2">
                 {collapsePagosRecientes ? <ChevronRight className="w-5 h-5 text-gym-primary" /> : <ChevronDown className="w-5 h-5 text-gym-primary" />}
+                <FileText className="w-4 h-4 text-gym-primary" />
                 Pagos Recientes
               </CardTitle>
             </CardHeader>

@@ -192,6 +192,7 @@ export default function PagosPage() {
   }
 
   return (
+    <>
     <div className="space-y-4 animate-fadeIn relative">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 relative z-10">
         <div>
@@ -457,6 +458,7 @@ export default function PagosPage() {
           </div>
         )}
       </Modal>
+    </div>
 
       {/* Mobile floating Generar pagos button */}
       <Link href="/dashboard/mis-pagos" className="sm:hidden fixed bottom-24 right-4 z-[60]">
@@ -464,6 +466,6 @@ export default function PagosPage() {
           <Plus className="w-6 h-6" />
         </div>
       </Link>
-    </div>
+    </>
   );
 }

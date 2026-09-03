@@ -171,6 +171,7 @@ export default function ConfiguracionPage() {
   }
 
   return (
+    <>
     <div className="space-y-4 animate-fadeIn relative">
       <Loader show={saving} message={messages.common.guardando} variant="overlay" />
       <div className="absolute top-0 right-0 w-72 h-72 bg-gym-primary/5 rounded-full blur-3xl animate-pulse" />
@@ -387,6 +388,7 @@ export default function ConfiguracionPage() {
           {messages.configuracion.guardar}
         </button>
       </div>
+    </div>
 
       {/* Mobile floating save button */}
       <button
@@ -400,6 +402,6 @@ export default function ConfiguracionPage() {
           <Save className="w-6 h-6" />
         )}
       </button>
-    </div>
+    </>
   );
 }

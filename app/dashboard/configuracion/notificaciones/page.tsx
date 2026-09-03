@@ -182,6 +182,7 @@ export default function NotificacionesPage() {
   }
 
   return (
+    <>
     <div className="space-y-4 animate-fadeIn relative">
       <Loader show={isLoading} message={saving ? messages.common.guardando : executing || executingTipo ? messages.common.enviandoNotificaciones : diagnosticing ? messages.common.ejecutandoDiagnostico : undefined} variant="overlay" />
 
@@ -376,6 +377,7 @@ export default function NotificacionesPage() {
           </CardContent>
         </Card>
       </>}
+    </div>
 
       {/* Mobile floating save button */}
       {gymConfig.notificaciones_enabled && (
@@ -391,6 +393,6 @@ export default function NotificacionesPage() {
         )}
       </button>
       )}
-    </div>
+    </>
   );
 }

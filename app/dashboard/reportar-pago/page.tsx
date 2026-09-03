@@ -302,6 +302,7 @@ function ReportarPagoForm() {
   const isLibre = membresiaLibreInfo && !membresiaLibreInfo.end_date;
 
   return (
+    <>
     <div className="max-w-2xl mx-auto space-y-6 animate-fadeIn">
       <Loader show={loading} message={messages.common.enviandoPago} variant="overlay" />
       <div className="flex items-center gap-3">
@@ -676,6 +677,7 @@ function ReportarPagoForm() {
           )}
         </CardContent>
       </Card>
+    </div>
 
       {/* Mobile floating button */}
       <button
@@ -698,6 +700,6 @@ function ReportarPagoForm() {
           <Send className="w-6 h-6" />
         )}
       </button>
-    </div>
+    </>
   );
 }

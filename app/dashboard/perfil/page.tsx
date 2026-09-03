@@ -185,6 +185,7 @@ function PerfilContent() {
   const isAdmin = profile.role === "super_admin";
 
   return (
+    <>
     <div className="space-y-6 animate-fadeIn relative">
       <Loader show={saving} message={messages.common.guardando} variant="overlay" />
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 relative z-10">
@@ -328,6 +329,7 @@ function PerfilContent() {
           <Save className="w-4 h-4 mr-2" /> Guardar
         </Button>
       </div>
+    </div>
 
       {/* Mobile floating save button */}
       <button
@@ -341,6 +343,6 @@ function PerfilContent() {
           <Save className="w-6 h-6" />
         )}
       </button>
-    </div>
+    </>
   );
 }

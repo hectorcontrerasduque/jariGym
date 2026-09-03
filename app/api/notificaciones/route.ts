@@ -207,6 +207,26 @@ async function ejecutarTipo(
       error_detail: errorMsg,
       created_by: userId,
     });
+
+    const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL;
+    if (adminEmail) {
+      try {
+        const { sendErrorReportEmail } = await import("@/lib/services/email/email.service");
+        await sendErrorReportEmail(
+          adminEmail,
+          gymConfig.gym_name || "GymApp",
+          {
+            paso: `Notificación: ${config.notification_type}`,
+            mensaje: errorMsg,
+            timestamp: new Date().toLocaleString("es-ES"),
+            contexto: { tipo: config.notification_type, config_id: config.id },
+          },
+          gymConfig.logo_url,
+          gymConfig.address
+        );
+      } catch { /* silent */ }
+    }
+
     return { miembrosNotificados: 0, sinProblemas: false };
   }
 }

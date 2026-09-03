@@ -434,14 +434,34 @@ export async function POST(request: Request) {
           members_notified: count,
           no_issues: true,
         });
-      } catch {
+      } catch (error) {
         errores++;
+        const errorMsg = error instanceof Error ? error.message : "Error en ejecución manual";
         await supabase.from("notification_log").insert({
           notification_config_id: config.id,
           members_notified: 0,
           no_issues: false,
-          error_detail: "Error en ejecución manual",
+          error_detail: errorMsg,
         });
+
+        const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL;
+        if (adminEmail) {
+          try {
+            const { sendErrorReportEmail } = await import("@/lib/services/email/email.service");
+            await sendErrorReportEmail(
+              adminEmail,
+              (gymConfig.gym_name as string) || "GymApp",
+              {
+                paso: `Notificación manual: ${config.notification_type}`,
+                mensaje: errorMsg,
+                timestamp: new Date().toLocaleString("es-ES"),
+                contexto: { tipo: config.notification_type, config_id: config.id },
+              },
+              gymConfig.logo_url as string | null,
+              gymConfig.address as string | null
+            );
+          } catch { /* silent */ }
+        }
       }
     }
 

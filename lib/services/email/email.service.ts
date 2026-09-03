@@ -6,6 +6,8 @@ import { recordatorioMiembroTemplate } from "./templates/recordatorio-miembro";
 import { recordatorioAdminTemplate } from "./templates/recordatorio-admin";
 import { resumenDuenoTemplate } from "./templates/resumen-dueno";
 import { estatusSistemaTemplate } from "./templates/estatus-sistema";
+import { diagnosticoTemplate } from "./templates/diagnostico";
+import { errorReportTemplate } from "./templates/error-report";
 
 const transporter = nodemailer.createTransport({
   service: "gmail",
@@ -266,6 +268,47 @@ export async function sendSystemStatusEmail(
     html: baseHtml + unsubscribeFooter(gymName, direccion),
     fromName: gymName,
     campaign: "estatus-sistema",
+  });
+}
+
+// ─── DIAGNOSTIC ──────────────────────────────────────────────
+export async function sendDiagnosticoEmail(
+  to: string,
+  gymName: string,
+  resultados: Array<{ paso: string; estado: "ok" | "error" | "warning"; detalle: string }>,
+  gymLogo?: string | null,
+  direccion?: string | null
+): Promise<void> {
+  const baseHtml = diagnosticoTemplate(resultados, gymName, gymLogo);
+  await sendNotificationEmail({
+    to,
+    subject: `${gymName} - Diagnóstico del sistema`,
+    html: baseHtml + unsubscribeFooter(gymName, direccion),
+    fromName: gymName,
+    campaign: "diagnostico",
+  });
+}
+
+// ─── ERROR REPORT ────────────────────────────────────────────
+export async function sendErrorReportEmail(
+  to: string,
+  gymName: string,
+  errorInfo: {
+    paso: string;
+    mensaje: string;
+    timestamp: string;
+    contexto: Record<string, unknown>;
+  },
+  gymLogo?: string | null,
+  direccion?: string | null
+): Promise<void> {
+  const baseHtml = errorReportTemplate(errorInfo, gymName, gymLogo);
+  await sendNotificationEmail({
+    to,
+    subject: `${gymName} - Error en notificaciones`,
+    html: baseHtml + unsubscribeFooter(gymName, direccion),
+    fromName: gymName,
+    campaign: "error-report",
   });
 }
 

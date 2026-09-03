@@ -150,6 +150,25 @@ export async function POST(request: Request) {
     });
 
     const exitoso = resultados.every((r) => r.estado !== "error");
+
+    const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL;
+    if (adminEmail) {
+      try {
+        const { sendDiagnosticoEmail } = await import("@/lib/services/email/email.service");
+        const { data: cfg } = await supabase
+          .from("gym_config")
+          .select("gym_name, logo_url, address")
+          .single();
+        await sendDiagnosticoEmail(
+          adminEmail,
+          cfg?.gym_name || "GymApp",
+          resultados,
+          cfg?.logo_url,
+          cfg?.address
+        );
+      } catch { /* silent */ }
+    }
+
     return NextResponse.json({ exitoso, resultados });
   } catch (error) {
     return NextResponse.json(

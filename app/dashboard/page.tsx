@@ -170,11 +170,13 @@ export default function DashboardPage() {
           }
         }
 
+        const elegibles = await pagosService.getMiembrosElegibles();
+
         const [statsResult, pagosResult, aniosResult, monthlyResult, miembrosResult] = await Promise.allSettled([
-          pagosService.stats(anioSeleccionado),
+          pagosService.stats(anioSeleccionado, undefined, elegibles),
           pagosService.pagosRecientesAprobados(anioSeleccionado),
           pagosService.aniosConPagos(),
-          pagosService.monthlyStats(anioSeleccionado),
+          pagosService.monthlyStats(anioSeleccionado, undefined, elegibles),
           miembrosService.listarMiembros(),
         ]);
         if (!cancelled) {

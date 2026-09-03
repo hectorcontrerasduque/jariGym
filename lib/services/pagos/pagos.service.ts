@@ -3,6 +3,16 @@ import { getMonthName, getDiaCobro } from "@/lib/utils";
 import { messages } from "@/lib/messages";
 import type { Pago, MetodoPago, TipoPago, Profile, DetallePago } from "@/lib/types";
 
+export interface ElegiblesResult {
+  miembros: Array<{ id: string; email: string | null; full_name: string | null; inscription_paid: boolean; activo: boolean | null; start_date: string | null }>;
+  miembrosLibresIds: Set<string>;
+  fechaInicioMap: Map<string, string>;
+  ownerEmail: string;
+  modoCobro: "dia_uno" | "fecha_inscripcion";
+  montoMensual: number;
+  montoInscripcion: number;
+}
+
 /**
  * PagosService - Service for payment operations.
  * 
@@ -618,14 +628,14 @@ export class PagosService {
     return anios.sort((a, b) => b - a);
   }
 
-  async stats(anio?: number, supabaseClient?: ReturnType<typeof createClient>) {
+  async stats(anio?: number, supabaseClient?: ReturnType<typeof createClient>, elegibles?: ElegiblesResult) {
     const supabase = supabaseClient || this.supabase;
     const hoy = new Date();
     const anioConsulta = anio || hoy.getFullYear();
     const mesActual = hoy.getMonth() + 1;
 
-    const elegibles = await this.getMiembrosElegibles(supabase);
-    const { miembros: allMiembros, miembrosLibresIds, ownerEmail, montoMensual, montoInscripcion } = elegibles;
+    const elegiblesData = elegibles || await this.getMiembrosElegibles(supabase);
+    const { miembros: allMiembros, miembrosLibresIds, ownerEmail, montoMensual, montoInscripcion } = elegiblesData;
 
     const miembrosActivos = allMiembros.filter((m) => m.email?.toLowerCase() !== ownerEmail);
 
@@ -668,7 +678,7 @@ export class PagosService {
     const inscritosPagados = miembrosActivos.filter((m) => miembrosConInscripcionPagada.has(m.id)).length;
     const inscritosPendientes = miembrosActivos.filter((m) => !miembrosConInscripcionPagada.has(m.id)).length;
 
-    const morosos = await this.getMiembrosMorosos(anioConsulta, supabase);
+    const morosos = await this.getMiembrosMorosos(anioConsulta, supabase, elegiblesData);
     const deudoresInscripcion = morosos.filter((m) => m.debeInscripcion).length;
     const deudoresMensualidad = morosos.filter((m) => m.mesesDeuda.length > 0).length;
     const montoDeudaInscripcion = morosos.filter((m) => m.debeInscripcion).length * montoInscripcion;
@@ -711,7 +721,7 @@ export class PagosService {
    * Retorna miembros activos (excluyendo dueño y membresía libre) junto con
    * la configuración de cobro. Todas las funciones de morosos/deudas usan esto.
    */
-  async getMiembrosElegibles(supabaseClient?: ReturnType<typeof createClient>) {
+  async getMiembrosElegibles(supabaseClient?: ReturnType<typeof createClient>): Promise<ElegiblesResult> {
     const supabase = supabaseClient || this.supabase;
 
     const [miembrosResult, configResult, libresResult, ownerResult] = await Promise.all([
@@ -768,7 +778,7 @@ export class PagosService {
     };
   }
 
-  async getMiembrosMorosos(anio?: number, supabaseClient?: ReturnType<typeof createClient>): Promise<
+  async getMiembrosMorosos(anio?: number, supabaseClient?: ReturnType<typeof createClient>, elegibles?: ElegiblesResult): Promise<
     Array<{
       id: string;
       email: string;
@@ -786,8 +796,8 @@ export class PagosService {
     const anioConsulta = anio || hoy.getFullYear();
     const mesActual = anioConsulta === hoy.getFullYear() ? hoy.getMonth() + 1 : 12;
 
-    const elegibles = await this.getMiembrosElegibles(supabase);
-    const { miembros, miembrosLibresIds, fechaInicioMap, ownerEmail, modoCobro, montoMensual, montoInscripcion } = elegibles;
+    const elegiblesData = elegibles || await this.getMiembrosElegibles(supabase);
+    const { miembros, miembrosLibresIds, fechaInicioMap, ownerEmail, modoCobro, montoMensual, montoInscripcion } = elegiblesData;
 
     if (miembros.length === 0) return [];
 
@@ -906,7 +916,7 @@ export class PagosService {
       morosos.push({
         id: miembro.id,
         email: miembro.email!,
-        full_name: miembro.full_name,
+        full_name: miembro.full_name || "",
         deudas,
         totalDeuda,
         debeInscripcion,
@@ -919,14 +929,14 @@ export class PagosService {
     return morosos;
   }
 
-  async monthlyStats(anio?: number, supabaseClient?: ReturnType<typeof createClient>) {
+  async monthlyStats(anio?: number, supabaseClient?: ReturnType<typeof createClient>, elegibles?: ElegiblesResult) {
     const supabase = supabaseClient || this.supabase;
     const hoy = new Date();
     const anioConsulta = anio || hoy.getFullYear();
     const mesMaximo = anioConsulta === hoy.getFullYear() ? hoy.getMonth() + 1 : 12;
 
-    const elegibles = await this.getMiembrosElegibles(supabase);
-    const { miembros: allProfiles, miembrosLibresIds: libresIds, ownerEmail, montoMensual } = elegibles;
+    const elegiblesData = elegibles || await this.getMiembrosElegibles(supabase);
+    const { miembros: allProfiles, miembrosLibresIds: libresIds, ownerEmail, montoMensual } = elegiblesData;
 
     const profiles = allProfiles.filter((p) => p.email?.toLowerCase() !== ownerEmail);
     const libresCount = libresIds.size;

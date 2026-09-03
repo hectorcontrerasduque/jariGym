@@ -215,16 +215,20 @@ async function procesarMiembrosDeudores(gymConfig: {
   gym_name: string | null;
   logo_url: string | null;
   address: string | null;
+  owner_email: string | null;
 }): Promise<number> {
   const morosos = await pagosService.getMiembrosMorosos(undefined, supabase);
   if (morosos.length === 0) return 0;
 
+  const ownerEmail = gymConfig.owner_email?.toLowerCase();
   const { sendPaymentDebtEmail } = await import(
     "@/lib/services/email/email.service"
   );
 
   let count = 0;
   for (const miembro of morosos) {
+    if (ownerEmail && miembro.email?.toLowerCase() === ownerEmail) continue;
+
     try {
       const deudasParaEmail = miembro.deudas.length > 0
         ? miembro.deudas

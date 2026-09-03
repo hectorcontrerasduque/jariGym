@@ -122,7 +122,7 @@ const [password, setPassword] = useState("");
             </Link>
           </CardContent>
           <div className="px-6 pb-5 text-center">
-            <Link href="/" className="text-[10px] text-gym-muted/50 hover:text-gym-primary transition-colors">
+            <Link href="/" className="text-sm text-gym-primary/70 hover:text-gym-primary transition-colors">
               hcontrer.org
             </Link>
           </div>
@@ -159,7 +159,7 @@ const [password, setPassword] = useState("");
             </Link>
           </CardContent>
           <div className="px-6 pb-5 text-center">
-            <Link href="/" className="text-[10px] text-gym-muted/50 hover:text-gym-primary transition-colors">
+            <Link href="/" className="text-sm text-gym-primary/70 hover:text-gym-primary transition-colors">
               hcontrer.org
             </Link>
           </div>

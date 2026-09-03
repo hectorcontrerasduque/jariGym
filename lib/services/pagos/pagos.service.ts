@@ -390,20 +390,12 @@ export class PagosService {
 
     if (pagoError || !nuevoPago) return 0;
 
-    const { data: configData } = await this.supabase
-      .from("gym_config_payment_methods")
-      .select("amount_monthly")
-      .eq("is_active", true)
-      .limit(1)
-      .maybeSingle();
-    const montoMensual = configData?.amount_monthly || 0;
-
     const detalles = meses.map(({ month_number, year_number }) => ({
       payment_id: nuevoPago.id,
       month_number,
       year_number,
       payment_type: "mensualidad" as const,
-      payment_amount: montoMensual,
+      payment_amount: 0,
     }));
 
     const { error: detError } = await this.supabase

@@ -10,7 +10,6 @@ import { Loader } from "@/components/ui/loader";
 import { Dumbbell, CheckCircle } from "lucide-react";
 
 import { messages } from "@/lib/messages";
-import { AuthFooter } from "@/components/auth-footer";
 import { showToast } from "@/components/ui/toast";
 import Link from "next/link";
 
@@ -85,7 +84,9 @@ const [password, setPassword] = useState("");
         <div className="min-h-screen flex items-center justify-center p-4 pb-16 relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-gym-primary/5 via-transparent to-gym-secondary/5" />
         </div>
-        <AuthFooter />
+        <Link href="/" className="block text-center text-[10px] text-gym-muted/50 hover:text-gym-primary transition-colors mt-4 relative z-10">
+          hcontrer.org
+        </Link>
       </>
     );
   }
@@ -124,7 +125,9 @@ const [password, setPassword] = useState("");
             </Link>
           </CardContent>
         </Card>
-        <AuthFooter />
+        <Link href="/" className="block text-center text-[10px] text-gym-muted/50 hover:text-gym-primary transition-colors mt-4 relative z-10">
+          hcontrer.org
+        </Link>
       </div>
     );
   }
@@ -157,7 +160,9 @@ const [password, setPassword] = useState("");
             </Link>
           </CardContent>
         </Card>
-        <AuthFooter />
+        <Link href="/" className="block text-center text-[10px] text-gym-muted/50 hover:text-gym-primary transition-colors mt-4 relative z-10">
+          hcontrer.org
+        </Link>
       </div>
     );
   }
@@ -229,7 +234,9 @@ const [password, setPassword] = useState("");
           </div>
         </CardContent>
       </Card>
-      <AuthFooter />
+      <Link href="/" className="block text-center text-[10px] text-gym-muted/50 hover:text-gym-primary transition-colors mt-4 relative z-10">
+        hcontrer.org
+      </Link>
     </div>
   );
 }

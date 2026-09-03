@@ -16,7 +16,7 @@ import { Dumbbell, CheckCircle, Mail, Zap } from "lucide-react";
 
 import { messages } from "@/lib/messages";
 import { showToast } from "@/components/ui/toast";
-import { AuthFooter } from "@/components/auth-footer";
+import Link from "next/link";
 
 const particleCount = 10;
 
@@ -479,6 +479,10 @@ function LoginForm() {
         </CardContent>
       </Card>
 
+      <Link href="/" className="block text-center text-[10px] text-gym-muted/50 hover:text-gym-primary transition-colors mt-4 relative z-10">
+        hcontrer.org
+      </Link>
+
       {/* Forgot Password Modal */}
       <Modal isOpen={showResetForm} onClose={() => { setShowResetForm(false); setResetSent(false); }} className="max-w-md border-gym-primary/20">
         <Loader show={resetLoading} message={messages.common.procesando} variant="overlay" />
@@ -740,7 +744,6 @@ function LoginForm() {
               )}
           </div>
       </Modal>
-      <AuthFooter />
     </div>
   );
 }

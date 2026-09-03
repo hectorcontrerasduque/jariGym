@@ -12,6 +12,7 @@ import {
   ChevronRight,
   BarChart3,
   Zap,
+  Hourglass,
 } from "lucide-react";
 import {
   Card,
@@ -113,6 +114,8 @@ export default function DashboardPage() {
   const [showBanner, setShowBanner] = useState(true);
   const [modalData, setModalData] = useState<{ title: string; members: Array<{ id: string; nombre: string; detalle?: string }> } | null>(null);
   const [loadingModal, setLoadingModal] = useState(false);
+  const [userProfile, setUserProfile] = useState<Profile | null>(null);
+  const [misPagosPendientes, setMisPagosPendientes] = useState(0);
 
   useEffect(() => {
     if (isSuperAdmin) {
@@ -131,10 +134,22 @@ export default function DashboardPage() {
         if (user) {
           const { data: profile } = await supabase
             .from("profiles")
-            .select("role")
+            .select("role, arrival_time, departure_time, full_name")
             .eq("id", user.id)
             .single();
-          if (!cancelled && profile?.role === "super_admin") setIsSuperAdmin(true);
+          if (!cancelled && profile) {
+            setUserProfile(profile as Profile);
+            if (profile.role === "super_admin") setIsSuperAdmin(true);
+          }
+
+          if (!cancelled && profile?.role !== "super_admin") {
+            const { data: misPagos } = await supabase
+              .from("payments")
+              .select("id")
+              .eq("user_id", user.id)
+              .eq("status", "pendiente");
+            setMisPagosPendientes(misPagos?.length || 0);
+          }
         }
 
         const [statsResult, pagosResult, aniosResult, monthlyResult, miembrosResult] = await Promise.allSettled([
@@ -323,6 +338,8 @@ export default function DashboardPage() {
               </div>
             </div>
             <select
+              id="anio-seleccionado"
+              name="anio-seleccionado"
               value={anioSeleccionado}
               onChange={(e) => setAnioSeleccionado(Number(e.target.value))}
               className="px-3 py-1.5 bg-gym-surface border border-gym-border rounded-xl text-gym-text focus:outline-none focus:ring-2 focus:ring-gym-primary text-xs sm:text-sm"
@@ -334,8 +351,56 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Stats Grid - 4 cards */}
+        {/* Schedule del miembro */}
+        {!isSuperAdmin && userProfile?.arrival_time && userProfile?.departure_time
+          && userProfile.arrival_time !== "--:--" && userProfile.departure_time !== "--:--" && (
+          <Card className="mb-4 animate-slideUp">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gym-primary/20 flex items-center justify-center">
+                  <Clock className="w-5 h-5 text-gym-primary" />
+                </div>
+                <div>
+                  <p className="text-xs text-gym-muted uppercase tracking-wider">{messages.dashboard.tuHorario}</p>
+                  <div className="flex items-center gap-3 mt-1">
+                    <span className="text-sm font-medium text-gym-text">
+                      {messages.dashboard.llegada}: {userProfile.arrival_time}
+                    </span>
+                    <span className="text-gym-muted">•</span>
+                    <span className="text-sm font-medium text-gym-text">
+                      {messages.dashboard.salida}: {userProfile.departure_time}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Stats Grid - 5 cards */}
         <div className="stats-grid section-gap">
+          {!isSuperAdmin && (
+            <Card className="stat-card">
+              <CardContent className="p-3 sm:p-5">
+                <div className="flex items-start justify-between mb-2 sm:mb-4">
+                  <div className="stat-icon" style={{ background: "rgba(251, 191, 36, 0.15)" }}>
+                    <Hourglass className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-500" />
+                  </div>
+                  <div className="hidden sm:flex items-center gap-1.5 px-2 py-1 rounded-full bg-yellow-500/10 border border-yellow-500/20">
+                    <Clock className="w-3 h-3 text-yellow-500" />
+                    <span className="text-[10px] font-medium text-yellow-500">Pendiente</span>
+                  </div>
+                </div>
+                <div className="flex items-end justify-between">
+                  <div>
+                    <p className="text-[10px] sm:text-xs text-gym-muted mb-0.5 sm:mb-1 uppercase tracking-wider">{messages.dashboard.pagosPendientes}</p>
+                    <div className="stat-number text-yellow-500">{misPagosPendientes}</div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           <Card className="stat-card" onClick={handleClickActivos}>
             <CardContent className="p-3 sm:p-5">
               <div className="flex items-start justify-between mb-2 sm:mb-4">

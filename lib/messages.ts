@@ -53,6 +53,10 @@ export const messages = {
     libresLabel: "libres",
     pagosRecientes: "Pagos Recientes",
     noPagosRegistrados: "No hay pagos registrados aún",
+    pagosPendientes: "Pagos Pendientes",
+    tuHorario: "Tu Horario",
+    llegada: "Llegada",
+    salida: "Salida",
   },
   pagos: {
     title: "Pagos",

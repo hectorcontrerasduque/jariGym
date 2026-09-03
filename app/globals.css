@@ -391,6 +391,7 @@ option {
   background: rgba(30, 41, 59, 0.8);
   overflow: hidden;
   position: relative;
+  display: flex;
 }
 
 .progress-bar-fill {

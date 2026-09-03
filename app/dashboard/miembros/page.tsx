@@ -545,6 +545,8 @@ export default function MiembrosPage() {
       <div className="relative z-10">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gym-muted" />
         <input
+          id="buscar-miembros"
+          name="buscar"
           type="text"
           placeholder="Buscar por nombre o correo..."
           value={busqueda}
@@ -854,6 +856,8 @@ export default function MiembrosPage() {
                 <label className="text-[11px] text-gym-muted mb-0.5 block">Fecha inicio</label>
                 {isMembresiaLibre ? (
                   <Input
+                    id="membresia-start-date"
+                    name="membresia_start_date"
                     type="date"
                     value={membresiaStartDate}
                     onChange={(e) => setMembresiaStartDate(e.target.value)}
@@ -868,6 +872,8 @@ export default function MiembrosPage() {
                 <label className="text-[11px] text-gym-muted mb-0.5 block">Fecha fin</label>
                 {isMembresiaLibre ? (
                   <Input
+                    id="membresia-end-date"
+                    name="membresia_end_date"
                     type="date"
                     value={membresiaEndDate}
                     onChange={(e) => setMembresiaEndDate(e.target.value)}
@@ -891,6 +897,8 @@ export default function MiembrosPage() {
             <div>
               <label className="text-[11px] text-gym-muted mb-0.5 block">Nota</label>
               <textarea
+                id="nota-membresia"
+                name="nota_membresia"
                 value={notaMembresia}
                 onChange={(e) => setNotaMembresia(e.target.value)}
                 placeholder="Nota sobre esta membresía..."
@@ -937,6 +945,8 @@ export default function MiembrosPage() {
           <div>
             <label className="text-[11px] text-gym-muted mb-0.5 block">Nota</label>
             <textarea
+              id="nota-admin"
+              name="nota_admin"
               value={notaAdminInput}
               onChange={(e) => setNotaAdminInput(e.target.value)}
               placeholder="Agregar nota..."
@@ -960,6 +970,8 @@ export default function MiembrosPage() {
         <div className="space-y-4">
           <p className="text-sm text-gym-muted">Agrega un miembro por su correo. Estará activo para poder presentar pagos.</p>
           <Input
+            id="nuevo-nombre"
+            name="nuevo_nombre"
             label="Nombre completo *"
             placeholder="Juan Pérez"
             value={nuevoNombre}
@@ -967,6 +979,8 @@ export default function MiembrosPage() {
           />
           <div>
             <Input
+              id="nuevo-email"
+              name="nuevo_email"
               label="Correo * (será el usuario para inicio de sesión)"
               type="email"
               placeholder="correo@gmail.com"
@@ -977,6 +991,8 @@ export default function MiembrosPage() {
             {emailError && <p className="text-xs text-gym-danger mt-1">{emailError}</p>}
           </div>
           <PasswordInput
+            id="nuevo-password"
+            name="nuevo_password"
             label={nuevoEmail && !isGmail(nuevoEmail) ? "Contraseña *" : "Contraseña (opcional, se genera si se deja vacía)"}
             placeholder="••••••••"
             value={nuevoPassword}

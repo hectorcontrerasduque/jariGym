@@ -31,6 +31,12 @@ export function Avatar({ src, alt = "", size = "md", className }: AvatarProps) {
     lg: "w-8 h-8",
   };
 
+  const pixelSizes = {
+    sm: 32,
+    md: 40,
+    lg: 64,
+  };
+
   return (
     <div
       className={cn(
@@ -45,6 +51,8 @@ export function Avatar({ src, alt = "", size = "md", className }: AvatarProps) {
         <img
           src={imageUrl}
           alt={alt}
+          width={pixelSizes[size]}
+          height={pixelSizes[size]}
           className="w-full h-full object-cover"
           loading="lazy"
         />

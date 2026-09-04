@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { METODOS_PAGO_DEFAULT } from "@/lib/services/config/config.service";
 import { createClient } from "@/lib/supabase/client";
-import { Save, Building2, User, CreditCard, Upload, Dumbbell, Trash2 } from "lucide-react";
+import { Save, Building2, User, CreditCard, Upload, Dumbbell, Trash2, Database, ArrowDownToLine } from "lucide-react";
 import { showToast } from "@/components/ui/toast";
 import { Loader } from "@/components/ui/loader";
 import { messages } from "@/lib/messages";
@@ -47,6 +47,14 @@ export default function ConfiguracionPage() {
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const logoInputRef = useRef<HTMLInputElement>(null);
   const metodosRef = useRef<HTMLDivElement>(null);
+
+  const isDevMode = (process.env.NEXT_PUBLIC_SITE_URL || "").includes("dev");
+  const [migrating, setMigrating] = useState(false);
+  const [migrationResults, setMigrationResults] = useState<Array<{ table: string; rows: number; ok: boolean; error?: string }> | null>(null);
+  const [prodUrl, setProdUrl] = useState("");
+  const [rememberUrl, setRememberUrl] = useState(false);
+  const [testResult, setTestResult] = useState<{ ok: boolean; tables?: string[]; error?: string } | null>(null);
+  const [testing, setTesting] = useState(false);
 
   useEffect(() => {
     const checkAccess = async () => {
@@ -185,6 +193,54 @@ export default function ConfiguracionPage() {
       showToast(messages.toast.logoEliminado, "success");
     } catch {
       showToast(messages.toast.logoErrorEliminar, "error");
+    }
+  };
+
+  const handleTestConnection = async () => {
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const res = await fetch("/api/dev/migrate");
+      const data = await res.json();
+      setTestResult({
+        ok: data.connected ?? false,
+        tables: data.tables,
+        error: data.error,
+      });
+    } catch {
+      setTestResult({ ok: false, error: "Error de red" });
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const handleMigrate = async () => {
+    if (!prodUrl.trim()) {
+      showToast(messages.dev.urlProdRequerida, "error");
+      return;
+    }
+    setMigrating(true);
+    setMigrationResults(null);
+    try {
+      const res = await fetch("/api/dev/migrate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prodDatabaseUrl: prodUrl }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Error desconocido");
+      }
+      setMigrationResults(data.results);
+      if (data.ok) {
+        showToast(`${messages.dev.migracionCompleta} — ${data.summary.totalRows} filas`, "success");
+      } else {
+        showToast(`${messages.dev.migracionError} — ${data.summary.errors} tablas fallaron`, "error");
+      }
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : messages.dev.migracionError, "error");
+    } finally {
+      setMigrating(false);
     }
   };
 
@@ -398,6 +454,90 @@ export default function ConfiguracionPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Migración Prod → Dev (solo dev mode) */}
+      {isDevMode && (
+        <Card className="neon-card relative z-10 border-amber-500/30">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Database className="w-5 h-5 text-amber-500" /> {messages.dev.migrarProdDev}
+            </CardTitle>
+            <p className="text-xs text-gym-muted">{messages.dev.origen} → {messages.dev.destino}</p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gym-muted mb-2">{messages.dev.origen} DB URL</label>
+              <Input
+                id="prod-db-url"
+                name="prod_db_url"
+                placeholder={messages.dev.urlProdPlaceholder}
+                value={prodUrl}
+                onChange={(e) => setProdUrl(e.target.value)}
+              />
+              <label className="flex items-center gap-2 mt-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={rememberUrl}
+                  onChange={(e) => setRememberUrl(e.target.checked)}
+                  className="w-4 h-4 rounded text-amber-500"
+                />
+                <span className="text-xs text-gym-muted">{messages.dev.recordarUrl}</span>
+              </label>
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                onClick={handleTestConnection}
+                disabled={testing || !prodUrl.trim()}
+                className="flex items-center gap-2 px-4 py-2 bg-gym-surface border border-gym-border rounded-xl text-sm text-gym-text hover:bg-gym-border/50 transition-colors disabled:opacity-50"
+              >
+                {testing ? (
+                  <div className="w-4 h-4 border-2 border-gym-primary border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Database className="w-4 h-4" />
+                )}
+                {messages.dev.probandoConexion}
+              </button>
+              <button
+                onClick={handleMigrate}
+                disabled={migrating || !prodUrl.trim()}
+                className="flex items-center gap-2 px-4 py-2 bg-amber-500/20 border border-amber-500/30 rounded-xl text-sm text-amber-400 hover:bg-amber-500/30 transition-colors disabled:opacity-50"
+              >
+                {migrating ? (
+                  <div className="w-4 h-4 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <ArrowDownToLine className="w-4 h-4" />
+                )}
+                {messages.dev.migrando}
+              </button>
+            </div>
+
+            {testResult && (
+              <div className={`p-3 rounded-xl text-sm ${testResult.ok ? "bg-green-500/10 text-green-400" : "bg-red-500/10 text-red-400"}`}>
+                {testResult.ok ? (
+                  <p>✅ {messages.dev.conexionExitosa} — {testResult.tables?.length} {messages.dev.tablasEncontradas}</p>
+                ) : (
+                  <p>❌ {messages.dev.conexionFallida}: {testResult.error}</p>
+                )}
+              </div>
+            )}
+
+            {migrationResults && (
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-gym-text">{messages.dev.migracionCompleta}:</p>
+                {migrationResults.map((r) => (
+                  <div key={r.table} className="flex items-center gap-2 text-sm">
+                    <span>{r.ok ? "✅" : "❌"}</span>
+                    <span className="text-gym-text font-mono">{r.table}</span>
+                    <span className="text-gym-muted">({r.rows} filas)</span>
+                    {r.error && <span className="text-red-400 text-xs">— {r.error}</span>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Desktop bottom save button */}
       <div className="hidden sm:flex justify-end">

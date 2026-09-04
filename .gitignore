@@ -19,6 +19,8 @@ build/
 .env.development
 .env.production
 .env*.local
+.env.prod
+.env.dev
 
 # typescript
 *.tsbuildinfo

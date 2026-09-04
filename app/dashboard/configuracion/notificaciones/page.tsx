@@ -194,10 +194,6 @@ export default function NotificacionesPage() {
           </h1>
           <p className="text-gym-muted text-sm">{messages.notificaciones.subtitle}</p>
         </div>
-        <Button onClick={handleSave} loading={saving} className="hidden sm:flex">
-          <Save className="w-4 h-4 mr-2" />
-          {messages.notificaciones.guardar}
-        </Button>
       </div>
 
       {/* Global toggle */}
@@ -213,13 +209,43 @@ export default function NotificacionesPage() {
                 type="checkbox"
                 className="sr-only peer"
                 checked={gymConfig.notificaciones_enabled || false}
-                onChange={(e) => setGymConfig({ ...gymConfig, notificaciones_enabled: e.target.checked })}
+                onChange={async (e) => {
+                  const newValue = e.target.checked;
+                  setGymConfig({ ...gymConfig, notificaciones_enabled: newValue });
+                  try {
+                    await fetch("/api/config", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ config: { notificaciones_enabled: newValue } }),
+                    });
+                  } catch {
+                    showToast(messages.notificaciones.errorGuardar, "error");
+                    setGymConfig({ ...gymConfig, notificaciones_enabled: !newValue });
+                  }
+                }}
               />
               <div className="w-11 h-6 bg-gym-surface peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-gym-primary rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-gym-primary"></div>
             </label>
           </div>
         </CardContent>
       </Card>
+
+      {gymConfig.notificaciones_enabled && (
+        <>
+          <div className="flex justify-end mb-4 sm:hidden">
+            <Button onClick={handleSave} loading={saving} className="w-full">
+              <Save className="w-4 h-4 mr-2" />
+              {messages.notificaciones.guardar}
+            </Button>
+          </div>
+          <div className="hidden sm:flex justify-end mb-4">
+            <Button onClick={handleSave} loading={saving}>
+              <Save className="w-4 h-4 mr-2" />
+              {messages.notificaciones.guardar}
+            </Button>
+          </div>
+        </>
+      )}
 
       {gymConfig.notificaciones_enabled && <>
         {configs.map((config) => {

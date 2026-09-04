@@ -93,11 +93,16 @@ export default function NotificacionesPage() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      await fetch("/api/config", {
+      const res = await fetch("/api/config", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        credentials: "include",
         body: JSON.stringify({ config: { notificaciones_enabled: gymConfig.notificaciones_enabled } }),
       });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "Error desconocido" }));
+        throw new Error(err.error || "Error guardando");
+      }
 
       for (const config of configs) {
         await notificacionesService.updateNotificacionConfig(config.id, {
@@ -213,11 +218,16 @@ export default function NotificacionesPage() {
                   const newValue = e.target.checked;
                   setGymConfig({ ...gymConfig, notificaciones_enabled: newValue });
                   try {
-                    await fetch("/api/config", {
+                    const res = await fetch("/api/config", {
                       method: "POST",
                       headers: { "Content-Type": "application/json" },
+                      credentials: "include",
                       body: JSON.stringify({ config: { notificaciones_enabled: newValue } }),
                     });
+                    if (!res.ok) {
+                      const err = await res.json().catch(() => ({ error: "Error desconocido" }));
+                      throw new Error(err.error || "Error guardando");
+                    }
                   } catch {
                     showToast(messages.notificaciones.errorGuardar, "error");
                     setGymConfig({ ...gymConfig, notificaciones_enabled: !newValue });

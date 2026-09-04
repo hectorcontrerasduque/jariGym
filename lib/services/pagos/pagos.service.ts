@@ -900,7 +900,6 @@ export class PagosService {
         (p) => p.user_id === miembro.id && p.year_number === anioConsulta &&
           p.payment_type === "mensualidad" && p.status === "pendiente"
       );
-      const mesesPendientes = pagosPendientesMiembro.map(p => p.month_number!).filter(Boolean);
       const montoPendiente = pagosPendientesMiembro.reduce((sum, p) => sum + (p.payment_amount || montoMensual), 0);
 
       if (!debeInscripcion && mesesDeuda.length === 0 && pagosPendientesMiembro.length === 0) continue;

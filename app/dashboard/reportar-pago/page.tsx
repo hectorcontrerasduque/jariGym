@@ -273,6 +273,11 @@ function ReportarPagoForm() {
 
       if (isAdmin && formData.estado_pago === "aprobado") {
         await pagosService.aprobarPago(pago.id);
+        fetch("/api/pagos/notify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ pagoId: pago.id, action: "aprobado" }),
+        }).catch(() => {});
       }
 
       setSuccess(true);

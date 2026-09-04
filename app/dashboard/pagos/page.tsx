@@ -125,6 +125,11 @@ export default function PagosPage() {
   const handleAprobar = async (pagoId: string) => {
     try {
       await pagosService.aprobarPago(pagoId);
+      fetch("/api/pagos/notify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pagoId, action: "aprobado" }),
+      }).catch(() => {});
       showToast(messages.toast.pagoAprobado, "success");
       await loadData();
       setModalOpen(false);
@@ -136,6 +141,11 @@ export default function PagosPage() {
   const handleRechazar = async (pagoId: string) => {
     try {
       await pagosService.rechazarPago(pagoId);
+      fetch("/api/pagos/notify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pagoId, action: "rechazado" }),
+      }).catch(() => {});
       showToast(messages.toast.pagoRechazado, "success");
       await loadData();
       setModalOpen(false);

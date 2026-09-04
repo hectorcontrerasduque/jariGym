@@ -8,6 +8,8 @@ import { resumenDuenoTemplate } from "./templates/resumen-dueno";
 import { estatusSistemaTemplate } from "./templates/estatus-sistema";
 import { diagnosticoTemplate } from "./templates/diagnostico";
 import { errorReportTemplate } from "./templates/error-report";
+import { pagoAprobadoTemplate } from "./templates/pago-aprobado";
+import { pagoRechazadoTemplate } from "./templates/pago-rechazado";
 
 const transporter = nodemailer.createTransport({
   service: "gmail",
@@ -309,6 +311,45 @@ export async function sendErrorReportEmail(
     html: baseHtml + unsubscribeFooter(gymName, direccion),
     fromName: gymName,
     campaign: "error-report",
+  });
+}
+
+// ─── PAYMENT APPROVED ──────────────────────────────────────
+export async function sendPaymentApprovedEmail(
+  to: string,
+  memberName: string,
+  gymName: string,
+  monto: number,
+  meses: Array<{ month_number: number; year_number: number }>,
+  metodoPago: string,
+  gymLogo?: string | null
+): Promise<void> {
+  const html = pagoAprobadoTemplate(memberName, gymName, monto, meses, metodoPago, gymLogo);
+  await sendEmail({
+    to,
+    subject: `✅ Pago aprobado - ${gymName}`,
+    html,
+    fromName: gymName,
+  });
+}
+
+// ─── PAYMENT REJECTED ──────────────────────────────────────
+export async function sendPaymentRejectedEmail(
+  to: string,
+  memberName: string,
+  gymName: string,
+  monto: number,
+  meses: Array<{ month_number: number; year_number: number }>,
+  metodoPago: string,
+  motivo: string,
+  gymLogo?: string | null
+): Promise<void> {
+  const html = pagoRechazadoTemplate(memberName, gymName, monto, meses, metodoPago, motivo, gymLogo);
+  await sendEmail({
+    to,
+    subject: `❌ Pago rechazado - ${gymName}`,
+    html,
+    fromName: gymName,
   });
 }
 

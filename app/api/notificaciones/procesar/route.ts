@@ -277,9 +277,6 @@ async function ejecutarEstatusSistema(gymConfig: Record<string, unknown>): Promi
     .eq("role", "miembro")
     .eq("activo", false);
 
-  const mesActual = new Date().getMonth() + 1;
-  const anioActual = new Date().getFullYear();
-
   const { count: pagosAprobadosMes } = await supabase
     .from("payments")
     .select("id", { count: "exact", head: true })

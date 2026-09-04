@@ -120,7 +120,7 @@ export default function DashboardPage() {
   const [userProfile, setUserProfile] = useState<Profile | null>(null);
   const [misPagosPendientes, setMisPagosPendientes] = useState(0);
   const [adminLevel, setAdminLevel] = useState<AdminLevel | null>(null);
-  const [ownerEmail, setOwnerEmail] = useState<string | null>(null);
+  const [, setOwnerEmail] = useState<string | null>(null);
   const fullAdmin = isFullAdmin(adminLevel);
 
   useEffect(() => {

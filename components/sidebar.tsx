@@ -20,7 +20,7 @@ import {
   Home,
 } from "lucide-react";
 import type { Profile } from "@/lib/types";
-import { getAdminLevel, isFullAdmin, type AdminLevel } from "@/lib/admin-level";
+import { getAdminLevel, isFullAdmin } from "@/lib/admin-level";
 
 const adminNavItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },

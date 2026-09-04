@@ -51,7 +51,9 @@ export function Avatar({ src, alt = "", size = "md", className }: AvatarProps) {
         <img
           src={imageUrl}
           alt={alt}
+          // eslint-disable-next-line security/detect-object-injection
           width={pixelSizes[size]}
+          // eslint-disable-next-line security/detect-object-injection
           height={pixelSizes[size]}
           className="w-full h-full object-cover"
           loading="lazy"

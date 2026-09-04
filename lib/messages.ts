@@ -418,22 +418,6 @@ export const messages = {
     noConfiguracionesHabilitadas: "No hay configuraciones habilitadas",
     noDuenoEmail: "No hay correo de propietario configurado. Configure el correo en Configuración del Gym.",
   },
-  dev: {
-    migrarProdDev: "Migrar Prod → Dev",
-    soloDisponibleEnDev: "Solo disponible en modo desarrollo",
-    urlProdRequerida: "URL de producción requerida",
-    probandoConexion: "Probando conexión...",
-    conexionExitosa: "Conexión exitosa",
-    conexionFallida: "Error de conexión",
-    tablasEncontradas: "tablas encontradas",
-    migrando: "Migrando datos...",
-    migracionCompleta: "Migración completada",
-    migracionError: "Error en la migración",
-    origen: "Producción",
-    destino: "Desarrollo",
-    urlProdPlaceholder: "postgresql://postgres:password@aws-0-region.pooler.supabase.com:6543/postgres",
-    recordarUrl: "Recordar URL",
-  },
 } as const;
 
 export type Messages = typeof messages;

@@ -56,3 +56,4 @@ yarn-error.log*
 check.sh
 check.ps1
 .opencode/
+db/

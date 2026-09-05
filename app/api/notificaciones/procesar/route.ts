@@ -4,17 +4,13 @@ import { messages } from "@/lib/messages";
 import { getDiaCobro, getDiaNotificacion } from "@/lib/utils";
 import { pagosService } from "@/lib/services/pagos/pagos.service";
 import { applyRateLimit } from "@/lib/middleware/rate-limit";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function ejecutarMiembrosDeudores(gymConfig: Record<string, unknown>): Promise<number> {
+async function ejecutarMiembrosDeudores(supabase: SupabaseClient, gymConfig: Record<string, unknown>): Promise<number> {
   const morosos = await pagosService.getMiembrosMorosos(undefined, supabase);
   if (morosos.length === 0) return 0;
 
@@ -50,6 +46,7 @@ async function ejecutarMiembrosDeudores(gymConfig: Record<string, unknown>): Pro
 }
 
 async function ejecutarRecordatorioPago(
+  supabase: SupabaseClient,
   diasPrevio: number,
   gymConfig: Record<string, unknown>,
   forzar: boolean
@@ -193,7 +190,7 @@ async function ejecutarRecordatorioPago(
   return count;
 }
 
-async function ejecutarResumenDueno(gymConfig: Record<string, unknown>): Promise<number> {
+async function ejecutarResumenDueno(supabase: SupabaseClient, gymConfig: Record<string, unknown>): Promise<number> {
   const duenoEmail = gymConfig.owner_email as string | null;
   if (!duenoEmail) return 0;
 
@@ -261,7 +258,7 @@ async function ejecutarResumenDueno(gymConfig: Record<string, unknown>): Promise
   return 1;
 }
 
-async function ejecutarEstatusSistema(gymConfig: Record<string, unknown>): Promise<number> {
+async function ejecutarEstatusSistema(supabase: SupabaseClient, gymConfig: Record<string, unknown>): Promise<number> {
   const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL;
   if (!adminEmail) return 0;
 
@@ -344,6 +341,11 @@ async function ejecutarEstatusSistema(gymConfig: Record<string, unknown>): Promi
 }
 
 export async function POST(request: Request) {
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
   const authHeader = request.headers.get("authorization");
   if (!authHeader) {
     return NextResponse.json({ error: messages.toast.noAutenticado }, { status: 401 });
@@ -410,16 +412,16 @@ export async function POST(request: Request) {
 
         switch (config.notification_type) {
           case "miembros_deudores":
-            count = await ejecutarMiembrosDeudores(gymConfig);
+            count = await ejecutarMiembrosDeudores(supabase, gymConfig);
             break;
           case "recordatorio_pago":
-            count = await ejecutarRecordatorioPago(config.days_before || 7, gymConfig, forzar);
+            count = await ejecutarRecordatorioPago(supabase, config.days_before || 7, gymConfig, forzar);
             break;
           case "resumen_dueno":
-            count = await ejecutarResumenDueno(gymConfig);
+            count = await ejecutarResumenDueno(supabase, gymConfig);
             break;
           case "estatus_sistema":
-            count = await ejecutarEstatusSistema(gymConfig);
+            count = await ejecutarEstatusSistema(supabase, gymConfig);
             break;
         }
 

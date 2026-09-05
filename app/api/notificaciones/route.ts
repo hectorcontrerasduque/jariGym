@@ -5,20 +5,20 @@ import { messages } from "@/lib/messages";
 import { sleep } from "@/lib/services/email/email.service";
 import { getDiaCobro, getDiaNotificacion } from "@/lib/utils";
 import { applyRateLimit } from "@/lib/middleware/rate-limit";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 const CRON_SECRET = process.env.CRON_SECRET || "gym-notifications-cron-secret";
 
 import type { NextRequest } from "next/server";
 
 export async function POST(request: NextRequest) {
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
   const authHeader = request.headers.get("authorization");
 
-  // Accept either CRON_SECRET or admin user token
   const isCronAuth = authHeader === `Bearer ${CRON_SECRET}`;
   let isAdminAuth = false;
   let userId: string | null = null;
@@ -86,11 +86,11 @@ export async function POST(request: NextRequest) {
     let errores = 0;
 
     for (const config of configs) {
-      const debeEjecutar = await verificarFrecuencia(config);
+      const debeEjecutar = await verificarFrecuencia(supabase, config);
       if (!debeEjecutar) continue;
 
       ejecutadas++;
-      const resultado = await ejecutarTipo(config, gymConfig, false, userId);
+      const resultado = await ejecutarTipo(supabase, config, gymConfig, false, userId);
       if (resultado.sinProblemas) {
         enviados += resultado.miembrosNotificados;
       } else {
@@ -115,7 +115,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-async function verificarFrecuencia(config: {
+async function verificarFrecuencia(supabase: SupabaseClient, config: {
   id: string;
   daily_frequency: boolean;
   weekly_frequency: boolean;
@@ -153,6 +153,7 @@ async function verificarFrecuencia(config: {
 }
 
 async function ejecutarTipo(
+  supabase: SupabaseClient,
   config: {
     id: string;
     notification_type: string;
@@ -173,20 +174,21 @@ async function ejecutarTipo(
 
     switch (config.notification_type) {
       case "miembros_deudores":
-        miembrosNotificados = await procesarMiembrosDeudores(gymConfig);
+        miembrosNotificados = await procesarMiembrosDeudores(supabase, gymConfig);
         break;
       case "recordatorio_pago":
         miembrosNotificados = await procesarRecordatorioPago(
+          supabase,
           config.days_before,
           gymConfig,
           forzar
         );
         break;
       case "resumen_dueno":
-        miembrosNotificados = await procesarResumenDueno(gymConfig);
+        miembrosNotificados = await procesarResumenDueno(supabase, gymConfig);
         break;
       case "estatus_sistema":
-        miembrosNotificados = await procesarEstatusSistema(gymConfig);
+        miembrosNotificados = await procesarEstatusSistema(supabase, gymConfig);
         break;
     }
 
@@ -231,7 +233,7 @@ async function ejecutarTipo(
   }
 }
 
-async function procesarMiembrosDeudores(gymConfig: {
+async function procesarMiembrosDeudores(supabase: SupabaseClient, gymConfig: {
   gym_name: string | null;
   logo_url: string | null;
   address: string | null;
@@ -273,6 +275,7 @@ async function procesarMiembrosDeudores(gymConfig: {
 }
 
 async function procesarRecordatorioPago(
+  supabase: SupabaseClient,
   diasPrevio: number,
   gymConfig: Record<string, unknown>,
   forzar: boolean = false
@@ -424,7 +427,7 @@ async function procesarRecordatorioPago(
   return count;
 }
 
-async function procesarResumenDueno(gymConfig: Record<string, unknown>): Promise<number> {
+async function procesarResumenDueno(supabase: SupabaseClient, gymConfig: Record<string, unknown>): Promise<number> {
   if (!gymConfig.owner_email) throw new Error(messages.notificaciones.noDuenoEmail);
 
   const mesActual = new Date().getMonth() + 1;
@@ -501,7 +504,7 @@ async function procesarResumenDueno(gymConfig: Record<string, unknown>): Promise
   }
 }
 
-async function procesarEstatusSistema(gymConfig: Record<string, unknown>): Promise<number> {
+async function procesarEstatusSistema(supabase: SupabaseClient, gymConfig: Record<string, unknown>): Promise<number> {
   const destino = process.env.NEXT_PUBLIC_ADMIN_EMAIL;
   if (!destino) return 0;
 

@@ -51,7 +51,7 @@ export async function GET(request: Request) {
 
       const isGymOwner = gymConfig?.owner_email && user.email?.toLowerCase() === gymConfig.owner_email.toLowerCase();
 
-      let { data: profile } = await supabase
+      let { data: profile } = await serviceSupabase
         .from("profiles")
         .select("role, activo, registered")
         .eq("id", user.id)
@@ -77,7 +77,7 @@ export async function GET(request: Request) {
               role: "super_admin",
             });
 
-            const { data: retry } = await supabase
+            const { data: retry } = await serviceSupabase
               .from("profiles")
               .select("role, activo, registered")
               .eq("id", user.id)
@@ -147,7 +147,7 @@ export async function GET(request: Request) {
       if (email) updates.email = email;
 
       if (Object.keys(updates).length > 0) {
-        await supabase
+        await serviceSupabase
           .from("profiles")
           .update(updates)
           .eq("id", user.id);

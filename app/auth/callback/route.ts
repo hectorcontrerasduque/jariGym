@@ -18,10 +18,14 @@ export async function GET(request: Request) {
   }
 
   if (code) {
-    const supabase = await createClient();
-    const { data: { user }, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
+    try {
+      const supabase = await createClient();
+      const { data: { user }, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
 
-    if (!exchangeError && user) {
+      if (exchangeError || !user) {
+        return NextResponse.redirect(`${origin}/login?error=${encodeURIComponent("auth_failed")}&debug=${encodeURIComponent(JSON.stringify({ path: "EXCHANGE_FAILED", error: exchangeError?.message }))}`);
+      }
+
       // Email confirmation flow: next=/login means just confirm email, then redirect to login with success
       if (next === "/login") {
         await supabase.auth.signOut();
@@ -39,7 +43,7 @@ export async function GET(request: Request) {
         .from("gym_config")
         .select("owner_email")
         .limit(1)
-        .single();
+        .maybeSingle();
 
       const isGymOwner = gymConfig?.owner_email && user.email?.toLowerCase() === gymConfig.owner_email.toLowerCase();
 
@@ -57,14 +61,18 @@ export async function GET(request: Request) {
         .single();
 
       // Query profiles by email for debug + fix (helps when ID doesn't match)
-      const { data: profilesByEmail } = await serviceSupabase
-        .from("profiles")
-        .select("id, role, activo, registered")
-        .eq("email", user.email);
-
-      const profilesByEmailDebug = profilesByEmail?.map(p => ({
-        id: p.id, role: p.role, activo: p.activo, registered: p.registered,
-      })) ?? [];
+      let profilesByEmailDebug: { id: string; role: string; activo: boolean | null; registered: boolean }[] = [];
+      try {
+        const { data: profilesByEmail } = await serviceSupabase
+          .from("profiles")
+          .select("id, role, activo, registered")
+          .eq("email", user.email);
+        profilesByEmailDebug = profilesByEmail?.map(p => ({
+          id: p.id, role: p.role, activo: p.activo, registered: p.registered,
+        })) ?? [];
+      } catch {
+        profilesByEmailDebug = [];
+      }
 
       if (isAdminByEmail || isGymOwner) {
         if (profile && profile.role !== "super_admin") {
@@ -77,9 +85,7 @@ export async function GET(request: Request) {
         }
 
         if (!profile) {
-          const existingByEmail = profilesByEmail?.[0];
-
-          if (existingByEmail) {
+          try {
             await createOrUpdateProfile(serviceSupabase, {
               id: user.id,
               email: user.email || "",
@@ -87,14 +93,22 @@ export async function GET(request: Request) {
               avatar_url: avatarUrl,
               role: "super_admin",
             });
-          } else {
-            await createOrUpdateProfile(serviceSupabase, {
-              id: user.id,
-              email: user.email || "",
-              full_name: user.user_metadata?.full_name || user.email || "",
-              avatar_url: avatarUrl,
-              role: "super_admin",
-            });
+          } catch (createError) {
+            await supabase.auth.signOut();
+            const debug = encodeURIComponent(JSON.stringify({
+              path: "PROFILE_CREATE_FAILED",
+              auth_user_id: user.id,
+              email: user.email,
+              adminEmail,
+              isAdminByEmail,
+              isGymOwner,
+              gymOwnerEmail: gymConfig?.owner_email ?? null,
+              supabaseProject,
+              profiles_by_email: profilesByEmailDebug,
+              error: createError instanceof Error ? createError.message : String(createError),
+            }));
+            const msg = encodeURIComponent(messages.auth.userNotRegistered);
+            return NextResponse.redirect(`${origin}/login?error=${msg}&debug=${debug}`);
           }
 
           const { data: retry } = await supabase
@@ -184,9 +198,14 @@ export async function GET(request: Request) {
       }
 
       return NextResponse.redirect(`${origin}${redirectPath}?debug=${debug}`);
-    }
 
+    } catch (globalError) {
+      return NextResponse.redirect(`${origin}/login?error=${encodeURIComponent("auth_callback_error")}&debug=${encodeURIComponent(JSON.stringify({
+        path: "GLOBAL_ERROR",
+        error: globalError instanceof Error ? globalError.message : String(globalError),
+      }))}`);
+    }
   }
 
-  return NextResponse.redirect(`${origin}/login?error=${encodeURIComponent("auth_failed")}&debug=${encodeURIComponent(JSON.stringify({ path: "EXCHANGE_FAILED", code: code ? "present" : "null", error, errorDescription }))}`);
+  return NextResponse.redirect(`${origin}/login?error=${encodeURIComponent("auth_failed")}&debug=${encodeURIComponent(JSON.stringify({ path: "NO_CODE" }))}`);
 }

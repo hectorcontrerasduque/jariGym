@@ -93,7 +93,9 @@ export async function GET(request: Request) {
               avatar_url: avatarUrl,
               role: "super_admin",
             });
-          } catch (createError) {
+          } catch (createError: unknown) {
+            const err = createError as Record<string, unknown>;
+            const errObj = (typeof err === "object" && err !== null && "error" in err) ? err.error as Record<string, unknown> : err;
             await supabase.auth.signOut();
             const debug = encodeURIComponent(JSON.stringify({
               path: "PROFILE_CREATE_FAILED",
@@ -105,7 +107,10 @@ export async function GET(request: Request) {
               gymOwnerEmail: gymConfig?.owner_email ?? null,
               supabaseProject,
               profiles_by_email: profilesByEmailDebug,
-              error: createError instanceof Error ? createError.message : String(createError),
+              error_message: errObj?.message || err?.message || String(createError),
+              error_code: errObj?.code || err?.code || null,
+              error_details: errObj?.details || err?.details || null,
+              error_hint: errObj?.hint || err?.hint || null,
             }));
             const msg = encodeURIComponent(messages.auth.userNotRegistered);
             return NextResponse.redirect(`${origin}/login?error=${msg}&debug=${debug}`);

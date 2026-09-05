@@ -39,14 +39,6 @@ export async function GET(request: Request) {
       const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL;
       const isAdminByEmail = adminEmail && user.email === adminEmail;
 
-      const { data: gymConfig } = await supabase
-        .from("gym_config")
-        .select("owner_email")
-        .limit(1)
-        .maybeSingle();
-
-      const isGymOwner = gymConfig?.owner_email && user.email?.toLowerCase() === gymConfig.owner_email.toLowerCase();
-
       const serviceSupabase = createServiceClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -54,25 +46,19 @@ export async function GET(request: Request) {
 
       const supabaseProject = process.env.NEXT_PUBLIC_SUPABASE_URL?.match(/\/\/([^.]+)/)?.[1] ?? "unknown";
 
-      let { data: profile } = await supabase
+      const { data: gymConfig } = await serviceSupabase
+        .from("gym_config")
+        .select("owner_email")
+        .limit(1)
+        .maybeSingle();
+
+      const isGymOwner = gymConfig?.owner_email && user.email?.toLowerCase() === gymConfig.owner_email.toLowerCase();
+
+      let { data: profile } = await serviceSupabase
         .from("profiles")
         .select("role, activo, registered")
         .eq("id", user.id)
         .single();
-
-      // Query profiles by email for debug + fix (helps when ID doesn't match)
-      let profilesByEmailDebug: { id: string; role: string; activo: boolean | null; registered: boolean }[] = [];
-      try {
-        const { data: profilesByEmail } = await serviceSupabase
-          .from("profiles")
-          .select("id, role, activo, registered")
-          .eq("email", user.email);
-        profilesByEmailDebug = profilesByEmail?.map(p => ({
-          id: p.id, role: p.role, activo: p.activo, registered: p.registered,
-        })) ?? [];
-      } catch {
-        profilesByEmailDebug = [];
-      }
 
       if (isAdminByEmail || isGymOwner) {
         if (profile && profile.role !== "super_admin") {
@@ -93,6 +79,13 @@ export async function GET(request: Request) {
               avatar_url: avatarUrl,
               role: "super_admin",
             });
+
+            const { data: retry } = await serviceSupabase
+              .from("profiles")
+              .select("role, activo, registered")
+              .eq("id", user.id)
+              .single();
+            if (retry) profile = retry;
           } catch (createError: unknown) {
             const err = createError as Record<string, unknown>;
             const errObj = (typeof err === "object" && err !== null && "error" in err) ? err.error as Record<string, unknown> : err;
@@ -106,7 +99,6 @@ export async function GET(request: Request) {
               isGymOwner,
               gymOwnerEmail: gymConfig?.owner_email ?? null,
               supabaseProject,
-              profiles_by_email: profilesByEmailDebug,
               error_message: errObj?.message || err?.message || String(createError),
               error_code: errObj?.code || err?.code || null,
               error_details: errObj?.details || err?.details || null,
@@ -115,13 +107,6 @@ export async function GET(request: Request) {
             const msg = encodeURIComponent(messages.auth.userNotRegistered);
             return NextResponse.redirect(`${origin}/login?error=${msg}&debug=${debug}`);
           }
-
-          const { data: retry } = await supabase
-            .from("profiles")
-            .select("role, activo, registered")
-            .eq("id", user.id)
-            .single();
-          if (retry) profile = retry;
         }
       }
 
@@ -136,8 +121,6 @@ export async function GET(request: Request) {
           isGymOwner,
           gymOwnerEmail: gymConfig?.owner_email ?? null,
           supabaseProject,
-          profile_by_id: null,
-          profiles_by_email: profilesByEmailDebug,
         }));
         const msg = encodeURIComponent(messages.auth.userNotRegistered);
         return NextResponse.redirect(`${origin}/login?error=${msg}&debug=${debug}`);
@@ -147,12 +130,6 @@ export async function GET(request: Request) {
       const isActiveMember = profile.activo !== false && profile.registered === true && profile.role === "miembro";
 
       if (!isAdmin && !isActiveMember) {
-        if (profile.registered === false) {
-          await serviceSupabase
-            .from("profiles")
-            .delete()
-            .eq("id", user.id);
-        }
         await supabase.auth.signOut();
         const debug = encodeURIComponent(JSON.stringify({
           path: "NOT_AUTHORIZED",
@@ -163,8 +140,9 @@ export async function GET(request: Request) {
           isGymOwner,
           gymOwnerEmail: gymConfig?.owner_email ?? null,
           supabaseProject,
-          profile_by_id: { role: profile.role, activo: profile.activo, registered: profile.registered },
-          profiles_by_email: profilesByEmailDebug,
+          profile_role: profile.role,
+          profile_activo: profile.activo,
+          profile_registered: profile.registered,
           isAdmin,
           isActiveMember,
         }));
@@ -172,37 +150,25 @@ export async function GET(request: Request) {
         return NextResponse.redirect(`${origin}/login?error=${msg}&debug=${debug}`);
       }
 
-      if (profile) {
-        const updates: Record<string, unknown> = {};
-        if (avatarUrl) updates.avatar_url = avatarUrl;
-        if (email) updates.email = email;
+      const updates: Record<string, unknown> = {};
+      if (avatarUrl) updates.avatar_url = avatarUrl;
+      if (email) updates.email = email;
 
-        if (Object.keys(updates).length > 0) {
-          await supabase
-            .from("profiles")
-            .update(updates)
-            .eq("id", user.id);
-        }
+      if (Object.keys(updates).length > 0) {
+        await serviceSupabase
+          .from("profiles")
+          .update(updates)
+          .eq("id", user.id);
       }
 
       const redirectPath = isAdmin ? next : (next === "/dashboard" ? "/dashboard/mis-pagos" : next);
 
-      const debug = encodeURIComponent(JSON.stringify({
-        path: "SUCCESS",
-        auth_user_id: user.id,
-        email: user.email,
-        supabaseProject,
-        profile_by_id: { role: profile.role, activo: profile.activo, registered: profile.registered },
-        profiles_by_email: profilesByEmailDebug,
-        isAdmin,
-        redirectPath,
-      }));
-
+      // Super admin sin config: redirigir a configuracion
       if (isAdmin && !gymConfig && redirectPath === "/dashboard") {
-        return NextResponse.redirect(`${origin}/dashboard/configuracion?debug=${debug}`);
+        return NextResponse.redirect(`${origin}/dashboard/configuracion`);
       }
 
-      return NextResponse.redirect(`${origin}${redirectPath}?debug=${debug}`);
+      return NextResponse.redirect(`${origin}${redirectPath}`);
 
     } catch (globalError) {
       return NextResponse.redirect(`${origin}/login?error=${encodeURIComponent("auth_callback_error")}&debug=${encodeURIComponent(JSON.stringify({

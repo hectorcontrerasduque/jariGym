@@ -54,6 +54,26 @@ export async function GET(request: Request) {
         .eq("id", user.id)
         .single();
 
+      // Query profiles by email for debug + fix (helps when ID doesn't match)
+      const { data: profilesByEmail } = await serviceSupabase
+        .from("profiles")
+        .select("id, role, activo, registered")
+        .eq("email", user.email);
+
+      console.log("[AUTH_CALLBACK]", JSON.stringify({
+        step: "START",
+        auth_user_id: user.id,
+        email: user.email,
+        profile_by_id: profile ? { role: profile.role, activo: profile.activo, registered: profile.registered } : null,
+        profiles_by_email: profilesByEmail?.map(p => ({ id: p.id, role: p.role, registered: p.registered })) ?? [],
+        profiles_by_email_count: profilesByEmail?.length ?? 0,
+        adminEmail,
+        isAdminByEmail,
+        gymOwnerEmail: gymConfig?.owner_email ?? null,
+        isGymOwner,
+        supabaseProject: process.env.NEXT_PUBLIC_SUPABASE_URL?.match(/\/\/([^.]+)/)?.[1] ?? "unknown",
+      }));
+
       if (isAdminByEmail || isGymOwner) {
         if (profile && profile.role !== "super_admin") {
           await serviceSupabase
@@ -65,36 +85,58 @@ export async function GET(request: Request) {
         }
 
         if (!profile) {
-          const randomPassword = Math.random().toString(36).slice(-12) + "A1!";
-          const { data: newUser } = await serviceSupabase.auth.admin.createUser({
-            email: user.email!,
-            password: randomPassword,
-            email_confirm: true,
-            user_metadata: { full_name: user.user_metadata?.full_name || user.email },
-          });
+          // Profile not found by auth user ID — try to recover by email
+          const existingByEmail = profilesByEmail?.[0];
 
-          if (newUser?.user?.id) {
+          if (existingByEmail) {
+            // Profile exists with this email but different ID — create new profile for current auth user
+            console.log("[AUTH_CALLBACK]", JSON.stringify({
+              step: "RECOVER_BY_EMAIL",
+              existing_profile_id: existingByEmail.id,
+              auth_user_id: user.id,
+              action: "create_new_profile_for_auth_user",
+            }));
             await createOrUpdateProfile(serviceSupabase, {
-              id: newUser.user.id,
+              id: user.id,
               email: user.email || "",
               full_name: user.user_metadata?.full_name || user.email || "",
               avatar_url: avatarUrl,
               role: "super_admin",
-              inscription_paid: isGymOwner,
-              inscription_date: isGymOwner ? new Date().toISOString().split("T")[0] : null,
             });
-
-            const { data: retry } = await supabase
-              .from("profiles")
-              .select("role, activo, registered")
-              .eq("id", user.id)
-              .single();
-            if (retry) profile = retry;
+          } else {
+            // No profile with this email at all — create directly for auth user
+            console.log("[AUTH_CALLBACK]", JSON.stringify({
+              step: "CREATE_NEW",
+              auth_user_id: user.id,
+              action: "create_profile_directly",
+            }));
+            await createOrUpdateProfile(serviceSupabase, {
+              id: user.id,
+              email: user.email || "",
+              full_name: user.user_metadata?.full_name || user.email || "",
+              avatar_url: avatarUrl,
+              role: "super_admin",
+            });
           }
+
+          const { data: retry } = await supabase
+            .from("profiles")
+            .select("role, activo, registered")
+            .eq("id", user.id)
+            .single();
+          if (retry) profile = retry;
         }
       }
 
       if (!profile) {
+        console.log("[AUTH_CALLBACK]", JSON.stringify({
+          step: "PROFILE_NULL",
+          auth_user_id: user.id,
+          email: user.email,
+          profiles_by_email_count: profilesByEmail?.length ?? 0,
+          profiles_by_email_ids: profilesByEmail?.map(p => p.id) ?? [],
+          supabaseProject: process.env.NEXT_PUBLIC_SUPABASE_URL?.match(/\/\/([^.]+)/)?.[1] ?? "unknown",
+        }));
         await supabase.auth.signOut();
         const debug = encodeURIComponent(JSON.stringify({
           path: "PROFILE_NULL",
@@ -113,6 +155,17 @@ export async function GET(request: Request) {
       const isActiveMember = profile.activo !== false && profile.registered === true && profile.role === "miembro";
 
       if (!isAdmin && !isActiveMember) {
+        console.log("[AUTH_CALLBACK]", JSON.stringify({
+          step: "NOT_AUTHORIZED",
+          auth_user_id: user.id,
+          email: user.email,
+          profile_role: profile.role,
+          profile_activo: profile.activo,
+          profile_registered: profile.registered,
+          isAdmin,
+          isActiveMember,
+          supabaseProject: process.env.NEXT_PUBLIC_SUPABASE_URL?.match(/\/\/([^.]+)/)?.[1] ?? "unknown",
+        }));
         if (profile.registered === false) {
           await serviceSupabase
             .from("profiles")
@@ -153,6 +206,18 @@ export async function GET(request: Request) {
       }
 
       const redirectPath = isAdmin ? next : (next === "/dashboard" ? "/dashboard/mis-pagos" : next);
+
+      console.log("[AUTH_CALLBACK]", JSON.stringify({
+        step: "SUCCESS",
+        auth_user_id: user.id,
+        email: user.email,
+        profile_role: profile.role,
+        profile_activo: profile.activo,
+        profile_registered: profile.registered,
+        isAdmin,
+        redirectPath,
+        supabaseProject: process.env.NEXT_PUBLIC_SUPABASE_URL?.match(/\/\/([^.]+)/)?.[1] ?? "unknown",
+      }));
 
       // Super admin sin config: redirigir a configuracion
       if (isAdmin && !gymConfig && redirectPath === "/dashboard") {

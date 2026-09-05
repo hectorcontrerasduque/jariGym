@@ -96,8 +96,17 @@ export async function GET(request: Request) {
 
       if (!profile) {
         await supabase.auth.signOut();
+        const debug = encodeURIComponent(JSON.stringify({
+          path: "PROFILE_NULL",
+          user_id: user.id,
+          email: user.email,
+          adminEmail,
+          isAdminByEmail,
+          isGymOwner,
+          gymOwnerEmail: gymConfig?.owner_email ?? null,
+        }));
         const msg = encodeURIComponent(messages.auth.userNotRegistered);
-        return NextResponse.redirect(`${origin}/login?error=${msg}`);
+        return NextResponse.redirect(`${origin}/login?error=${msg}&debug=${debug}`);
       }
 
       const isAdmin = isAdminByEmail || profile.role === "super_admin";
@@ -111,8 +120,22 @@ export async function GET(request: Request) {
             .eq("id", user.id);
         }
         await supabase.auth.signOut();
+        const debug = encodeURIComponent(JSON.stringify({
+          path: "NOT_AUTHORIZED",
+          user_id: user.id,
+          email: user.email,
+          adminEmail,
+          isAdminByEmail,
+          isGymOwner,
+          gymOwnerEmail: gymConfig?.owner_email ?? null,
+          profile_role: profile.role,
+          profile_activo: profile.activo,
+          profile_registered: profile.registered,
+          isAdmin,
+          isActiveMember,
+        }));
         const msg = encodeURIComponent(messages.auth.userNotRegistered);
-        return NextResponse.redirect(`${origin}/login?error=${msg}`);
+        return NextResponse.redirect(`${origin}/login?error=${msg}&debug=${debug}`);
       }
 
       if (profile) {
@@ -141,5 +164,5 @@ export async function GET(request: Request) {
 
   }
 
-  return NextResponse.redirect(`${origin}/login?error=auth_failed`);
+  return NextResponse.redirect(`${origin}/login?error=${encodeURIComponent("auth_failed")}&debug=${encodeURIComponent(JSON.stringify({ path: "EXCHANGE_FAILED", code: code ? "present" : "null", error, errorDescription }))}`);
 }

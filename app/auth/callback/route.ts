@@ -26,7 +26,6 @@ export async function GET(request: Request) {
         return NextResponse.redirect(`${origin}/login?error=${encodeURIComponent("auth_failed")}&debug=${encodeURIComponent(JSON.stringify({ path: "EXCHANGE_FAILED", error: exchangeError?.message }))}`);
       }
 
-      // Email confirmation flow: next=/login means just confirm email, then redirect to login with success
       if (next === "/login") {
         await supabase.auth.signOut();
         const msg = encodeURIComponent(messages.auth.emailConfirmed);
@@ -44,9 +43,7 @@ export async function GET(request: Request) {
         process.env.SUPABASE_SERVICE_ROLE_KEY!
       );
 
-      const supabaseProject = process.env.NEXT_PUBLIC_SUPABASE_URL?.match(/\/\/([^.]+)/)?.[1] ?? "unknown";
-
-      const { data: gymConfig } = await serviceSupabase
+      const { data: gymConfig } = await supabase
         .from("gym_config")
         .select("owner_email")
         .limit(1)
@@ -54,7 +51,7 @@ export async function GET(request: Request) {
 
       const isGymOwner = gymConfig?.owner_email && user.email?.toLowerCase() === gymConfig.owner_email.toLowerCase();
 
-      let { data: profile } = await serviceSupabase
+      let { data: profile } = await supabase
         .from("profiles")
         .select("role, activo, registered")
         .eq("id", user.id)
@@ -80,7 +77,7 @@ export async function GET(request: Request) {
               role: "super_admin",
             });
 
-            const { data: retry } = await serviceSupabase
+            const { data: retry } = await supabase
               .from("profiles")
               .select("role, activo, registered")
               .eq("id", user.id)
@@ -98,11 +95,8 @@ export async function GET(request: Request) {
               isAdminByEmail,
               isGymOwner,
               gymOwnerEmail: gymConfig?.owner_email ?? null,
-              supabaseProject,
               error_message: errObj?.message || err?.message || String(createError),
               error_code: errObj?.code || err?.code || null,
-              error_details: errObj?.details || err?.details || null,
-              error_hint: errObj?.hint || err?.hint || null,
             }));
             const msg = encodeURIComponent(messages.auth.userNotRegistered);
             return NextResponse.redirect(`${origin}/login?error=${msg}&debug=${debug}`);
@@ -120,7 +114,6 @@ export async function GET(request: Request) {
           isAdminByEmail,
           isGymOwner,
           gymOwnerEmail: gymConfig?.owner_email ?? null,
-          supabaseProject,
         }));
         const msg = encodeURIComponent(messages.auth.userNotRegistered);
         return NextResponse.redirect(`${origin}/login?error=${msg}&debug=${debug}`);
@@ -139,7 +132,6 @@ export async function GET(request: Request) {
           isAdminByEmail,
           isGymOwner,
           gymOwnerEmail: gymConfig?.owner_email ?? null,
-          supabaseProject,
           profile_role: profile.role,
           profile_activo: profile.activo,
           profile_registered: profile.registered,
@@ -155,7 +147,7 @@ export async function GET(request: Request) {
       if (email) updates.email = email;
 
       if (Object.keys(updates).length > 0) {
-        await serviceSupabase
+        await supabase
           .from("profiles")
           .update(updates)
           .eq("id", user.id);
@@ -163,7 +155,6 @@ export async function GET(request: Request) {
 
       const redirectPath = isAdmin ? next : (next === "/dashboard" ? "/dashboard/mis-pagos" : next);
 
-      // Super admin sin config: redirigir a configuracion
       if (isAdmin && !gymConfig && redirectPath === "/dashboard") {
         return NextResponse.redirect(`${origin}/dashboard/configuracion`);
       }

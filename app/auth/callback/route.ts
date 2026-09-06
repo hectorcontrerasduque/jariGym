@@ -23,7 +23,7 @@ export async function GET(request: Request) {
       const { data: { user }, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
 
       if (exchangeError || !user) {
-        return NextResponse.redirect(`${origin}/login?error=${encodeURIComponent("auth_failed")}&debug=${encodeURIComponent(JSON.stringify({ path: "EXCHANGE_FAILED", error: exchangeError?.message }))}`);
+        return NextResponse.redirect(`${origin}/login?error=${encodeURIComponent("auth_failed")}`);
       }
 
       if (next === "/login") {
@@ -84,39 +84,17 @@ export async function GET(request: Request) {
               .single();
             if (retry) profile = retry;
           } catch (createError: unknown) {
-            const err = createError as Record<string, unknown>;
-            const errObj = (typeof err === "object" && err !== null && "error" in err) ? err.error as Record<string, unknown> : err;
             await supabase.auth.signOut();
-            const debug = encodeURIComponent(JSON.stringify({
-              path: "PROFILE_CREATE_FAILED",
-              auth_user_id: user.id,
-              email: user.email,
-              adminEmail,
-              isAdminByEmail,
-              isGymOwner,
-              gymOwnerEmail: gymConfig?.owner_email ?? null,
-              error_message: errObj?.message || err?.message || String(createError),
-              error_code: errObj?.code || err?.code || null,
-            }));
             const msg = encodeURIComponent(messages.auth.userNotRegistered);
-            return NextResponse.redirect(`${origin}/login?error=${msg}&debug=${debug}`);
+            return NextResponse.redirect(`${origin}/login?error=${msg}`);
           }
         }
       }
 
       if (!profile) {
         await supabase.auth.signOut();
-        const debug = encodeURIComponent(JSON.stringify({
-          path: "PROFILE_NULL",
-          auth_user_id: user.id,
-          email: user.email,
-          adminEmail,
-          isAdminByEmail,
-          isGymOwner,
-          gymOwnerEmail: gymConfig?.owner_email ?? null,
-        }));
         const msg = encodeURIComponent(messages.auth.userNotRegistered);
-        return NextResponse.redirect(`${origin}/login?error=${msg}&debug=${debug}`);
+        return NextResponse.redirect(`${origin}/login?error=${msg}`);
       }
 
       const isAdmin = isAdminByEmail || profile.role === "super_admin";
@@ -124,22 +102,8 @@ export async function GET(request: Request) {
 
       if (!isAdmin && !isActiveMember) {
         await supabase.auth.signOut();
-        const debug = encodeURIComponent(JSON.stringify({
-          path: "NOT_AUTHORIZED",
-          auth_user_id: user.id,
-          email: user.email,
-          adminEmail,
-          isAdminByEmail,
-          isGymOwner,
-          gymOwnerEmail: gymConfig?.owner_email ?? null,
-          profile_role: profile.role,
-          profile_activo: profile.activo,
-          profile_registered: profile.registered,
-          isAdmin,
-          isActiveMember,
-        }));
         const msg = encodeURIComponent(messages.auth.userNotRegistered);
-        return NextResponse.redirect(`${origin}/login?error=${msg}&debug=${debug}`);
+        return NextResponse.redirect(`${origin}/login?error=${msg}`);
       }
 
       const updates: Record<string, unknown> = {};
@@ -162,12 +126,9 @@ export async function GET(request: Request) {
       return NextResponse.redirect(`${origin}${redirectPath}`);
 
     } catch (globalError) {
-      return NextResponse.redirect(`${origin}/login?error=${encodeURIComponent("auth_callback_error")}&debug=${encodeURIComponent(JSON.stringify({
-        path: "GLOBAL_ERROR",
-        error: globalError instanceof Error ? globalError.message : String(globalError),
-      }))}`);
+      return NextResponse.redirect(`${origin}/login?error=${encodeURIComponent("auth_callback_error")}`);
     }
   }
 
-  return NextResponse.redirect(`${origin}/login?error=${encodeURIComponent("auth_failed")}&debug=${encodeURIComponent(JSON.stringify({ path: "NO_CODE" }))}`);
+  return NextResponse.redirect(`${origin}/login?error=${encodeURIComponent("auth_failed")}`);
 }

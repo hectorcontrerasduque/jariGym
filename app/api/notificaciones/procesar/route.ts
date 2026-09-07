@@ -54,7 +54,7 @@ async function ejecutarRecordatorioPago(
   const nombreGym = (gymConfig.gym_name as string) || "GymApp";
   const logoUrl = gymConfig.logo_url as string | null;
   const duenoEmail = gymConfig.owner_email as string | null;
-  const direccion = gymConfig.address as string | null;
+  const address = gymConfig.address as string | null;
   const modoCobro = (gymConfig.billing_mode as "dia_uno" | "fecha_inscripcion") || "dia_uno";
 
   const mesActual = new Date().getMonth() + 1;
@@ -155,7 +155,7 @@ async function ejecutarRecordatorioPago(
         forzar ? 0 : Math.max(0, diasRestantesMes),
         new Date(anioActual, mesActual, diaCobro).toLocaleDateString("es-ES"),
         logoUrl,
-        direccion
+        address
       );
       count++;
       await sleep(3000);
@@ -179,7 +179,7 @@ async function ejecutarRecordatorioPago(
           };
         }),
         logoUrl,
-        direccion
+        address
       );
       count++;
     } catch {

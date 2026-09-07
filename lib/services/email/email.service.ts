@@ -91,9 +91,9 @@ function injectQrAfterHeader(html: string): string {
 }
 
 // ─── SHARED FOOTER (branding only) ──────────────────────────
-function sharedFooter(gymName: string, direccion?: string | null): string {
-  const addressHtml = direccion
-    ? `<p style="color:#94a3b8;font-size:11px;margin:0 0 5px;">${direccion}</p>`
+function sharedFooter(gymName: string, address?: string | null): string {
+  const addressHtml = address
+    ? `<p style="color:#94a3b8;font-size:11px;margin:0 0 5px;">${address}</p>`
     : "";
   return `
     <tr>
@@ -107,9 +107,9 @@ function sharedFooter(gymName: string, direccion?: string | null): string {
 }
 
 // ─── UNSUBSCRIBE FOOTER (notifications) ──────────────────────
-function unsubscribeFooter(gymName: string, direccion?: string | null): string {
-  const addressHtml = direccion
-    ? `<p style="color:#94a3b8;font-size:11px;margin:0 0 5px;">${direccion}</p>`
+function unsubscribeFooter(gymName: string, address?: string | null): string {
+  const addressHtml = address
+    ? `<p style="color:#94a3b8;font-size:11px;margin:0 0 5px;">${address}</p>`
     : "";
   return `
     <tr>
@@ -224,13 +224,13 @@ export async function sendWelcomeEmail(
   gymLogo?: string | null,
   confirmLink?: string,
   isOAuth?: boolean,
-  direccion?: string
+  address?: string
 ): Promise<void> {
-  const baseHtml = welcomeTemplate(email, password, gymName, gymLogo, confirmLink, isOAuth, direccion);
+  const baseHtml = welcomeTemplate(email, password, gymName, gymLogo, confirmLink, isOAuth);
   await sendEmail({
     to,
     subject: `${gymName} - Bienvenido`,
-    html: baseHtml + sharedFooter(gymName, direccion),
+    html: baseHtml + sharedFooter(gymName, address),
     fromName: gymName,
   });
 }
@@ -243,13 +243,13 @@ export async function sendPaymentDebtEmail(
   deudas: Array<{ month_number: number; year_number: number; payment_amount: number }>,
   totalDeuda: number,
   gymLogo?: string | null,
-  direccion?: string | null
+  address?: string | null
 ): Promise<void> {
   const baseHtml = deudasPendientesTemplate(memberName, gymName, deudas, totalDeuda, gymLogo);
   await sendNotificationEmail({
     to,
     subject: `${gymName} - Pago pendiente de ${memberName}`,
-    html: baseHtml + unsubscribeFooter(gymName, direccion),
+    html: baseHtml + unsubscribeFooter(gymName, address),
     fromName: gymName,
     campaign: "deudas-pendientes",
   });
@@ -263,13 +263,13 @@ export async function sendPaymentReminderEmail(
   diasRestantes: number,
   fechaVencimiento: string,
   gymLogo?: string | null,
-  direccion?: string | null
+  address?: string | null
 ): Promise<void> {
   const baseHtml = recordatorioMiembroTemplate(memberName, gymName, diasRestantes, fechaVencimiento, gymLogo);
   await sendNotificationEmail({
     to,
     subject: `${gymName} - Tu membresía vence en ${diasRestantes} día${diasRestantes !== 1 ? "s" : ""}`,
-    html: baseHtml + unsubscribeFooter(gymName, direccion),
+    html: baseHtml + unsubscribeFooter(gymName, address),
     fromName: gymName,
     campaign: "recordatorio-pago",
   });
@@ -286,13 +286,13 @@ export async function sendAdminReminderEmail(
     fechaVencimiento: string;
   }>,
   gymLogo?: string | null,
-  direccion?: string | null
+  address?: string | null
 ): Promise<void> {
   const baseHtml = recordatorioAdminTemplate(adminName, gymName, miembrosProximoVencer, gymLogo);
   await sendNotificationEmail({
     to,
     subject: `${gymName} - Miembros con membresía por vencer`,
-    html: baseHtml + unsubscribeFooter(gymName, direccion),
+    html: baseHtml + unsubscribeFooter(gymName, address),
     fromName: gymName,
     campaign: "recordatorio-admin",
   });
@@ -313,13 +313,13 @@ export async function sendAdminSummaryEmail(
   },
   appUrl: string,
   gymLogo?: string | null,
-  direccion?: string | null
+  address?: string | null
 ): Promise<void> {
   const baseHtml = resumenDuenoTemplate(gymName, resumen, appUrl, gymLogo);
   await sendNotificationEmail({
     to,
     subject: `${gymName} - Resumen semanal de pagos`,
-    html: baseHtml + unsubscribeFooter(gymName, direccion),
+    html: baseHtml + unsubscribeFooter(gymName, address),
     fromName: gymName,
     campaign: "resumen-dueno",
   });
@@ -343,14 +343,14 @@ export async function sendSystemStatusEmail(
     migraciones: number;
   },
   gymLogo?: string | null,
-  direccion?: string | null,
+  address?: string | null,
   erroresRecientes?: Array<{ tipo: string; fecha: string; detalle: string }>
 ): Promise<void> {
   const baseHtml = estatusSistemaTemplate(gymName, metricas, gymLogo, erroresRecientes);
   await sendNotificationEmail({
     to,
     subject: `${gymName} - Estado del sistema`,
-    html: baseHtml + unsubscribeFooter(gymName, direccion),
+    html: baseHtml + unsubscribeFooter(gymName, address),
     fromName: gymName,
     campaign: "estatus-sistema",
   });
@@ -362,13 +362,13 @@ export async function sendDiagnosticoEmail(
   gymName: string,
   resultados: Array<{ paso: string; estado: "ok" | "error" | "warning"; detalle: string }>,
   gymLogo?: string | null,
-  direccion?: string | null
+  address?: string | null
 ): Promise<void> {
   const baseHtml = diagnosticoTemplate(resultados, gymName, gymLogo);
   await sendNotificationEmail({
     to,
     subject: `${gymName} - Diagnóstico del sistema`,
-    html: baseHtml + unsubscribeFooter(gymName, direccion),
+    html: baseHtml + unsubscribeFooter(gymName, address),
     fromName: gymName,
     campaign: "diagnostico",
   });
@@ -385,13 +385,13 @@ export async function sendErrorReportEmail(
     contexto: Record<string, unknown>;
   },
   gymLogo?: string | null,
-  direccion?: string | null
+  address?: string | null
 ): Promise<void> {
   const baseHtml = errorReportTemplate(errorInfo, gymName, gymLogo);
   await sendNotificationEmail({
     to,
     subject: `${gymName} - Error en notificaciones`,
-    html: baseHtml + unsubscribeFooter(gymName, direccion),
+    html: baseHtml + unsubscribeFooter(gymName, address),
     fromName: gymName,
     campaign: "error-report",
   });

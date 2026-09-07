@@ -4,8 +4,7 @@ export function welcomeTemplate(
   gymName: string,
   gymLogo?: string | null,
   confirmLink?: string,
-  isOAuth?: boolean,
-  direccion?: string
+  isOAuth?: boolean
 ): string {
   const logoHtml = gymLogo
     ? `<img src="${gymLogo}" alt="${gymName}" style="width:60px;height:60px;object-fit:cover;border-radius:12px;">`

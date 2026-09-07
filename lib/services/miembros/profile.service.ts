@@ -346,7 +346,7 @@ export async function createOrUpdateUser(
 
   // Send welcome email
   let welcomeEmailSent = false;
-  if (params.sendWelcome && isNewAuthUser) {
+  if (params.sendWelcome) {
     try {
       let gymName = params.gymName || "Gym";
       let gymLogo = params.gymLogo || null;
@@ -360,7 +360,8 @@ export async function createOrUpdateUser(
         if (config?.logo_url) gymLogo = config.logo_url;
         if (config?.address) address = config.address;
       }
-      await sendWelcomeEmail(emailLower, emailLower, generatedPassword, gymName, gymLogo, undefined, params.isOAuth, address || undefined);
+      const isOAuthUser = params.isOAuth || (existingAuth?.app_metadata?.providers?.length ?? 0) > 0;
+      await sendWelcomeEmail(emailLower, emailLower, generatedPassword, gymName, gymLogo, undefined, isOAuthUser, address || undefined);
       welcomeEmailSent = true;
     } catch { /* silent */ }
   }

@@ -25,8 +25,12 @@ export function pagoRechazadoTemplate(
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pago Rechazado - ${gymName}</title>
 </head>
 <body style="margin:0;padding:0;background-color:#f4f4f5;font-family:Arial,sans-serif;">
+  <div style="display:none;font-size:1px;color:#f4f4f5;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden;">
+    Tu pago de $${monto.toFixed(2)} ha sido rechazado en ${gymName}. Motivo: ${motivo}
+  </div>
   <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f5;padding:40px 20px;">
     <tr>
       <td align="center">
@@ -87,13 +91,6 @@ export function pagoRechazadoTemplate(
               </table>
               <p style="color:#cbd5e1;font-size:11px;line-height:1.5;margin:15px 0 0;">
                 Este es un correo automático, por favor no respondas a este mensaje.
-              </p>
-            </td>
-          </tr>
-          <tr>
-            <td style="background-color:#f8fafc;padding:20px 30px;border-top:1px solid #e2e8f0;">
-              <p style="color:#94a3b8;font-size:12px;margin:0;text-align:center;">
-                ${gymName} &mdash; Gestión de gimnasio inteligente
               </p>
             </td>
           </tr>

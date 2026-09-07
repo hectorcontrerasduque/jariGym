@@ -105,13 +105,6 @@ export function deudasPendientesTemplate(
               </p>
             </td>
           </tr>
-          <tr>
-            <td style="background-color:#f8fafc;padding:20px 30px;border-top:1px solid #e2e8f0;">
-              <p style="color:#94a3b8;font-size:12px;margin:0;text-align:center;">
-                ${gymName} &mdash; Gestión de gimnasio inteligente
-              </p>
-            </td>
-          </tr>
         </table>
       </td>
     </tr>

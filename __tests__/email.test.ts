@@ -40,7 +40,6 @@ describe("resetPasswordTemplate", () => {
   it("should have gym name in footer", () => {
     const html = resetPasswordTemplate(resetLink, gymName, null);
     expect(html).toContain(gymName);
-    expect(html).toContain("Gestión de gimnasio inteligente");
   });
 
   it("should use app color scheme", () => {

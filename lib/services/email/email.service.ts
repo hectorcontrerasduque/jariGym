@@ -1,4 +1,5 @@
 import nodemailer from "nodemailer";
+import QRCode from "qrcode";
 import { resetPasswordTemplate } from "./templates/reset-password";
 import { welcomeTemplate } from "./templates/welcome";
 import { deudasPendientesTemplate } from "./templates/deudas-pendientes";
@@ -36,22 +37,82 @@ async function rateLimit(): Promise<void> {
   lastEmailSentAt = Date.now();
 }
 
-// ─── UNSUBSCRIBE FOOTER ──────────────────────────────────────
+// ─── QR CODE (cached PNG buffer for CID embedding) ───────────
+const APP_URL = "https://jarigym.vercel.app/login";
+let cachedQrBuffer: Buffer | null = null;
+
+async function getQrBuffer(): Promise<Buffer> {
+  if (cachedQrBuffer) return cachedQrBuffer;
+  cachedQrBuffer = await QRCode.toBuffer(APP_URL, {
+    type: "png",
+    width: 120,
+    margin: 1,
+    color: { dark: "#0B1120", light: "#ffffff" },
+  });
+  return cachedQrBuffer;
+}
+
+function qrAttachment(): Promise<NonNullable<nodemailer.SendMailOptions["attachments"]>> {
+  return getQrBuffer().then((buf) => [
+    { filename: "qr-login.png", content: buf, cid: "qr-login" },
+  ]);
+}
+
+// ─── SHARED FOOTER ──────────────────────────────────────────
+function sharedFooter(gymName: string, direccion?: string | null): string {
+  const addressHtml = direccion
+    ? `<p style="color:#94a3b8;font-size:11px;margin:0 0 5px;">${direccion}</p>`
+    : "";
+  return `
+    <tr>
+      <td style="background-color:#f8fafc;padding:24px 30px;border-top:1px solid #e2e8f0;text-align:center;">
+        <table cellpadding="0" cellspacing="0" style="margin:0 auto 12px;">
+          <tr>
+            <td style="padding-right:10px;vertical-align:middle;">
+              <img src="cid:qr-login" alt="QR" width="64" height="64" style="display:block;border-radius:6px;">
+            </td>
+            <td style="vertical-align:middle;text-align:left;">
+              <p style="color:#1e293b;font-size:12px;font-weight:bold;margin:0 0 2px;">Accede al sistema</p>
+              <a href="${APP_URL}" style="color:#38bdf8;font-size:11px;text-decoration:none;">${APP_URL.replace("https://", "")}</a>
+            </td>
+          </tr>
+        </table>
+        ${addressHtml}
+        <p style="color:#94a3b8;font-size:11px;margin:6px 0 0;">
+          ${gymName} &mdash; Gestión de gimnasio inteligente
+        </p>
+      </td>
+    </tr>`;
+}
+
+// ─── UNSUBSCRIBE FOOTER (notifications) ──────────────────────
 function unsubscribeFooter(gymName: string, direccion?: string | null): string {
   const addressHtml = direccion
     ? `<p style="color:#94a3b8;font-size:11px;margin:0 0 5px;">${direccion}</p>`
     : "";
   return `
-    <div style="margin-top:30px;padding-top:15px;border-top:1px solid #e2e8f0;text-align:center;">
-      ${addressHtml}
-      <p style="color:#94a3b8;font-size:11px;margin:0 0 5px;">
-        ${gymName} &mdash; Notificación automática
-      </p>
-      <p style="color:#94a3b8;font-size:11px;margin:0;">
-        Si no deseas recibir estos correos, contacta al administrador para desactivar las notificaciones.
-      </p>
-    </div>
-  `;
+    <tr>
+      <td style="background-color:#f8fafc;padding:24px 30px;border-top:1px solid #e2e8f0;text-align:center;">
+        <table cellpadding="0" cellspacing="0" style="margin:0 auto 12px;">
+          <tr>
+            <td style="padding-right:10px;vertical-align:middle;">
+              <img src="cid:qr-login" alt="QR" width="64" height="64" style="display:block;border-radius:6px;">
+            </td>
+            <td style="vertical-align:middle;text-align:left;">
+              <p style="color:#1e293b;font-size:12px;font-weight:bold;margin:0 0 2px;">Accede al sistema</p>
+              <a href="${APP_URL}" style="color:#38bdf8;font-size:11px;text-decoration:none;">${APP_URL.replace("https://", "")}</a>
+            </td>
+          </tr>
+        </table>
+        ${addressHtml}
+        <p style="color:#94a3b8;font-size:11px;margin:6px 0 4px;">
+          ${gymName} &mdash; Notificación automática
+        </p>
+        <p style="color:#94a3b8;font-size:11px;margin:0;">
+          Si no deseas recibir estos correos, contacta al administrador para desactivar las notificaciones.
+        </p>
+      </td>
+    </tr>`;
 }
 
 // ─── SEND EMAIL (transactional) ──────────────────────────────
@@ -74,15 +135,15 @@ async function sendEmail({
 
   await rateLimit();
 
+  const attachments = await qrAttachment();
+
   const result = await transporter.sendMail({
     from: `"${fromName || "GymApp"}" <${process.env.GMAIL_USER}>`,
     to,
     subject,
     html,
     replyTo: process.env.GMAIL_USER,
-    headers: {
-      "List-Unsubscribe": `<mailto:${process.env.GMAIL_USER}?subject=unsubscribe>`,
-    },
+    attachments,
   });
 
   if (!result.messageId) {
@@ -104,14 +165,18 @@ async function sendNotificationEmail({
 
   await rateLimit();
 
+  const attachments = await qrAttachment();
+
   const result = await transporter.sendMail({
     from: `"${fromName || "GymApp"}" <${process.env.GMAIL_USER}>`,
     to,
     subject,
     html,
     replyTo: process.env.GMAIL_USER,
+    attachments,
     headers: {
       "List-Unsubscribe": `<mailto:${process.env.GMAIL_USER}?subject=unsubscribe>`,
+      "List-Unsubscribe-Post": "List-Unsubscribe=One-Click",
       "Precedence": "bulk",
       "X-Campaign": campaign,
       "X-Mailer": "GymApp-Notifications",
@@ -133,7 +198,7 @@ export async function sendPasswordResetEmail(
   await sendEmail({
     to,
     subject: `${gymName} - Restablecer Contraseña`,
-    html: resetPasswordTemplate(resetLink, gymName, gymLogo),
+    html: resetPasswordTemplate(resetLink, gymName, gymLogo) + sharedFooter(gymName),
     fromName: gymName,
   });
 }
@@ -149,10 +214,11 @@ export async function sendWelcomeEmail(
   isOAuth?: boolean,
   direccion?: string
 ): Promise<void> {
+  const baseHtml = welcomeTemplate(email, password, gymName, gymLogo, confirmLink, isOAuth, direccion);
   await sendEmail({
     to,
     subject: `${gymName} - Bienvenido`,
-    html: welcomeTemplate(email, password, gymName, gymLogo, confirmLink, isOAuth, direccion),
+    html: baseHtml + sharedFooter(gymName, direccion),
     fromName: gymName,
   });
 }
@@ -332,8 +398,8 @@ export async function sendPaymentApprovedEmail(
   const html = pagoAprobadoTemplate(memberName, gymName, monto, meses, metodoPago, gymLogo);
   await sendEmail({
     to,
-    subject: `✅ Pago aprobado - ${gymName}`,
-    html,
+    subject: `Pago aprobado - ${gymName}`,
+    html: html + sharedFooter(gymName),
     fromName: gymName,
   });
 }
@@ -352,8 +418,8 @@ export async function sendPaymentRejectedEmail(
   const html = pagoRechazadoTemplate(memberName, gymName, monto, meses, metodoPago, motivo, gymLogo);
   await sendEmail({
     to,
-    subject: `❌ Pago rechazado - ${gymName}`,
-    html,
+    subject: `Pago rechazado - ${gymName}`,
+    html: html + sharedFooter(gymName),
     fromName: gymName,
   });
 }

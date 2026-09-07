@@ -46,7 +46,5 @@ export function errorReportTemplate(
     '</table></td></tr></table>' +
     '<p style="color:#cbd5e1;font-size:11px;line-height:1.5;margin:15px 0 0;">Este es un reporte automatico del sistema. No requiere accion.</p>' +
     '</td></tr>' +
-    '<tr><td style="background-color:#f8fafc;padding:20px 30px;border-top:1px solid #e2e8f0;">' +
-    '<p style="color:#94a3b8;font-size:12px;margin:0;text-align:center;">' + gymName + ' &mdash; Gestion de gimnasio inteligente</p>' +
     '</td></tr></table></td></tr></table></body></html>';
 }

@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { applyRateLimit } from "@/lib/middleware/rate-limit";
 import { createOrUpdateProfile } from "@/lib/services/miembros/profile.service";
+import { sendWelcomeEmail } from "@/lib/services/email/email.service";
 import type { NextRequest } from "next/server";
 
 export async function POST(request: NextRequest) {
@@ -127,6 +128,21 @@ export async function POST(request: NextRequest) {
         inscription_paid: isOwner,
         inscription_date: isOwner ? new Date().toISOString().split("T")[0] : null,
       });
+
+      let gymName = "Gym";
+      let gymLogo: string | null = null;
+      try {
+        const { data: config } = await serviceSupabase
+          .from("gym_config")
+          .select("gym_name, logo_url")
+          .maybeSingle();
+        if (config?.gym_name) gymName = config.gym_name;
+        if (config?.logo_url) gymLogo = config.logo_url;
+      } catch { /* silent */ }
+
+      try {
+        await sendWelcomeEmail(emailLower, emailLower, randomPassword, gymName, gymLogo);
+      } catch { /* silent */ }
     } catch {
       return NextResponse.json({ created: false });
     }

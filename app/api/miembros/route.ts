@@ -5,6 +5,7 @@ import { messages } from "@/lib/messages";
 import { randomBytes } from "crypto";
 import { applyRateLimit } from "@/lib/middleware/rate-limit";
 import { createOrUpdateProfile } from "@/lib/services/miembros/profile.service";
+import { sendWelcomeEmail } from "@/lib/services/email/email.service";
 
 export async function POST(request: Request) {
   try {
@@ -134,22 +135,17 @@ export async function POST(request: Request) {
 
       let welcomeEmailSent = false;
       try {
-        const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
-        const { error: inviteError } = await serviceSupabase.auth.admin.inviteUserByEmail(email, {
-          data: { full_name: nombre },
-          redirectTo: `${siteUrl}/login`,
-        });
-        if (!inviteError) {
-          welcomeEmailSent = true;
-        } else {
-          const { error: resetError } = await serviceSupabase.auth.admin.generateLink({
-            type: "magiclink",
-            email: email,
-          });
-          if (!resetError) {
-            welcomeEmailSent = true;
-          }
-        }
+        let gymName = "Gym";
+        let gymLogo: string | null = null;
+        const { data: config } = await serviceSupabase
+          .from("gym_config")
+          .select("gym_name, logo_url")
+          .maybeSingle();
+        if (config?.gym_name) gymName = config.gym_name;
+        if (config?.logo_url) gymLogo = config.logo_url;
+
+        await sendWelcomeEmail(email, email, userPassword, gymName, gymLogo);
+        welcomeEmailSent = true;
       } catch {
         // silent
       }

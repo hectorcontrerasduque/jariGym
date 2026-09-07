@@ -2,7 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { messages } from "@/lib/messages";
 import { sendWelcomeEmail } from "@/lib/services/email/email.service";
-import { randomBytes } from "crypto";
+
 import { sanitizeOrFilter } from "@/lib/utils/sanitize";
 import { applyRateLimit } from "@/lib/middleware/rate-limit";
 import { createOrUpdateProfile } from "@/lib/services/miembros/profile.service";
@@ -182,7 +182,7 @@ export async function POST(request: Request) {
         const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
           email,
           password,
-          email_confirm: false,
+          email_confirm: true,
           user_metadata: { full_name: profileNombre },
         });
 
@@ -277,26 +277,8 @@ export async function POST(request: Request) {
       }
 
       if (isNewUser) {
-        // New user: generate confirmation token + send welcome email with credentials
-        let confirmLink: string | null = null;
         try {
-          const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "";
-          const token = randomBytes(32).toString("hex");
-          const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-
-          await supabase.from("password_reset_tokens").insert({
-            user_id: userId,
-            token,
-            expires_at: expiresAt,
-          });
-
-          confirmLink = `${siteUrl}/api/auth/confirm-email?token=${token}`;
-        } catch {
-          // silent
-        }
-
-        try {
-          await sendWelcomeEmail(email, email, password, gymName, gymLogo, confirmLink || undefined);
+          await sendWelcomeEmail(email, email, password, gymName, gymLogo);
           welcomeEmailSent = true;
         } catch {
           // silent

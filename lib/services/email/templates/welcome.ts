@@ -94,8 +94,11 @@ export function welcomeTemplate(
           </tr>
           <tr>
             <td style="background-color:#f8fafc;padding:20px 30px;border-top:1px solid #e2e8f0;">
-              <p style="color:#94a3b8;font-size:12px;margin:0;text-align:center;">
+              <p style="color:#94a3b8;font-size:12px;margin:0 0 5px;text-align:center;">
                 ${gymName} &mdash; Gestión de gimnasio inteligente
+              </p>
+              <p style="color:#cbd5e1;font-size:11px;margin:0;text-align:center;">
+                Este es un correo transaccional enviado por tu gimnasio.
               </p>
             </td>
           </tr>

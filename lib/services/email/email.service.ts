@@ -80,6 +80,9 @@ async function sendEmail({
     subject,
     html,
     replyTo: process.env.GMAIL_USER,
+    headers: {
+      "List-Unsubscribe": `<mailto:${process.env.GMAIL_USER}?subject=unsubscribe>`,
+    },
   });
 
   if (!result.messageId) {

@@ -45,7 +45,7 @@ async function getQrBuffer(): Promise<Buffer> {
   if (cachedQrBuffer) return cachedQrBuffer;
   cachedQrBuffer = await QRCode.toBuffer(APP_URL, {
     type: "png",
-    width: 120,
+    width: 200,
     margin: 1,
     color: { dark: "#0B1120", light: "#ffffff" },
   });
@@ -58,25 +58,46 @@ function qrAttachment(): Promise<NonNullable<nodemailer.SendMailOptions["attachm
   ]);
 }
 
-// ─── SHARED FOOTER ──────────────────────────────────────────
+// ─── QR SECTION (injected after header in every email) ──────
+function qrSectionHtml(): string {
+  return `
+          <tr>
+            <td style="padding:0 30px 20px;background-color:#ffffff;">
+              <table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;border-radius:12px;border:1px solid #e2e8f0;">
+                <tr>
+                  <td style="padding:24px;text-align:center;">
+                    <p style="color:#64748b;font-size:13px;margin:0 0 12px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Escanea para acceder</p>
+                    <img src="cid:qr-login" alt="QR Acceso" width="160" height="160" style="display:block;margin:0 auto 12px;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,0.1);">
+                    <a href="${APP_URL}" style="color:#38bdf8;font-size:13px;text-decoration:none;font-weight:600;">${APP_URL.replace("https://", "")}</a>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>`;
+}
+
+// ─── INJECT QR AFTER HEADER ─────────────────────────────────
+function injectQrAfterHeader(html: string): string {
+  const marker = "</tr>\n          <tr>\n            <td style=\"padding:30px;\">";
+  const replacement = `</tr>\n${qrSectionHtml()}\n          <tr>\n            <td style="padding:30px;">`;
+  if (html.includes(marker)) {
+    return html.replace(marker, replacement);
+  }
+  const markerAlt = '</tr>\n          <tr>\n            <td style="padding:30px;">';
+  if (html.includes(markerAlt)) {
+    return html.replace(markerAlt, replacement);
+  }
+  return html;
+}
+
+// ─── SHARED FOOTER (branding only) ──────────────────────────
 function sharedFooter(gymName: string, direccion?: string | null): string {
   const addressHtml = direccion
     ? `<p style="color:#94a3b8;font-size:11px;margin:0 0 5px;">${direccion}</p>`
     : "";
   return `
     <tr>
-      <td style="background-color:#f8fafc;padding:24px 30px;border-top:1px solid #e2e8f0;text-align:center;">
-        <table cellpadding="0" cellspacing="0" style="margin:0 auto 12px;">
-          <tr>
-            <td style="padding-right:10px;vertical-align:middle;">
-              <img src="cid:qr-login" alt="QR" width="64" height="64" style="display:block;border-radius:6px;">
-            </td>
-            <td style="vertical-align:middle;text-align:left;">
-              <p style="color:#1e293b;font-size:12px;font-weight:bold;margin:0 0 2px;">Accede al sistema</p>
-              <a href="${APP_URL}" style="color:#38bdf8;font-size:11px;text-decoration:none;">${APP_URL.replace("https://", "")}</a>
-            </td>
-          </tr>
-        </table>
+      <td style="background-color:#f8fafc;padding:20px 30px;border-top:1px solid #e2e8f0;text-align:center;">
         ${addressHtml}
         <p style="color:#94a3b8;font-size:11px;margin:6px 0 0;">
           ${gymName} &mdash; Gestión de gimnasio inteligente
@@ -92,18 +113,7 @@ function unsubscribeFooter(gymName: string, direccion?: string | null): string {
     : "";
   return `
     <tr>
-      <td style="background-color:#f8fafc;padding:24px 30px;border-top:1px solid #e2e8f0;text-align:center;">
-        <table cellpadding="0" cellspacing="0" style="margin:0 auto 12px;">
-          <tr>
-            <td style="padding-right:10px;vertical-align:middle;">
-              <img src="cid:qr-login" alt="QR" width="64" height="64" style="display:block;border-radius:6px;">
-            </td>
-            <td style="vertical-align:middle;text-align:left;">
-              <p style="color:#1e293b;font-size:12px;font-weight:bold;margin:0 0 2px;">Accede al sistema</p>
-              <a href="${APP_URL}" style="color:#38bdf8;font-size:11px;text-decoration:none;">${APP_URL.replace("https://", "")}</a>
-            </td>
-          </tr>
-        </table>
+      <td style="background-color:#f8fafc;padding:20px 30px;border-top:1px solid #e2e8f0;text-align:center;">
         ${addressHtml}
         <p style="color:#94a3b8;font-size:11px;margin:6px 0 4px;">
           ${gymName} &mdash; Notificación automática
@@ -136,12 +146,13 @@ async function sendEmail({
   await rateLimit();
 
   const attachments = await qrAttachment();
+  const finalHtml = injectQrAfterHeader(html);
 
   const result = await transporter.sendMail({
     from: `"${fromName || "GymApp"}" <${process.env.GMAIL_USER}>`,
     to,
     subject,
-    html,
+    html: finalHtml,
     replyTo: process.env.GMAIL_USER,
     attachments,
   });
@@ -166,12 +177,13 @@ async function sendNotificationEmail({
   await rateLimit();
 
   const attachments = await qrAttachment();
+  const finalHtml = injectQrAfterHeader(html);
 
   const result = await transporter.sendMail({
     from: `"${fromName || "GymApp"}" <${process.env.GMAIL_USER}>`,
     to,
     subject,
-    html,
+    html: finalHtml,
     replyTo: process.env.GMAIL_USER,
     attachments,
     headers: {

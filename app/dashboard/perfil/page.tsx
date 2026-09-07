@@ -146,7 +146,6 @@ function PerfilContent() {
 
     setSaving(true);
     try {
-      const canEditEmail = profile!.role === "super_admin" || currentUserRole === "super_admin";
       const res = await fetch("/api/profile", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -154,7 +153,7 @@ function PerfilContent() {
           user_id: targetUserId || undefined,
           updates: {
             full_name: (formData.full_name || profile!.full_name || "Sin nombre").trim().toUpperCase(),
-            email: canEditEmail ? formData.email : undefined,
+            email: formData.email,
             phone_number: phone_numberToSend,
             document_id: document_idToSend,
             arrival_time: formData.arrival_time || null,

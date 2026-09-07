@@ -2,10 +2,19 @@ import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { messages } from "@/lib/messages";
-import { randomBytes } from "crypto";
 import { applyRateLimit } from "@/lib/middleware/rate-limit";
-import { createOrUpdateProfile } from "@/lib/services/miembros/profile.service";
-import { sendWelcomeEmail } from "@/lib/services/email/email.service";
+import { createOrUpdateUser } from "@/lib/services/miembros/profile.service";
+
+const errorMap: Record<string, string> = {
+  email_invalid: messages.miembros.emailInvalido,
+  email_too_long: messages.miembros.emailDemasiadoLargo,
+  name_required: messages.miembros.nombreRequerido,
+  name_too_long: messages.miembros.nombreDemasiadoLargo,
+  password_too_short: messages.migracion.passwordMinError,
+  email_duplicate: messages.miembros.emailDuplicado,
+  auth_user_create_failed: messages.toast.miembroError,
+  profile_create_failed: messages.toast.miembroError,
+};
 
 export async function POST(request: Request) {
   try {
@@ -38,20 +47,8 @@ export async function POST(request: Request) {
     if (!nombre) {
       return NextResponse.json({ error: messages.miembros.nombreRequerido }, { status: 400 });
     }
-
     if (!email) {
       return NextResponse.json({ error: messages.miembros.correoRequerido }, { status: 400 });
-    }
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      return NextResponse.json({ error: messages.miembros.emailInvalido }, { status: 400 });
-    }
-    if (email.length > 254) {
-      return NextResponse.json({ error: messages.miembros.emailDemasiadoLargo }, { status: 400 });
-    }
-    if (nombre.length > 200) {
-      return NextResponse.json({ error: messages.miembros.nombreDemasiadoLargo }, { status: 400 });
     }
 
     const serviceSupabase = createServiceClient(
@@ -59,109 +56,25 @@ export async function POST(request: Request) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
-    // Proactive duplicate email check
-    const { data: existingProfile } = await serviceSupabase
-      .from("profiles")
-      .select("id")
-      .ilike("email", email)
-      .maybeSingle();
-
-    if (existingProfile) {
-      return NextResponse.json({ error: messages.miembros.emailDuplicado }, { status: 409 });
-    }
-
-    const userPassword = password || randomBytes(12).toString("base64url").slice(0, 16);
-
-    const { data: { users }, error: listError } = await serviceSupabase.auth.admin.listUsers();
-
-    if (listError) {
-      return NextResponse.json({ error: messages.toast.miembroError }, { status: 400 });
-    }
-
-    const existingAuthUser = users?.find(u => u.email === email);
-
-    if (existingAuthUser) {
-      const orphanedUserId = existingAuthUser.id;
-
-      try {
-        const profileData = await createOrUpdateProfile(serviceSupabase, {
-          id: orphanedUserId,
-          email,
-          full_name: nombre,
-        });
-
-        if (password) {
-          try {
-            await serviceSupabase.auth.admin.updateUserById(orphanedUserId, { password });
-          } catch {
-            // silent
-          }
-        }
-
-        return NextResponse.json({
-          miembro: profileData,
-          password,
-          loginEmail: email,
-          welcomeEmailSent: false,
-        });
-      } catch {
-        return NextResponse.json({ error: messages.toast.miembroError }, { status: 400 });
-      }
-    }
-
-    const { data: authUser, error: authError } = await serviceSupabase.auth.admin.createUser({
-      email: email,
-      email_confirm: true,
-      password: userPassword,
-      user_metadata: { full_name: nombre, display_email: email },
+    const result = await createOrUpdateUser(serviceSupabase, {
+      email,
+      full_name: nombre,
+      password: password || undefined,
+      sendWelcome: true,
+      isSuperAdmin: true,
     });
 
-    const userId = authUser?.user?.id;
-
-    if (authError) {
-      return NextResponse.json({ error: authError.message || messages.toast.miembroError }, { status: 400 });
-    }
-
-    if (!userId) {
-      return NextResponse.json({ error: messages.miembros.errorObtenerUsuario }, { status: 500 });
-    }
-
-    try {
-      const profileData = await createOrUpdateProfile(serviceSupabase, {
-        id: userId,
-        email,
-        full_name: nombre,
-      });
-
-      let welcomeEmailSent = false;
-      try {
-        let gymName = "Gym";
-        let gymLogo: string | null = null;
-        const { data: config } = await serviceSupabase
-          .from("gym_config")
-          .select("gym_name, logo_url")
-          .maybeSingle();
-        if (config?.gym_name) gymName = config.gym_name;
-        if (config?.logo_url) gymLogo = config.logo_url;
-
-        await sendWelcomeEmail(email, email, userPassword, gymName, gymLogo);
-        welcomeEmailSent = true;
-      } catch {
-        // silent
-      }
-
-      return NextResponse.json({
-        miembro: profileData,
-        password: userPassword,
-        loginEmail: email,
-        welcomeEmailSent,
-      });
-    } catch {
-      await serviceSupabase.auth.admin.deleteUser(userId);
-      return NextResponse.json({ error: messages.toast.miembroError }, { status: 400 });
-    }
-  } catch {
-    return NextResponse.json({ error: messages.toast.errorGenerico }, { status: 500 });
+    return NextResponse.json({
+      miembro: result.user,
+      password: result.password,
+      loginEmail: email,
+      welcomeEmailSent: result.welcomeEmailSent || false,
+    });
+  } catch (err) {
+    const code = err instanceof Error ? err.message : "";
+    const msg = errorMap[code] || messages.toast.errorGenerico;
+    const status = code === "email_duplicate" ? 409 : 400;
+    return NextResponse.json({ error: msg }, { status });
   }
 }
 

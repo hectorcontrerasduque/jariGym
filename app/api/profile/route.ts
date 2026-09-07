@@ -4,6 +4,21 @@ import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { messages } from "@/lib/messages";
 import { applyRateLimit } from "@/lib/middleware/rate-limit";
 import { getAdminLevel, isFullAdmin } from "@/lib/admin-level";
+import { createOrUpdateUser } from "@/lib/services/miembros/profile.service";
+
+const errorMap: Record<string, string> = {
+  email_invalid: messages.miembros.emailInvalido,
+  email_too_long: messages.miembros.emailDemasiadoLargo,
+  name_required: messages.miembros.nombreRequerido,
+  name_too_long: messages.miembros.nombreDemasiadoLargo,
+  email_duplicate: messages.miembros.emailDuplicado,
+  email_update_not_allowed: messages.toast.noAutorizado,
+  email_update_failed: messages.toast.perfilError,
+  current_password_required: messages.toast.contrasenaActualRequerida,
+  current_password_wrong: messages.toast.contrasenaActualIncorrecta,
+  password_update_failed: messages.toast.errorCambiarContrasena,
+  profile_update_failed: messages.toast.perfilError,
+};
 
 export async function PUT(request: Request) {
   const rateLimitResponse = await applyRateLimit(request, {
@@ -12,7 +27,7 @@ export async function PUT(request: Request) {
     prefix: "api",
   });
   if (rateLimitResponse) return rateLimitResponse;
-  
+
   try {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
@@ -53,94 +68,27 @@ export async function PUT(request: Request) {
       fullAdmin = isFullAdmin(level);
     }
 
-    const { data: currentData } = await serviceSupabase
-      .from("profiles")
-      .select("full_name, email, phone_number, document_id, arrival_time, departure_time, inscription_admin_note")
-      .eq("id", targetUserId)
-      .single();
+    const result = await createOrUpdateUser(serviceSupabase, {
+      id: targetUserId,
+      email: updates.email || undefined,
+      full_name: updates.full_name || "",
+      phone_number: updates.phone_number,
+      document_id: updates.document_id,
+      arrival_time: updates.arrival_time,
+      departure_time: updates.departure_time,
+      role: fullAdmin ? updates.role : undefined,
+      inscription_admin_note: fullAdmin ? updates.inscription_admin_note : undefined,
+      newPassword: password || undefined,
+      currentPassword,
+      isSuperAdmin: isAdmin,
+      sendWelcome: isAdmin && updates.email,
+    });
 
-    const profileUpdates: Record<string, unknown> = {
-      full_name: updates.full_name ?? currentData?.full_name,
-      email: updates.email ?? currentData?.email,
-      phone_number: updates.phone_number ?? currentData?.phone_number,
-      document_id: updates.document_id ?? currentData?.document_id,
-      arrival_time: updates.arrival_time ?? currentData?.arrival_time,
-      departure_time: updates.departure_time ?? currentData?.departure_time,
-    };
-    if (fullAdmin) {
-      profileUpdates.role = updates.role;
-      profileUpdates.inscription_admin_note = updates.inscription_admin_note ?? currentData?.inscription_admin_note;
-    }
-
-    if (profileUpdates.email && currentData?.email && profileUpdates.email !== currentData.email) {
-      const { data: existingProfile } = await serviceSupabase
-        .from("profiles")
-        .select("id")
-        .ilike("email", profileUpdates.email as string)
-        .neq("id", targetUserId)
-        .maybeSingle();
-
-      if (existingProfile) {
-        return NextResponse.json({ error: messages.miembros.emailDuplicado }, { status: 409 });
-      }
-    }
-
-    const { data, error: profileError } = await serviceSupabase
-      .from("profiles")
-      .update(profileUpdates)
-      .eq("id", targetUserId)
-      .select()
-      .single();
-
-    if (profileError) {
-      return NextResponse.json({ error: `${messages.toast.perfilError}: ${profileError.message}` }, { status: 400 });
-    }
-
-    // Sync email to auth.users if it changed
-    if (data.email && currentData?.email && data.email !== currentData.email) {
-      await serviceSupabase.auth.admin.updateUserById(
-        targetUserId,
-        { email: data.email, email_confirm: true }
-      );
-    }
-
-    if (password && password.trim()) {
-      if (targetUserId === user.id && !isAdmin) {
-        if (!currentPassword) {
-          return NextResponse.json({ error: messages.toast.contrasenaActualRequerida }, { status: 400 });
-        }
-        const { error: verifyError } = await supabase.auth.signInWithPassword({
-          email: data.email,
-          password: currentPassword,
-        });
-        if (verifyError) {
-          return NextResponse.json({ error: messages.toast.contrasenaActualIncorrecta }, { status: 400 });
-        }
-      }
-
-      const { data: authUser, error: fetchError } = await serviceSupabase.auth.admin.getUserById(targetUserId);
-      if (fetchError || !authUser?.user) {
-        return NextResponse.json({ 
-          error: messages.toast.cuentaAuthNoExiste,
-          profile: data 
-        }, { status: 400 });
-      }
-
-      const { error: pwError } = await serviceSupabase.auth.admin.updateUserById(
-        targetUserId,
-        { password: password }
-      );
-      if (pwError) {
-        return NextResponse.json({ 
-          error: messages.toast.errorCambiarContrasena,
-          profile: data 
-        }, { status: 500 });
-      }
-    }
-
-    return NextResponse.json({ profile: data });
+    return NextResponse.json({ profile: result.user });
   } catch (err) {
-    const msg = err instanceof Error ? err.message : messages.toast.errorGenerico;
-    return NextResponse.json({ error: msg }, { status: 500 });
+    const code = err instanceof Error ? err.message : "";
+    const msg = errorMap[code] || (err instanceof Error ? err.message : messages.toast.errorGenerico);
+    const status = code === "email_duplicate" ? 409 : 500;
+    return NextResponse.json({ error: msg }, { status });
   }
 }

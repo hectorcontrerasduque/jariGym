@@ -121,14 +121,17 @@ function PerfilContent() {
   }, [targetUserId, router]);
 
   const handleSave = async () => {
-    if (!formData.email.trim()) {
-      showToast(messages.miembros.correoRequerido, "error");
-      return;
-    }
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(formData.email)) {
-      showToast(messages.toast.correoFormatoInvalido, "error");
-      return;
+    const canEditEmail = profile!.role === "super_admin" || currentUserRole === "super_admin";
+    if (canEditEmail) {
+      if (!formData.email.trim()) {
+        showToast(messages.miembros.correoRequerido, "error");
+        return;
+      }
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(formData.email)) {
+        showToast(messages.toast.correoFormatoInvalido, "error");
+        return;
+      }
     }
 
     let document_idToSend = formData.document_id || null;
@@ -143,6 +146,7 @@ function PerfilContent() {
 
     setSaving(true);
     try {
+      const canEditEmail = profile!.role === "super_admin" || currentUserRole === "super_admin";
       const res = await fetch("/api/profile", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -150,7 +154,7 @@ function PerfilContent() {
           user_id: targetUserId || undefined,
           updates: {
             full_name: (formData.full_name || profile!.full_name || "Sin nombre").trim().toUpperCase(),
-            email: formData.email,
+            email: canEditEmail ? formData.email : undefined,
             phone_number: phone_numberToSend,
             document_id: document_idToSend,
             arrival_time: formData.arrival_time || null,
@@ -183,6 +187,7 @@ function PerfilContent() {
   if (!profile) return null;
 
   const isAdmin = profile.role === "super_admin";
+  const canEditEmail = profile.role === "super_admin" || currentUserRole === "super_admin";
 
   return (
     <>
@@ -253,8 +258,15 @@ function PerfilContent() {
               value={formData.email}
               onChange={(e) => setFormData({ ...formData, email: e.target.value })}
               placeholder="email@ejemplo.com"
+              disabled={!canEditEmail}
+              className={canEditEmail ? "" : "bg-gym-surface/50 cursor-not-allowed"}
               required
             />
+            {!canEditEmail && (
+              <p className="text-xs text-gym-muted mt-1 italic">
+                {messages.toast.emailSoloLectura}
+              </p>
+            )}
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>

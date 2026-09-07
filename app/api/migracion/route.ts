@@ -5,7 +5,7 @@ import { sendWelcomeEmail } from "@/lib/services/email/email.service";
 
 import { sanitizeOrFilter } from "@/lib/utils/sanitize";
 import { applyRateLimit } from "@/lib/middleware/rate-limit";
-import { createOrUpdateProfile } from "@/lib/services/miembros/profile.service";
+import { createOrUpdateUser } from "@/lib/services/miembros/profile.service";
 
 export async function POST(request: Request) {
   const rateLimitResponse = await applyRateLimit(request, {
@@ -124,12 +124,6 @@ export async function POST(request: Request) {
     let userId: string;
     let isNewUser = false;
 
-    const { data: existingProfile } = await supabase
-      .from("profiles")
-      .select("id")
-      .eq("email", email)
-      .maybeSingle();
-
     // Calculate fecha_inicio from first pagado record
     const sortedForInsc = [...migrablesRecords].sort((a, b) => {
       if (a.anio_pagar !== b.anio_pagar) return a.anio_pagar - b.anio_pagar;
@@ -140,74 +134,20 @@ export async function POST(request: Request) {
       ? `${firstPagadoInsc.anio_pagar}-${String(firstPagadoInsc.mes_pagar).padStart(2, "0")}-01`
       : `${new Date().getFullYear()}-01-01`;
 
-    if (existingProfile) {
-      userId = existingProfile.id;
-      const { error: profileError } = await supabase
-        .from("profiles")
-        .update({
-          full_name: profileNombre,
-          phone_number: whatsappFormatted,
-          email,
-          registered: true,
-          activo: true,
-          start_date: fechaInicioCalc,
-        })
-        .eq("id", userId);
-      if (profileError) {
-        return NextResponse.json({ error: messages.migracion.errorServidor }, { status: 500 });
-      }
-    } else {
-      // Check if auth user already exists (profile may have been deleted)
-      const { data: authUsers } = await supabase.auth.admin.listUsers();
-      const existingAuth = authUsers?.users?.find(
-        (u) => u.email?.toLowerCase() === email.toLowerCase()
-      );
-
-      if (existingAuth) {
-        userId = existingAuth.id;
-        try {
-          await createOrUpdateProfile(supabase, {
-            id: userId,
-            email,
-            full_name: profileNombre,
-            phone_number: whatsappFormatted,
-            start_date: fechaInicioCalc,
-          });
-        } catch {
-          return NextResponse.json({ error: messages.migracion.errorServidor }, { status: 500 });
-        }
-        isNewUser = true;
-      } else {
-        // Create new auth user
-        const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
-          email,
-          password,
-          email_confirm: true,
-          user_metadata: { full_name: profileNombre },
-        });
-
-        if (authError) {
-          return NextResponse.json({ error: messages.migracion.crearUsuarioError }, { status: 500 });
-        }
-
-        if (!authUser?.user?.id) {
-          return NextResponse.json({ error: messages.migracion.usuarioNoCreado }, { status: 500 });
-        }
-        userId = authUser.user.id;
-
-        try {
-          await createOrUpdateProfile(supabase, {
-            id: userId,
-            email,
-            full_name: profileNombre,
-            phone_number: whatsappFormatted,
-            start_date: fechaInicioCalc,
-          });
-        } catch {
-          return NextResponse.json({ error: messages.migracion.errorServidor }, { status: 500 });
-        }
-        isNewUser = true;
-      }
+    try {
+      const result = await createOrUpdateUser(supabase, {
+        email,
+        full_name: profileNombre,
+        password: password || undefined,
+        phone_number: whatsappFormatted,
+        start_date: fechaInicioCalc,
+        isSuperAdmin: true,
+        sendWelcome: false,
+      });
+      userId = result.userId;
+      isNewUser = result.isNewAuthUser;
+    } catch {
+      return NextResponse.json({ error: messages.migracion.errorServidor }, { status: 500 });
     }
 
     // Sort records by year and month

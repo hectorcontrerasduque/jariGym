@@ -310,6 +310,7 @@ export const messages = {
     suspensionRechazadaError: "Error al rechazar suspensión",
     contrasenaActualRequerida: "Contraseña actual requerida",
     contrasenaActualIncorrecta: "Contraseña actual incorrecta",
+    emailSoloLectura: "Si desea actualizar comuníquese con el administrador.",
     errorAuthCallback: "Error en callback de autenticación",
     errorIntercambioCodigo: "Error al intercambiar código",
     perfilSaving: "Guardando perfil...",

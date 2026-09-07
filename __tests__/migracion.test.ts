@@ -35,7 +35,7 @@ function chainReturn(data: unknown, error: unknown = null) {
   const chain: Record<string, ReturnType<typeof vi.fn>> = {};
   const methods = [
     "select", "insert", "update", "upsert", "delete",
-    "eq", "ilike", "or", "in", "order", "limit",
+    "eq", "neq", "ilike", "or", "in", "order", "limit",
     "maybeSingle", "single",
   ];
   for (const m of methods) {

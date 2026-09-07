@@ -72,6 +72,7 @@ export async function POST(request: Request) {
     });
   } catch (err) {
     const code = err instanceof Error ? err.message : "";
+    // eslint-disable-next-line security/detect-object-injection
     const msg = errorMap[code] || messages.toast.errorGenerico;
     const status = code === "email_duplicate" ? 409 : 400;
     return NextResponse.json({ error: msg }, { status });

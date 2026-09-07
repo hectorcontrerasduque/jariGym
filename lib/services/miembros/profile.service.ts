@@ -94,6 +94,7 @@ export async function createOrUpdateUser(
     currentPassword?: string;
     isSuperAdmin?: boolean;
     sendWelcome?: boolean;
+    isOAuth?: boolean;
     gymName?: string;
     gymLogo?: string | null;
   }
@@ -231,16 +232,18 @@ export async function createOrUpdateUser(
       try {
         let gymName = params.gymName || "Gym";
         let gymLogo = params.gymLogo || null;
+        let address: string | null = null;
         if (!params.gymName || !params.gymLogo) {
           const { data: config } = await supabase
             .from("gym_config")
-            .select("gym_name, logo_url")
+            .select("gym_name, logo_url, address")
             .maybeSingle();
           if (config?.gym_name) gymName = config.gym_name;
           if (config?.logo_url) gymLogo = config.logo_url;
+          if (config?.address) address = config.address;
         }
         const pw = params.newPassword || params.password || "";
-        await sendWelcomeEmail(emailLower, emailLower, pw, gymName, gymLogo);
+        await sendWelcomeEmail(emailLower, emailLower, pw, gymName, gymLogo, undefined, params.isOAuth, address || undefined);
         welcomeEmailSent = true;
       } catch { /* silent */ }
     }
@@ -347,15 +350,17 @@ export async function createOrUpdateUser(
     try {
       let gymName = params.gymName || "Gym";
       let gymLogo = params.gymLogo || null;
+      let address: string | null = null;
       if (!params.gymName || !params.gymLogo) {
         const { data: config } = await supabase
           .from("gym_config")
-          .select("gym_name, logo_url")
+          .select("gym_name, logo_url, address")
           .maybeSingle();
         if (config?.gym_name) gymName = config.gym_name;
         if (config?.logo_url) gymLogo = config.logo_url;
+        if (config?.address) address = config.address;
       }
-      await sendWelcomeEmail(emailLower, emailLower, generatedPassword, gymName, gymLogo);
+      await sendWelcomeEmail(emailLower, emailLower, generatedPassword, gymName, gymLogo, undefined, params.isOAuth, address || undefined);
       welcomeEmailSent = true;
     } catch { /* silent */ }
   }

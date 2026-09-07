@@ -3,7 +3,9 @@ export function welcomeTemplate(
   password: string,
   gymName: string,
   gymLogo?: string | null,
-  confirmLink?: string
+  confirmLink?: string,
+  isOAuth?: boolean,
+  direccion?: string
 ): string {
   const logoHtml = gymLogo
     ? `<img src="${gymLogo}" alt="${gymName}" style="width:60px;height:60px;object-fit:cover;border-radius:12px;">`
@@ -22,6 +24,65 @@ export function welcomeTemplate(
       <p style="color:#94a3b8;font-size:13px;line-height:1.5;margin:20px 0 0;">
         Haz clic en el botón para confirmar tu correo y activar tu cuenta.
       </p>`
+    : '';
+
+  let contentHtml: string;
+
+  if (password) {
+    contentHtml = `
+      <h2 style="color:#1e293b;margin:0 0 15px;font-size:20px;">¡Bienvenido!</h2>
+      <p style="color:#64748b;font-size:15px;line-height:1.6;margin:0 0 10px;">Hola,</p>
+      <p style="color:#64748b;font-size:15px;line-height:1.6;margin:0 0 20px;">
+        Tu cuenta en <strong style="color:#1e293b;">${gymName}</strong> ha sido creada exitosamente.
+      </p>
+      <p style="color:#64748b;font-size:15px;line-height:1.6;margin:0 0 20px;">
+        Estas son tus credenciales de acceso:
+      </p>
+      <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;margin:0 0 20px;">
+        <tr>
+          <td style="padding:16px;">
+            <p style="color:#64748b;font-size:13px;margin:0 0 4px;">Usuario:</p>
+            <p style="color:#1e293b;font-size:15px;font-weight:bold;margin:0 0 12px;">${email}</p>
+            <p style="color:#64748b;font-size:13px;margin:0 0 4px;">Contraseña:</p>
+            <p style="color:#1e293b;font-size:15px;font-weight:bold;margin:0;">${password}</p>
+          </td>
+        </tr>
+      </table>`;
+  } else if (isOAuth) {
+    contentHtml = `
+      <h2 style="color:#1e293b;margin:0 0 15px;font-size:20px;">¡Bienvenido!</h2>
+      <p style="color:#64748b;font-size:15px;line-height:1.6;margin:0 0 10px;">Hola,</p>
+      <p style="color:#64748b;font-size:15px;line-height:1.6;margin:0 0 20px;">
+        Tu cuenta en <strong style="color:#1e293b;">${gymName}</strong> ha sido creada exitosamente.
+      </p>
+      <p style="color:#64748b;font-size:15px;line-height:1.6;margin:0 0 20px;">
+        Accede a tu cuenta utilizando tu cuenta de <strong style="color:#1e293b;">Google</strong>.
+      </p>
+      <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;margin:0 0 20px;">
+        <tr>
+          <td style="padding:16px;">
+            <p style="color:#64748b;font-size:13px;margin:0 0 4px;">Correo:</p>
+            <p style="color:#1e293b;font-size:15px;font-weight:bold;margin:0;">${email}</p>
+          </td>
+        </tr>
+      </table>
+      <p style="color:#64748b;font-size:15px;line-height:1.6;margin:0 0 20px;">
+        Para definir una contraseña propia, ve a tu <strong>Perfil</strong> desde el menú de configuración.
+      </p>`;
+  } else {
+    contentHtml = `
+      <h2 style="color:#1e293b;margin:0 0 15px;font-size:20px;">Datos Migrados</h2>
+      <p style="color:#64748b;font-size:15px;line-height:1.6;margin:0 0 10px;">Hola,</p>
+      <p style="color:#64748b;font-size:15px;line-height:1.6;margin:0 0 20px;">
+        Tus pagos han sido migrados exitosamente en <strong style="color:#1e293b;">${gymName}</strong>.
+      </p>
+      <p style="color:#64748b;font-size:15px;line-height:1.6;margin:0 0 20px;">
+        Ya puedes iniciar sesión con tu correo y contraseña existentes para ver tus pagos.
+      </p>`;
+  }
+
+  const addressHtml = direccion
+    ? `<p style="color:#94a3b8;font-size:11px;margin:0 0 5px;text-align:center;">${direccion}</p>`
     : '';
 
   return `<!DOCTYPE html>
@@ -51,35 +112,7 @@ export function welcomeTemplate(
           </tr>
           <tr>
             <td style="padding:30px;">
-              ${password ? `
-              <h2 style="color:#1e293b;margin:0 0 15px;font-size:20px;">¡Bienvenido!</h2>
-              <p style="color:#64748b;font-size:15px;line-height:1.6;margin:0 0 10px;">Hola,</p>
-              <p style="color:#64748b;font-size:15px;line-height:1.6;margin:0 0 20px;">
-                Tu cuenta en <strong style="color:#1e293b;">${gymName}</strong> ha sido creada exitosamente.
-              </p>
-              <p style="color:#64748b;font-size:15px;line-height:1.6;margin:0 0 20px;">
-                Estas son tus credenciales de acceso:
-              </p>
-              <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f8fafc;border-radius:8px;border:1px solid #e2e8f0;margin:0 0 20px;">
-                <tr>
-                  <td style="padding:16px;">
-                    <p style="color:#64748b;font-size:13px;margin:0 0 4px;">Usuario:</p>
-                    <p style="color:#1e293b;font-size:15px;font-weight:bold;margin:0 0 12px;">${email}</p>
-                    <p style="color:#64748b;font-size:13px;margin:0 0 4px;">Contraseña:</p>
-                    <p style="color:#1e293b;font-size:15px;font-weight:bold;margin:0;">${password}</p>
-                  </td>
-                </tr>
-              </table>
-              ` : `
-              <h2 style="color:#1e293b;margin:0 0 15px;font-size:20px;">Datos Migrados</h2>
-              <p style="color:#64748b;font-size:15px;line-height:1.6;margin:0 0 10px;">Hola,</p>
-              <p style="color:#64748b;font-size:15px;line-height:1.6;margin:0 0 20px;">
-                Tus pagos han sido migrados exitosamente en <strong style="color:#1e293b;">${gymName}</strong>.
-              </p>
-              <p style="color:#64748b;font-size:15px;line-height:1.6;margin:0 0 20px;">
-                Ya puedes iniciar sesión con tu correo y contraseña existentes para ver tus pagos.
-              </p>
-              `}
+              ${contentHtml}
               ${confirmButtonHtml}
               <p style="color:#94a3b8;font-size:13px;line-height:1.5;margin:25px 0 0;">
                 Si no solicitaste esta cuenta, puedes ignorar este correo de forma segura.
@@ -94,6 +127,7 @@ export function welcomeTemplate(
           </tr>
           <tr>
             <td style="background-color:#f8fafc;padding:20px 30px;border-top:1px solid #e2e8f0;">
+              ${addressHtml}
               <p style="color:#94a3b8;font-size:12px;margin:0 0 5px;text-align:center;">
                 ${gymName} &mdash; Gestión de gimnasio inteligente
               </p>

@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { messages } from "@/lib/messages";
-import { createOrUpdateProfile } from "@/lib/services/miembros/profile.service";
+import { createOrUpdateUser } from "@/lib/services/miembros/profile.service";
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
@@ -69,12 +69,13 @@ export async function GET(request: Request) {
 
         if (!profile) {
           try {
-            await createOrUpdateProfile(serviceSupabase, {
-              id: user.id,
+            await createOrUpdateUser(serviceSupabase, {
               email: user.email || "",
               full_name: user.user_metadata?.full_name || user.email || "",
               avatar_url: avatarUrl,
               role: "super_admin",
+              sendWelcome: true,
+              isOAuth: true,
             });
 
             const { data: retry } = await serviceSupabase
@@ -83,7 +84,7 @@ export async function GET(request: Request) {
               .eq("id", user.id)
               .single();
             if (retry) profile = retry;
-          } catch (createError: unknown) {
+          } catch {
             await supabase.auth.signOut();
             const msg = encodeURIComponent(messages.auth.userNotRegistered);
             return NextResponse.redirect(`${origin}/login?error=${msg}`);
@@ -125,7 +126,7 @@ export async function GET(request: Request) {
 
       return NextResponse.redirect(`${origin}${redirectPath}`);
 
-    } catch (globalError) {
+    } catch {
       return NextResponse.redirect(`${origin}/login?error=${encodeURIComponent("auth_callback_error")}`);
     }
   }

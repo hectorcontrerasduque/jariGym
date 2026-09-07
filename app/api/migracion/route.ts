@@ -146,8 +146,21 @@ export async function POST(request: Request) {
       });
       userId = result.userId;
       isNewUser = result.isNewAuthUser;
-    } catch {
-      return NextResponse.json({ error: messages.migracion.errorServidor }, { status: 500 });
+    } catch (err: unknown) {
+      if (err instanceof Error && err.message === "email_duplicate") {
+        const { data: existingProfile } = await supabase
+          .from("profiles")
+          .select("id")
+          .ilike("email", email)
+          .maybeSingle();
+        if (!existingProfile) {
+          return NextResponse.json({ error: messages.migracion.errorServidor }, { status: 500 });
+        }
+        userId = existingProfile.id;
+        isNewUser = false;
+      } else {
+        return NextResponse.json({ error: messages.migracion.errorServidor }, { status: 500 });
+      }
     }
 
     // Sort records by year and month

@@ -87,6 +87,7 @@ export async function PUT(request: Request) {
     return NextResponse.json({ profile: result.user });
   } catch (err) {
     const code = err instanceof Error ? err.message : "";
+    // eslint-disable-next-line security/detect-object-injection
     const msg = errorMap[code] || (err instanceof Error ? err.message : messages.toast.errorGenerico);
     const status = code === "email_duplicate" ? 409 : 500;
     return NextResponse.json({ error: msg }, { status });

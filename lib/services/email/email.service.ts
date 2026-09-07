@@ -145,12 +145,14 @@ export async function sendWelcomeEmail(
   password: string,
   gymName: string,
   gymLogo?: string | null,
-  confirmLink?: string
+  confirmLink?: string,
+  isOAuth?: boolean,
+  direccion?: string
 ): Promise<void> {
   await sendEmail({
     to,
     subject: `${gymName} - Bienvenido`,
-    html: welcomeTemplate(email, password, gymName, gymLogo, confirmLink),
+    html: welcomeTemplate(email, password, gymName, gymLogo, confirmLink, isOAuth, direccion),
     fromName: gymName,
   });
 }

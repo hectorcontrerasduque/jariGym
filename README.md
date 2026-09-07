@@ -60,13 +60,29 @@ En Vercel Dashboard → Settings → Environment Variables, agrega:
 - `GMAIL_USER` = tu Gmail
 - `GMAIL_APP_PASSWORD` = tu App Password
 
-### 6. Ejecutar
+### 6. Google OAuth (Login con Google)
+
+El login con Google utiliza **Google Cloud Console** con un proyecto llamado **jariGym**.
+
+1. Ve a [console.cloud.google.com](https://console.cloud.google.com)
+2. Selecciona el proyecto **jariGym**
+3. Ve a **APIs & Services → Credentials**
+4. En **OAuth 2.0 Client IDs**, encuentra el client ID que usa Supabase
+5. En **Authorized redirect URIs**, asegúrate de tener:
+   - `https://uymlacysgbpmfmkidbzy.supabase.co/auth/v1/callback` (producción)
+   - `https://szcxzabtrpdzwmaevsbh.supabase.co/auth/v1/callback` (desarrollo)
+6. En **Supabase Dashboard → Authentication → Providers → Google**, copia el Client ID y Client Secret de Google Cloud
+7. En **Supabase Dashboard → Authentication → URL Configuration**, agrega las Redirect URLs de tu app:
+   - `https://jarigym.vercel.app/auth/callback` (producción)
+   - `https://jarigym-dev.vercel.app/auth/callback` (desarrollo)
+
+### 7. Ejecutar
 
 ```bash
 npm run dev
 ```
 
-### 7. Configurar Cron de Notificaciones (cron-job.org)
+### 8. Configurar Cron de Notificaciones (cron-job.org)
 
 Las notificaciones automáticas se disparan de dos formas:
 1. **Cron externo**: llama al endpoint `/api/notificaciones` diariamente a medianoche
@@ -195,3 +211,22 @@ Todos los super_admin comparten:
 2. Vercel despliega automáticamente
 3. Asegúrate de tener las env vars en Vercel
 4. Ejecuta las migraciones en Supabase
+
+## Migración de Base de Datos
+
+Para sincronizar la base de datos de desarrollo con producción:
+
+```bash
+# Migración completa (estructura + datos + auth + GRANTS + storage)
+.\db\migrate-db.ps1
+```
+
+El script ejecuta:
+1. `pg_dump` del origen (schema public + auth)
+2. `DROP SCHEMA public CASCADE` en destino
+3. `pg_restore` de estructura y datos
+4. Importa `auth.users` via CSV (método confiable)
+5. Aplica GRANT permissions para PostgREST
+6. Recrea storage buckets y policies
+7. Recrea foreign key constraints
+8. Verifica integridad (tablas, FK, auth.users, GRANTS, storage)

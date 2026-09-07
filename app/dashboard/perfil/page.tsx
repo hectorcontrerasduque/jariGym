@@ -19,6 +19,7 @@ import {
   CheckCircle,
 } from "lucide-react";
 import type { Profile } from "@/lib/types";
+import { useProfileContext } from "@/components/profile-context";
 
 export default function PerfilPage() {
   return (
@@ -32,9 +33,10 @@ function PerfilContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const targetUserId = searchParams.get("user_id");
+  const { profile: contextProfile, setProfile: setContextProfile } = useProfileContext();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [profile, setProfile] = useState<Profile | null>(null);
+  const [targetProfile, setTargetProfile] = useState<Profile | null>(null);
   const [currentUserRole, setCurrentUserRole] = useState<string>("");
   const [formData, setFormData] = useState({
     full_name: "",
@@ -49,6 +51,8 @@ function PerfilContent() {
     currentPassword: "",
   });
 
+  const profile = targetUserId && targetProfile ? targetProfile : contextProfile;
+
   useEffect(() => {
     let cancelled = false;
     const loadProfile = async () => {
@@ -61,53 +65,44 @@ function PerfilContent() {
         }
 
         const profileUserId = user.id;
-        const { data } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("id", profileUserId)
-          .single();
+        const isSuperAdmin = contextProfile?.role === "super_admin";
+        setCurrentUserRole(contextProfile?.role || "");
+        const targetId = isSuperAdmin && targetUserId ? targetUserId : profileUserId;
 
-        if (!cancelled && data) {
-          setCurrentUserRole(data.role || "");
-          const isSuperAdmin = data.role === "super_admin";
-          const targetId = isSuperAdmin && targetUserId ? targetUserId : profileUserId;
-
-          if (targetId !== profileUserId) {
-            const { data: targetData } = await supabase
-              .from("profiles")
-              .select("*")
-              .eq("id", targetId)
-              .single();
-            if (!cancelled && targetData) {
-              setProfile(targetData);
-              setFormData({
-                full_name: targetData.full_name || "",
-                email: targetData.email || "",
-                phone_number: targetData.phone_number || "",
-                document_id: targetData.document_id || "",
-                arrival_time: targetData.arrival_time || "--:--",
-                departure_time: targetData.departure_time || "--:--",
-                role: targetData.role,
-                inscription_admin_note: targetData.inscription_admin_note || "",
-                password: "",
-                currentPassword: "",
-              });
-            }
-          } else {
-            setProfile(data);
+        if (targetId !== profileUserId) {
+          const { data: targetData } = await supabase
+            .from("profiles")
+            .select("*")
+            .eq("id", targetId)
+            .single();
+          if (!cancelled && targetData) {
+            setTargetProfile(targetData);
             setFormData({
-              full_name: data.full_name || "",
-              email: data.email || "",
-              phone_number: data.phone_number || "",
-              document_id: data.document_id || "",
-              arrival_time: data.arrival_time || "--:--",
-              departure_time: data.departure_time || "--:--",
-              role: data.role,
-              inscription_admin_note: data.inscription_admin_note || "",
+              full_name: targetData.full_name || "",
+              email: targetData.email || "",
+              phone_number: targetData.phone_number || "",
+              document_id: targetData.document_id || "",
+              arrival_time: targetData.arrival_time || "--:--",
+              departure_time: targetData.departure_time || "--:--",
+              role: targetData.role,
+              inscription_admin_note: targetData.inscription_admin_note || "",
               password: "",
               currentPassword: "",
             });
           }
+        } else if (contextProfile) {
+          setFormData({
+            full_name: contextProfile.full_name || "",
+            email: contextProfile.email || "",
+            phone_number: contextProfile.phone_number || "",
+            document_id: contextProfile.document_id || "",
+            arrival_time: contextProfile.arrival_time || "--:--",
+            departure_time: contextProfile.departure_time || "--:--",
+            role: contextProfile.role,
+            inscription_admin_note: contextProfile.inscription_admin_note || "",
+            password: "",
+            currentPassword: "",
+          });
         }
       } catch {
         if (!cancelled) showToast(messages.toast.errorCargaDatos, "error");
@@ -117,8 +112,8 @@ function PerfilContent() {
     };
     loadProfile();
     return () => { cancelled = true; };
-   
-  }, [targetUserId, router]);
+
+  }, [targetUserId, router, contextProfile]);
 
   const handleSave = async () => {
     const canEditEmail = profile!.role === "super_admin" || currentUserRole === "super_admin";
@@ -166,7 +161,11 @@ function PerfilContent() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Error al guardar");
-      setProfile(data.profile);
+      if (!targetUserId) {
+        setContextProfile(data.profile);
+      } else {
+        setTargetProfile(data.profile);
+      }
       setFormData((prev) => ({ ...prev, password: "", currentPassword: "" }));
       showToast(messages.toast.perfilGuardado, "success");
     } catch (err) {

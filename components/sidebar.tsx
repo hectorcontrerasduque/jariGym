@@ -19,8 +19,8 @@ import {
   User,
   Home,
 } from "lucide-react";
-import type { Profile } from "@/lib/types";
 import { getAdminLevel, isFullAdmin } from "@/lib/admin-level";
+import { useProfileContext } from "@/components/profile-context";
 
 const adminNavItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -72,34 +72,21 @@ function SidebarNavItem({ item, pathname, variant }: { item: { href: string; lab
 export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const [profile, setProfile] = useState<Profile | null>(null);
+  const { profile } = useProfileContext();
   const [gymName, setGymName] = useState("GymApp");
   const [gymLogo, setGymLogo] = useState("");
   const [hasConfig, setHasConfig] = useState<boolean | null>(null);
   const [ownerEmail, setOwnerEmail] = useState<string | null>(null);
 
   useEffect(() => {
-    const supabase = createClient();
-    const getProfile = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (user) {
-        const { data } = await supabase
-          .from("profiles")
-          .select("*")
-          .eq("id", user.id)
-          .single();
-        setProfile(data);
+    if (!profile || profile.role === "super_admin") return;
+    const allowed = ["/dashboard/mis-pagos", "/dashboard/reportar-pago", "/dashboard/perfil"];
+    if (!allowed.some((p) => pathname.startsWith(p))) {
+      router.replace("/dashboard/mis-pagos?tab=pagos");
+    }
+  }, [profile, pathname, router]);
 
-        if (data && data.role !== "super_admin") {
-          const allowed = ["/dashboard/mis-pagos", "/dashboard/reportar-pago", "/dashboard/perfil"];
-          if (!allowed.some((p) => pathname.startsWith(p))) {
-            router.replace("/dashboard/mis-pagos?tab=pagos");
-          }
-        }
-      }
-    };
+  useEffect(() => {
     const getGymConfig = async () => {
       try {
         const res = await fetch("/api/config/public");
@@ -116,21 +103,19 @@ export function Sidebar() {
         setHasConfig(false);
       }
     };
-    getProfile();
     getGymConfig();
 
-    // Background: trigger notifications check for admins on login
     const triggerNotifications = async () => {
       try {
         const supabase = createClient();
         const { data: { session } } = await supabase.auth.getSession();
         if (!session?.access_token) return;
-        const { data: profile } = await supabase
+        const { data: p } = await supabase
           .from("profiles")
           .select("role")
           .eq("id", session.user.id)
           .single();
-        if (profile?.role !== "super_admin") return;
+        if (p?.role !== "super_admin") return;
         await fetch("/api/notificaciones", {
           method: "POST",
           headers: {
@@ -145,7 +130,7 @@ export function Sidebar() {
     const handleConfigUpdated = () => getGymConfig();
     window.addEventListener("config:updated", handleConfigUpdated);
     return () => window.removeEventListener("config:updated", handleConfigUpdated);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleSignOut = async () => {
     await createClient().auth.signOut();

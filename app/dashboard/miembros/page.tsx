@@ -222,6 +222,7 @@ export default function MiembrosPage() {
       return;
     }
     setSaving(true);
+    const startTime = Date.now();
     try {
       const res = await fetch("/api/miembros", {
         method: "POST",
@@ -247,6 +248,9 @@ export default function MiembrosPage() {
     } catch {
       showToast(messages.toast.miembroError, "error");
     } finally {
+      const elapsed = Date.now() - startTime;
+      const remaining = Math.max(0, 500 - elapsed);
+      if (remaining > 0) await new Promise((r) => setTimeout(r, remaining));
       setSaving(false);
     }
   };

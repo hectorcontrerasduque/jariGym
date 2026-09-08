@@ -120,7 +120,7 @@ export async function createOrUpdateUser(
   }
 
   const emailLower = params.email.toLowerCase().trim();
-  const fullName = params.full_name.trim();
+  const fullName = params.full_name.trim().toUpperCase();
 
   // ── BUSCAR PROFILE EXISTENTE ──
   let existingProfile: Record<string, unknown> | null = null;

@@ -290,7 +290,7 @@ function LoginForm() {
         const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL;
         const isAdmin = (adminEmail && result.user?.email === adminEmail) ||
           (result.user?.email === gymOwnerEmail);
-        router.push(isAdmin ? "/dashboard" : "/dashboard/mis-pagos");
+        router.push(isAdmin ? "/dashboard" : "/dashboard/mis-pagos?tab=home");
       }
     } catch (err) {
       showToast(mapAuthError(err instanceof Error ? err.message : String(err)), "error");

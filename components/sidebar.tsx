@@ -82,7 +82,7 @@ export function Sidebar() {
     if (!profile || profile.role === "super_admin") return;
     const allowed = ["/dashboard/mis-pagos", "/dashboard/reportar-pago", "/dashboard/perfil"];
     if (!allowed.some((p) => pathname.startsWith(p))) {
-      router.replace("/dashboard/mis-pagos?tab=pagos");
+      router.replace("/dashboard/mis-pagos?tab=home");
     }
   }, [profile, pathname, router]);
 

@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { pagosService } from "@/lib/services/pagos/pagos.service";
 import { createClient } from "@/lib/supabase/client";
 import { formatCurrency, getMonthName, getDiaCobro } from "@/lib/utils";
-import { CreditCard, CheckCircle, Clock, Calendar, Eye, Trash2, FileText, Plus, Search, Upload, Gift, AlertTriangle, ChevronDown, ChevronRight, X, Save, Home, Phone, Mail, MapPin } from "lucide-react";
+import { CreditCard, CheckCircle, Clock, Calendar, Eye, Trash2, FileText, Plus, Search, Upload, Gift, AlertTriangle, ChevronDown, ChevronRight, X, Save, Phone, Mail, MapPin } from "lucide-react";
 import { showToast } from "@/components/ui/toast";
 import { Modal } from "@/components/ui/modal";
 import { messages } from "@/lib/messages";
@@ -84,8 +84,8 @@ function MisPagosContent() {
   const [showSearch, setShowSearch] = useState(false);
 
   // Home expand toggles
-  const [expandedPendientes, setExpandedPendientes] = useState(false);
-  const [expandedMoroso, setExpandedMoroso] = useState(false);
+  const [expandedPendientes, setExpandedPendientes] = useState(true);
+  const [expandedMoroso, setExpandedMoroso] = useState(true);
 
   // Payment form
   const [selectedPago, setSelectedPago] = useState<Payment | null>(null);
@@ -535,6 +535,14 @@ setMembresiaLibre(!!libre.data);
   const rechazadosSuspensosHome = pagosHome.filter(p => p.status === "rechazado" || p.status === "suspendido");
   const totalRechazadosSuspensosHome = rechazadosSuspensosHome.reduce((sum, p) => sum + (p.detail?.reduce((s, d) => s + d.payment_amount, 0) || 0), 0);
 
+  const pagosHomeSorted = useMemo(() => {
+    return [...pagosHome].sort((a, b) => {
+      const dateA = a.created_at || "";
+      const dateB = b.created_at || "";
+      return dateB.localeCompare(dateA);
+    });
+  }, [pagosHome]);
+
   // Morosidad (client-side)
   const morosidad = useMemo(() => {
     if (!profile?.start_date || !gymConfig) return null;
@@ -718,10 +726,97 @@ setMembresiaLibre(!!libre.data);
               <p className="text-gym-primary text-xs font-medium tracking-widest uppercase mb-1">Bienvenido a</p>
               <h2 className="text-2xl font-display font-bold text-gym-text neon-text">{gymConfig?.gym_name || "tu gimnasio"}</h2>
               <p className="text-gym-muted text-sm mt-1">{profile?.full_name || "Miembro"}</p>
+              {(gymConfig?.address || gymConfig?.phone_number || gymConfig?.contact_email) && (
+                <div className="flex flex-wrap gap-3 mt-3">
+                  {gymConfig?.address && (
+                    <div className="flex items-center gap-1.5 text-xs text-gym-muted">
+                      <MapPin className="w-3.5 h-3.5 text-gym-primary" />
+                      <span>{gymConfig.address}</span>
+                    </div>
+                  )}
+                  {gymConfig?.phone_number && (
+                    <div className="flex items-center gap-1.5 text-xs text-gym-muted">
+                      <Phone className="w-3.5 h-3.5 text-gym-primary" />
+                      <span>{gymConfig.phone_number}</span>
+                    </div>
+                  )}
+                  {gymConfig?.contact_email && (
+                    <div className="flex items-center gap-1.5 text-xs text-gym-muted">
+                      <Mail className="w-3.5 h-3.5 text-gym-primary" />
+                      <span>{gymConfig.contact_email}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+              {morosidad && morosidad.totalDeuda > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setExpandedMoroso(true)}
+                  className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-gym-danger hover:underline"
+                >
+                  <AlertTriangle className="w-3.5 h-3.5" />
+                  Tienes {formatCurrency(morosidad.totalDeuda)} pendiente
+                </button>
+              )}
             </div>
           </div>
 
-          {/* Quick stats */}
+          {/* Horarios, asistencia */}
+          {miembros.length > 0 && (() => {
+            const hourCounts: Record<string, number> = {};
+            for (const m of miembros) {
+              if (m.arrival_time && m.departure_time && m.arrival_time !== "--:--" && m.departure_time !== "--:--") {
+                const startH = parseInt(m.arrival_time.split(":")[0], 10);
+                const endH = parseInt(m.departure_time.split(":")[0], 10);
+                if (!isNaN(startH) && !isNaN(endH)) {
+                  for (let h = startH; h <= endH; h++) {
+                    const key = `${String(h).padStart(2, "0")}:00`;
+                    // eslint-disable-next-line security/detect-object-injection
+                    hourCounts[key] = (hourCounts[key] || 0) + 1;
+                  }
+                }
+              }
+            }
+            const hourEntries = Object.entries(hourCounts).sort((a, b) => a[0].localeCompare(b[0]));
+            const maxHourCount = Math.max(...hourEntries.map((e) => e[1]), 1);
+            if (hourEntries.length === 0) return null;
+            return (
+              <Card className="neon-card overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-br from-gym-primary/5 to-transparent pointer-events-none" />
+                <CardHeader className="pb-2 relative">
+                  <CardTitle className="flex items-center gap-2 text-sm">
+                    <div className="w-7 h-7 rounded-lg bg-gym-primary/15 flex items-center justify-center">
+                      <Clock className="w-4 h-4 text-gym-primary" />
+                    </div>
+                    Horarios, asistencia
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="relative">
+                  <div className="space-y-1.5">
+                    {hourEntries.map(([hour, count]) => {
+                      const pct = (count / maxHourCount) * 100;
+                      const isTop = pct >= 80;
+                      return (
+                        <div key={hour} className="flex items-center gap-3">
+                          <span className={`text-[11px] w-10 text-right font-mono ${isTop ? "text-gym-primary font-semibold" : "text-gym-muted"}`}>{hour}</span>
+                          <div className="flex-1 h-4 bg-gym-bg/80 rounded-full overflow-hidden">
+                            <div
+                              className={`h-full rounded-full transition-all duration-700 ${isTop ? "bg-gradient-to-r from-gym-primary/80 to-gym-primary shadow-[0_0_8px_rgba(56,189,248,0.3)]" : "bg-gradient-to-r from-gym-primary/40 to-gym-primary/60"}`}
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                          <span className={`text-[11px] w-5 text-right ${isTop ? "text-gym-primary font-semibold" : "text-gym-muted"}`}>{count}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <p className="text-[10px] text-gym-muted mt-3 text-center uppercase tracking-wide">Horarios más concurridos</p>
+                </CardContent>
+              </Card>
+            );
+          })()}
+
+          {/* Resumen */}
           <div className="flex items-center justify-between mb-1">
             <span className="text-xs text-gym-muted font-medium uppercase tracking-wide">Resumen</span>
             <select
@@ -735,7 +830,7 @@ setMembresiaLibre(!!libre.data);
             </select>
           </div>
 
-          {/* Card 1: Pagos aprobados */}
+          {/* Pagos aprobados */}
           <div className="rounded-xl border border-gym-border bg-gym-surface p-4">
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
@@ -763,241 +858,9 @@ setMembresiaLibre(!!libre.data);
             </div>
           </div>
 
-          {/* Card 2: Pendientes */}
-          <div className="rounded-xl border border-gym-border bg-gym-surface p-4">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <Clock className="w-4 h-4 text-gym-warning" />
-                <span className="text-xs font-medium text-gym-muted uppercase tracking-wide">Pendientes</span>
-              </div>
-              <div className="text-right">
-                <span className="text-lg font-bold text-gym-warning">{pendientesHome.length}</span>
-                {totalPendientesHome > 0 && (
-                  <p className="text-[10px] text-gym-warning">{formatCurrency(totalPendientesHome)}</p>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Card 3: Suspendidos / Rechazados */}
-          {rechazadosSuspensosHome.length > 0 && (
-            <div className="rounded-xl border border-gym-border bg-gym-surface p-4">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4 text-gym-danger" />
-                  <span className="text-xs font-medium text-gym-muted uppercase tracking-wide">Suspendidos / Rechazados</span>
-                </div>
-                <div className="text-right">
-                  <span className="text-lg font-bold text-gym-danger">{rechazadosSuspensosHome.length}</span>
-                  {totalRechazadosSuspensosHome > 0 && (
-                    <p className="text-[10px] text-gym-danger">{formatCurrency(totalRechazadosSuspensosHome)}</p>
-                  )}
-                </div>
-              </div>
-              <div className="space-y-1.5">
-                {rechazadosSuspensosHome.filter(p => p.status === "rechazado").length > 0 && (
-                  <div className="flex items-center justify-between px-2 py-1.5 bg-gym-bg/60 rounded-lg">
-                    <span className="text-xs text-gym-muted">Rechazados ({rechazadosSuspensosHome.filter(p => p.status === "rechazado").length})</span>
-                    <span className="text-xs font-semibold text-gym-danger">
-                      {formatCurrency(rechazadosSuspensosHome.filter(p => p.status === "rechazado").reduce((sum, p) => sum + (p.detail?.reduce((s, d) => s + d.payment_amount, 0) || 0), 0))}
-                    </span>
-                  </div>
-                )}
-                {rechazadosSuspensosHome.filter(p => p.status === "suspendido").length > 0 && (
-                  <div className="flex items-center justify-between px-2 py-1.5 bg-gym-bg/60 rounded-lg">
-                    <span className="text-xs text-gym-muted">Suspendidos ({rechazadosSuspensosHome.filter(p => p.status === "suspendido").length})</span>
-                    <span className="text-xs font-semibold text-gym-danger">
-                      {formatCurrency(rechazadosSuspensosHome.filter(p => p.status === "suspendido").reduce((sum, p) => sum + (p.detail?.reduce((s, d) => s + d.payment_amount, 0) || 0), 0))}
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Info del gym */}
-          {gymConfig && (gymConfig.schedule || gymConfig.phone_number || gymConfig.contact_email || gymConfig.address) && (
-            <Card className="neon-card overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-br from-gym-primary/5 to-transparent pointer-events-none" />
-              <CardHeader className="pb-2 relative">
-                <CardTitle className="flex items-center gap-2 text-sm">
-                  <div className="w-7 h-7 rounded-lg bg-gym-primary/15 flex items-center justify-center">
-                    <Home className="w-4 h-4 text-gym-primary" />
-                  </div>
-                  {gymConfig.gym_name || "Información del Gimnasio"}
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="relative space-y-2">
-                {gymConfig.schedule && (
-                  <div className="flex items-center gap-3 p-2.5 bg-gym-bg/60 rounded-xl">
-                    <Clock className="w-4 h-4 text-gym-primary flex-shrink-0" />
-                    <div>
-                      <p className="text-[10px] text-gym-muted uppercase tracking-wide">Horario</p>
-                      <p className="text-sm text-gym-text whitespace-pre-line">{gymConfig.schedule}</p>
-                    </div>
-                  </div>
-                )}
-                {gymConfig.phone_number && (
-                  <div className="flex items-center gap-3 p-2.5 bg-gym-bg/60 rounded-xl">
-                    <Phone className="w-4 h-4 text-gym-primary flex-shrink-0" />
-                    <div>
-                      <p className="text-[10px] text-gym-muted uppercase tracking-wide">Teléfono</p>
-                      <p className="text-sm text-gym-text">{gymConfig.phone_number}</p>
-                    </div>
-                  </div>
-                )}
-                {gymConfig.contact_email && (
-                  <div className="flex items-center gap-3 p-2.5 bg-gym-bg/60 rounded-xl">
-                    <Mail className="w-4 h-4 text-gym-primary flex-shrink-0" />
-                    <div>
-                      <p className="text-[10px] text-gym-muted uppercase tracking-wide">Correo</p>
-                      <p className="text-sm text-gym-text">{gymConfig.contact_email}</p>
-                    </div>
-                  </div>
-                )}
-                {gymConfig.address && (
-                  <div className="flex items-center gap-3 p-2.5 bg-gym-bg/60 rounded-xl">
-                    <MapPin className="w-4 h-4 text-gym-primary flex-shrink-0" />
-                    <div>
-                      <p className="text-[10px] text-gym-muted uppercase tracking-wide">Dirección</p>
-                      <p className="text-sm text-gym-text">{gymConfig.address}</p>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Tarifas */}
-          {metodosPago.filter(m => m.is_active).length > 0 && (
-            <Card className="neon-card overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-br from-gym-secondary/5 to-transparent pointer-events-none" />
-              <CardHeader className="pb-2 relative">
-                <CardTitle className="flex items-center gap-2 text-sm">
-                  <div className="w-7 h-7 rounded-lg bg-gym-secondary/15 flex items-center justify-center">
-                    <CreditCard className="w-4 h-4 text-gym-secondary" />
-                  </div>
-                  Tarifas
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="relative">
-                <div className="space-y-2">
-                  {metodosPago.filter(m => m.is_active).map(m => (
-                    <div key={m.payment_method} className="flex items-center justify-between p-2.5 bg-gym-bg/60 rounded-xl">
-                      <span className="text-sm font-medium text-gym-text">
-                        {m.payment_method === "efectivo" ? "Efectivo" : m.payment_method === "bs" ? "Bs" : "Binance"}
-                      </span>
-                      <div className="flex gap-4 text-sm">
-                        <span className="text-gym-muted">{m.amount_monthly > 0 ? formatCurrency(m.amount_monthly) : "Gratis"}<span className="text-[10px] text-gym-muted ml-1">/mes</span></span>
-                        {m.amount_inscription > 0 && (
-                          <span className="text-gym-success font-medium">{formatCurrency(m.amount_inscription)}<span className="text-[10px] ml-1">insc.</span></span>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Estado de cuenta */}
-          <Card className="neon-card overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-br from-gym-success/5 to-transparent pointer-events-none" />
-            <CardHeader className="pb-2 relative">
-              <CardTitle className="flex items-center gap-2 text-sm">
-                <div className="w-7 h-7 rounded-lg bg-gym-success/15 flex items-center justify-center">
-                  <CheckCircle className="w-4 h-4 text-gym-success" />
-                </div>
-                Mi Estado
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="relative space-y-2">
-              <div className="flex items-center justify-between p-2.5 bg-gym-bg/60 rounded-xl">
-                <span className="text-sm text-gym-muted">Inscripción</span>
-                {profile?.inscription_paid ? (
-                  <Badge variant="success">Pagada</Badge>
-                ) : (
-                  <Badge variant="warning">Pendiente</Badge>
-                )}
-              </div>
-              {profile?.start_date && (
-                <div className="flex items-center justify-between p-2.5 bg-gym-bg/60 rounded-xl">
-                  <span className="text-sm text-gym-muted">Fecha de inicio</span>
-                  <span className="text-sm text-gym-text">{new Date(profile.start_date).toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" })}</span>
-                </div>
-              )}
-              {montoPendiente > 0 && (
-                <div className="flex items-center justify-between p-2.5 bg-gym-bg/60 rounded-xl border border-gym-warning/20">
-                  <span className="text-sm text-gym-warning font-medium">Deuda</span>
-                  <span className="text-sm font-semibold text-gym-warning">{formatCurrency(montoPendiente)}</span>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Pendientes */}
-          {pendientesHome.length > 0 && (
-            <Card className="neon-card overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-br from-gym-warning/5 to-transparent pointer-events-none" />
-              <button
-                type="button"
-                onClick={() => setExpandedPendientes(!expandedPendientes)}
-                className="w-full text-left"
-              >
-                <CardHeader className="pb-2 relative">
-                  <CardTitle className="flex items-center justify-between text-sm">
-                    <div className="flex items-center gap-2">
-                      <div className="w-7 h-7 rounded-lg bg-gym-warning/15 flex items-center justify-center">
-                        <AlertTriangle className="w-4 h-4 text-gym-warning" />
-                      </div>
-                      <span>Detalle Pendientes</span>
-                      <Badge variant="warning" className="text-[10px]">{pendientesHome.length}</Badge>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-semibold text-gym-warning">{formatCurrency(totalPendientesHome)}</span>
-                      {expandedPendientes ? <ChevronDown className="w-4 h-4 text-gym-muted" /> : <ChevronRight className="w-4 h-4 text-gym-muted" />}
-                    </div>
-                  </CardTitle>
-                </CardHeader>
-              </button>
-              {expandedPendientes && (
-                <CardContent className="relative">
-                  <div className="space-y-2">
-                    {pendientesHome.map(p => (
-                      <button
-                        key={p.id}
-                        type="button"
-                        onClick={() => { setSelectedPago(p as Payment); setModalOpen(true); }}
-                        className="w-full text-left p-2.5 bg-gym-bg/60 rounded-xl hover:bg-gym-bg transition-colors"
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-bold text-white">{getPagoLabel(p)}</span>
-                          <Badge variant={p.status === "pendiente" ? "warning" : "secondary"} className="text-[10px]">
-                            {p.status === "pendiente" ? "Pendiente" : "Suspendido"}
-                          </Badge>
-                        </div>
-                        <div className="flex items-center gap-2 text-[11px] text-gym-muted mt-1">
-                          <span>{getTotalMonto(p) > 0 ? formatCurrency(getTotalMonto(p)) : "0.00"}</span>
-                          <span>·</span>
-                          <span className="text-gym-primary/80">{getPagoMesesInfo(p)}</span>
-                          {p.bill_code && (
-                            <>
-                              <span>·</span>
-                              <span className="font-mono text-gym-secondary">{p.bill_code}</span>
-                            </>
-                          )}
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </CardContent>
-              )}
-            </Card>
-          )}
-
           {/* Morosidad */}
           {morosidad && (
-            <Card className="neon-card overflow-hidden">
+            <Card className={`neon-card overflow-hidden ${morosidad.totalDeuda > 0 ? "border-gym-danger/40 shadow-[0_0_15px_rgba(239,68,68,0.15)]" : ""}`}>
               <div className="absolute inset-0 bg-gradient-to-br from-gym-danger/5 to-transparent pointer-events-none" />
               <button
                 type="button"
@@ -1010,7 +873,7 @@ setMembresiaLibre(!!libre.data);
                       <div className="w-7 h-7 rounded-lg bg-gym-danger/15 flex items-center justify-center">
                         <AlertTriangle className="w-4 h-4 text-gym-danger" />
                       </div>
-                      <span>Morosidad</span>
+                      <span className={morosidad.totalDeuda > 0 ? "text-gym-danger font-semibold" : ""}>Morosidad</span>
                       <Badge variant="danger" className="text-[10px]">{morosidad.mesesDeuda.length} mes(es)</Badge>
                     </div>
                     <div className="flex items-center gap-2">
@@ -1047,60 +910,183 @@ setMembresiaLibre(!!libre.data);
             </Card>
           )}
 
-          {/* Distribución por hora */}
-          {miembros.length > 0 && (() => {
-            const hourCounts: Record<string, number> = {};
-            for (const m of miembros) {
-              if (m.arrival_time && m.departure_time && m.arrival_time !== "--:--" && m.departure_time !== "--:--") {
-                const startH = parseInt(m.arrival_time.split(":")[0], 10);
-                const endH = parseInt(m.departure_time.split(":")[0], 10);
-                if (!isNaN(startH) && !isNaN(endH)) {
-                  for (let h = startH; h <= endH; h++) {
-                    const key = `${String(h).padStart(2, "0")}:00`;
-                    // eslint-disable-next-line security/detect-object-injection
-                    hourCounts[key] = (hourCounts[key] || 0) + 1;
-                  }
-                }
-              }
-            }
-            const hourEntries = Object.entries(hourCounts).sort((a, b) => a[0].localeCompare(b[0]));
-            const maxHourCount = Math.max(...hourEntries.map((e) => e[1]), 1);
-            if (hourEntries.length === 0) return null;
-            return (
-              <Card className="neon-card overflow-hidden">
-                <div className="absolute inset-0 bg-gradient-to-br from-gym-primary/5 to-transparent pointer-events-none" />
-                <CardHeader className="pb-2 relative">
-                  <CardTitle className="flex items-center gap-2 text-sm">
-                    <div className="w-7 h-7 rounded-lg bg-gym-primary/15 flex items-center justify-center">
-                      <Clock className="w-4 h-4 text-gym-primary" />
+          {/* Pendientes */}
+          <div className="rounded-xl border border-gym-border bg-gym-surface p-4">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <Clock className="w-4 h-4 text-gym-warning" />
+                <span className="text-xs font-medium text-gym-muted uppercase tracking-wide">Pendientes</span>
+              </div>
+              <div className="text-right">
+                <span className="text-lg font-bold text-gym-warning">{pendientesHome.length}</span>
+                {totalPendientesHome > 0 && (
+                  <p className="text-[10px] text-gym-warning">{formatCurrency(totalPendientesHome)}</p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Suspendidos / Rechazados */}
+          {rechazadosSuspensosHome.length > 0 && (
+            <div className="rounded-xl border border-gym-border bg-gym-surface p-4">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-gym-danger" />
+                  <span className="text-xs font-medium text-gym-muted uppercase tracking-wide">Suspendidos / Rechazados</span>
+                </div>
+                <div className="text-right">
+                  <span className="text-lg font-bold text-gym-danger">{rechazadosSuspensosHome.length}</span>
+                  {totalRechazadosSuspensosHome > 0 && (
+                    <p className="text-[10px] text-gym-danger">{formatCurrency(totalRechazadosSuspensosHome)}</p>
+                  )}
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                {rechazadosSuspensosHome.filter(p => p.status === "rechazado").length > 0 && (
+                  <div className="flex items-center justify-between px-2 py-1.5 bg-gym-bg/60 rounded-lg">
+                    <span className="text-xs text-gym-muted">Rechazados ({rechazadosSuspensosHome.filter(p => p.status === "rechazado").length})</span>
+                    <span className="text-xs font-semibold text-gym-danger">
+                      {formatCurrency(rechazadosSuspensosHome.filter(p => p.status === "rechazado").reduce((sum, p) => sum + (p.detail?.reduce((s, d) => s + d.payment_amount, 0) || 0), 0))}
+                    </span>
+                  </div>
+                )}
+                {rechazadosSuspensosHome.filter(p => p.status === "suspendido").length > 0 && (
+                  <div className="flex items-center justify-between px-2 py-1.5 bg-gym-bg/60 rounded-lg">
+                    <span className="text-xs text-gym-muted">Suspendidos ({rechazadosSuspensosHome.filter(p => p.status === "suspendido").length})</span>
+                    <span className="text-xs font-semibold text-gym-danger">
+                      {formatCurrency(rechazadosSuspensosHome.filter(p => p.status === "suspendido").reduce((sum, p) => sum + (p.detail?.reduce((s, d) => s + d.payment_amount, 0) || 0), 0))}
+                    </span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Tarifas */}
+          {metodosPago.filter(m => m.is_active).length > 0 && (
+            <Card className="neon-card overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-br from-gym-secondary/5 to-transparent pointer-events-none" />
+              <CardHeader className="pb-2 relative">
+                <CardTitle className="flex items-center gap-2 text-sm">
+                  <div className="w-7 h-7 rounded-lg bg-gym-secondary/15 flex items-center justify-center">
+                    <CreditCard className="w-4 h-4 text-gym-secondary" />
+                  </div>
+                  Tarifas
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="relative">
+                <div className="space-y-2">
+                  {metodosPago.filter(m => m.is_active).map(m => (
+                    <div key={m.payment_method} className="flex items-center justify-between p-2.5 bg-gym-bg/60 rounded-xl">
+                      <span className="text-sm font-medium text-gym-text">
+                        {m.payment_method === "efectivo" ? "Efectivo" : m.payment_method === "bs" ? "Bs" : "Binance"}
+                      </span>
+                      <div className="flex gap-4 text-sm">
+                        <span className="text-gym-muted">{m.amount_monthly > 0 ? formatCurrency(m.amount_monthly) : "Gratis"}<span className="text-[10px] text-gym-muted ml-1">/mes</span></span>
+                        {m.amount_inscription > 0 && (
+                          <span className="text-gym-success font-medium">{formatCurrency(m.amount_inscription)}<span className="text-[10px] ml-1">insc.</span></span>
+                        )}
+                      </div>
                     </div>
-                    Horarios Pico
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Mi Estado */}
+          <Card className="neon-card overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-br from-gym-success/5 to-transparent pointer-events-none" />
+            <CardHeader className="pb-2 relative">
+              <CardTitle className="flex items-center gap-2 text-sm">
+                <div className="w-7 h-7 rounded-lg bg-gym-success/15 flex items-center justify-center">
+                  <CheckCircle className="w-4 h-4 text-gym-success" />
+                </div>
+                Mi Estado
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="relative space-y-2">
+              <div className="flex items-center justify-between p-2.5 bg-gym-bg/60 rounded-xl">
+                <span className="text-sm text-gym-muted">Inscripción</span>
+                {profile?.inscription_paid ? (
+                  <Badge variant="success">Pagada</Badge>
+                ) : (
+                  <Badge variant="warning">Pendiente</Badge>
+                )}
+              </div>
+              {profile?.start_date && (
+                <div className="flex items-center justify-between p-2.5 bg-gym-bg/60 rounded-xl">
+                  <span className="text-sm text-gym-muted">Fecha de inicio</span>
+                  <span className="text-sm text-gym-text">{new Date(profile.start_date).toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" })}</span>
+                </div>
+              )}
+              {montoPendiente > 0 && (
+                <div className="flex items-center justify-between p-2.5 bg-gym-bg/60 rounded-xl border border-gym-warning/20">
+                  <span className="text-sm text-gym-warning font-medium">Deuda</span>
+                  <span className="text-sm font-semibold text-gym-warning">{formatCurrency(montoPendiente)}</span>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Detalle de Pagos */}
+          {pagosHomeSorted.length > 0 && (
+            <Card className="neon-card overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-br from-gym-primary/5 to-transparent pointer-events-none" />
+              <button
+                type="button"
+                onClick={() => setExpandedPendientes(!expandedPendientes)}
+                className="w-full text-left"
+              >
+                <CardHeader className="pb-2 relative">
+                  <CardTitle className="flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-lg bg-gym-primary/15 flex items-center justify-center">
+                        <FileText className="w-4 h-4 text-gym-primary" />
+                      </div>
+                      <span>Detalle de Pagos</span>
+                      <Badge variant="secondary" className="text-[10px]">{pagosHomeSorted.length}</Badge>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {expandedPendientes ? <ChevronDown className="w-4 h-4 text-gym-muted" /> : <ChevronRight className="w-4 h-4 text-gym-muted" />}
+                    </div>
                   </CardTitle>
                 </CardHeader>
+              </button>
+              {expandedPendientes && (
                 <CardContent className="relative">
-                  <div className="space-y-1.5">
-                    {hourEntries.map(([hour, count]) => {
-                      const pct = (count / maxHourCount) * 100;
-                      const isTop = pct >= 80;
-                      return (
-                        <div key={hour} className="flex items-center gap-3">
-                          <span className={`text-[11px] w-10 text-right font-mono ${isTop ? "text-gym-primary font-semibold" : "text-gym-muted"}`}>{hour}</span>
-                          <div className="flex-1 h-4 bg-gym-bg/80 rounded-full overflow-hidden">
-                            <div
-                              className={`h-full rounded-full transition-all duration-700 ${isTop ? "bg-gradient-to-r from-gym-primary/80 to-gym-primary shadow-[0_0_8px_rgba(56,189,248,0.3)]" : "bg-gradient-to-r from-gym-primary/40 to-gym-primary/60"}`}
-                              style={{ width: `${pct}%` }}
-                            />
-                          </div>
-                          <span className={`text-[11px] w-5 text-right ${isTop ? "text-gym-primary font-semibold" : "text-gym-muted"}`}>{count}</span>
+                  <div className="space-y-2">
+                    {pagosHomeSorted.map(p => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => { setSelectedPago(p as Payment); setModalOpen(true); }}
+                        className="w-full text-left p-2.5 bg-gym-bg/60 rounded-xl hover:bg-gym-bg transition-colors"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-bold text-white">{getPagoLabel(p)}</span>
+                          <Badge variant={p.status === "aprobado" ? "success" : p.status === "pendiente" ? "warning" : "secondary"} className="text-[10px]">
+                            {p.status === "aprobado" ? "Aprobado" : p.status === "pendiente" ? "Pendiente" : p.status === "suspendido" ? "Suspendido" : "Rechazado"}
+                          </Badge>
                         </div>
-                      );
-                    })}
+                        <div className="flex items-center gap-2 text-[11px] text-gym-muted mt-1">
+                          <span>{getTotalMonto(p) > 0 ? formatCurrency(getTotalMonto(p)) : "0.00"}</span>
+                          <span>·</span>
+                          <span className="text-gym-primary/80">{getPagoMesesInfo(p)}</span>
+                          {p.bill_code && (
+                            <>
+                              <span>·</span>
+                              <span className="font-mono text-gym-secondary">{p.bill_code}</span>
+                            </>
+                          )}
+                        </div>
+                      </button>
+                    ))}
                   </div>
-                  <p className="text-[10px] text-gym-muted mt-3 text-center uppercase tracking-wide">Horarios más concurridos</p>
                 </CardContent>
-              </Card>
-            );
-          })()}
+              )}
+            </Card>
+          )}
         </div>
       )}
 

@@ -49,6 +49,7 @@ function PerfilContent() {
     inscription_admin_note: "",
     password: "",
     currentPassword: "",
+    start_date: "",
   });
 
   const profile = targetUserId && targetProfile ? targetProfile : contextProfile;
@@ -88,6 +89,7 @@ function PerfilContent() {
               inscription_admin_note: targetData.inscription_admin_note || "",
               password: "",
               currentPassword: "",
+              start_date: targetData.start_date || "",
             });
           }
         } else if (contextProfile) {
@@ -102,6 +104,7 @@ function PerfilContent() {
             inscription_admin_note: contextProfile.inscription_admin_note || "",
             password: "",
             currentPassword: "",
+            start_date: contextProfile.start_date || "",
           });
         }
       } catch {
@@ -154,6 +157,7 @@ function PerfilContent() {
             arrival_time: formData.arrival_time || null,
             departure_time: formData.departure_time || null,
             role: currentUserRole === "super_admin" ? formData.role : undefined,
+            start_date: currentUserRole === "super_admin" ? formData.start_date || undefined : undefined,
           },
           password: formData.password || undefined,
           currentPassword: formData.currentPassword || undefined,
@@ -327,13 +331,24 @@ function PerfilContent() {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="text-xs text-gym-muted mb-1 block">Fecha de inicio</label>
-              <Input
-                id="start-date"
-                name="start_date"
-                value={profile.start_date ? new Date(profile.start_date).toLocaleDateString("es-ES") : "—"}
-                disabled
-                className="bg-gym-surface/50"
-              />
+              {currentUserRole === "super_admin" ? (
+                <input
+                  id="start-date"
+                  name="start_date"
+                  type="date"
+                  value={formData.start_date ? formData.start_date.split("T")[0] : ""}
+                  onChange={(e) => setFormData({ ...formData, start_date: e.target.value })}
+                  className="w-full px-3 py-2 rounded-xl border border-gym-border bg-gym-surface text-gym-text text-sm focus:outline-none focus:ring-2 focus:ring-gym-primary/50"
+                />
+              ) : (
+                <Input
+                  id="start-date"
+                  name="start_date"
+                  value={profile.start_date ? new Date(profile.start_date).toLocaleDateString("es-ES") : "—"}
+                  disabled
+                  className="bg-gym-surface/50"
+                />
+              )}
             </div>
             <div>
               <label className="text-xs text-gym-muted mb-1 block">Estado</label>

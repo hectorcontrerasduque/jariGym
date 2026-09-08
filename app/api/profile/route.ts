@@ -78,6 +78,7 @@ export async function PUT(request: Request) {
       departure_time: updates.departure_time,
       role: fullAdmin ? updates.role : undefined,
       inscription_admin_note: fullAdmin ? updates.inscription_admin_note : undefined,
+      start_date: updates.start_date || undefined,
       newPassword: password || undefined,
       currentPassword,
       isSuperAdmin: isAdmin,

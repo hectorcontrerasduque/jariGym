@@ -63,7 +63,7 @@ function getPagoMesesInfo(pago: Payment): string {
 
 function MisPagosContent() {
   const searchParams = useSearchParams();
-  const activeTab = (searchParams.get("tab") as "home" | "pagos") || "pagos";
+  const activeTab = (searchParams.get("tab") as "home" | "pagos") || "home";
 
   const [pagos, setPagos] = useState<Payment[]>([]);
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -84,7 +84,7 @@ function MisPagosContent() {
   const [showSearch, setShowSearch] = useState(false);
 
   // Home expand toggles
-  const [expandedPendientes, setExpandedPendientes] = useState(true);
+  const [expandedPendientes, setExpandedPendientes] = useState(false);
   const [expandedMoroso, setExpandedMoroso] = useState(true);
 
   // Payment form

@@ -315,7 +315,7 @@ function LoginForm() {
     e.preventDefault();
 
     // Validations
-    if (!migNombre.trim() || migNombre.trim().split(" ").length < 2) {
+    if (!migNombre.trim()) {
       showToast(messages.migracion.nombreRequerido, "error");
       return;
     }

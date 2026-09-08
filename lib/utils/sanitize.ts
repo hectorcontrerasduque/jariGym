@@ -33,7 +33,7 @@ export function sanitizeOrFilter(words: string[]): string {
   const conditions: string[] = [];
   
   for (const w of words) {
-    if (w.length < 2) continue;
+    if (w.length < 1) continue;
     
     const safe = sanitizePostgrestILike(w);
     conditions.push(`nombre.ilike.${safe}%`);

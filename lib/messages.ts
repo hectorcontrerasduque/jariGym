@@ -358,7 +358,7 @@ export const messages = {
     existingUserMessage: "Tu correo ya estaba registrado. Se agregaron los pagos a tu cuenta existente.",
     existingUserNote: "Inicia sesión con tu contraseña actual",
     goToLogin: "Ir al Login",
-    nombreRequerido: "Nombre y apellido son requeridos",
+    nombreRequerido: "Nombre requerido",
     seleccioneNombre: "Seleccione su nombre de la lista de resultados",
     correoFormatoInvalido: "Correo con formato inválido",
     registroSeleccionado: "Registro seleccionado:",

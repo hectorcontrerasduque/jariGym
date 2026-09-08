@@ -65,7 +65,7 @@ export async function POST(request: Request) {
     const montoInscripcion = metodoEfectivo?.amount_inscription || 0;
 
     const searchName = selectedNombre || nombre;
-    const words = searchName.split(/\s+/).filter((w: string) => w.length >= 2);
+    const words = searchName.split(/\s+/).filter((w: string) => w.length >= 1);
     let migracionRecords;
 
     if (words.length > 0) {

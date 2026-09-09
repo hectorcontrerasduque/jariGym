@@ -208,7 +208,7 @@ function LoginForm() {
     return () => clearTimeout(timeout);
   }, [migCorreo, allRecords]);
 
-  const isAuthorizedUser = async (userEmail: string, userId: string): Promise<boolean> => {
+  const isAuthorizedUser = async (userEmail: string, userId: string): Promise<{ authorized: boolean; role?: string }> => {
     const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL;
     const isAdminEmail = adminEmail && userEmail === adminEmail;
 
@@ -237,7 +237,7 @@ function LoginForm() {
       }
     }
 
-    if (!profile) return false;
+    if (!profile) return { authorized: false };
     if (profile.role === "super_admin") {
       if (gymOwnerEmail && userEmail === gymOwnerEmail && profile.role !== "super_admin") {
         await supabase
@@ -245,11 +245,11 @@ function LoginForm() {
           .update({ role: "super_admin", registered: true })
           .eq("id", userId);
       }
-      return true;
+      return { authorized: true, role: "super_admin" };
     }
-    if (profile.activo !== false && profile.registered === true) return true;
+    if (profile.activo !== false && profile.registered === true) return { authorized: true, role: profile.role };
 
-    return false;
+    return { authorized: false };
   };
 
   const handleGoogleLogin = async () => {
@@ -279,7 +279,7 @@ function LoginForm() {
       const result = await authService.signInWithEmail(email, password);
       const userId = result.user?.id;
       if (userId) {
-        const authorized = await isAuthorizedUser(result.user?.email || "", userId);
+        const { authorized, role } = await isAuthorizedUser(result.user?.email || "", userId);
         if (!authorized) {
           const supabase = createClient();
           await supabase.auth.signOut();
@@ -287,9 +287,7 @@ function LoginForm() {
           setLoading(false);
           return;
         }
-        const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL;
-        const isAdmin = (adminEmail && result.user?.email === adminEmail) ||
-          (result.user?.email === gymOwnerEmail);
+        const isAdmin = role === "super_admin";
         router.push(isAdmin ? "/dashboard" : "/dashboard/mis-pagos?tab=home");
       }
     } catch (err) {

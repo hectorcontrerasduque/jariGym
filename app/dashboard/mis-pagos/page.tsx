@@ -61,6 +61,7 @@ function getPagoMesesInfo(pago: Payment): string {
 function MisPagosContent() {
   const searchParams = useSearchParams();
   const activeTab = (searchParams.get("tab") as "home" | "pagos") || "home";
+  const memberFromUrl = searchParams.get("member") || "";
 
   const [pagos, setPagos] = useState<Payment[]>([]);
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -212,12 +213,19 @@ function MisPagosContent() {
           .eq("registered", true)
           .order("full_name");
         if (error) throw error;
-        if (miembrosData) setMiembros(miembrosData);
+        if (miembrosData) {
+          setMiembros(miembrosData);
+          if (memberFromUrl && !miembroSeleccionado) {
+            const found = miembrosData.find((m) => m.id === memberFromUrl);
+            if (found) setMiembroSeleccionado(found);
+          }
+        }
       } catch {
         showToast(messages.toast.errorCargaDatos, "error");
       }
     };
     loadMiembros();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {

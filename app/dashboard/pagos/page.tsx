@@ -8,7 +8,7 @@ import { Modal } from "@/components/ui/modal";
 import { pagosService } from "@/lib/services/pagos/pagos.service";
 import { miembrosService } from "@/lib/services/miembros/miembros.service";
 import { formatCurrency, getMonthName } from "@/lib/utils";
-import { Check, X, Eye, CreditCard, Clock, CheckCircle, AlertTriangle, Bell, Search, Plus } from "lucide-react";
+import { Check, X, Eye, CreditCard, Clock, CheckCircle, AlertTriangle, Search, Plus } from "lucide-react";
 import { showToast } from "@/components/ui/toast";
 import { messages } from "@/lib/messages";
 import { Loader } from "@/components/ui/loader";
@@ -112,7 +112,8 @@ function PagosContent() {
     };
     load();
     return () => { cancelled = true; };
-  }, [fetchAllData, anioSeleccionado, busquedaMiembro, memberFromUrl]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fetchAllData, anioSeleccionado]);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { pagination.resetPage(); }, [filtro, busquedaMiembro]);
@@ -225,14 +226,6 @@ function PagosContent() {
               Generar pagos
             </Button>
           </Link>
-          {miembroSeleccionado && isActive && (
-            <Link href={`/dashboard/reportar-pago?member=${miembroSeleccionado}`}>
-              <Button>
-                <Bell className="w-4 h-4 mr-2" />
-                Reportar Pago
-              </Button>
-            </Link>
-          )}
           <div className="flex gap-2">
             <select
               id="anio-pagos"

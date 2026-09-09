@@ -645,7 +645,7 @@ export default function MiembrosPage() {
                           </Button>
                         </Link>
                         {currentUser?.role === "super_admin" && (
-                          <Link href={`/dashboard/pagos?member=${miembro.id}`}>
+                          <Link href={`/dashboard/mis-pagos?member=${miembro.id}`}>
                             <Button variant="ghost" size="sm" title="Pagos">
                               <CreditCard className="w-4 h-4" />
                             </Button>
@@ -694,7 +694,7 @@ export default function MiembrosPage() {
                   </Button>
                 </Link>
                 {currentUser?.role === "super_admin" && (
-                  <Link href={`/dashboard/pagos?member=${miembro.id}`} className="flex-1">
+                  <Link href={`/dashboard/mis-pagos?member=${miembro.id}`} className="flex-1">
                     <Button variant="ghost" size="sm" className="w-full">
                       <CreditCard className="w-4 h-4 mr-1" /> Pagos
                     </Button>

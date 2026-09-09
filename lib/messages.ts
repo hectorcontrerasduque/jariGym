@@ -59,6 +59,15 @@ export const messages = {
     llegada: "Llegada",
     salida: "Salida",
   },
+  reporteMorosos: {
+    titulo: "Reporte de Morosos",
+    subtitulo: "Miembros con más de 3 meses de deuda",
+    descargar: "Descargar imagen",
+    totalMorosos: "Total morosos",
+    deudaTotal: "Deuda total",
+    mesesAdeudados: "Meses adeudados",
+    verReporte: "Ver reporte",
+  },
   pagos: {
     title: "Pagos",
     subtitle: "Gestiona los pagos de tus miembros",

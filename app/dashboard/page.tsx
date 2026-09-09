@@ -31,6 +31,8 @@ import { showToast } from "@/components/ui/toast";
 import { Loader } from "@/components/ui/loader";
 import { messages } from "@/lib/messages";
 import { getAdminLevel, isFullAdmin, type AdminLevel } from "@/lib/admin-level";
+import { ReporteMorosos } from "@/components/reporte-morosos";
+import type { GymConfig } from "@/lib/types";
 
 interface MonthlyStat {
   month_number: number;
@@ -126,6 +128,10 @@ export default function DashboardPage() {
   const [misPagosPendientes, setMisPagosPendientes] = useState(0);
   const [adminLevel, setAdminLevel] = useState<AdminLevel | null>(null);
   const fullAdmin = isFullAdmin(adminLevel);
+  const [gymConfig, setGymConfig] = useState<GymConfig | null>(null);
+  const [showReporteMorosos, setShowReporteMorosos] = useState(false);
+  const [morososData, setMorososData] = useState<Array<{ id: string; full_name: string; mesesDeuda: number[]; totalDeuda: number; debeInscripcion: boolean; pagosPendientes: number; montoPendiente: number }>>([]);
+  const [loadingReporte, setLoadingReporte] = useState(false);
 
   useEffect(() => {
     if (isSuperAdmin) {
@@ -186,12 +192,13 @@ export default function DashboardPage() {
           departure_time: m.departure_time,
         })) as Profile[];
 
-        const [sharedPagos, statsResult, pagosResult, aniosResult, monthlyResult] = await Promise.all([
+        const [sharedPagos, statsResult, pagosResult, aniosResult, monthlyResult, configResult] = await Promise.all([
           fetchSharedPagos(supabase),
           pagosService.stats(anioSeleccionado, undefined, elegibles, undefined),
           pagosService.pagosRecientesAprobados(anioSeleccionado),
           pagosService.aniosConPagos(),
           pagosService.monthlyStats(anioSeleccionado, undefined, elegibles, undefined),
+          supabase.from("gym_config").select("*").limit(1).maybeSingle(),
         ]);
 
         if (!cancelled) {
@@ -209,6 +216,7 @@ export default function DashboardPage() {
           setPagosRecientes(pagosResult.slice(0, 5));
           setAnios(aniosResult);
           setMiembros(miembrosFromElegibles);
+          if (configResult.data) setGymConfig(configResult.data as GymConfig);
         }
       } catch {
         if (!cancelled) showToast(messages.toast.errorCargaDatos, "error");
@@ -279,6 +287,19 @@ export default function DashboardPage() {
       detalle: `${m.mesesDeuda.length > 0 ? `${m.mesesDeuda.length} mes(es) sin pago` : ""}${m.debeInscripcion ? `${m.mesesDeuda.length > 0 ? " + " : ""}inscripción` : ""}${m.pagosPendientes > 0 ? `${m.mesesDeuda.length > 0 || m.debeInscripcion ? " + " : ""}${m.pagosPendientes} pago(s) pendiente(s)` : ""} — ${formatCurrency(m.totalDeuda + m.montoPendiente)}`,
     }));
   });
+
+  const handleOpenReporteMorosos = async () => {
+    setLoadingReporte(true);
+    try {
+      const morosos = await pagosService.getMiembrosMorosos(anioSeleccionado);
+      setMorososData(morosos);
+      setShowReporteMorosos(true);
+    } catch {
+      showToast(messages.toast.errorCargarMorosos, "error");
+    } finally {
+      setLoadingReporte(false);
+    }
+  };
 
   const handleClickAlDia = () => openModal("Al día", async () => {
     const idsAlDia = await pagosService.getMiembrosAlDia(anioSeleccionado);
@@ -442,8 +463,8 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          <Card className="stat-card" onClick={handleClickMorosos}>
-            <CardContent className="p-3 sm:p-5">
+          <Card className="stat-card">
+            <CardContent className="p-3 sm:p-5" onClick={handleClickMorosos}>
               <div className="flex items-start justify-between mb-2 sm:mb-4">
                 <div className="stat-icon stat-icon-danger">
                   <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5 text-gym-danger" />
@@ -468,6 +489,17 @@ export default function DashboardPage() {
                 <span className="text-[9px] sm:text-[10px] text-gym-muted">deuda</span>
               </div>
             </CardContent>
+            {isSuperAdmin && (
+              <div className="px-3 sm:px-5 pb-3 sm:pb-5">
+                <button
+                  onClick={(e) => { e.stopPropagation(); handleOpenReporteMorosos(); }}
+                  disabled={loadingReporte}
+                  className="w-full text-[10px] sm:text-xs text-gym-primary hover:text-gym-primary/80 font-medium py-1.5 rounded-lg border border-gym-primary/20 hover:bg-gym-primary/10 transition-colors disabled:opacity-50"
+                >
+                  {loadingReporte ? "Cargando..." : messages.reporteMorosos.verReporte}
+                </button>
+              </div>
+            )}
           </Card>
 
           <Card className="stat-card" onClick={handleClickAlDia}>
@@ -729,6 +761,16 @@ export default function DashboardPage() {
           </div>
         )}
       </Modal>
+
+      {showReporteMorosos && gymConfig && (
+        <ReporteMorosos
+          morosos={morososData}
+          gymName={gymConfig.gym_name || "Gym"}
+          gymLogo={gymConfig.logo_url}
+          anio={anioSeleccionado}
+          onClose={() => setShowReporteMorosos(false)}
+        />
+      )}
     </div>
   );
 }

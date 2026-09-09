@@ -327,7 +327,7 @@ export const messages = {
     guardando: "Guardando...",
   },
   migracion: {
-    linkText: "Ya soy miembro",
+    linkText: "Mantenimiento",
     title: "Migrar mis datos",
     subtitle: "Si ya eres miembro del gym, migra tus datos para comenzar a usar la app",
     fullName: "Nombre y apellido",

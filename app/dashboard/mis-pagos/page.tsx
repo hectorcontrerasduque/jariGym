@@ -700,7 +700,7 @@ function MisPagosContent() {
                     className="w-full pl-9 pr-3 py-2 bg-gym-bg border border-gym-border rounded-xl text-gym-text text-sm focus:outline-none focus:ring-2 focus:ring-gym-primary"
                   />
                   {miembroSearch && (
-                    <div className="absolute top-full left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-gym-bg border border-gym-border rounded-xl z-50 shadow-lg">
+                    <div className="absolute top-full left-0 right-0 mt-1 max-h-64 overflow-y-auto bg-gym-bg border border-gym-primary/30 rounded-xl z-50 shadow-lg shadow-gym-primary/10">
                       {filteredMiembros.length === 0 ? (
                         <p className="p-3 text-sm text-gym-muted">Sin resultados</p>
                       ) : (

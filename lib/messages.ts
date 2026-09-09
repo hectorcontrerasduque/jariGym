@@ -27,6 +27,7 @@ export const messages = {
     resetPasswordSpamWarning: "Si no recibes el correo, revisa tu carpeta de spam o contacta al administrador de",
     emailConfirmed: "Correo confirmado. Ya puedes iniciar sesión",
     userNotRegistered: "Este usuario no está registrado o no está activo",
+    userSuspended: "Tu cuenta está suspendida. Contacta al administrador.",
     googleLoginError: "Error al iniciar sesión con Google",
     emailLoginError: "Error al iniciar sesión",
     invalidCredentials: "Correo o contraseña incorrectos",

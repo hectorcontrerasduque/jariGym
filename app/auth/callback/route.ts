@@ -93,6 +93,7 @@ export async function GET(request: Request) {
       }
 
       if (!profile) {
+        await serviceSupabase.auth.admin.deleteUser(user.id);
         await supabase.auth.signOut();
         const msg = encodeURIComponent(messages.auth.userNotRegistered);
         return NextResponse.redirect(`${origin}/login?error=${msg}`);
@@ -103,7 +104,7 @@ export async function GET(request: Request) {
 
       if (!isAdmin && !isActiveMember) {
         await supabase.auth.signOut();
-        const msg = encodeURIComponent(messages.auth.userNotRegistered);
+        const msg = encodeURIComponent(messages.auth.userSuspended);
         return NextResponse.redirect(`${origin}/login?error=${msg}`);
       }
 

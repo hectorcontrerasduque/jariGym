@@ -37,7 +37,6 @@ function PerfilContent() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [targetProfile, setTargetProfile] = useState<Profile | null>(null);
-  const [currentUserRole, setCurrentUserRole] = useState<string>("");
   const [formData, setFormData] = useState({
     full_name: "",
     email: "",
@@ -67,7 +66,6 @@ function PerfilContent() {
 
         const profileUserId = user.id;
         const isSuperAdmin = contextProfile?.role === "super_admin";
-        setCurrentUserRole(contextProfile?.role || "");
         const targetId = isSuperAdmin && targetUserId ? targetUserId : profileUserId;
 
         if (targetId !== profileUserId) {
@@ -119,7 +117,7 @@ function PerfilContent() {
   }, [targetUserId, router, contextProfile]);
 
   const handleSave = async () => {
-    const canEditEmail = profile!.role === "super_admin" || currentUserRole === "super_admin";
+    const canEditEmail = profile!.role === "super_admin" || contextProfile?.role === "super_admin";
     if (canEditEmail) {
       if (!formData.email.trim()) {
         showToast(messages.miembros.correoRequerido, "error");
@@ -156,8 +154,8 @@ function PerfilContent() {
             document_id: document_idToSend,
             arrival_time: formData.arrival_time || null,
             departure_time: formData.departure_time || null,
-            role: currentUserRole === "super_admin" ? formData.role : undefined,
-            start_date: currentUserRole === "super_admin" ? formData.start_date || undefined : undefined,
+            role: contextProfile?.role === "super_admin" ? formData.role : undefined,
+            start_date: contextProfile?.role === "super_admin" ? formData.start_date || undefined : undefined,
           },
           password: formData.password || undefined,
           currentPassword: formData.currentPassword || undefined,
@@ -189,7 +187,7 @@ function PerfilContent() {
   if (!profile) return null;
 
   const isAdmin = profile.role === "super_admin";
-  const canEditEmail = profile.role === "super_admin" || currentUserRole === "super_admin";
+  const canEditEmail = profile.role === "super_admin" || contextProfile?.role === "super_admin";
 
   return (
     <>
@@ -331,7 +329,7 @@ function PerfilContent() {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="text-xs text-gym-muted mb-1 block">Fecha de inicio</label>
-              {currentUserRole === "super_admin" ? (
+              {contextProfile?.role === "super_admin" ? (
                 <input
                   id="start-date"
                   name="start_date"

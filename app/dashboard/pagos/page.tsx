@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback, useMemo, Suspense } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -56,7 +56,7 @@ function getPagoMesesInfo(pago: Payment): string {
   return parts.join(" | ") || "—";
 }
 
-export default function PagosPage() {
+function PagosContent() {
   const searchParams = useSearchParams();
   const memberFromUrl = searchParams.get("member") || "";
   const [pagos, setPagos] = useState<Payment[]>([]);
@@ -490,5 +490,13 @@ export default function PagosPage() {
         </div>
       </Link>
     </>
+  );
+}
+
+export default function PagosPage() {
+  return (
+    <Suspense fallback={<Loader show={true} />}>
+      <PagosContent />
+    </Suspense>
   );
 }

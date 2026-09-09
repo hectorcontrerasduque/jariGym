@@ -16,6 +16,7 @@ import { Pagination } from "@/components/ui/pagination";
 import { usePagination } from "@/hooks/usePagination";
 import type { Payment, MetodoPago, Profile } from "@/lib/types";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 
 const metodoLabels: Record<MetodoPago, string> = {
   efectivo: "💵 Efectivo",
@@ -56,6 +57,8 @@ function getPagoMesesInfo(pago: Payment): string {
 }
 
 export default function PagosPage() {
+  const searchParams = useSearchParams();
+  const memberFromUrl = searchParams.get("member") || "";
   const [pagos, setPagos] = useState<Payment[]>([]);
   const [filtro, setFiltro] = useState<string>("todos");
   const [loading, setLoading] = useState(true);
@@ -65,7 +68,7 @@ export default function PagosPage() {
   const [anioSeleccionado, setAnioSeleccionado] = useState(new Date().getFullYear());
   const [mesSeleccionado, setMesSeleccionado] = useState<number>(0);
   const [miembros, setMiembros] = useState<Profile[]>([]);
-  const [miembroSeleccionado] = useState<string>("");
+  const [miembroSeleccionado] = useState<string>(memberFromUrl);
   const [busquedaMiembro, setBusquedaMiembro] = useState("");
   const pagination = usePagination(25);
 
@@ -91,7 +94,13 @@ export default function PagosPage() {
               setAnioSeleccionado(aniosResult.value[0]);
             }
           }
-          if (miembrosResult.status === "fulfilled") setMiembros(miembrosResult.value);
+          if (miembrosResult.status === "fulfilled") {
+            setMiembros(miembrosResult.value);
+            if (memberFromUrl && !busquedaMiembro) {
+              const miembro = miembrosResult.value.find((m) => m.id === memberFromUrl);
+              if (miembro) setBusquedaMiembro(miembro.full_name);
+            }
+          }
         }
       } catch {
         if (!cancelled) {
@@ -103,7 +112,7 @@ export default function PagosPage() {
     };
     load();
     return () => { cancelled = true; };
-  }, [fetchAllData, anioSeleccionado]);
+  }, [fetchAllData, anioSeleccionado, busquedaMiembro, memberFromUrl]);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { pagination.resetPage(); }, [filtro, busquedaMiembro]);

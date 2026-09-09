@@ -11,7 +11,7 @@ import { Avatar } from "@/components/ui/avatar";
 import { miembrosService } from "@/lib/services/miembros/miembros.service";
 import { formatDate, formatCurrency } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
-import { Users, Search, Plus, Settings, Save, Pencil, ChevronDown, ChevronUp } from "lucide-react";
+import { Users, Search, Plus, Settings, Save, Pencil, ChevronDown, ChevronUp, CreditCard } from "lucide-react";
 import { Loader } from "@/components/ui/loader";
 import { Pagination } from "@/components/ui/pagination";
 import { usePagination } from "@/hooks/usePagination";
@@ -497,6 +497,10 @@ export default function MiembrosPage() {
 
   const handleToggleActivar = async (miembro: Profile) => {
     const activar = miembro.activo === false;
+    const msg = activar
+      ? messages.miembros.confirmarReactivar.replace("{nombre}", miembro.full_name)
+      : messages.miembros.confirmarInactivar.replace("{nombre}", miembro.full_name);
+    if (!confirm(msg)) return;
     setTogglingActivar(true);
     try {
       const res = await fetch("/api/miembros/toggle-status", {
@@ -640,7 +644,14 @@ export default function MiembrosPage() {
                             <Pencil className="w-4 h-4" />
                           </Button>
                         </Link>
-                        {fullAdmin && (
+                        {currentUser?.role === "super_admin" && (
+                          <Link href={`/dashboard/pagos?member=${miembro.id}`}>
+                            <Button variant="ghost" size="sm" title="Pagos">
+                              <CreditCard className="w-4 h-4" />
+                            </Button>
+                          </Link>
+                        )}
+                        {currentUser?.role === "super_admin" && (
                           <Button variant="ghost" size="sm" onClick={() => verDetalle(miembro)} title="Gestionar">
                             <Settings className="w-4 h-4" />
                           </Button>
@@ -682,7 +693,14 @@ export default function MiembrosPage() {
                     <Pencil className="w-4 h-4 mr-1" /> Editar
                   </Button>
                 </Link>
-                {fullAdmin && (
+                {currentUser?.role === "super_admin" && (
+                  <Link href={`/dashboard/pagos?member=${miembro.id}`} className="flex-1">
+                    <Button variant="ghost" size="sm" className="w-full">
+                      <CreditCard className="w-4 h-4 mr-1" /> Pagos
+                    </Button>
+                  </Link>
+                )}
+                {currentUser?.role === "super_admin" && (
                   <Button variant="ghost" size="sm" className="flex-1" onClick={() => verDetalle(miembro)}>
                     <Settings className="w-4 h-4 mr-1" /> Gestionar
                   </Button>

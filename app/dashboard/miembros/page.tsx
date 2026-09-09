@@ -49,6 +49,7 @@ export default function MiembrosPage() {
   const [togglingMembresia, setTogglingMembresia] = useState(false);
   const [togglingSuperAdmin, setTogglingSuperAdmin] = useState(false);
   const [togglingActivar, setTogglingActivar] = useState(false);
+  const [eliminando, setEliminando] = useState(false);
   const [savingMembresia, setSavingMembresia] = useState(false);
   const [savingNotaAdmin, setSavingNotaAdmin] = useState(false);
   const [historialExpanded, setHistorialExpanded] = useState(false);
@@ -518,6 +519,23 @@ export default function MiembrosPage() {
     }
   };
 
+  const handleEliminarMiembro = async (miembro: Profile) => {
+    if (!confirm(messages.miembros.confirmarEliminar.replace("{nombre}", miembro.full_name))) return;
+    setEliminando(true);
+    try {
+      const res = await fetch(`/api/miembros?id=${miembro.id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      showToast(messages.miembros.miembroEliminado, "success");
+      setModalGestion(false);
+      await loadMiembros();
+    } catch {
+      showToast(messages.miembros.miembroEliminadoError, "error");
+    } finally {
+      setEliminando(false);
+    }
+  };
+
   const miembrosFiltrados = miembros;
 
   if (loading) {
@@ -533,6 +551,7 @@ export default function MiembrosPage() {
       <Loader show={togglingActivar} message={messages.common.actualizandoEstado} variant="overlay" />
       <Loader show={savingMembresia} message={messages.common.guardandoMembresia} variant="overlay" />
       <Loader show={savingNotaAdmin} message={messages.common.guardandoNota} variant="overlay" />
+      <Loader show={eliminando} message={messages.common.eliminando} variant="overlay" />
       <div className="absolute top-0 right-0 w-72 h-72 bg-gym-secondary/5 rounded-full blur-3xl animate-pulse" />
 
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 relative z-10">
@@ -832,6 +851,25 @@ export default function MiembrosPage() {
                 )}
               </div>
             </div>
+
+            {/* Eliminar miembro */}
+            {fullAdmin && (
+              <div className="p-4 bg-red-500/10 border border-red-500/30 rounded-xl">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-red-400">{messages.miembros.eliminarMiembro}</p>
+                    <p className="text-xs text-gym-muted">Eliminar cuenta y todos sus datos</p>
+                  </div>
+                  <button
+                    onClick={() => handleEliminarMiembro(selectedMiembro)}
+                    disabled={eliminando}
+                    className="px-4 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 text-sm font-medium rounded-lg transition-colors disabled:opacity-50"
+                  >
+                    {messages.miembros.eliminarMiembro}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </Modal>

@@ -147,6 +147,8 @@ export const messages = {
     miembroEliminado: "Miembro eliminado",
     miembroEliminadoError: "Error al eliminar miembro",
     tienePagosNoEliminar: "Este miembro tiene pagos registrados. No se puede eliminar.",
+    confirmarReactivar: "¿Desea reactivar al miembro {nombre}?",
+    confirmarInactivar: "¿Inactivar a {nombre}? No tendra acceso al sistema despues de inactivado.",
   },
   configuracion: {
     title: "Configuración",

@@ -107,7 +107,12 @@ const morosos = await pagosService.getMiembrosMorosos();
 
 ## Environment Variables
 
-All in `.env.local`:
+**Structure (gitignored):**
+- `.env.development` — Supabase dev variables (Next.js reads in dev mode)
+- `.env.prod` — Supabase production variables
+- `.env.local` — Local PostgreSQL credentials (for migrate-db-new.ps1)
+
+**Supabase variables** (in `.env.development` / `.env.prod`):
 - `NEXT_PUBLIC_SUPABASE_URL` — Supabase project URL
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY` — public anon key
 - `SUPABASE_SERVICE_ROLE_KEY` — admin key (server-side only, never expose to client)
@@ -115,6 +120,13 @@ All in `.env.local`:
 - `NEXT_PUBLIC_ADMIN_EMAIL` — initial admin email
 - `GMAIL_USER` — Gmail address for sending password reset emails
 - `GMAIL_APP_PASSWORD` — Gmail App Password (16 chars, NOT your real password)
+
+**Local PostgreSQL** (in `.env.local`):
+- `LOCAL_DB_HOST` — localhost
+- `LOCAL_DB_PORT` — 6000
+- `LOCAL_DB_USER` — postgres
+- `LOCAL_DB_PASS` — local password
+- `LOCAL_DB_NAME` — postgres
 
 ## Database
 

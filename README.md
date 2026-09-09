@@ -19,10 +19,10 @@ npm install
 
 ### 2. Configurar variables de entorno
 
-Copia `.env.example` a `.env.local` y completa los valores:
+Crea `.env.development` con variables de Supabase dev:
 
 ```bash
-cp .env.example .env.local
+cp .env.example .env.development
 ```
 
 | Variable | Descripción | Ejemplo |
@@ -214,12 +214,14 @@ Todos los super_admin comparten:
 
 ## Migración de Base de Datos
 
-Para sincronizar la base de datos de desarrollo con producción:
+Para sincronizar la base de datos entre entornos (prod, dev, local):
 
 ```bash
 # Migración completa (estructura + datos + auth + GRANTS + storage)
-.\db\migrate-db.ps1
+.\db\migrate-db-new.ps1
 ```
+
+Soporta: Prod ↔ Dev, Prod/Dev → Local, Local → Prod/Dev/Respaldo.
 
 El script ejecuta:
 1. `pg_dump` del origen (schema public + auth)

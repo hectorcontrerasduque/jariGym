@@ -213,7 +213,7 @@ function MisPagosContent() {
           .order("full_name");
         if (error) throw error;
         if (miembrosData) setMiembros(miembrosData);
-      } catch (err) {
+      } catch {
         showToast(messages.toast.errorCargaDatos, "error");
       }
     };

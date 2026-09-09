@@ -670,7 +670,7 @@ function MisPagosContent() {
 
       {/* Super Admin: member selector */}
       {isSuperAdmin && (
-        <Card className="neon-card relative z-30">
+        <Card className="neon-card relative z-30 overflow-visible">
           <CardContent className="p-3">
             <div className="flex items-center gap-3">
               {miembroSeleccionado ? (

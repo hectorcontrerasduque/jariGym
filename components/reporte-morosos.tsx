@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import html2canvas from "html2canvas";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Download, X } from "lucide-react";
 import { formatCurrency, getMonthName } from "@/lib/utils";
@@ -91,7 +92,7 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
             {/* Header */}
             <div className="flex items-center gap-4 mb-6 pb-4 border-b border-gym-primary/20">
               {gymLogo && (
-                <img src={gymLogo} alt={gymName} className="w-16 h-16 object-contain rounded-xl" />
+                <Image src={gymLogo} alt={gymName} width={64} height={64} unoptimized className="w-16 h-16 object-contain rounded-xl" />
               )}
               <div>
                 <h1 className="text-2xl font-bold text-white">{gymName}</h1>

@@ -342,7 +342,7 @@ function PerfilContent() {
                 <Input
                   id="start-date"
                   name="start_date"
-                  value={profile.start_date ? new Date(profile.start_date).toLocaleDateString("es-ES") : "—"}
+                  value={profile.start_date ? profile.start_date.split("T")[0].split("-").reverse().join("/") : "—"}
                   disabled
                   className="bg-gym-surface/50"
                 />

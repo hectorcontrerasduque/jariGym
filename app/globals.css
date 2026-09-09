@@ -174,38 +174,40 @@ option {
     0 0 40px rgba(251, 191, 36, 0.1);
 }
 
-.neon-card {
-  border: 1px solid rgba(56, 189, 248, 0.08);
-  box-shadow:
-    0 4px 6px rgba(0, 0, 0, 0.3),
-    0 0 0 1px rgba(56, 189, 248, 0.05),
-    inset 0 1px 0 rgba(255, 255, 255, 0.03);
-  position: relative;
-  overflow: hidden;
-}
+@layer components {
+  .neon-card {
+    border: 1px solid rgba(56, 189, 248, 0.08);
+    box-shadow:
+      0 4px 6px rgba(0, 0, 0, 0.3),
+      0 0 0 1px rgba(56, 189, 248, 0.05),
+      inset 0 1px 0 rgba(255, 255, 255, 0.03);
+    position: relative;
+    overflow: hidden;
+  }
 
-.neon-card::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(56, 189, 248, 0.3), transparent);
-  opacity: 0;
-  transition: opacity 0.3s ease;
-}
+  .neon-card::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(56, 189, 248, 0.3), transparent);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
 
-.neon-card:hover::before {
-  opacity: 1;
-}
+  .neon-card:hover::before {
+    opacity: 1;
+  }
 
-.neon-card:hover {
-  border-color: rgba(56, 189, 248, 0.15);
-  box-shadow:
-    0 8px 25px rgba(0, 0, 0, 0.4),
-    0 0 30px rgba(56, 189, 248, 0.08),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  .neon-card:hover {
+    border-color: rgba(56, 189, 248, 0.15);
+    box-shadow:
+      0 8px 25px rgba(0, 0, 0, 0.4),
+      0 0 30px rgba(56, 189, 248, 0.08),
+      inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  }
 }
 
 /* ===== Banner de Bienvenida Admin ===== */

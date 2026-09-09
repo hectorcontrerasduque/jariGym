@@ -4,13 +4,18 @@ import { messages } from "@/lib/messages";
 import type { Pago, MetodoPago, TipoPago, Profile, DetallePago } from "@/lib/types";
 
 export interface ElegiblesResult {
-  miembros: Array<{ id: string; email: string | null; full_name: string | null; inscription_paid: boolean; activo: boolean | null; start_date: string | null }>;
+  miembros: Array<{ id: string; email: string | null; full_name: string | null; inscription_paid: boolean; activo: boolean | null; start_date: string | null; avatar_url: string | null; role: string | null; inscription_admin_note: string | null; arrival_time: string | null; departure_time: string | null }>;
   miembrosLibresIds: Set<string>;
   fechaInicioMap: Map<string, string>;
   ownerEmail: string;
   modoCobro: "dia_uno" | "fecha_inscripcion";
   montoMensual: number;
   montoInscripcion: number;
+}
+
+export interface SharedPagos {
+  headers: Array<{ id: string; user_id: string; status: string; payment_note: string | null }>;
+  detalles: Array<{ payment_id: string; month_number: number; year_number: number; payment_amount: number; payment_type: string }>;
 }
 
 /**
@@ -637,7 +642,7 @@ export class PagosService {
     return anios.sort((a, b) => b - a);
   }
 
-  async stats(anio?: number, supabaseClient?: ReturnType<typeof createClient>, elegibles?: ElegiblesResult) {
+  async stats(anio?: number, supabaseClient?: ReturnType<typeof createClient>, elegibles?: ElegiblesResult, sharedPagos?: SharedPagos) {
     const supabase = supabaseClient || this.supabase;
     const hoy = new Date();
     const anioConsulta = anio || hoy.getFullYear();
@@ -648,27 +653,41 @@ export class PagosService {
 
     const miembrosActivos = allMiembros.filter((m) => m.email?.toLowerCase() !== ownerEmail);
 
-    const { data: pagosAnio } = await supabase
-      .from("payments")
-      .select("id, user_id, status, payment_note")
-      .in("status", ["aprobado", "pendiente"]);
+    let pagosConDetalle: Array<{ payment_id: string; month_number: number; year_number: number; payment_amount: number; payment_type: string; status: string; user_id: string; payment_note: string | null }>;
 
-    const pagosIds = (pagosAnio || []).map((p) => p.id);
+    if (sharedPagos) {
+      const pagoMap = new Map(sharedPagos.headers.map((p) => [p.id, p]));
+      pagosConDetalle = sharedPagos.detalles
+        .filter((d) => d.year_number === anioConsulta)
+        .map((d) => ({
+          ...d,
+          status: pagoMap.get(d.payment_id)?.status || "pendiente",
+          user_id: pagoMap.get(d.payment_id)?.user_id || "",
+          payment_note: pagoMap.get(d.payment_id)?.payment_note || null,
+        }));
+    } else {
+      const { data: pagosAnio } = await supabase
+        .from("payments")
+        .select("id, user_id, status, payment_note")
+        .in("status", ["aprobado", "pendiente"]);
 
-    const { data: detallesAnio } = await supabase
-      .from("payment_detail")
-      .select("payment_id, month_number, year_number, payment_amount, payment_type")
-      .in("payment_id", pagosIds.length > 0 ? pagosIds : ["00000000-0000-0000-0000-000000000000"])
-      .eq("year_number", anioConsulta);
+      const pagosIds = (pagosAnio || []).map((p) => p.id);
 
-    const pagoMap = new Map((pagosAnio || []).map((p) => [p.id, p]));
+      const { data: detallesAnio } = await supabase
+        .from("payment_detail")
+        .select("payment_id, month_number, year_number, payment_amount, payment_type")
+        .in("payment_id", pagosIds.length > 0 ? pagosIds : ["00000000-0000-0000-0000-000000000000"])
+        .eq("year_number", anioConsulta);
 
-    const pagosConDetalle = (detallesAnio || []).map((d) => ({
-      ...d,
-      status: pagoMap.get(d.payment_id)?.status || "pendiente",
-      user_id: pagoMap.get(d.payment_id)?.user_id || "",
-      payment_note: pagoMap.get(d.payment_id)?.payment_note || null,
-    }));
+      const pagoMap = new Map((pagosAnio || []).map((p) => [p.id, p]));
+
+      pagosConDetalle = (detallesAnio || []).map((d) => ({
+        ...d,
+        status: pagoMap.get(d.payment_id)?.status || "pendiente",
+        user_id: pagoMap.get(d.payment_id)?.user_id || "",
+        payment_note: pagoMap.get(d.payment_id)?.payment_note || null,
+      }));
+    }
 
     const todosPagosAprobados = pagosConDetalle.filter((p) => p.status === "aprobado");
     const miembrosConInscripcionPagada = new Set<string>();
@@ -687,7 +706,10 @@ export class PagosService {
     const inscritosPagados = miembrosActivos.filter((m) => miembrosConInscripcionPagada.has(m.id)).length;
     const inscritosPendientes = miembrosActivos.filter((m) => !miembrosConInscripcionPagada.has(m.id)).length;
 
-    const morosos = await this.getMiembrosMorosos(anioConsulta, supabase, elegiblesData);
+    const sharedPagosForMorosos: SharedPagos | undefined = sharedPagos
+      ? sharedPagos
+      : { headers: [], detalles: pagosConDetalle.map((d) => ({ payment_id: d.payment_id, month_number: d.month_number, year_number: d.year_number, payment_amount: d.payment_amount, payment_type: d.payment_type })) };
+    const morosos = await this.getMiembrosMorosos(anioConsulta, supabase, elegiblesData, sharedPagos ? sharedPagosForMorosos : undefined);
     const deudoresInscripcion = morosos.filter((m) => m.debeInscripcion).length;
     const deudoresMensualidad = morosos.filter((m) => m.mesesDeuda.length > 0).length;
     const montoDeudaInscripcion = morosos.filter((m) => m.debeInscripcion).length * montoInscripcion;
@@ -736,7 +758,7 @@ export class PagosService {
     const [miembrosResult, configResult, libresResult, ownerResult] = await Promise.all([
       supabase
         .from("profiles")
-        .select("id, email, full_name, inscription_paid, activo, start_date")
+        .select("id, email, full_name, inscription_paid, activo, start_date, avatar_url, role, inscription_admin_note, arrival_time, departure_time")
         .in("role", ["miembro", "super_admin"])
         .not("email", "is", null),
       supabase
@@ -787,7 +809,7 @@ export class PagosService {
     };
   }
 
-  async getMiembrosMorosos(anio?: number, supabaseClient?: ReturnType<typeof createClient>, elegibles?: ElegiblesResult): Promise<
+  async getMiembrosMorosos(anio?: number, supabaseClient?: ReturnType<typeof createClient>, elegibles?: ElegiblesResult, sharedPagos?: SharedPagos): Promise<
     Array<{
       id: string;
       email: string;
@@ -810,28 +832,45 @@ export class PagosService {
 
     if (miembros.length === 0) return [];
 
-    const { data: todosPagosHeader } = await supabase
-      .from("payments")
-      .select("id, user_id, status, payment_note");
+    let todosPagos: Array<{ user_id: string; month_number: number; year_number: number; payment_amount: number; status: string; payment_note: string | null; payment_type: string }>;
 
-    const pagoIds = (todosPagosHeader || []).map((p) => p.id);
-    const { data: todosDetalles } = await supabase
-      .from("payment_detail")
-      .select("payment_id, month_number, year_number, payment_amount, payment_type")
-      .in("payment_id", pagoIds.length > 0 ? pagoIds : ["00000000-0000-0000-0000-000000000000"])
-      .eq("year_number", anioConsulta);
+    if (sharedPagos) {
+      const pagoHeaderMap = new Map(sharedPagos.headers.map((p) => [p.id, p]));
+      todosPagos = sharedPagos.detalles
+        .filter((d) => d.year_number === anioConsulta)
+        .map((d) => ({
+          user_id: pagoHeaderMap.get(d.payment_id)?.user_id || "",
+          month_number: d.month_number,
+          year_number: d.year_number,
+          payment_amount: d.payment_amount,
+          status: pagoHeaderMap.get(d.payment_id)?.status || "pendiente",
+          payment_note: pagoHeaderMap.get(d.payment_id)?.payment_note || null,
+          payment_type: d.payment_type,
+        }));
+    } else {
+      const { data: todosPagosHeader } = await supabase
+        .from("payments")
+        .select("id, user_id, status, payment_note");
 
-    const pagoHeaderMap = new Map((todosPagosHeader || []).map((p) => [p.id, p]));
+      const pagoIds = (todosPagosHeader || []).map((p) => p.id);
+      const { data: todosDetalles } = await supabase
+        .from("payment_detail")
+        .select("payment_id, month_number, year_number, payment_amount, payment_type")
+        .in("payment_id", pagoIds.length > 0 ? pagoIds : ["00000000-0000-0000-0000-000000000000"])
+        .eq("year_number", anioConsulta);
 
-    const todosPagos = (todosDetalles || []).map((d) => ({
-      user_id: pagoHeaderMap.get(d.payment_id)?.user_id || "",
-      month_number: d.month_number,
-      year_number: d.year_number,
-      payment_amount: d.payment_amount,
-      status: pagoHeaderMap.get(d.payment_id)?.status || "pendiente",
-      payment_note: pagoHeaderMap.get(d.payment_id)?.payment_note || null,
-      payment_type: d.payment_type,
-    }));
+      const pagoHeaderMap = new Map((todosPagosHeader || []).map((p) => [p.id, p]));
+
+      todosPagos = (todosDetalles || []).map((d) => ({
+        user_id: pagoHeaderMap.get(d.payment_id)?.user_id || "",
+        month_number: d.month_number,
+        year_number: d.year_number,
+        payment_amount: d.payment_amount,
+        status: pagoHeaderMap.get(d.payment_id)?.status || "pendiente",
+        payment_note: pagoHeaderMap.get(d.payment_id)?.payment_note || null,
+        payment_type: d.payment_type,
+      }));
+    }
 
     const pagosAprobados = todosPagos.filter((p) => p.status === "aprobado");
     const pagosQueCubrenMes = todosPagos.filter((p) => p.status === "aprobado" || p.status === "suspendido");
@@ -937,7 +976,7 @@ export class PagosService {
     return morosos;
   }
 
-  async monthlyStats(anio?: number, supabaseClient?: ReturnType<typeof createClient>, elegibles?: ElegiblesResult) {
+  async monthlyStats(anio?: number, supabaseClient?: ReturnType<typeof createClient>, elegibles?: ElegiblesResult, sharedPagos?: SharedPagos) {
     const supabase = supabaseClient || this.supabase;
     const hoy = new Date();
     const anioConsulta = anio || hoy.getFullYear();
@@ -975,30 +1014,42 @@ export class PagosService {
       })
     );
 
-    const { data: pagosHeader } = await supabase
-      .from("payments")
-      .select("id, user_id, status")
-      .in("status", ["aprobado", "pendiente", "suspendido"]);
+    let pagosAll: Array<{ user_id: string; status: string; payment_amount: number; month_number: number; year_number: number }>;
 
-    const pagoIds = (pagosHeader || []).map((p) => p.id);
-    const { data: allDetalles } = await supabase
-      .from("payment_detail")
-      .select("payment_id, month_number, year_number, payment_amount")
-      .in("payment_id", pagoIds.length > 0 ? pagoIds : ["00000000-0000-0000-0000-000000000000"])
-      .eq("year_number", anioConsulta);
+    if (sharedPagos) {
+      const pagoEstadoMap = new Map(sharedPagos.headers.map((p) => [p.id, { status: p.status, user_id: p.user_id }]));
+      pagosAll = sharedPagos.detalles
+        .filter((d) => d.year_number === anioConsulta)
+        .map((d) => ({
+          user_id: pagoEstadoMap.get(d.payment_id)?.user_id || "",
+          status: pagoEstadoMap.get(d.payment_id)?.status || "pendiente",
+          payment_amount: d.payment_amount,
+          month_number: d.month_number,
+          year_number: d.year_number,
+        }));
+    } else {
+      const { data: pagosHeader } = await supabase
+        .from("payments")
+        .select("id, user_id, status")
+        .in("status", ["aprobado", "pendiente", "suspendido"]);
 
-    const pagoEstadoMap = new Map((pagosHeader || []).map((p) => [p.id, { status: p.status, user_id: p.user_id }]));
+      const pagoIds = (pagosHeader || []).map((p) => p.id);
+      const { data: allDetalles } = await supabase
+        .from("payment_detail")
+        .select("payment_id, month_number, year_number, payment_amount")
+        .in("payment_id", pagoIds.length > 0 ? pagoIds : ["00000000-0000-0000-0000-000000000000"])
+        .eq("year_number", anioConsulta);
 
-    const pagosAll = (allDetalles || []).map((d) => {
-      const header = pagoEstadoMap.get(d.payment_id);
-      return {
-        user_id: header?.user_id || "",
-        status: header?.status || "pendiente",
+      const pagoEstadoMap = new Map((pagosHeader || []).map((p) => [p.id, { status: p.status, user_id: p.user_id }]));
+
+      pagosAll = (allDetalles || []).map((d) => ({
+        user_id: pagoEstadoMap.get(d.payment_id)?.user_id || "",
+        status: pagoEstadoMap.get(d.payment_id)?.status || "pendiente",
         payment_amount: d.payment_amount,
         month_number: d.month_number,
         year_number: d.year_number,
-      };
-    });
+      }));
+    }
 
     const mesesFinal = statsMeses.map((m) => {
       const pagosMes = pagosAll.filter((p) => p.month_number === m.mes && p.year_number === m.anio);
@@ -1037,6 +1088,48 @@ export class PagosService {
     });
 
     return { totalMiembros: profiles.length, libres: libresCount, meses: mesesFinal };
+  }
+
+  async getMiembrosAlDia(anio?: number, supabaseClient?: ReturnType<typeof createClient>, elegibles?: ElegiblesResult): Promise<string[]> {
+    const supabase = supabaseClient || this.supabase;
+    const hoy = new Date();
+    const anioConsulta = anio || hoy.getFullYear();
+    const mesActual = hoy.getMonth() + 1;
+
+    const elegiblesData = elegibles || await this.getMiembrosElegibles(supabase);
+    const { miembros, ownerEmail, miembrosLibresIds } = elegiblesData;
+    const miembrosActivos = miembros.filter((m) => m.email?.toLowerCase() !== ownerEmail && !miembrosLibresIds.has(m.id));
+
+    const { data: pagosHeader } = await supabase
+      .from("payments")
+      .select("id, user_id")
+      .in("status", ["aprobado", "suspendido"]);
+
+    const pagoIds = (pagosHeader || []).map((p) => p.id);
+    const { data: pagosDetalles } = await supabase
+      .from("payment_detail")
+      .select("payment_id")
+      .in("payment_id", pagoIds.length > 0 ? pagoIds : ["00000000-0000-0000-0000-000000000000"])
+      .eq("month_number", mesActual)
+      .eq("year_number", anioConsulta)
+      .eq("payment_type", "mensualidad");
+
+    const pagoUsuarioMap = new Map((pagosHeader || []).map((p) => [p.id, p.user_id]));
+    const idsAlDia = new Set(
+      (pagosDetalles || []).map((d) => pagoUsuarioMap.get(d.payment_id)).filter(Boolean)
+    );
+
+    return miembrosActivos.filter((m) => idsAlDia.has(m.id)).map((m) => m.id);
+  }
+
+  async getMiembrosLibres(supabaseClient?: ReturnType<typeof createClient>): Promise<string[]> {
+    const supabase = supabaseClient || this.supabase;
+    const { data: libres } = await supabase
+      .from("memberships")
+      .select("user_id")
+      .eq("status", "activa")
+      .is("end_date", null);
+    return (libres || []).map((l) => l.user_id);
   }
 }
 

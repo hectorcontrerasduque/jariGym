@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import {
   Users,
   CheckCircle,
@@ -24,8 +24,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
 import { createClient } from "@/lib/supabase/client";
-import { pagosService } from "@/lib/services/pagos/pagos.service";
-import { miembrosService } from "@/lib/services/miembros/miembros.service";
+import { pagosService, type SharedPagos } from "@/lib/services/pagos/pagos.service";
 import { formatCurrency, getMonthName } from "@/lib/utils";
 import type { Payment, Profile } from "@/lib/types";
 import { showToast } from "@/components/ui/toast";
@@ -44,6 +43,30 @@ interface MonthlyStat {
   montoAcumulado: number;
   montoAdeudado: number;
   montoPendiente: number;
+}
+
+interface DashboardStats {
+  totalMiembros: number;
+  miembrosActivos: number;
+  inscritosPagados: number;
+  inscritosPendientes: number;
+  deudoresTotal: number;
+  deudoresInscripcion: number;
+  deudoresMensualidad: number;
+  alDiaMensualidad: number;
+  montoDeuda: number;
+  montoDeudaInscripcion: number;
+  montoDeudaMensualidad: number;
+  montoPagado: number;
+  membresiaLibre: number;
+  pagosConfirmados: number;
+  pagosPendientes: number;
+  ingresosMes: number;
+}
+
+interface ModalData {
+  title: string;
+  members: Array<{ id: string; nombre: string; detalle?: string }>;
 }
 
 const particleCount = 12;
@@ -84,24 +107,7 @@ function FloatingParticles() {
 }
 
 export default function DashboardPage() {
-  const [stats, setStats] = useState<{
-    totalMiembros: number;
-    miembrosActivos: number;
-    inscritosPagados: number;
-    inscritosPendientes: number;
-    deudoresTotal: number;
-    deudoresInscripcion: number;
-    deudoresMensualidad: number;
-    alDiaMensualidad: number;
-    montoDeuda: number;
-    montoDeudaInscripcion: number;
-    montoDeudaMensualidad: number;
-    montoPagado: number;
-    membresiaLibre: number;
-    pagosConfirmados: number;
-    pagosPendientes: number;
-    ingresosMes: number;
-  } | null>(null);
+  const [stats, setStats] = useState<DashboardStats | null>(null);
   const [pagosRecientes, setPagosRecientes] = useState<Payment[]>([]);
   const [anios, setAnios] = useState<number[]>([]);
   const [anioSeleccionado, setAnioSeleccionado] = useState(new Date().getFullYear());
@@ -111,16 +117,14 @@ export default function DashboardPage() {
   const [collapsePagosMes, setCollapsePagosMes] = useState(true);
   const [collapsePagosRecientes, setCollapsePagosRecientes] = useState(true);
   const [collapseDistHoras, setCollapseDistHoras] = useState(true);
-  const [particleReady] = useState(true);
   const [miembros, setMiembros] = useState<Profile[]>([]);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [showBanner, setShowBanner] = useState(true);
-  const [modalData, setModalData] = useState<{ title: string; members: Array<{ id: string; nombre: string; detalle?: string }> } | null>(null);
+  const [modalData, setModalData] = useState<ModalData | null>(null);
   const [loadingModal, setLoadingModal] = useState(false);
   const [userProfile, setUserProfile] = useState<Profile | null>(null);
   const [misPagosPendientes, setMisPagosPendientes] = useState(0);
   const [adminLevel, setAdminLevel] = useState<AdminLevel | null>(null);
-  const [, setOwnerEmail] = useState<string | null>(null);
   const fullAdmin = isFullAdmin(adminLevel);
 
   useEffect(() => {
@@ -137,54 +141,74 @@ export default function DashboardPage() {
       try {
         const supabase = createClient();
         const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          const { data: profile } = await supabase
+        if (!user) return;
+
+        const isSuperAdminUser = user.email === process.env.NEXT_PUBLIC_ADMIN_EMAIL;
+
+        const [profileResult, elegibles] = await Promise.all([
+          supabase
             .from("profiles")
             .select("role, arrival_time, departure_time, full_name, email")
             .eq("id", user.id)
-            .single();
-          if (!cancelled && profile) {
-            setUserProfile(profile as Profile);
-            if (profile.role === "super_admin") setIsSuperAdmin(true);
-          }
+            .single(),
+          pagosService.getMiembrosElegibles(),
+        ]);
 
-          if (!cancelled && profile?.role !== "super_admin") {
-            const { data: misPagos } = await supabase
-              .from("payments")
-              .select("id")
-              .eq("user_id", user.id)
-              .eq("status", "pendiente");
-            setMisPagosPendientes(misPagos?.length || 0);
-          }
-
-          if (!cancelled && profile?.role === "super_admin") {
-            try {
-              const res = await fetch("/api/config/public");
-              const { config } = await res.json();
-              const owner = config?.owner_email || null;
-              if (!cancelled) {
-                setOwnerEmail(owner);
-                setAdminLevel(getAdminLevel(user.email, owner, process.env.NEXT_PUBLIC_ADMIN_EMAIL));
-              }
-            } catch {}
-          }
+        if (!cancelled && profileResult.data) {
+          setUserProfile(profileResult.data as Profile);
+          if (profileResult.data.role === "super_admin") setIsSuperAdmin(true);
         }
 
-        const elegibles = await pagosService.getMiembrosElegibles();
+        if (!cancelled && profileResult.data?.role !== "super_admin") {
+          const { data: misPagos } = await supabase
+            .from("payments")
+            .select("id")
+            .eq("user_id", user.id)
+            .eq("status", "pendiente");
+          setMisPagosPendientes(misPagos?.length || 0);
+        }
 
-        const [statsResult, pagosResult, aniosResult, monthlyResult, miembrosResult] = await Promise.allSettled([
-          pagosService.stats(anioSeleccionado, undefined, elegibles),
+        if (!cancelled && (isSuperAdminUser || profileResult.data?.role === "super_admin")) {
+          setAdminLevel(getAdminLevel(user.email, elegibles.ownerEmail, process.env.NEXT_PUBLIC_ADMIN_EMAIL));
+        }
+
+        const miembrosFromElegibles: Profile[] = elegibles.miembros.map((m) => ({
+          id: m.id,
+          email: m.email,
+          full_name: m.full_name || "",
+          avatar_url: m.avatar_url,
+          activo: m.activo,
+          role: (m.role as "super_admin" | "miembro") || "miembro",
+          start_date: m.start_date || "",
+          inscription_admin_note: m.inscription_admin_note,
+          inscription_paid: m.inscription_paid,
+          arrival_time: m.arrival_time,
+          departure_time: m.departure_time,
+        })) as Profile[];
+
+        const [sharedPagos, statsResult, pagosResult, aniosResult, monthlyResult] = await Promise.all([
+          fetchSharedPagos(supabase),
+          pagosService.stats(anioSeleccionado, undefined, elegibles, undefined),
           pagosService.pagosRecientesAprobados(anioSeleccionado),
           pagosService.aniosConPagos(),
-          pagosService.monthlyStats(anioSeleccionado, undefined, elegibles),
-          miembrosService.listarMiembros(),
+          pagosService.monthlyStats(anioSeleccionado, undefined, elegibles, undefined),
         ]);
+
         if (!cancelled) {
-          if (statsResult.status === "fulfilled") setStats(statsResult.value);
-          if (pagosResult.status === "fulfilled") setPagosRecientes(pagosResult.value.slice(0, 5));
-          if (aniosResult.status === "fulfilled") setAnios(aniosResult.value);
-          if (monthlyResult.status === "fulfilled") setMonthlyStats(monthlyResult.value);
-          if (miembrosResult.status === "fulfilled") setMiembros(miembrosResult.value);
+          if (sharedPagos) {
+            const [statsWithPagos, monthlyWithPagos] = await Promise.all([
+              pagosService.stats(anioSeleccionado, undefined, elegibles, sharedPagos),
+              pagosService.monthlyStats(anioSeleccionado, undefined, elegibles, sharedPagos),
+            ]);
+            setStats(statsWithPagos);
+            setMonthlyStats(monthlyWithPagos);
+          } else {
+            setStats(statsResult);
+            setMonthlyStats(monthlyResult);
+          }
+          setPagosRecientes(pagosResult.slice(0, 5));
+          setAnios(aniosResult);
+          setMiembros(miembrosFromElegibles);
         }
       } catch {
         if (!cancelled) showToast(messages.toast.errorCargaDatos, "error");
@@ -196,80 +220,50 @@ export default function DashboardPage() {
     return () => { cancelled = true; };
   }, [anioSeleccionado]);
 
-  const getNombreMiembro = (pago: Payment): string => {
+  const getNombreMiembro = useCallback((pago: Payment): string => {
     if (pago.profile?.full_name) return pago.profile.full_name;
     const miembro = miembros.find((m) => m.id === pago.user_id);
     return miembro?.full_name || "Desconocido";
-  };
+  }, [miembros]);
+
+  const hourDistribution = useMemo(() => {
+    const hourCounts = new Map<string, number>();
+    for (const m of miembros) {
+      if (m.arrival_time && m.departure_time && m.arrival_time !== "--:--" && m.departure_time !== "--:--") {
+        const startH = parseInt(m.arrival_time.split(":")[0], 10);
+        const endH = parseInt(m.departure_time.split(":")[0], 10);
+        if (!isNaN(startH) && !isNaN(endH)) {
+          for (let h = startH; h <= endH; h++) {
+            const key = `${String(h).padStart(2, "0")}:00`;
+            hourCounts.set(key, (hourCounts.get(key) || 0) + 1);
+          }
+        }
+      }
+    }
+    const entries = Array.from(hourCounts.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+    const maxCount = Math.max(...entries.map((e) => e[1]), 1);
+    return { entries, maxCount };
+  }, [miembros]);
+
+  const maxMiembros = useMemo(() => {
+    return monthlyStats ? Math.max(...monthlyStats.meses.map(m => m.pagados + m.sinPago + m.libres), 1) : 1;
+  }, [monthlyStats]);
+
+  const trendPercent = useMemo(() => {
+    return stats && stats.miembrosActivos > 0
+      ? Math.round(((stats.alDiaMensualidad || 0) / stats.miembrosActivos) * 100)
+      : 0;
+  }, [stats]);
 
   if (loading) {
     return <Loader show={true} message={messages.common.cargandoDashboard} />;
   }
 
-  const maxMiembros = monthlyStats ? Math.max(...monthlyStats.meses.map(m => m.pagados + m.sinPago + m.libres), 1) : 1;
-
-  const hourCounts = new Map<string, number>();
-  for (const m of miembros) {
-    if (m.arrival_time && m.departure_time && m.arrival_time !== "--:--" && m.departure_time !== "--:--") {
-      const startH = parseInt(m.arrival_time.split(":")[0], 10);
-      const endH = parseInt(m.departure_time.split(":")[0], 10);
-      if (!isNaN(startH) && !isNaN(endH)) {
-        for (let h = startH; h <= endH; h++) {
-          const key = `${String(h).padStart(2, "0")}:00`;
-          hourCounts.set(key, (hourCounts.get(key) || 0) + 1);
-        }
-      }
-    }
-  }
-  const hourEntries = Array.from(hourCounts.entries()).sort((a, b) => a[0].localeCompare(b[0]));
-  const maxHourCount = Math.max(...hourEntries.map((e) => e[1]), 1);
-
-  const handleClickMorosos = async () => {
+  const openModal = async (title: string, fetchMembers: () => Promise<Array<{ id: string; nombre: string; detalle?: string }>>) => {
     setLoadingModal(true);
     try {
-      const morosos = await pagosService.getMiembrosMorosos(anioSeleccionado);
-      setModalData({
-        title: "Morosos",
-        members: morosos.map((m) => ({
-          id: m.id,
-          nombre: m.full_name,
-          detalle: `${m.mesesDeuda.length > 0 ? `${m.mesesDeuda.length} mes(es) sin pago` : ""}${m.debeInscripcion ? `${m.mesesDeuda.length > 0 ? " + " : ""}inscripción` : ""}${m.pagosPendientes > 0 ? `${m.mesesDeuda.length > 0 || m.debeInscripcion ? " + " : ""}${m.pagosPendientes} pago(s) pendiente(s)` : ""} — ${formatCurrency(m.totalDeuda + m.montoPendiente)}`,
-        })),
-      });
-    } catch {
-      showToast(messages.toast.errorCargarMorosos, "error");
-    } finally {
-      setLoadingModal(false);
-    }
-  };
-
-  const handleClickAlDia = async () => {
-    setLoadingModal(true);
-    try {
-      const supabase = createClient();
-      const mesActual = new Date().getMonth() + 1;
-      const anioActual = new Date().getFullYear();
-      const { data: pagosHeader } = await supabase
-        .from("payments")
-        .select("id, user_id")
-        .in("status", ["aprobado", "suspendido"]);
-      const pagoIds = (pagosHeader || []).map((p) => p.id);
-      const { data: pagosDetalles } = await supabase
-        .from("payment_detail")
-        .select("payment_id")
-        .in("payment_id", pagoIds.length > 0 ? pagoIds : ["00000000-0000-0000-0000-000000000000"])
-        .eq("month_number", mesActual)
-        .eq("year_number", anioActual)
-        .eq("payment_type", "mensualidad");
-      const pagoUsuarioMap = new Map((pagosHeader || []).map((p) => [p.id, p.user_id]));
-      const idsAlDia = Array.from(new Set(
-        (pagosDetalles || []).map((d) => pagoUsuarioMap.get(d.payment_id)).filter(Boolean)
-      ));
-      const alDia = miembros.filter((m) => idsAlDia.includes(m.id));
-      setModalData({
-        title: "Al día",
-        members: alDia.map((m) => ({ id: m.id, nombre: m.full_name })),
-      });
+      const members = await fetchMembers();
+      setModalData({ title, members });
     } catch {
       showToast(messages.toast.errorCargaDatos, "error");
     } finally {
@@ -277,27 +271,28 @@ export default function DashboardPage() {
     }
   };
 
-  const handleClickMembresiaLibre = async () => {
-    setLoadingModal(true);
-    try {
-      const supabase = createClient();
-      const { data: libres } = await supabase
-        .from("memberships")
-        .select("user_id")
-        .eq("status", "activa")
-        .is("end_date", null);
-      const libresIds = new Set((libres || []).map((l) => l.user_id));
-      const libresList = miembros.filter((m) => libresIds.has(m.id));
-      setModalData({
-        title: "Membresía Libre",
-        members: libresList.map((m) => ({ id: m.id, nombre: m.full_name })),
-      });
-    } catch {
-      showToast(messages.toast.errorCargaDatos, "error");
-    } finally {
-      setLoadingModal(false);
-    }
-  };
+  const handleClickMorosos = () => openModal("Morosos", async () => {
+    const morosos = await pagosService.getMiembrosMorosos(anioSeleccionado);
+    return morosos.map((m) => ({
+      id: m.id,
+      nombre: m.full_name,
+      detalle: `${m.mesesDeuda.length > 0 ? `${m.mesesDeuda.length} mes(es) sin pago` : ""}${m.debeInscripcion ? `${m.mesesDeuda.length > 0 ? " + " : ""}inscripción` : ""}${m.pagosPendientes > 0 ? `${m.mesesDeuda.length > 0 || m.debeInscripcion ? " + " : ""}${m.pagosPendientes} pago(s) pendiente(s)` : ""} — ${formatCurrency(m.totalDeuda + m.montoPendiente)}`,
+    }));
+  });
+
+  const handleClickAlDia = () => openModal("Al día", async () => {
+    const idsAlDia = await pagosService.getMiembrosAlDia(anioSeleccionado);
+    return miembros
+      .filter((m) => idsAlDia.includes(m.id))
+      .map((m) => ({ id: m.id, nombre: m.full_name }));
+  });
+
+  const handleClickMembresiaLibre = () => openModal("Membresía Libre", async () => {
+    const libresIds = await pagosService.getMiembrosLibres();
+    return miembros
+      .filter((m) => libresIds.includes(m.id))
+      .map((m) => ({ id: m.id, nombre: m.full_name }));
+  });
 
   const handleClickActivos = () => {
     setModalData({
@@ -310,13 +305,9 @@ export default function DashboardPage() {
     });
   };
 
-  const trendPercent = stats && stats.miembrosActivos > 0
-    ? Math.round(((stats.alDiaMensualidad || 0) / stats.miembrosActivos) * 100)
-    : 0;
-
   return (
     <div className="relative min-h-screen bg-gym-bg">
-      {particleReady && <FloatingParticles />}
+      <FloatingParticles />
 
       <div className="relative z-10 dashboard-container">
         {isSuperAdmin && showBanner && (
@@ -397,7 +388,7 @@ export default function DashboardPage() {
           </Card>
         )}
 
-        {/* Stats Grid - 5 cards */}
+        {/* Stats Grid */}
         <div className="stats-grid section-gap">
           {!isSuperAdmin && (
             <Card className="stat-card">
@@ -682,40 +673,39 @@ export default function DashboardPage() {
             )}
           </Card>
 
-          <details
-            open={!collapseDistHoras}
-            onToggle={(e) => setCollapseDistHoras(!(e.target as HTMLDetailsElement).open)}
-            className="chart-section mb-4 lg:mb-0 animate-slideUp"
-            style={{ animationDelay: "0.3s" }}
-          >
-            <summary className="p-6 cursor-pointer select-none list-none flex items-center gap-2 font-semibold text-lg text-gym-text [&::-webkit-details-marker]:hidden">
-              {collapseDistHoras ? <ChevronRight className="w-5 h-5 text-gym-primary" /> : <ChevronDown className="w-5 h-5 text-gym-primary" />}
-              <Zap className="w-4 h-4 text-gym-primary" />
-              Distribución por hora
-            </summary>
-            <div className="px-6 pb-6">
-              {hourEntries.length === 0 ? (
-                <p className="text-center text-gym-muted py-6">Sin datos de horarios</p>
-              ) : (
-                <div className="space-y-3">
-                  {hourEntries.map(([hour, count]) => (
-                    <div key={hour} className="flex items-center gap-3">
-                      <span className="text-xs text-gym-muted w-12 text-right font-mono">{hour}</span>
-                      <div className="flex-1 h-6 bg-gym-bg rounded-full overflow-hidden relative">
-                        <div
-                          className="h-full bg-gradient-to-r from-gym-primary to-gym-secondary rounded-full transition-all duration-700 relative overflow-hidden"
-                          style={{ width: `${(count / maxHourCount) * 100}%` }}
-                        >
-                          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer" />
+          <Card className="chart-section mb-4 lg:mb-0 animate-slideUp" style={{ animationDelay: "0.3s" }}>
+            <CardHeader className="pb-2 cursor-pointer select-none" onClick={() => setCollapseDistHoras(!collapseDistHoras)}>
+              <CardTitle className="flex items-center gap-2">
+                {collapseDistHoras ? <ChevronRight className="w-5 h-5 text-gym-primary" /> : <ChevronDown className="w-5 h-5 text-gym-primary" />}
+                <Zap className="w-4 h-4 text-gym-primary" />
+                Distribución por hora
+              </CardTitle>
+            </CardHeader>
+            {!collapseDistHoras && (
+              <CardContent>
+                {hourDistribution.entries.length === 0 ? (
+                  <p className="text-center text-gym-muted py-6">Sin datos de horarios</p>
+                ) : (
+                  <div className="space-y-3">
+                    {hourDistribution.entries.map(([hour, count]) => (
+                      <div key={hour} className="flex items-center gap-3">
+                        <span className="text-xs text-gym-muted w-12 text-right font-mono">{hour}</span>
+                        <div className="flex-1 h-6 bg-gym-bg rounded-full overflow-hidden relative">
+                          <div
+                            className="h-full bg-gradient-to-r from-gym-primary to-gym-secondary rounded-full transition-all duration-700 relative overflow-hidden"
+                            style={{ width: `${(count / hourDistribution.maxCount) * 100}%` }}
+                          >
+                            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-shimmer" />
+                          </div>
                         </div>
+                        <span className="text-xs text-gym-text w-6 text-right font-bold">{count}</span>
                       </div>
-                      <span className="text-xs text-gym-text w-6 text-right font-bold">{count}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </details>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            )}
+          </Card>
         </div>
       </div>
 
@@ -741,4 +731,25 @@ export default function DashboardPage() {
       </Modal>
     </div>
   );
+}
+
+async function fetchSharedPagos(supabase: ReturnType<typeof createClient>): Promise<SharedPagos | null> {
+  try {
+    const { data: headers } = await supabase
+      .from("payments")
+      .select("id, user_id, status, payment_note");
+
+    const pagoIds = (headers || []).map((p) => p.id);
+    const { data: detalles } = await supabase
+      .from("payment_detail")
+      .select("payment_id, month_number, year_number, payment_amount, payment_type")
+      .in("payment_id", pagoIds.length > 0 ? pagoIds : ["00000000-0000-0000-0000-000000000000"]);
+
+    return {
+      headers: headers || [],
+      detalles: detalles || [],
+    };
+  } catch {
+    return null;
+  }
 }

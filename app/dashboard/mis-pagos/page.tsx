@@ -45,17 +45,14 @@ function getPagoMesesInfo(pago: Payment): string {
   const detalles = pago.detail || [];
   if (!detalles.length) return "—";
   
-  // Ordenar por year_number, month_number
   const sorted = detalles.sort(
     (a, b) => (a.year_number || 0) - (b.year_number || 0) || (a.month_number || 0) - (b.month_number || 0)
   );
   
-  // Agrupar por tipo y formar cadena
   const parts: string[] = [];
   for (const d of sorted) {
-    const mes = getMonthName(d.month_number ?? 0).slice(0, 3);
-    const tipo = d.payment_type === "inscripcion" ? "Inscripción" : "Mensualidad";
-    parts.push(`${mes} ${d.year_number} (${tipo})`);
+    const mes = getMonthName(d.month_number ?? 0);
+    parts.push(`${mes} ${d.year_number}`);
   }
   
   return parts.join(" | ") || "—";
@@ -73,6 +70,7 @@ function MisPagosContent() {
   const [anioSeleccionado, setAnioSeleccionado] = useState(new Date().getFullYear());
   const [gymConfig, setGymConfig] = useState<GymConfig | null>(null);
   const [homeAnioSeleccionado, setHomeAnioSeleccionado] = useState(new Date().getFullYear());
+  const [anioPagos, setAnioPagos] = useState(new Date().getFullYear());
 
   const isSuperAdmin = profile?.role === "super_admin";
   const isAdmin = profile?.role === "super_admin";
@@ -201,20 +199,26 @@ function MisPagosContent() {
     setPagos(pagosData);
     setAnios(aniosData);
     setGymConfig(config);
-
-    // 5. Cargar miembros (para distribucion por hora en Home)
-    try {
-      const { data: miembrosData } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("activo", true)
-        .eq("registered", true)
-        .order("full_name");
-      if (miembrosData) setMiembros(miembrosData);
-    } catch (err) {
-      console.error("Error cargando miembros:", err);
-    }
   }, [miembroSeleccionado]);
+
+  useEffect(() => {
+    const loadMiembros = async () => {
+      try {
+        const supabase = createClient();
+        const { data: miembrosData, error } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("activo", true)
+          .eq("registered", true)
+          .order("full_name");
+        if (error) throw error;
+        if (miembrosData) setMiembros(miembrosData);
+      } catch (err) {
+        showToast(messages.toast.errorCargaDatos, "error");
+      }
+    };
+    loadMiembros();
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -515,8 +519,20 @@ function MisPagosContent() {
     });
   }, [pagos]);
 
-  const aprobados = pagos.filter(p => p.status === "aprobado");
-  const pendientes = pagos.filter(p => p.status === "pendiente");
+  const aniosPagos = useMemo(() => {
+    const years = new Set<number>();
+    pagos.forEach(p => p.detail?.forEach(d => { if (d.year_number) years.add(d.year_number); }));
+    return Array.from(years).sort((a, b) => b - a);
+  }, [pagos]);
+
+  const pagosFiltrados = useMemo(() => {
+    return pagosOrdenados.filter(p =>
+      p.detail?.some(d => d.year_number === anioPagos)
+    );
+  }, [pagosOrdenados, anioPagos]);
+
+  const aprobados = pagosFiltrados.filter(p => p.status === "aprobado");
+  const pendientes = pagosFiltrados.filter(p => p.status === "pendiente");
   const montoAprobado = aprobados.reduce((sum, p) => sum + (p.detail?.reduce((s, d) => s + d.payment_amount, 0) || 0), 0);
   const montoPendiente = pendientes.reduce((sum, p) => sum + (p.detail?.reduce((s, d) => s + d.payment_amount, 0) || 0), 0);
 
@@ -624,7 +640,7 @@ function MisPagosContent() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-display font-bold text-gym-text neon-text">{activeTab === "home" ? "Home" : "Mis Pagos"}</h1>
+          <h1 className="text-2xl font-display font-bold text-gym-text neon-text">Mis Pagos</h1>
           <p className="text-gym-muted text-sm">
             {activeTab === "home" ? "Resumen de tu cuenta" : miembroSeleccionado ? `Pagos de ${miembroSeleccionado.full_name || miembroSeleccionado.email}` : "Historial y registro de pagos"}
           </p>
@@ -1377,9 +1393,23 @@ function MisPagosContent() {
               <div className="flex items-center gap-2">
                 <CreditCard className="w-5 h-5 text-gym-primary" />
                 Pagos Realizados
+                {aniosPagos.length > 1 && (
+                  <select
+                    id="anio-pagos-realizados"
+                    name="anio-pagos"
+                    value={anioPagos}
+                    onChange={(e) => { e.stopPropagation(); setAnioPagos(Number(e.target.value)); }}
+                    onClick={(e) => e.stopPropagation()}
+                    className="px-2 py-0.5 bg-gym-surface border border-gym-border rounded-lg text-gym-text text-xs focus:outline-none focus:ring-1 focus:ring-gym-primary"
+                  >
+                    {aniosPagos.map(a => (
+                      <option key={a} value={a}>{a}</option>
+                    ))}
+                  </select>
+                )}
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-sm font-normal text-gym-muted">{pagos.length} pago(s)</span>
+                <span className="text-sm font-normal text-gym-muted">{pagosFiltrados.length} pago(s)</span>
                 {showPagosRealizados ? (
                   <ChevronDown className="w-4 h-4 text-gym-muted" />
                 ) : (
@@ -1398,7 +1428,9 @@ function MisPagosContent() {
             </div>
           ) : (
             <div className="max-h-[60vh] overflow-y-auto space-y-2 pr-1">
-              {pagosOrdenados.map(pago => (
+              {pagosFiltrados.length === 0 ? (
+                <p className="text-center text-gym-muted py-6">Sin pagos para el año seleccionado</p>
+              ) : pagosFiltrados.map(pago => (
                 <div key={pago.id} className="p-3 bg-gym-bg rounded-xl hover:bg-gym-surface transition-colors">
                   <div className="flex items-center justify-between">
                     <div className="flex-1 min-w-0">
@@ -1459,7 +1491,7 @@ function MisPagosContent() {
       </Card>
 
       {/* Totals */}
-      {pagos.length > 0 && (
+      {pagosFiltrados.length > 0 && (
         <Card className="neon-card">
           <CardContent className="p-4 space-y-3">
             <div className="flex items-center justify-between">
@@ -1546,12 +1578,10 @@ function MisPagosContent() {
                   : "Pendiente"}
               </Badge>
             </div>
-            {selectedPago.bill_code && (
-              <div>
-                <p className="text-sm text-gym-muted">Código del billete</p>
-                <p className="text-gym-text font-mono">{selectedPago.bill_code}</p>
-              </div>
-            )}
+            <div>
+              <p className="text-sm text-gym-muted">Código del billete</p>
+              <p className="text-gym-text font-mono">{selectedPago.bill_code || "—"}</p>
+            </div>
             {selectedPago.receipt_url && (
               <div>
                 <p className="text-sm text-gym-muted mb-2">Comprobante</p>

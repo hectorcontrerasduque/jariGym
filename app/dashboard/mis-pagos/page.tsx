@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { pagosService } from "@/lib/services/pagos/pagos.service";
 import { createClient } from "@/lib/supabase/client";
-import { formatCurrency, getMonthName, getDiaCobro } from "@/lib/utils";
+import { formatCurrency, formatDate, getMonthName, getDiaCobro } from "@/lib/utils";
 import { CreditCard, CheckCircle, Clock, Calendar, Eye, Trash2, FileText, Plus, Search, Upload, Gift, AlertTriangle, ChevronDown, ChevronRight, X, Save, Phone, Mail, MapPin } from "lucide-react";
 import { showToast } from "@/components/ui/toast";
 import { Modal } from "@/components/ui/modal";
@@ -96,6 +96,7 @@ function MisPagosContent() {
   const [inscripcionPagada, setInscripcionPagada] = useState(false);
   const [inscripcionPendiente, setInscripcionPendiente] = useState(false);
   const [membresiaLibre, setMembresiaLibre] = useState(false);
+  const [fechaInicioMiembro, setFechaInicioMiembro] = useState<string | null>(null);
   const [savingPago, setSavingPago] = useState(false);
   const [loadingPendientes, setLoadingPendientes] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -234,16 +235,18 @@ function MisPagosContent() {
   const loadMiembroPendientes = useCallback(async (miembroId: string, anio?: number) => {
     setLoadingPendientes(true);
     try {
-      const [meses, profile, libre, tienePendiente] = await Promise.all([
-        pagosService.mesesPendientesAdmin(miembroId, anio),
-        createClient().from("profiles").select("inscription_paid").eq("id", miembroId).single(),
-        createClient().from("memberships").select("id").eq("user_id", miembroId).eq("status", "activa").is("end_date", null).maybeSingle(),
+      const [profile, membresia, tienePendiente] = await Promise.all([
+        createClient().from("profiles").select("inscription_paid, start_date").eq("id", miembroId).single(),
+        createClient().from("memberships").select("id, start_date").eq("user_id", miembroId).eq("status", "activa").is("end_date", null).maybeSingle(),
         pagosService.tieneInscripcionPendiente(miembroId),
       ]);
+      const fechaInicio = profile.data?.start_date || membresia.data?.start_date;
+      setFechaInicioMiembro(fechaInicio || null);
+      const meses = await pagosService.mesesPendientesAdmin(miembroId, anio, undefined, fechaInicio);
       setMesesPendientes(meses);
       if (profile.data) setInscripcionPagada(profile.data.inscription_paid);
       setInscripcionPendiente(tienePendiente);
-setMembresiaLibre(!!libre.data);
+      setMembresiaLibre(!!membresia.data);
       setFormData(prev => ({ ...prev, meses: [], pagar_inscripcion: false, pagar_mensualidad: false }));
     } catch {
       showToast(messages.toast.errorCargaDatos, "error");
@@ -254,16 +257,18 @@ setMembresiaLibre(!!libre.data);
     const loadSelfPendientes = useCallback(async (userId: string, anio?: number) => {
     setLoadingPendientes(true);
     try {
-      const [meses, profile, libre, tienePendiente] = await Promise.all([
-        pagosService.mesesPendientes(userId, anio),
-        createClient().from("profiles").select("inscription_paid").eq("id", userId).single(),
-        createClient().from("memberships").select("id").eq("user_id", userId).eq("status", "activa").is("end_date", null).maybeSingle(),
+      const [profile, membresia, tienePendiente] = await Promise.all([
+        createClient().from("profiles").select("inscription_paid, start_date").eq("id", userId).single(),
+        createClient().from("memberships").select("id, start_date").eq("user_id", userId).eq("status", "activa").is("end_date", null).maybeSingle(),
         pagosService.tieneInscripcionPendiente(userId),
       ]);
+      const fechaInicio = profile.data?.start_date || membresia.data?.start_date;
+      setFechaInicioMiembro(fechaInicio || null);
+      const meses = await pagosService.mesesPendientes(userId, anio, undefined, fechaInicio);
       setMesesPendientes(meses);
       if (profile.data) setInscripcionPagada(profile.data.inscription_paid);
       setInscripcionPendiente(tienePendiente);
-setMembresiaLibre(!!libre.data);
+      setMembresiaLibre(!!membresia.data);
       setFormData(prev => ({ ...prev, meses: [], pagar_inscripcion: false, pagar_mensualidad: false }));
     } catch {
       showToast(messages.toast.errorCargaDatos, "error");
@@ -1171,6 +1176,12 @@ setMembresiaLibre(!!libre.data);
                 {/* Months selector */}
                 {(formData.pagar_mensualidad || formData.solicitar_suspension) && (
                   <div>
+                    {fechaInicioMiembro && (
+                      <div className="flex items-center gap-2 mb-2 p-2 bg-gym-surface/50 rounded-lg">
+                        <Calendar className="w-3.5 h-3.5 text-gym-muted" />
+                        <span className="text-xs text-gym-muted">Fecha de inicio: <span className="font-medium text-gym-text">{formatDate(fechaInicioMiembro)}</span></span>
+                      </div>
+                    )}
                     <div className="flex items-center justify-between mb-3">
                       <p className="text-sm font-medium text-gym-muted">Meses a pagar</p>
                       {!loadingPendientes && (formData.solicitar_suspension ? mesesParaSuspender : mesesDisponiblesParaPagar).length > 0 && (

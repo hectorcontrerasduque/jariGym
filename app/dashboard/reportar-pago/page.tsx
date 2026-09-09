@@ -75,7 +75,7 @@ function ReportarPagoForm() {
           if (!cancelled) setUserId(user.id);
           const { data: profile } = await supabase
             .from("profiles")
-            .select("role, inscription_paid")
+            .select("role, inscription_paid, start_date")
             .eq("id", user.id)
             .single();
 
@@ -90,8 +90,17 @@ function ReportarPagoForm() {
             const members = await miembrosService.listarMiembros();
             if (!cancelled) setMiembros(members);
           } else {
+            const { data: membresiaData } = await supabase
+              .from("memberships")
+              .select("start_date")
+              .eq("user_id", user.id)
+              .eq("status", "activa")
+              .is("end_date", null)
+              .maybeSingle();
+
+            const fechaInicio = profile?.start_date || membresiaData?.start_date;
             const [meses, tienePendiente] = await Promise.all([
-              pagosService.mesesPendientes(user.id),
+              pagosService.mesesPendientes(user.id, undefined, undefined, fechaInicio),
               pagosService.tieneInscripcionPendiente(user.id),
             ]);
             if (!cancelled) {
@@ -136,12 +145,13 @@ function ReportarPagoForm() {
     let cancelled = false;
     const loadMiembroPendientes = async (miembroId: string) => {
       try {
-        const [meses, profile, libreData, tienePendiente] = await Promise.all([
-          pagosService.mesesPendientesAdmin(miembroId),
-          createClient().from("profiles").select("inscription_paid").eq("id", miembroId).single(),
+        const [profile, libreData, tienePendiente] = await Promise.all([
+          createClient().from("profiles").select("inscription_paid, start_date").eq("id", miembroId).single(),
           createClient().from("memberships").select("start_date, end_date, assigned_by, profiles!assigned_by(full_name)").eq("user_id", miembroId).order("created_at", { ascending: false }).limit(1).maybeSingle(),
           pagosService.tieneInscripcionPendiente(miembroId),
         ]);
+        const fechaInicio = profile.data?.start_date || libreData.data?.start_date;
+        const meses = await pagosService.mesesPendientesAdmin(miembroId, undefined, undefined, fechaInicio);
 
         if (!cancelled) {
           setMesesPendientes(meses);

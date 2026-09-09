@@ -509,7 +509,7 @@ export class PagosService {
     return this.listarPagos("pendiente", undefined, undefined, supabaseClient);
   }
 
-  async mesesPendientes(usuarioId: string, anio?: number, supabaseClient?: ReturnType<typeof createClient>): Promise<{ month_number: number; year_number: number }[]> {
+  async mesesPendientes(usuarioId: string, anio?: number, supabaseClient?: ReturnType<typeof createClient>, startDate?: string): Promise<{ month_number: number; year_number: number }[]> {
     const supabase = supabaseClient || this.supabase;
     const { data: pagos, error } = await supabase
       .from("payments")
@@ -537,8 +537,17 @@ export class PagosService {
       }
     }
 
+    let primerMesDeuda = 1;
+    if (startDate) {
+      const parts = startDate.split("-").map(Number);
+      const anioInicio = parts[0];
+      const mesInicio = parts[1];
+      if (anioInicio > anioFiltro) return [];
+      if (anioInicio === anioFiltro) primerMesDeuda = mesInicio;
+    }
+
     const mesesPendientes: { month_number: number; year_number: number }[] = [];
-    for (let mes = 12; mes >= 1; mes--) {
+    for (let mes = 12; mes >= primerMesDeuda; mes--) {
       if (!mesesConPago.has(`${mes}-${anioFiltro}`)) {
         mesesPendientes.push({ month_number: mes, year_number: anioFiltro });
       }
@@ -547,8 +556,8 @@ export class PagosService {
     return mesesPendientes.reverse();
   }
 
-  async mesesPendientesAdmin(usuarioId: string, anio?: number, supabaseClient?: ReturnType<typeof createClient>): Promise<{ month_number: number; year_number: number }[]> {
-    return this.mesesPendientes(usuarioId, anio, supabaseClient);
+  async mesesPendientesAdmin(usuarioId: string, anio?: number, supabaseClient?: ReturnType<typeof createClient>, startDate?: string): Promise<{ month_number: number; year_number: number }[]> {
+    return this.mesesPendientes(usuarioId, anio, supabaseClient, startDate);
   }
 
   async tieneInscripcionPendiente(usuarioId: string, supabaseClient?: ReturnType<typeof createClient>): Promise<boolean> {

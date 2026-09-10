@@ -525,20 +525,20 @@ export class PagosService {
     if (error || !pagos) return [];
 
     const pagoIds = pagos.map((p) => p.id);
-    if (pagoIds.length === 0) return [];
-
-    const { data: detalles } = await supabase
-      .from("payment_detail")
-      .select("month_number, year_number, payment_id")
-      .in("payment_id", pagoIds)
-      .not("month_number", "is", null);
-
     const anioFiltro = anio || new Date().getFullYear();
 
     const mesesConPago = new Set<string>();
-    for (const d of detalles || []) {
-      if (d.year_number === anioFiltro && d.month_number) {
-        mesesConPago.add(`${d.month_number}-${d.year_number}`);
+    if (pagoIds.length > 0) {
+      const { data: detalles } = await supabase
+        .from("payment_detail")
+        .select("month_number, year_number, payment_id")
+        .in("payment_id", pagoIds)
+        .not("month_number", "is", null);
+
+      for (const d of detalles || []) {
+        if (d.year_number === anioFiltro && d.month_number) {
+          mesesConPago.add(`${d.month_number}-${d.year_number}`);
+        }
       }
     }
 

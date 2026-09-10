@@ -581,7 +581,7 @@ function MisPagosContent() {
     const modoCobro = (gymConfig.billing_mode as "dia_uno" | "fecha_inscripcion") || "dia_uno";
 
     const parts = profile.start_date.split("-").map(Number);
-    let mesDeuda = parts[1] + 1;
+    let mesDeuda = parts[1];
     let anioDeuda = parts[0];
     if (mesDeuda > 12) { mesDeuda = 1; anioDeuda++; }
     if (anioDeuda > anioActual) return null;

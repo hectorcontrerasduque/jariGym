@@ -291,13 +291,17 @@ export default function DashboardPage() {
   const handleOpenReporteMorosos = async () => {
     setLoadingReporte(true);
     try {
-      const [morosos, migradosRes] = await Promise.all([
+      const supabase = createClient();
+      const [morosos, migradosRes, profilesRes] = await Promise.all([
         pagosService.getMiembrosMorosos(anioSeleccionado),
         fetch(`/api/migracion/morosos?anio=${anioSeleccionado}`),
+        supabase.from("profiles").select("full_name").not("full_name", "is", null),
       ]);
       const migradosData = await migradosRes.json();
       const migrados: Array<{ id: string; full_name: string; mesesDeuda: number[]; totalDeuda: number; debeInscripcion: boolean; pagosPendientes: number; montoPendiente: number; esMigrado: boolean }> = migradosData.morosos || [];
-      const nombresRegistrados = new Set(morosos.map((m) => m.full_name.trim().toUpperCase()));
+      const nombresRegistrados = new Set(
+        (profilesRes.data || []).map((p) => p.full_name?.trim().replace(/\s+/g, " ").toUpperCase())
+      );
       const migradosFiltrados = migrados.filter((m) => !nombresRegistrados.has(m.full_name.trim().toUpperCase()));
       const todos = [
         ...morosos.map((m) => ({ ...m, esMigrado: false })),

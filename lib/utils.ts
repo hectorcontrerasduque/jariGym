@@ -13,12 +13,20 @@ export function formatCurrency(amount: number, currency: string = "USD") {
   }).format(amount);
 }
 
+function parseLocalDate(date: string | Date): Date {
+  if (typeof date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    const [y, m, d] = date.split("-").map(Number);
+    return new Date(y, m - 1, d);
+  }
+  return new Date(date);
+}
+
 export function formatDate(date: string | Date) {
   return new Intl.DateTimeFormat("es-ES", {
     year: "numeric",
     month: "long",
     day: "numeric",
-  }).format(new Date(date));
+  }).format(parseLocalDate(date));
 }
 
 export function formatDateTime(date: string | Date) {
@@ -28,7 +36,7 @@ export function formatDateTime(date: string | Date) {
     day: "numeric",
     hour: "2-digit",
     minute: "2-digit",
-  }).format(new Date(date));
+  }).format(parseLocalDate(date));
 }
 
 export function getMonthName(month: number) {
@@ -55,7 +63,7 @@ export function getDiaCobro(
 ): number {
   if (modoCobro === "dia_uno") return 1;
 
-  const dia = new Date(fechaInscripcion).getDate();
+  const dia = parseInt(fechaInscripcion.split("-")[2], 10);
   const ultimoDiaMes = new Date(anio, mes, 0).getDate();
   return Math.min(dia, ultimoDiaMes);
 }

@@ -1046,7 +1046,7 @@ function MisPagosContent() {
               {profile?.start_date && (
                 <div className="flex items-center justify-between p-2.5 bg-gym-bg/60 rounded-xl">
                   <span className="text-sm text-gym-muted">Fecha de inicio</span>
-                  <span className="text-sm text-gym-text">{new Date(profile.start_date).toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" })}</span>
+                  <span className="text-sm text-gym-text">{formatDate(profile.start_date)}</span>
                 </div>
               )}
               {montoPendiente > 0 && (

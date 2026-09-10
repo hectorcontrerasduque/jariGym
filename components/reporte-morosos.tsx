@@ -42,15 +42,26 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
     if (!reportRef.current) return;
     setDownloading(true);
     try {
+      const imgs = reportRef.current.querySelectorAll("img");
+      imgs.forEach((img) => { (img as HTMLElement).style.display = "none"; });
       const canvas = await html2canvas(reportRef.current, {
         background: "#0B1120",
-        useCORS: true,
         scale: 2,
+        logging: false,
+        backgroundColor: "#0B1120",
       } as Record<string, unknown>);
+      imgs.forEach((img) => { (img as HTMLElement).style.display = ""; });
+      const dataUrl = canvas.toDataURL("image/png");
+      if (!dataUrl || dataUrl === "data:,") {
+        showToast("Error al generar imagen", "error");
+        return;
+      }
       const link = document.createElement("a");
+      link.href = dataUrl;
       link.download = `morosos-${gymName.replace(/\s+/g, "-")}-${anio}.png`;
-      link.href = canvas.toDataURL("image/png");
+      document.body.appendChild(link);
       link.click();
+      document.body.removeChild(link);
     } catch {
       showToast("Error al generar imagen", "error");
     } finally {

@@ -291,10 +291,12 @@ export default function DashboardPage() {
   const handleOpenReporteMorosos = async () => {
     setLoadingReporte(true);
     try {
-      const [morosos, migrados] = await Promise.all([
+      const [morosos, migradosRes] = await Promise.all([
         pagosService.getMiembrosMorosos(anioSeleccionado),
-        pagosService.getMigradosConDeuda(anioSeleccionado),
+        fetch(`/api/migracion/morosos?anio=${anioSeleccionado}`),
       ]);
+      const migradosData = await migradosRes.json();
+      const migrados = migradosData.morosos || [];
       const todos = [
         ...morosos.map((m) => ({ ...m, esMigrado: false })),
         ...migrados,

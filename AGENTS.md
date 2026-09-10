@@ -330,12 +330,12 @@ a404ecd feat: ajustes Config page + 1 solo método de pago activo
 - `recordatorio_pago` uses per-member billing day logic
 - Billing day = day of inscription, adjusted for months with fewer days (e.g., Feb 28/29)
 - Notification sent on `diaCobro - dias_previo` (wraps to previous month if < 1)
-- 30-day grace period: first billing month is month after inscription
+- No grace period: first billing month is inscription month
 - Helper functions in `lib/utils.ts`: `getDiaCobro()`, `getDiaNotificacion()`, `esDiaDeNotificacion()`
 
 ### Miembros Morosos - Día de Cobro
 - `getMiembrosMorosos()` uses `getDiaCobro()` to determine debt start
-- First debt month = month after inscription (30-day grace)
+- First debt month = inscription month (no grace period)
 - Current month only counted as debt if `hoy.getDate() >= diaCobro`
 
 ### Dashboard trigger

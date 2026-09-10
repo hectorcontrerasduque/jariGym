@@ -14,9 +14,9 @@ export function formatCurrency(amount: number, currency: string = "USD") {
 }
 
 function parseLocalDate(date: string | Date): Date {
-  if (typeof date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
-    const [y, m, d] = date.split("-").map(Number);
-    return new Date(y, m - 1, d);
+  if (typeof date === "string") {
+    const match = date.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (match) return new Date(+match[1], +match[2] - 1, +match[3]);
   }
   return new Date(date);
 }

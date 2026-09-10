@@ -2,7 +2,6 @@
 
 import { useRef, useState } from "react";
 import html2canvas from "html2canvas";
-import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Download, X } from "lucide-react";
 import { formatCurrency, getMonthName } from "@/lib/utils";
@@ -46,7 +45,8 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
       const canvas = await html2canvas(reportRef.current, {
         background: "#0B1120",
         useCORS: true,
-      });
+        scale: 2,
+      } as Record<string, unknown>);
       const link = document.createElement("a");
       link.download = `morosos-${gymName.replace(/\s+/g, "-")}-${anio}.png`;
       link.href = canvas.toDataURL("image/png");
@@ -71,7 +71,7 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
 
   return (
     <div className="fixed inset-0 z-[200] flex items-start justify-center bg-black/70 backdrop-blur-sm overflow-y-auto py-8">
-      <div className="bg-gym-surface border border-gym-border rounded-2xl max-w-4xl w-full mx-4 overflow-hidden">
+      <div className="bg-gym-surface border border-gym-border rounded-2xl max-w-5xl w-full mx-4 overflow-hidden">
         {/* Toolbar */}
         <div className="flex items-center justify-between p-4 border-b border-gym-border">
           <h2 className="text-lg font-bold text-gym-text">{messages.reporteMorosos.titulo}</h2>
@@ -88,11 +88,12 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
 
         {/* Report preview */}
         <div className="p-4 overflow-x-auto">
-          <div ref={reportRef} className="bg-[#0B1120] p-6 rounded-xl min-w-[600px]">
+          <div ref={reportRef} className="bg-[#0B1120] p-6 rounded-xl w-[800px]">
             {/* Header */}
             <div className="flex items-center gap-4 mb-6 pb-4 border-b border-gym-primary/20">
               {gymLogo && (
-                <Image src={gymLogo} alt={gymName} width={64} height={64} unoptimized className="w-16 h-16 object-contain rounded-xl" />
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={gymLogo} alt={gymName} className="w-16 h-16 object-contain rounded-xl" />
               )}
               <div>
                 <h1 className="text-2xl font-bold text-white">{gymName}</h1>

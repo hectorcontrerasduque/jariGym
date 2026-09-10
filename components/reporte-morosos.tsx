@@ -16,6 +16,7 @@ interface Moroso {
   debeInscripcion: boolean;
   pagosPendientes: number;
   montoPendiente: number;
+  esMigrado: boolean;
 }
 
 interface ReporteMorososProps {
@@ -119,6 +120,7 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
                 <tr className="border-b border-gym-primary/20">
                   <th className="text-left py-2 px-2 text-gray-400 font-medium w-8">#</th>
                   <th className="text-left py-2 px-2 text-gray-400 font-medium">Nombre</th>
+                  <th className="text-center py-2 px-2 text-gray-400 font-medium">{messages.reporteMorosos.reportado}</th>
                   {todosLosMeses.map((mes) => (
                     <th key={mes} className="text-center py-2 px-2 text-gray-400 font-medium text-xs">
                       {getMonthName(mes).slice(0, 3)}
@@ -132,6 +134,11 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
                   <tr key={m.id} className="border-b border-gray-800/50">
                     <td className="py-2 px-2 text-gray-500">{i + 1}</td>
                     <td className="py-2 px-2 text-white font-medium truncate max-w-[200px]">{m.full_name}</td>
+                    <td className="text-center py-2 px-2">
+                      <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${m.esMigrado ? "bg-red-500/20 text-red-400" : "bg-green-500/20 text-green-400"}`}>
+                        {m.esMigrado ? messages.reporteMorosos.no : messages.reporteMorosos.si}
+                      </span>
+                    </td>
                     {todosLosMeses.map((mes) => (
                       <td key={mes} className="text-center py-2 px-2">
                         {m.mesesDeuda.includes(mes) ? (
@@ -149,7 +156,7 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
               </tbody>
               <tfoot>
                 <tr className="border-t border-gym-primary/30">
-                  <td colSpan={2 + todosLosMeses.length} className="py-3 px-2 text-gray-400 font-medium">
+                  <td colSpan={3 + todosLosMeses.length} className="py-3 px-2 text-gray-400 font-medium">
                     {messages.reporteMorosos.totalMorosos}: {morososOrdenados.length}
                   </td>
                   <td className="py-3 px-2 text-right text-gym-danger font-bold text-base">

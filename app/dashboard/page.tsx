@@ -130,7 +130,7 @@ export default function DashboardPage() {
   const fullAdmin = isFullAdmin(adminLevel);
   const [gymConfig, setGymConfig] = useState<GymConfig | null>(null);
   const [showReporteMorosos, setShowReporteMorosos] = useState(false);
-  const [morososData, setMorososData] = useState<Array<{ id: string; full_name: string; mesesDeuda: number[]; totalDeuda: number; debeInscripcion: boolean; pagosPendientes: number; montoPendiente: number }>>([]);
+  const [morososData, setMorososData] = useState<Array<{ id: string; full_name: string; mesesDeuda: number[]; totalDeuda: number; debeInscripcion: boolean; pagosPendientes: number; montoPendiente: number; esMigrado: boolean }>>([]);
   const [loadingReporte, setLoadingReporte] = useState(false);
 
   useEffect(() => {
@@ -291,8 +291,15 @@ export default function DashboardPage() {
   const handleOpenReporteMorosos = async () => {
     setLoadingReporte(true);
     try {
-      const morosos = await pagosService.getMiembrosMorosos(anioSeleccionado);
-      setMorososData(morosos);
+      const [morosos, migrados] = await Promise.all([
+        pagosService.getMiembrosMorosos(anioSeleccionado),
+        pagosService.getMigradosConDeuda(anioSeleccionado),
+      ]);
+      const todos = [
+        ...morosos.map((m) => ({ ...m, esMigrado: false })),
+        ...migrados,
+      ].sort((a, b) => a.full_name.localeCompare(b.full_name));
+      setMorososData(todos);
       setShowReporteMorosos(true);
     } catch {
       showToast(messages.toast.errorCargarMorosos, "error");

@@ -67,6 +67,9 @@ export const messages = {
     deudaTotal: "Deuda total",
     mesesAdeudados: "Meses adeudados",
     verReporte: "Ver reporte",
+    reportado: "Reportado",
+    si: "Sí",
+    no: "No",
   },
   pagos: {
     title: "Pagos",

@@ -976,6 +976,89 @@ export class PagosService {
     return morosos;
   }
 
+  async getMigradosConDeuda(anio: number, supabaseClient?: ReturnType<typeof createClient>): Promise<
+    Array<{
+      id: string;
+      email: string;
+      full_name: string;
+      deudas: Array<{ month_number: number; year_number: number; payment_amount: number }>;
+      totalDeuda: number;
+      debeInscripcion: boolean;
+      mesesDeuda: number[];
+      pagosPendientes: number;
+      montoPendiente: number;
+      esMigrado: boolean;
+    }>
+  > {
+    const supabase = supabaseClient || this.supabase;
+
+    const { data: configResult } = await supabase
+      .from("gym_config_payment_methods")
+      .select("amount_monthly")
+      .eq("is_active", true)
+      .limit(1)
+      .maybeSingle();
+    const montoMensual = configResult?.amount_monthly || 0;
+
+    const { data: rows } = await supabase
+      .from("migracion")
+      .select("nombre, correo, mes_pagar, anio_pagar, estado")
+      .eq("migrado", "no");
+
+    if (!rows || rows.length === 0) return [];
+
+    const porNombre = new Map<string, typeof rows>();
+    for (const row of rows) {
+      const key = row.nombre.toUpperCase();
+      const arr = porNombre.get(key) || [];
+      arr.push(row);
+      porNombre.set(key, arr);
+    }
+
+    const resultado: Array<{
+      id: string;
+      email: string;
+      full_name: string;
+      deudas: Array<{ month_number: number; year_number: number; payment_amount: number }>;
+      totalDeuda: number;
+      debeInscripcion: boolean;
+      mesesDeuda: number[];
+      pagosPendientes: number;
+      montoPendiente: number;
+      esMigrado: boolean;
+    }> = [];
+
+    for (const [nombre, filas] of porNombre) {
+      const mesesDeuda = filas
+        .filter((f) => f.estado === "debe" && f.anio_pagar === anio)
+        .map((f) => f.mes_pagar)
+        .sort((a, b) => a - b);
+
+      if (mesesDeuda.length < 3) continue;
+
+      const deudas = mesesDeuda.map((mes) => ({
+        month_number: mes,
+        year_number: anio,
+        payment_amount: montoMensual,
+      }));
+
+      resultado.push({
+        id: `migracion-${nombre}`,
+        email: filas.find((f) => f.correo)?.correo || "",
+        full_name: nombre,
+        deudas,
+        totalDeuda: mesesDeuda.length * montoMensual,
+        debeInscripcion: false,
+        mesesDeuda,
+        pagosPendientes: 0,
+        montoPendiente: 0,
+        esMigrado: true,
+      });
+    }
+
+    return resultado;
+  }
+
   async monthlyStats(anio?: number, supabaseClient?: ReturnType<typeof createClient>, elegibles?: ElegiblesResult, sharedPagos?: SharedPagos) {
     const supabase = supabaseClient || this.supabase;
     const hoy = new Date();

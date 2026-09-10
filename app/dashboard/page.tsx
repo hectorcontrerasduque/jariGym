@@ -296,10 +296,12 @@ export default function DashboardPage() {
         fetch(`/api/migracion/morosos?anio=${anioSeleccionado}`),
       ]);
       const migradosData = await migradosRes.json();
-      const migrados = migradosData.morosos || [];
+      const migrados: Array<{ id: string; full_name: string; mesesDeuda: number[]; totalDeuda: number; debeInscripcion: boolean; pagosPendientes: number; montoPendiente: number; esMigrado: boolean }> = migradosData.morosos || [];
+      const nombresRegistrados = new Set(morosos.map((m) => m.full_name.trim().toUpperCase()));
+      const migradosFiltrados = migrados.filter((m) => !nombresRegistrados.has(m.full_name.trim().toUpperCase()));
       const todos = [
         ...morosos.map((m) => ({ ...m, esMigrado: false })),
-        ...migrados,
+        ...migradosFiltrados,
       ].sort((a, b) => a.full_name.localeCompare(b.full_name));
       setMorososData(todos);
       setShowReporteMorosos(true);

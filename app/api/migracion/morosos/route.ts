@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
 
     const porNombre = new Map<string, typeof rows>();
     for (const row of rows) {
-      const key = row.nombre?.toUpperCase();
+      const key = row.nombre?.trim().replace(/\s+/g, " ").toUpperCase();
       if (!key) continue;
       const arr = porNombre.get(key) || [];
       arr.push(row);

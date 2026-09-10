@@ -779,7 +779,7 @@ export class PagosService {
         .maybeSingle(),
     ]);
 
-    const miembros = (miembrosResult.data || []).filter((m) => m.activo !== false);
+    const miembros = (miembrosResult.data || []).filter((m) => m.activo !== false && m.activo !== 0 && String(m.activo).toLowerCase() !== "false");
     const now = new Date();
     const miembrosLibresIds = new Set(
       (libresResult.data || [])

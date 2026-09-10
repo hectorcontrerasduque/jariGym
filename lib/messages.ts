@@ -70,6 +70,7 @@ export const messages = {
     reportado: "Reportado",
     si: "Sí",
     no: "No",
+    deslizar: "Desliza para ver más →",
   },
   pagos: {
     title: "Pagos",

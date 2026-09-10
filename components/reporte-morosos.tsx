@@ -75,8 +75,8 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
   return (
     <div className="fixed inset-0 z-[200] flex items-start justify-center bg-black/70 backdrop-blur-sm overflow-y-auto py-8">
       <div className="bg-gym-surface border border-gym-border rounded-2xl max-w-5xl w-full mx-4 overflow-hidden">
-        {/* Toolbar */}
-        <div className="flex items-center justify-between p-4 border-b border-gym-border">
+        {/* Toolbar desktop */}
+        <div className="hidden sm:flex items-center justify-between p-4 border-b border-gym-border">
           <h2 className="text-lg font-bold text-gym-text">{messages.reporteMorosos.titulo}</h2>
           <div className="flex items-center gap-2">
             <Button onClick={handleDescargar} disabled={downloading} size="sm">
@@ -89,8 +89,25 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
           </div>
         </div>
 
+        {/* Toolbar mobile */}
+        <div className="flex sm:hidden flex-col gap-2 p-4 border-b border-gym-border">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-bold text-gym-text">{messages.reporteMorosos.titulo}</h2>
+            <Button onClick={onClose} variant="ghost" size="sm">
+              <X className="w-4 h-4" />
+            </Button>
+          </div>
+          <Button onClick={handleDescargar} disabled={downloading} size="sm" className="w-full">
+            <Download className="w-4 h-4 mr-2" />
+            {downloading ? "Generando..." : messages.reporteMorosos.descargar}
+          </Button>
+        </div>
+
         {/* Report preview */}
         <div className="p-4 overflow-x-auto">
+          <div className="sm:hidden text-center text-xs text-gray-500 mb-2 animate-pulse">
+            {messages.reporteMorosos.deslizar}
+          </div>
           <div ref={reportRef} className="bg-[#0B1120] p-6 rounded-xl w-[800px]">
             {/* Header */}
             <div className="flex items-center gap-4 mb-6 pb-4 border-b border-gym-primary/20">

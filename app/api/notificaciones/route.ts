@@ -339,18 +339,23 @@ async function procesarRecordatorioPago(
 
   if (candidatos.length === 0) return 0;
 
-  const { data: pagosHeader } = await supabase
-    .from("payments")
-    .select("id, user_id")
-    .in("status", ["aprobado", "suspendido"]);
-
-  const pagoIds = (pagosHeader || []).map((p) => p.id);
+  // Step 1: query payment_detail by month+year (small result set)
   const { data: pagosDetalles } = await supabase
     .from("payment_detail")
     .select("payment_id, payment_amount")
-    .in("payment_id", pagoIds.length > 0 ? pagoIds : ["00000000-0000-0000-0000-000000000000"])
     .eq("month_number", mesActual)
     .eq("year_number", anioActual);
+
+  const pagoIds = [...new Set((pagosDetalles || []).map((d) => d.payment_id))];
+
+  // Step 2: fetch only relevant headers
+  const { data: pagosHeader } = pagoIds.length > 0
+    ? await supabase
+        .from("payments")
+        .select("id, user_id")
+        .in("id", pagoIds)
+        .in("status", ["aprobado", "suspendido"])
+    : { data: [] };
 
   const pagoUsuarioMap = new Map((pagosHeader || []).map((p) => [p.id, p.user_id]));
   const usuariosConPago = new Set(
@@ -433,31 +438,30 @@ async function procesarResumenDueno(supabase: SupabaseClient, gymConfig: Record<
   const mesActual = new Date().getMonth() + 1;
   const anioActual = new Date().getFullYear();
 
-  const { data: pagosAprobadosHeader } = await supabase
-    .from("payments")
-    .select("id")
-    .eq("status", "aprobado");
-
-  const aprobadosIds = (pagosAprobadosHeader || []).map((p) => p.id);
-  const { data: pagosAprobadosDetalles } = await supabase
+  // Step 1: query payment_detail by month+year (small result set)
+  const { data: pagosMesDetalles } = await supabase
     .from("payment_detail")
-    .select("payment_amount")
-    .in("payment_id", aprobadosIds.length > 0 ? aprobadosIds : ["00000000-0000-0000-0000-000000000000"])
+    .select("payment_id, payment_amount")
     .eq("month_number", mesActual)
     .eq("year_number", anioActual);
 
-  const { data: pagosPendientesHeader } = await supabase
-    .from("payments")
-    .select("id")
-    .in("status", ["pendiente", "suspendido"]);
+  const pagosMesIds = [...new Set((pagosMesDetalles || []).map((d) => d.payment_id))];
 
-  const pendientesIds = (pagosPendientesHeader || []).map((p) => p.id);
-  const { data: pagosPendientesDetalles } = await supabase
-    .from("payment_detail")
-    .select("payment_amount")
-    .in("payment_id", pendientesIds.length > 0 ? pendientesIds : ["00000000-0000-0000-0000-000000000000"])
-    .eq("month_number", mesActual)
-    .eq("year_number", anioActual);
+  // Step 2: fetch only relevant headers
+  const { data: pagosMesHeaders } = pagosMesIds.length > 0
+    ? await supabase
+        .from("payments")
+        .select("id, status")
+        .in("id", pagosMesIds)
+    : { data: [] };
+
+  const statusMap = new Map((pagosMesHeaders || []).map((p) => [p.id, p.status]));
+
+  const pagosAprobadosDetalles = (pagosMesDetalles || []).filter((d) => statusMap.get(d.payment_id) === "aprobado");
+  const pagosPendientesDetalles = (pagosMesDetalles || []).filter((d) => {
+    const s = statusMap.get(d.payment_id);
+    return s === "pendiente" || s === "suspendido";
+  });
 
   const { count: miembrosActivos } = await supabase
     .from("profiles")
@@ -521,31 +525,30 @@ async function procesarEstatusSistema(supabase: SupabaseClient, gymConfig: Recor
     .select("id", { count: "exact", head: true })
     .eq("activo", false);
 
-  const { data: pagosAprobadosMesHeader } = await supabase
-    .from("payments")
-    .select("id")
-    .eq("status", "aprobado");
-
-  const aprobadosMesIds = (pagosAprobadosMesHeader || []).map((p) => p.id);
-  const { data: pagosAprobadosMesDetalles } = await supabase
+  // Step 1: query payment_detail by month+year (small result set)
+  const { data: pagosMesDetalles } = await supabase
     .from("payment_detail")
-    .select("payment_amount")
-    .in("payment_id", aprobadosMesIds.length > 0 ? aprobadosMesIds : ["00000000-0000-0000-0000-000000000000"])
+    .select("payment_id, payment_amount")
     .eq("month_number", mesActual)
     .eq("year_number", anioActual);
 
-  const { data: pagosPendientesMesHeader } = await supabase
-    .from("payments")
-    .select("id")
-    .in("status", ["pendiente", "suspendido"]);
+  const pagosMesIds = [...new Set((pagosMesDetalles || []).map((d) => d.payment_id))];
 
-  const pendientesMesIds = (pagosPendientesMesHeader || []).map((p) => p.id);
-  const { data: pagosPendientesMesDetalles } = await supabase
-    .from("payment_detail")
-    .select("payment_amount")
-    .in("payment_id", pendientesMesIds.length > 0 ? pendientesMesIds : ["00000000-0000-0000-0000-000000000000"])
-    .eq("month_number", mesActual)
-    .eq("year_number", anioActual);
+  // Step 2: fetch only relevant headers
+  const { data: pagosMesHeaders } = pagosMesIds.length > 0
+    ? await supabase
+        .from("payments")
+        .select("id, status")
+        .in("id", pagosMesIds)
+    : { data: [] };
+
+  const statusMap = new Map((pagosMesHeaders || []).map((p) => [p.id, p.status]));
+
+  const pagosAprobadosMesDetalles = (pagosMesDetalles || []).filter((d) => statusMap.get(d.payment_id) === "aprobado");
+  const pagosPendientesMesDetalles = (pagosMesDetalles || []).filter((d) => {
+    const s = statusMap.get(d.payment_id);
+    return s === "pendiente" || s === "suspendido";
+  });
 
   const { data: ultimoMiembro } = await supabase
     .from("profiles")

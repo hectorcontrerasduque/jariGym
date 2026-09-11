@@ -159,20 +159,14 @@ function MisPagosContent() {
       showToast(messages.toast.errorCargaDatos, "error");
     }
 
-    // 2. Cargar años
+    // 2. Cargar años (query ligera por DISTINCT en payment_detail)
     try {
-      const { data: ad, error: adError } = await supabase
-        .from("payments")
-        .select("id");
-      if (adError) throw adError;
-      if (ad && ad.length > 0) {
-        const { data: detalle } = await supabase
-          .from("payment_detail")
-          .select("year_number")
-          .in("payment_id", ad.map((p) => p.id));
-        const years = Array.from(new Set((detalle || []).map((d) => d.year_number).filter(Boolean)));
-        aniosData = years.length > 0 ? years : [new Date().getFullYear()];
-      }
+      const { data: detalle, error: detError } = await supabase
+        .from("payment_detail")
+        .select("year_number");
+      if (detError) throw detError;
+      const years = Array.from(new Set((detalle || []).map((d) => d.year_number).filter(Boolean)));
+      aniosData = years.length > 0 ? years : [new Date().getFullYear()];
     } catch (err) {
       console.error("Error cargando años:", err);
       aniosData = [new Date().getFullYear()];

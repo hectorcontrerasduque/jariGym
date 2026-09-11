@@ -24,7 +24,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
 import { createClient } from "@/lib/supabase/client";
-import { pagosService, type SharedPagos } from "@/lib/services/pagos/pagos.service";
+import { pagosService } from "@/lib/services/pagos/pagos.service";
 import { formatCurrency, getMonthName } from "@/lib/utils";
 import type { Payment, Profile } from "@/lib/types";
 import { showToast } from "@/components/ui/toast";
@@ -192,27 +192,17 @@ export default function DashboardPage() {
           departure_time: m.departure_time,
         })) as Profile[];
 
-        const [sharedPagos, statsResult, pagosResult, aniosResult, monthlyResult, configResult] = await Promise.all([
-          fetchSharedPagos(supabase),
-          pagosService.stats(anioSeleccionado, undefined, elegibles, undefined),
+        const [statsResult, pagosResult, aniosResult, monthlyResult, configResult] = await Promise.all([
+          pagosService.stats(anioSeleccionado, undefined, elegibles),
           pagosService.pagosRecientesAprobados(anioSeleccionado),
           pagosService.aniosConPagos(),
-          pagosService.monthlyStats(anioSeleccionado, undefined, elegibles, undefined),
+          pagosService.monthlyStats(anioSeleccionado, undefined, elegibles),
           supabase.from("gym_config").select("*").limit(1).maybeSingle(),
         ]);
 
         if (!cancelled) {
-          if (sharedPagos) {
-            const [statsWithPagos, monthlyWithPagos] = await Promise.all([
-              pagosService.stats(anioSeleccionado, undefined, elegibles, sharedPagos),
-              pagosService.monthlyStats(anioSeleccionado, undefined, elegibles, sharedPagos),
-            ]);
-            setStats(statsWithPagos);
-            setMonthlyStats(monthlyWithPagos);
-          } else {
-            setStats(statsResult);
-            setMonthlyStats(monthlyResult);
-          }
+          setStats(statsResult);
+          setMonthlyStats(monthlyResult);
           setPagosRecientes(pagosResult.slice(0, 5));
           setAnios(aniosResult);
           setMiembros(miembrosFromElegibles);
@@ -790,23 +780,4 @@ export default function DashboardPage() {
   );
 }
 
-async function fetchSharedPagos(supabase: ReturnType<typeof createClient>): Promise<SharedPagos | null> {
-  try {
-    const { data: headers } = await supabase
-      .from("payments")
-      .select("id, user_id, status, payment_note");
 
-    const pagoIds = (headers || []).map((p) => p.id);
-    const { data: detalles } = await supabase
-      .from("payment_detail")
-      .select("payment_id, month_number, year_number, payment_amount, payment_type")
-      .in("payment_id", pagoIds.length > 0 ? pagoIds : ["00000000-0000-0000-0000-000000000000"]);
-
-    return {
-      headers: headers || [],
-      detalles: detalles || [],
-    };
-  } catch {
-    return null;
-  }
-}

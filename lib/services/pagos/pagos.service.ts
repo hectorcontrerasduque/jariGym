@@ -378,10 +378,11 @@ export class PagosService {
     const pagosMap = new Map<string, Pago>();
     for (const row of data || []) {
       const existing = pagosMap.get(row.id);
+      const detailArr = Array.isArray(row.detail) ? row.detail : row.detail ? [row.detail] : [];
       if (existing) {
-        existing.detail = [...(existing.detail || []), row.detail];
+        existing.detail = [...(existing.detail || []), ...detailArr];
       } else {
-        pagosMap.set(row.id, { ...row, detail: [row.detail] });
+        pagosMap.set(row.id, { ...row, detail: detailArr });
       }
     }
     const pagos = Array.from(pagosMap.values());
@@ -494,10 +495,11 @@ export class PagosService {
     const pagosMap = new Map<string, Pago>();
     for (const row of data || []) {
       const existing = pagosMap.get(row.id);
+      const detailArr = Array.isArray(row.detail) ? row.detail : row.detail ? [row.detail] : [];
       if (existing) {
-        existing.detail = [...(existing.detail || []), row.detail];
+        existing.detail = [...(existing.detail || []), ...detailArr];
       } else {
-        pagosMap.set(row.id, { ...row, detail: [row.detail] });
+        pagosMap.set(row.id, { ...row, detail: detailArr });
       }
     }
     return Array.from(pagosMap.values());

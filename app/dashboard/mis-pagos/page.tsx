@@ -26,7 +26,6 @@ function getPagoLabel(pago: Payment): string {
   const detalles = pago.detail || [];
   if (!detalles.length) return "Pago";
   if (detalles.some(d => d.payment_type === "inscripcion")) return "Inscripción";
-  if (detalles.some(d => d.payment_type === "suspension")) return "Suspensión";
   return "Mensualidad";
 }
 

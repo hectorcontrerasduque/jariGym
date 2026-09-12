@@ -343,7 +343,7 @@ export class PagosService {
       payment_id: nuevoPago.id,
       month_number,
       year_number,
-      payment_type: "suspension" as const,
+      payment_type: "mensualidad" as const,
       payment_amount: 0,
     }));
 

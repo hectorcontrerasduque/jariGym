@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { useEffect, useState } from "react";
 import { Avatar } from "@/components/ui/avatar";
-import { LogOut, Dumbbell, User } from "lucide-react";
+import { LogOut, Dumbbell, User, Home, Settings } from "lucide-react";
 import { getAdminLevel, isFullAdmin } from "@/lib/admin-level";
 import { useProfileContext } from "@/components/profile-context";
 import { adminNavItems, miembroNavItems } from "@/lib/nav-items";

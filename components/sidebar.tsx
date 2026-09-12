@@ -8,32 +8,10 @@ import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { useEffect, useState } from "react";
 import { Avatar } from "@/components/ui/avatar";
-import {
-  LayoutDashboard,
-  CreditCard,
-  Users,
-  Settings,
-  LogOut,
-  Dumbbell,
-  Bell,
-  User,
-  Home,
-} from "lucide-react";
+import { LogOut, Dumbbell, User } from "lucide-react";
 import { getAdminLevel, isFullAdmin } from "@/lib/admin-level";
 import { useProfileContext } from "@/components/profile-context";
-
-const adminNavItems = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/dashboard/pagos", label: "Pagos", icon: CreditCard },
-  { href: "/dashboard/miembros", label: "Miembros", icon: Users },
-  { href: "/dashboard/configuracion/notificaciones", label: "Notificaciones", icon: Bell },
-  { href: "/dashboard/configuracion", label: "Config", icon: Settings },
-];
-
-const miembroNavItems = [
-  { href: "/dashboard/mis-pagos?tab=home", label: "Home", icon: Home },
-  { href: "/dashboard/mis-pagos?tab=pagos", label: "Mis Pagos", icon: CreditCard },
-];
+import { adminNavItems, miembroNavItems } from "@/lib/nav-items";
 
 function SidebarNavItem({ item, pathname, variant }: { item: { href: string; label: string; icon: typeof Home }; pathname: string; variant: "desktop" | "mobile" }) {
   const searchParams = useSearchParams();

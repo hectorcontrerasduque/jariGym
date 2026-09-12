@@ -1,20 +1,10 @@
 import { describe, it, expect } from "vitest";
+import { adminNavItems, miembroNavItems } from "@/lib/nav-items";
 
-const superAdminNavItems = [
-  { href: "/dashboard", label: "Dashboard" },
-  { href: "/dashboard/pagos", label: "Pagos" },
-  { href: "/dashboard/miembros", label: "Miembros" },
-  { href: "/dashboard/configuracion/notificaciones", label: "Notificaciones" },
-  { href: "/dashboard/configuracion", label: "Config" },
-];
-
-const miembroNavItems = [
-  { href: "/dashboard/mis-pagos", label: "Mis Pagos" },
-];
-
-describe("Sidebar navigation", () => {
-  it("super_admin should see Dashboard, Pagos, Miembros, Notificaciones, Config", () => {
-    expect(superAdminNavItems.map((i) => i.href)).toEqual([
+describe("Sidebar navigation — real nav items", () => {
+  it("admin has exactly 5 items: Dashboard, Pagos, Miembros, Notificaciones, Config", () => {
+    expect(adminNavItems).toHaveLength(5);
+    expect(adminNavItems.map((i) => i.href)).toEqual([
       "/dashboard",
       "/dashboard/pagos",
       "/dashboard/miembros",
@@ -23,28 +13,37 @@ describe("Sidebar navigation", () => {
     ]);
   });
 
-  it("super_admin should have exactly 5 nav items", () => {
-    expect(superAdminNavItems).toHaveLength(5);
-  });
-
-  it("super_admin nav items should include Notificaciones", () => {
-    const labels = superAdminNavItems.map((i) => i.label);
+  it("admin items include Notificaciones", () => {
+    const labels = adminNavItems.map((i) => i.label);
     expect(labels).toContain("Notificaciones");
   });
 
-  it("miembro should NOT see Dashboard, Reportar, or Config in sidebar", () => {
+  it("miembro has exactly 2 items: Home, Mis Pagos", () => {
+    expect(miembroNavItems).toHaveLength(2);
+    expect(miembroNavItems.map((i) => i.label)).toEqual(["Home", "Mis Pagos"]);
+  });
+
+  it("miembro does NOT see Dashboard, Reportar Pago, or Config", () => {
     const miembroHrefs = miembroNavItems.map((i) => i.href);
     expect(miembroHrefs).not.toContain("/dashboard");
     expect(miembroHrefs).not.toContain("/dashboard/reportar-pago");
     expect(miembroHrefs).not.toContain("/dashboard/configuracion");
   });
 
-  it("miembro should see Mis Pagos", () => {
-    expect(miembroNavItems.map((i) => i.label)).toEqual(["Mis Pagos"]);
+  it("admin does NOT see Mis Pagos", () => {
+    const adminHrefs = adminNavItems.map((i) => i.href);
+    expect(adminHrefs).not.toContain("/dashboard/mis-pagos");
   });
 
-  it("super_admin should not see Mis Pagos in sidebar", () => {
-    const superAdminHrefs = superAdminNavItems.map((i) => i.href);
-    expect(superAdminHrefs).not.toContain("/dashboard/mis-pagos");
+  it("all admin items have an icon component", () => {
+    for (const item of adminNavItems) {
+      expect(item.icon).toBeDefined();
+    }
+  });
+
+  it("all miembro items have an icon component", () => {
+    for (const item of miembroNavItems) {
+      expect(item.icon).toBeDefined();
+    }
   });
 });

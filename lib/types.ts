@@ -38,7 +38,7 @@ export interface Membership {
 
 export type MetodoPago = "efectivo" | "bs" | "binance";
 
-export type TipoPago = "mensualidad" | "inscripcion";
+export type TipoPago = "mensualidad" | "inscripcion" | "suspension";
 
 // Payment = cabecera del pago (tabla payments)
 export interface Payment {

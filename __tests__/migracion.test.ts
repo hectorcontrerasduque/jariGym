@@ -42,8 +42,8 @@ function chainReturn(data: unknown, error: unknown = null) {
     // eslint-disable-next-line security/detect-object-injection
     chain[m] = vi.fn(() => chain);
   }
-  chain.then = (resolve: (value: unknown) => void) => {
-    if (error) reject(error);
+  chain.then = (resolve: (value: unknown) => void, reject?: (reason: unknown) => void) => {
+    if (error && reject) reject(error);
     else resolve({ data, error });
     return chain;
   };

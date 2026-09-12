@@ -1,210 +1,285 @@
 import { describe, it, expect } from "vitest";
-import type { Payment, CreatePagoInput } from "@/lib/types";
-import { getMonthName, formatCurrency } from "@/lib/utils";
+import type { Payment, PaymentDetail, CreatePaymentInput, TipoPago } from "@/lib/types";
+import type { PaymentDetailInput } from "@/lib/services/pagos/pagos.service";
+import { getMonthName, formatCurrency, formatDate } from "@/lib/utils";
 
 function createMockPago(overrides: Partial<Payment> = {}): Payment {
   return {
     id: "test-pago-id",
     user_id: "test-user-id",
-    payment_amount: 25.0,
-    receipt_url: null,
     status: "pendiente",
     payment_method: "efectivo",
     bill_code: null,
+    receipt_url: null,
     payment_note: null,
     approved_by: null,
     approved_at: null,
-    fecha_pago_real: null,
-    mes_pagar: 8,
-    anio_pagar: 2026,
+    created_by: null,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
+    updated_by: null,
     ...overrides,
   };
 }
 
-describe("Pago type", () => {
+function createMockDetail(overrides: Partial<PaymentDetail> = {}): PaymentDetail {
+  return {
+    id: "detail-1",
+    payment_id: "test-pago-id",
+    month_number: 8,
+    year_number: 2026,
+    payment_type: "mensualidad",
+    payment_amount: 25,
+    ...overrides,
+  };
+}
+
+function createMockInput(overrides: Partial<CreatePaymentInput> = {}): CreatePaymentInput {
+  return {
+    user_id: "user-123",
+    payment_method: "efectivo",
+    detalles: [
+      { month_number: 8, year_number: 2026, payment_type: "mensualidad", payment_amount: 25 },
+    ],
+    ...overrides,
+  };
+}
+
+// ─── Payment type ────────────────────────────────────────────
+
+describe("Payment type", () => {
   it("should have required fields", () => {
     const pago = createMockPago();
     expect(pago.id).toBeDefined();
     expect(pago.user_id).toBeDefined();
-    expect(pago.payment_amount).toBeTypeOf("number");
     expect(pago.status).toBeDefined();
     expect(pago.payment_method).toBeDefined();
-    expect(pago.mes_pagar).toBeTypeOf("number");
-    expect(pago.anio_pagar).toBeTypeOf("number");
   });
 
-  it("should not have membresia_id", () => {
+  it("should not have legacy fields", () => {
     const pago = createMockPago();
     expect(pago).not.toHaveProperty("membresia_id");
-  });
-
-  it("should not have membresia relation", () => {
-    const pago = createMockPago();
     expect(pago).not.toHaveProperty("membresia");
+    expect(pago).not.toHaveProperty("payment_amount");
+    expect(pago).not.toHaveProperty("mes_pagar");
+    expect(pago).not.toHaveProperty("anio_pagar");
   });
 
   it("should support all payment statuses", () => {
-    const pendiente = createMockPago({ estado: "pendiente" });
-    const aprobado = createMockPago({ estado: "aprobado" });
-    const rechazado = createMockPago({ estado: "rechazado" });
-    const suspendido = createMockPago({ estado: "suspendido" });
-    const suspendidoPendiente = createMockPago({ estado: "suspendido_pendiente" });
-
-    expect(pendiente.estado).toBe("pendiente");
-    expect(aprobado.estado).toBe("aprobado");
-    expect(rechazado.estado).toBe("rechazado");
-    expect(suspendido.estado).toBe("suspendido");
-    expect(suspendidoPendiente.estado).toBe("suspendido_pendiente");
+    const statuses: Payment["status"][] = [
+      "pendiente", "aprobado", "rechazado", "suspendido", "suspendido_pendiente",
+    ];
+    for (const status of statuses) {
+      const pago = createMockPago({ status });
+      expect(pago.status).toBe(status);
+    }
   });
 
   it("should support all payment methods", () => {
-    const efectivo = createMockPago({ metodo_pago: "efectivo" });
-    const bs = createMockPago({ metodo_pago: "bs" });
-    const binance = createMockPago({ metodo_pago: "binance" });
-    const transferencia = createMockPago({ metodo_pago: "transferencia" });
-    const libre = createMockPago({ metodo_pago: "membresia_libre" });
-
-    expect(efectivo.metodo_pago).toBe("efectivo");
-    expect(bs.metodo_pago).toBe("bs");
-    expect(binance.metodo_pago).toBe("binance");
-    expect(transferencia.metodo_pago).toBe("transferencia");
-    expect(libre.metodo_pago).toBe("membresia_libre");
+    const methods = ["efectivo", "bs", "binance", "transferencia", "membresia_libre"] as const;
+    for (const method of methods) {
+      const pago = createMockPago({ payment_method: method });
+      expect(pago.payment_method).toBe(method);
+    }
   });
 
   it("should have nullable optional fields", () => {
-    const pago = createMockPago({
-      receipt_url: null,
-      bill_code: null,
-      payment_note: null,
-      approved_by: null,
-      approved_at: null,
-    });
-
-    expect(pago.receipt_url).toBeNull();
+    const pago = createMockPago();
     expect(pago.bill_code).toBeNull();
+    expect(pago.receipt_url).toBeNull();
     expect(pago.payment_note).toBeNull();
     expect(pago.approved_by).toBeNull();
     expect(pago.approved_at).toBeNull();
+    expect(pago.created_by).toBeNull();
+    expect(pago.updated_by).toBeNull();
   });
 
-  it("should support tipo_pago field", () => {
-    const membresia = createMockPago({ tipo_pago: "membresia" });
-    const inscripcion = createMockPago({ tipo_pago: "inscripcion" });
-    expect(membresia.tipo_pago).toBe("membresia");
-    expect(inscripcion.tipo_pago).toBe("inscripcion");
-  });
-
-  it("should default estado to pendiente", () => {
+  it("should default status to pendiente", () => {
     const pago = createMockPago();
     expect(pago.status).toBe("pendiente");
   });
-});
 
-describe("Pago label helpers", () => {
-  function getPagoLabel(pago: Payment): string {
-    const isInscripcion = pago.payment_note?.toLowerCase().includes("inscripción") || pago.payment_note?.toLowerCase().includes("inscripcion");
-    if (isInscripcion) return "Inscripción";
-    return `${getMonthName(pago.mes_pagar)} ${pago.anio_pagar}`;
-  }
-
-  it("should return Inscripción for inscripcion pagos", () => {
-    const pago = createMockPago({ payment_note: "Inscripción - pago inicial" });
-    expect(getPagoLabel(pago)).toBe("Inscripción");
+  it("detail array is optional", () => {
+    const pago = createMockPago();
+    expect(pago.detail).toBeUndefined();
   });
 
-  it("should return Inscripción for inscripcion with accent", () => {
-    const pago = createMockPago({ payment_note: "INSCRIPCIÓN" });
-    expect(getPagoLabel(pago)).toBe("Inscripción");
-  });
-
-  it("should return month name for mensualidad pagos", () => {
-    const pago = createMockPago({ mes_pagar: 3, anio_pagar: 2026, payment_note: null });
-    expect(getPagoLabel(pago)).toBe("Marzo 2026");
-  });
-
-  it("should return month name for pagos with other notes", () => {
-    const pago = createMockPago({ mes_pagar: 12, anio_pagar: 2025, payment_note: "Pago regular" });
-    expect(getPagoLabel(pago)).toBe("Diciembre 2025");
+  it("detail with payments has correct structure", () => {
+    const detail = createMockDetail();
+    const pago = createMockPago({ detail: [detail] });
+    expect(pago.detail).toHaveLength(1);
+    expect(pago.detail![0].payment_type).toBe("mensualidad");
+    expect(pago.detail![0].payment_amount).toBe(25);
   });
 });
 
-describe("Pago creation input", () => {
+// ─── PaymentDetail type ──────────────────────────────────────
+
+describe("PaymentDetail type", () => {
+  it("should have required fields", () => {
+    const d = createMockDetail();
+    expect(d.id).toBeDefined();
+    expect(d.payment_id).toBeDefined();
+    expect(d.payment_type).toBeDefined();
+    expect(d.payment_amount).toBeTypeOf("number");
+  });
+
+  it("month_number and year_number can be null", () => {
+    const d = createMockDetail({ month_number: null, year_number: null });
+    expect(d.month_number).toBeNull();
+    expect(d.year_number).toBeNull();
+  });
+
+  it("should support all payment types", () => {
+    const types: TipoPago[] = ["mensualidad", "inscripcion"];
+    for (const payment_type of types) {
+      const d = createMockDetail({ payment_type });
+      expect(d.payment_type).toBe(payment_type);
+    }
+  });
+
+  it("payment_amount can be 0 for inscripcion", () => {
+    const d = createMockDetail({ payment_type: "inscripcion", payment_amount: 0 });
+    expect(d.payment_amount).toBe(0);
+  });
+});
+
+// ─── CreatePaymentInput ──────────────────────────────────────
+
+describe("CreatePaymentInput", () => {
   it("should accept all required fields", () => {
-    const input: CreatePagoInput = {
-      user_id: "user-123",
-      payment_amount: 30,
-      mes_pagar: 8,
-      anio_pagar: 2026,
-      payment_method: "efectivo",
-    };
-
+    const input = createMockInput();
     expect(input.user_id).toBe("user-123");
-    expect(input.payment_amount).toBe(30);
     expect(input.payment_method).toBe("efectivo");
+    expect(input.detalles).toHaveLength(1);
   });
 
-  it("should accept optional fields", () => {
-    const input: CreatePagoInput = {
-      user_id: "user-123",
-      payment_amount: 30,
-      mes_pagar: 8,
-      anio_pagar: 2026,
-      payment_method: "bs",
+  it("detalles must be non-empty", () => {
+    const input = createMockInput({ detalles: [] });
+    expect(input.detalles).toHaveLength(0);
+  });
+
+  it("supports multiple detalles", () => {
+    const input = createMockInput({
+      detalles: [
+        { month_number: 7, year_number: 2026, payment_type: "mensualidad", payment_amount: 25 },
+        { month_number: 8, year_number: 2026, payment_type: "mensualidad", payment_amount: 25 },
+        { month_number: null, year_number: null, payment_type: "inscripcion", payment_amount: 10 },
+      ],
+    });
+    expect(input.detalles).toHaveLength(3);
+    expect(input.detalles[2].payment_type).toBe("inscripcion");
+  });
+
+  it("optional fields are undefined by default", () => {
+    const input = createMockInput();
+    expect(input.receipt_url).toBeUndefined();
+    expect(input.bill_code).toBeUndefined();
+    expect(input.payment_note).toBeUndefined();
+  });
+
+  it("accepts optional fields", () => {
+    const input = createMockInput({
       receipt_url: "https://example.com/comprobante.jpg",
       bill_code: "ABC12",
       payment_note: "Pago de agosto",
-    };
-
+    });
     expect(input.receipt_url).toBe("https://example.com/comprobante.jpg");
     expect(input.bill_code).toBe("ABC12");
-  });
-
-  it("should require payment_note as optional string", () => {
-    const inputWithNote: CreatePagoInput = {
-      user_id: "user-123",
-      payment_amount: 30,
-      mes_pagar: 8,
-      anio_pagar: 2026,
-      payment_method: "efectivo",
-      payment_note: "Pago de agosto",
-    };
-
-    const inputWithoutNote: CreatePagoInput = {
-      user_id: "user-123",
-      payment_amount: 30,
-      mes_pagar: 8,
-      anio_pagar: 2026,
-      payment_method: "efectivo",
-    };
-
-    expect(inputWithNote.payment_note).toBe("Pago de agosto");
-    expect(inputWithoutNote.payment_note).toBeUndefined();
+    expect(input.payment_note).toBe("Pago de agosto");
   });
 });
 
-describe("Payment utility functions", () => {
-  it("formatCurrency should format USD by default", () => {
+// ─── PaymentDetailInput ──────────────────────────────────────
+
+describe("PaymentDetailInput", () => {
+  it("should require all fields", () => {
+    const input: PaymentDetailInput = {
+      month_number: 8,
+      year_number: 2026,
+      payment_type: "mensualidad",
+      payment_amount: 25,
+    };
+    expect(input.month_number).toBe(8);
+    expect(input.year_number).toBe(2026);
+    expect(input.payment_type).toBe("mensualidad");
+    expect(input.payment_amount).toBe(25);
+  });
+
+  it("accepts null month/year for inscripcion", () => {
+    const input: PaymentDetailInput = {
+      month_number: null,
+      year_number: null,
+      payment_type: "inscripcion",
+      payment_amount: 10,
+    };
+    expect(input.month_number).toBeNull();
+    expect(input.payment_type).toBe("inscripcion");
+  });
+});
+
+// ─── Utility functions ───────────────────────────────────────
+
+describe("formatCurrency", () => {
+  it("formats USD by default", () => {
     expect(formatCurrency(25)).toBe("$25.00");
   });
 
-  it("formatCurrency should format with decimals", () => {
+  it("formats with decimals", () => {
     expect(formatCurrency(25.5)).toBe("$25.50");
   });
 
-  it("formatCurrency should format zero", () => {
+  it("formats zero", () => {
     expect(formatCurrency(0)).toBe("$0.00");
   });
 
-  it("getMonthName should return correct month names", () => {
+  it("formats large numbers", () => {
+    expect(formatCurrency(999999)).toBe("$999,999.00");
+  });
+
+  it("formats negative numbers", () => {
+    expect(formatCurrency(-10)).toBe("-$10.00");
+  });
+
+  it("rounds to 2 decimals", () => {
+    expect(formatCurrency(10.005)).toBe("$10.01");
+  });
+});
+
+describe("getMonthName", () => {
+  it("returns correct month names", () => {
     expect(getMonthName(1)).toBe("Enero");
     expect(getMonthName(6)).toBe("Junio");
     expect(getMonthName(12)).toBe("Diciembre");
   });
 
-  it("getMonthName should return empty for invalid month", () => {
+  it("returns empty for invalid month 0", () => {
     expect(getMonthName(0)).toBe("");
+  });
+
+  it("returns empty for invalid month 13", () => {
     expect(getMonthName(13)).toBe("");
+  });
+
+  it("returns empty for negative month", () => {
+    expect(getMonthName(-1)).toBe("");
+  });
+
+  it("returns empty for null/undefined", () => {
+    expect(getMonthName(null as unknown as number)).toBe("");
+    expect(getMonthName(undefined as unknown as number)).toBe("");
+  });
+});
+
+describe("formatDate", () => {
+  it("formats a valid date string", () => {
+    const result = formatDate("2026-08-15T10:30:00Z");
+    expect(result).toContain("2026");
+  });
+
+  it("formats a ISO date string", () => {
+    const result = formatDate("2026-01-20");
+    expect(result).toContain("2026");
+    expect(result).toContain("enero");
   });
 });

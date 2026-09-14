@@ -44,7 +44,7 @@ BEGIN
     IF v_estado = 'pagado' THEN
       v_pago_status := 'aprobado';
     ELSE
-      v_pago_status := 'suspendido';
+      v_pago_status := 'aprobado';
     END IF;
 
     -- Lógica de "foundFirstPagado": saltar suspendidos antes del primer pagado
@@ -83,11 +83,19 @@ BEGIN
         WHERE id = v_existing_pago_id
           AND status IN ('pendiente', 'suspendido');
 
-        UPDATE payment_detail
-        SET payment_amount = p_monto_mensual
-        WHERE payment_id = v_existing_pago_id
-          AND month_number = v_mes
-          AND year_number = v_anio;
+        IF v_estado = 'suspendido' THEN
+          UPDATE payment_detail
+          SET payment_type = 'suspension', payment_amount = 0
+          WHERE payment_id = v_existing_pago_id
+            AND month_number = v_mes
+            AND year_number = v_anio;
+        ELSE
+          UPDATE payment_detail
+          SET payment_amount = p_monto_mensual
+          WHERE payment_id = v_existing_pago_id
+            AND month_number = v_mes
+            AND year_number = v_anio;
+        END IF;
 
         v_pagos_actualizados := v_pagos_actualizados + 1;
       END IF;
@@ -104,8 +112,13 @@ BEGIN
       RETURNING id INTO v_pago_id;
 
       IF v_pago_id IS NOT NULL THEN
-        INSERT INTO payment_detail (payment_id, month_number, year_number, payment_type, payment_amount)
-        VALUES (v_pago_id, v_mes, v_anio, 'mensualidad', p_monto_mensual);
+        IF v_estado = 'suspendido' THEN
+          INSERT INTO payment_detail (payment_id, month_number, year_number, payment_type, payment_amount)
+          VALUES (v_pago_id, v_mes, v_anio, 'suspension', 0);
+        ELSE
+          INSERT INTO payment_detail (payment_id, month_number, year_number, payment_type, payment_amount)
+          VALUES (v_pago_id, v_mes, v_anio, 'mensualidad', p_monto_mensual);
+        END IF;
 
         v_pagos_creados := v_pagos_creados + 1;
       END IF;

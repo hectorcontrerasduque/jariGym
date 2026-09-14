@@ -542,14 +542,21 @@ function MisPagosContent() {
     );
   }, [pagosOrdenados, anioPagos]);
 
-  // Último pago aprobado (el más reciente por created_at desc, id desc como tiebreaker)
+  // Último pago aprobado (el más reciente por año/mes del detail, igual que la UI)
   // Usa pagos (todos, sin filtro de año) para que coincida con la lógica del API
   const isLastApproved = useCallback((pago: Payment) => {
     const aprobados = pagos
       .filter(p => p.status === "aprobado")
       .sort((a, b) => {
-        const cmp = (b.created_at || "").localeCompare(a.created_at || "");
-        return cmp !== 0 ? cmp : (b.id || "").localeCompare(a.id || "");
+        const aMax = a.detail?.reduce((max, d) => {
+          const key = (d.year_number || 0) * 100 + (d.month_number || 0);
+          return key > max ? key : max;
+        }, 0) || 0;
+        const bMax = b.detail?.reduce((max, d) => {
+          const key = (d.year_number || 0) * 100 + (d.month_number || 0);
+          return key > max ? key : max;
+        }, 0) || 0;
+        return bMax - aMax || (b.id || "").localeCompare(a.id || "");
       });
     return aprobados.length > 0 && aprobados[0].id === pago.id;
   }, [pagos]);

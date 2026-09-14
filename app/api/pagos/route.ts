@@ -47,17 +47,29 @@ export async function DELETE(request: Request) {
     if (isAdmin) {
       // Super admin: puede borrar pendientes + el último aprobado
       if (esAprobado) {
-        const { data: ultimo } = await serviceSupabase
+        // Buscar el último aprobado usando year_number/month_number del detail (igual que la UI)
+        const { data: todosAprobados } = await serviceSupabase
           .from("payments")
-          .select("id")
+          .select("id, payment_detail(year_number, month_number)")
           .eq("user_id", pagoActual.user_id)
-          .eq("status", "aprobado")
-          .order("created_at", { ascending: false })
-          .order("id", { ascending: false })
-          .limit(1)
-          .single();
+          .eq("status", "aprobado");
 
-        if (ultimo?.id !== pagoId) {
+        if (!todosAprobados || todosAprobados.length === 0) {
+          return NextResponse.json({ error: "No hay pagos aprobados" }, { status: 404 });
+        }
+
+        // Ordenar por year_number * 100 + month_number desc (igual que la UI)
+        const ordenados = todosAprobados
+          .map(p => {
+            const maxKey = (p.payment_detail || []).reduce((max, d) => {
+              const key = ((d.year_number || 0) * 100 + (d.month_number || 0));
+              return key > max ? key : max;
+            }, 0);
+            return { id: p.id, maxKey };
+          })
+          .sort((a, b) => b.maxKey - a.maxKey || (b.id || "").localeCompare(a.id || ""));
+
+        if (ordenados[0].id !== pagoId) {
           return NextResponse.json({ error: "Solo se puede eliminar el último pago aprobado" }, { status: 403 });
         }
       } else if (!esPendiente) {

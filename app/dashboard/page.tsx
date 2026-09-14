@@ -680,7 +680,7 @@ export default function DashboardPage() {
                       const detailInfo = pago.detail?.map(d => {
                         const mes = d.month_number ? getMonthName(d.month_number).slice(0, 3) : "";
                         const anio = d.year_number || "";
-                        const tipo = d.payment_type === "inscripcion" ? "Insc." : "Mens.";
+                        const tipo = d.payment_type === "inscripcion" ? "Insc." : d.payment_type === "suspension" ? "Susp." : "Mens.";
                         return d.month_number ? `${mes} ${anio} (${tipo})` : tipo;
                       }).join(" | ") || "—";
                       const statusLabel = pago.status === "aprobado" ? "Aprobado" : pago.status === "rechazado" ? "Rechazado" : pago.status === "suspendido" ? "Suspendido" : "Pendiente";

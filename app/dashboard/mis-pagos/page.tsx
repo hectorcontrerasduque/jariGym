@@ -35,7 +35,9 @@ function isInscripcion(pago: Payment): boolean {
 }
 
 function getTipoLabel(pago: Payment): string {
-  return isInscripcion(pago) ? "Inscripción" : "Mensualidad";
+  if (isInscripcion(pago)) return "Inscripción";
+  if (pago.detail?.some(d => d.payment_type === "suspension")) return "Suspensión";
+  return "Mensualidad";
 }
 
 function getTotalMonto(pago: Payment): number {

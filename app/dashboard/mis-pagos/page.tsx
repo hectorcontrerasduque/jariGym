@@ -923,27 +923,16 @@ function MisPagosContent() {
               {expandedMoroso && (
                 <CardContent className="relative">
                   <div className="space-y-2">
-                    {morosidad.mesesDeuda.map(mes => {
-                      // Si existe payment_detail para este mes → es mensualidad pendiente
-                      // Si NO existe → es inscripción pendiente
-                      const esMensualidad = pagos.some(p =>
-                        (p.detail || []).some(d =>
-                          d.payment_type === "mensualidad" &&
-                          d.month_number === mes &&
-                          d.year_number === morosidad.anioActual
-                        )
-                      );
-                      return (
-                        <div key={mes} className="flex items-center justify-between p-2.5 bg-gym-bg/60 rounded-xl">
-                          <div className="flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full bg-gym-danger" />
-                            <span className="text-sm text-gym-text">{getMonthName(mes)} {morosidad.anioActual}</span>
-                            <span className="text-[10px] text-gym-muted">— {esMensualidad ? "Mensualidad" : "Inscripción"}</span>
-                          </div>
-                          <span className="text-sm font-medium text-gym-text">{formatCurrency(esMensualidad ? morosidad.montoMensual : morosidad.montoInscripcion)}</span>
+                    {morosidad.mesesDeuda.map(mes => (
+                      <div key={mes} className="flex items-center justify-between p-2.5 bg-gym-bg/60 rounded-xl">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full bg-gym-danger" />
+                          <span className="text-sm text-gym-text">{getMonthName(mes)} {morosidad.anioActual}</span>
+                          <span className="text-[10px] text-gym-muted">— Mensualidad</span>
                         </div>
-                      );
-                    })}
+                        <span className="text-sm font-medium text-gym-text">{formatCurrency(morosidad.montoMensual)}</span>
+                      </div>
+                    ))}
                     {morosidad.debeInscripcion && (
                       <div className="flex items-center justify-between p-2.5 bg-gym-bg/60 rounded-xl border border-gym-danger/20">
                         <div className="flex items-center gap-2">

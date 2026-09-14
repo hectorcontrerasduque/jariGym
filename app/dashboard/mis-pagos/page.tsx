@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { pagosService } from "@/lib/services/pagos/pagos.service";
 import { createClient } from "@/lib/supabase/client";
 import { formatCurrency, formatDate, getMonthName, getDiaCobro } from "@/lib/utils";
-import { CreditCard, CheckCircle, Clock, Calendar, Eye, Trash2, FileText, Plus, Search, Upload, Gift, AlertTriangle, ChevronDown, ChevronRight, X, Save, Phone, Mail, MapPin } from "lucide-react";
+import { CreditCard, CheckCircle, Clock, Calendar, Eye, Trash2, FileText, Plus, Search, Upload, Gift, AlertTriangle, ChevronDown, ChevronRight, X, Save, Phone, Mail, MapPin, XCircle } from "lucide-react";
 import { showToast } from "@/components/ui/toast";
 import { Modal } from "@/components/ui/modal";
 import { messages } from "@/lib/messages";
@@ -86,6 +86,8 @@ function MisPagosContent() {
   // Home expand toggles
   const [expandedPendientes, setExpandedPendientes] = useState(false);
   const [expandedMoroso, setExpandedMoroso] = useState(true);
+  const [expandedRechazados, setExpandedRechazados] = useState(false);
+  const [expandedSuspendidos, setExpandedSuspendidos] = useState(false);
 
   // Payment form
   const [selectedPago, setSelectedPago] = useState<Payment | null>(null);
@@ -556,8 +558,11 @@ function MisPagosContent() {
   const pendientesHome = pagosHome.filter(p => p.status === "pendiente" || p.status === "suspendido_pendiente");
   const totalPendientesHome = pendientesHome.reduce((sum, p) => sum + (p.detail?.reduce((s, d) => s + d.payment_amount, 0) || 0), 0);
 
-  const rechazadosSuspensosHome = pagosHome.filter(p => p.status === "rechazado" || p.status === "suspendido");
-  const totalRechazadosSuspensosHome = rechazadosSuspensosHome.reduce((sum, p) => sum + (p.detail?.reduce((s, d) => s + d.payment_amount, 0) || 0), 0);
+  const suspendidosHome = pagosHome.filter(p => p.status === "suspendido");
+  const totalSuspendidosHome = suspendidosHome.reduce((sum, p) => sum + (p.detail?.reduce((s, d) => s + d.payment_amount, 0) || 0), 0);
+
+  const rechazadosHome = pagosHome.filter(p => p.status === "rechazado");
+  const totalRechazadosHome = rechazadosHome.reduce((sum, p) => sum + (p.detail?.reduce((s, d) => s + d.payment_amount, 0) || 0), 0);
 
   const pagosHomeSorted = useMemo(() => {
     return [...pagosHome].sort((a, b) => {
@@ -964,39 +969,75 @@ function MisPagosContent() {
             </div>
           </div>
 
-          {/* Suspendidos / Rechazados */}
-          {rechazadosSuspensosHome.length > 0 && (
+          {/* Rechazados */}
+          {rechazadosHome.length > 0 && (
             <div className="rounded-xl border border-gym-border bg-gym-surface p-4">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4 text-gym-danger" />
-                  <span className="text-xs font-medium text-gym-muted uppercase tracking-wide">Suspendidos / Rechazados</span>
-                </div>
-                <div className="text-right">
-                  <span className="text-lg font-bold text-gym-danger">{rechazadosSuspensosHome.length}</span>
-                  {totalRechazadosSuspensosHome > 0 && (
-                    <p className="text-[10px] text-gym-danger">{formatCurrency(totalRechazadosSuspensosHome)}</p>
-                  )}
-                </div>
-              </div>
-              <div className="space-y-1.5">
-                {rechazadosSuspensosHome.filter(p => p.status === "rechazado").length > 0 && (
-                  <div className="flex items-center justify-between px-2 py-1.5 bg-gym-bg/60 rounded-lg">
-                    <span className="text-xs text-gym-muted">Rechazados ({rechazadosSuspensosHome.filter(p => p.status === "rechazado").length})</span>
-                    <span className="text-xs font-semibold text-gym-danger">
-                      {formatCurrency(rechazadosSuspensosHome.filter(p => p.status === "rechazado").reduce((sum, p) => sum + (p.detail?.reduce((s, d) => s + d.payment_amount, 0) || 0), 0))}
-                    </span>
+              <button type="button" onClick={() => setExpandedRechazados(!expandedRechazados)} className="w-full text-left">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <XCircle className="w-4 h-4 text-gym-danger" />
+                    <span className="text-xs font-medium text-gym-muted uppercase tracking-wide">Rechazados</span>
+                    <Badge variant="danger" className="text-[10px]">{rechazadosHome.length}</Badge>
                   </div>
-                )}
-                {rechazadosSuspensosHome.filter(p => p.status === "suspendido").length > 0 && (
-                  <div className="flex items-center justify-between px-2 py-1.5 bg-gym-bg/60 rounded-lg">
-                    <span className="text-xs text-gym-muted">Suspendidos ({rechazadosSuspensosHome.filter(p => p.status === "suspendido").length})</span>
-                    <span className="text-xs font-semibold text-gym-danger">
-                      {formatCurrency(rechazadosSuspensosHome.filter(p => p.status === "suspendido").reduce((sum, p) => sum + (p.detail?.reduce((s, d) => s + d.payment_amount, 0) || 0), 0))}
-                    </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-semibold text-gym-danger">{formatCurrency(totalRechazadosHome)}</span>
+                    {expandedRechazados ? <ChevronDown className="w-4 h-4 text-gym-muted" /> : <ChevronRight className="w-4 h-4 text-gym-muted" />}
                   </div>
-                )}
-              </div>
+                </div>
+              </button>
+              {expandedRechazados && (
+                <div className="mt-2 space-y-1.5">
+                  {rechazadosHome.flatMap(p => (p.detail || []).map(d => (
+                    <div key={d.id} className="flex items-center justify-between p-2.5 bg-gym-bg/60 rounded-xl">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-gym-danger" />
+                        <span className="text-sm text-gym-text">
+                          {d.payment_type === "inscripcion"
+                            ? "Inscripción"
+                            : `${getMonthName(d.month_number!)} ${d.year_number} — Mensualidad`}
+                        </span>
+                      </div>
+                      <span className="text-sm font-medium text-gym-text">{formatCurrency(d.payment_amount)}</span>
+                    </div>
+                  )))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Suspendidos */}
+          {suspendidosHome.length > 0 && (
+            <div className="rounded-xl border border-gym-border bg-gym-surface p-4">
+              <button type="button" onClick={() => setExpandedSuspendidos(!expandedSuspendidos)} className="w-full text-left">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-gym-danger" />
+                    <span className="text-xs font-medium text-gym-muted uppercase tracking-wide">Suspendidos</span>
+                    <Badge variant="danger" className="text-[10px]">{suspendidosHome.length}</Badge>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-semibold text-gym-danger">{formatCurrency(totalSuspendidosHome)}</span>
+                    {expandedSuspendidos ? <ChevronDown className="w-4 h-4 text-gym-muted" /> : <ChevronRight className="w-4 h-4 text-gym-muted" />}
+                  </div>
+                </div>
+              </button>
+              {expandedSuspendidos && (
+                <div className="mt-2 space-y-1.5">
+                  {suspendidosHome.flatMap(p => (p.detail || []).map(d => (
+                    <div key={d.id} className="flex items-center justify-between p-2.5 bg-gym-bg/60 rounded-xl">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-gym-danger" />
+                        <span className="text-sm text-gym-text">
+                          {d.payment_type === "inscripcion"
+                            ? "Inscripción"
+                            : `${getMonthName(d.month_number!)} ${d.year_number} — Mensualidad`}
+                        </span>
+                      </div>
+                      <span className="text-sm font-medium text-gym-text">{formatCurrency(d.payment_amount)}</span>
+                    </div>
+                  )))}
+                </div>
+              )}
             </div>
           )}
 

@@ -586,7 +586,7 @@ function MisPagosContent() {
       pagos
         .filter(p => p.status === "aprobado" || p.status === "suspendido")
         .flatMap(p => (p.detail || [])
-          .filter(d => d.payment_type === "mensualidad" && d.year_number === anioActual)
+          .filter(d => (d.payment_type === "mensualidad" || d.payment_type === "suspension") && d.year_number === anioActual)
           .map(d => d.month_number!))
     );
 

@@ -575,7 +575,7 @@ export class PagosService {
     const montoDeuda = montoDeudaInscripcion + montoDeudaMensualidad;
 
     const pagosMesActual = pagosConDetalle.filter(
-      (p) => ["aprobado", "suspendido"].includes(p.status) && p.month_number === mesActual && p.year_number === anioConsulta && p.payment_type === "mensualidad"
+      (p) => ["aprobado", "suspendido"].includes(p.status) && p.month_number === mesActual && p.year_number === anioConsulta && (p.payment_type === "mensualidad" || p.payment_type === "suspension")
     );
     const usuariosAlDia = new Set(
       pagosMesActual.filter((p) => miembrosConInscripcionPagada.has(p.user_id)).map((p) => p.user_id)
@@ -992,7 +992,7 @@ export class PagosService {
       .select("payment_id")
       .eq("month_number", mesActual)
       .eq("year_number", anioConsulta)
-      .eq("payment_type", "mensualidad");
+      .in("payment_type", ["mensualidad", "suspension"]);
 
     const pagoIds = [...new Set((pagosDetalles || []).map((d) => d.payment_id))];
 

@@ -72,7 +72,16 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
   }
 
   return (
-    <div className="fixed inset-0 z-[200] flex items-start justify-center bg-black/70 backdrop-blur-sm overflow-y-auto py-8">
+    <>
+      {downloading && (
+        <div className="fixed inset-0 z-[250] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="text-center">
+            <div className="animate-spin w-10 h-10 border-2 border-gym-primary border-t-transparent rounded-full mx-auto" />
+            <p className="text-gym-muted text-sm mt-4">Generando imagen...</p>
+          </div>
+        </div>
+      )}
+      <div className="fixed inset-0 z-[200] flex items-start justify-center bg-black/70 backdrop-blur-sm overflow-y-auto py-8">
       <div className="bg-gym-surface border border-gym-border rounded-2xl max-w-5xl w-full mx-4 overflow-hidden">
         {/* Toolbar desktop */}
         <div className="hidden sm:flex items-center justify-between p-4 border-b border-gym-border">
@@ -176,5 +185,6 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
         </div>
       </div>
     </div>
+    </>
   );
 }

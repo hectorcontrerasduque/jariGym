@@ -30,15 +30,47 @@ export async function DELETE(request: Request) {
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
 
-    const query = serviceSupabase.from("payments").delete().eq("id", pagoId);
+    // Verificar que el pago existe y su estado
+    const { data: pagoActual } = await serviceSupabase
+      .from("payments")
+      .select("status, user_id")
+      .eq("id", pagoId)
+      .single();
 
-    if (isAdmin) {
-      query.in("status", ["pendiente", "suspendido_pendiente"]);
-    } else {
-      query.eq("user_id", user.id).in("status", ["pendiente", "suspendido_pendiente"]);
+    if (!pagoActual) {
+      return NextResponse.json({ error: "Pago no encontrado" }, { status: 404 });
     }
 
-    const { error } = await query;
+    const esPendiente = ["pendiente", "suspendido_pendiente"].includes(pagoActual.status);
+    const esAprobado = pagoActual.status === "aprobado";
+
+    if (isAdmin) {
+      // Super admin: puede borrar pendientes/suspendido_pendiente + el último aprobado
+      if (esAprobado) {
+        const { data: ultimo } = await serviceSupabase
+          .from("payments")
+          .select("id")
+          .eq("user_id", pagoActual.user_id)
+          .eq("status", "aprobado")
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .single();
+
+        if (ultimo?.id !== pagoId) {
+          return NextResponse.json({ error: "Solo se puede eliminar el último pago aprobado" }, { status: 403 });
+        }
+      } else if (!esPendiente) {
+        return NextResponse.json({ error: "No se puede eliminar este pago" }, { status: 403 });
+      }
+    } else {
+      // Miembro: solo puede borrar sus propios pendientes
+      if (pagoActual.user_id !== user.id || !esPendiente) {
+        return NextResponse.json({ error: "No tienes permiso para eliminar este pago" }, { status: 403 });
+      }
+    }
+
+    // ON DELETE CASCADE elimina payment_detail automáticamente
+    const { error } = await serviceSupabase.from("payments").delete().eq("id", pagoId);
     if (error) throw error;
 
     return NextResponse.json({ success: true });

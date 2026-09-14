@@ -531,6 +531,12 @@ function MisPagosContent() {
     );
   }, [pagosOrdenados, anioPagos]);
 
+  // Último pago aprobado (el más reciente por created_at desc) — solo super admin puede eliminarlo
+  const isLastApproved = useCallback((pago: Payment) => {
+    const aprobados = pagosFiltrados.filter(p => p.status === "aprobado");
+    return aprobados.length > 0 && aprobados[0].id === pago.id;
+  }, [pagosFiltrados]);
+
   const aprobados = pagosFiltrados.filter(p => p.status === "aprobado");
   const pendientes = pagosFiltrados.filter(p => p.status === "pendiente");
   const montoAprobado = aprobados.reduce((sum, p) => sum + (p.detail?.reduce((s, d) => s + d.payment_amount, 0) || 0), 0);
@@ -658,7 +664,7 @@ function MisPagosContent() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-display font-bold text-gym-text neon-text">{activeTab === "home" ? "Home" : "Mis Pagos"}</h1>
+          <h1 className="text-2xl font-display font-bold text-gym-text neon-text">{activeTab === "home" && !isSuperAdmin ? "Home" : "Mis Pagos"}</h1>
           <p className="text-gym-muted text-sm">
             {activeTab === "home" ? "Resumen de tu cuenta" : miembroSeleccionado ? `Pagos de ${miembroSeleccionado.full_name || miembroSeleccionado.email}` : "Historial y registro de pagos"}
           </p>
@@ -1536,7 +1542,8 @@ function MisPagosContent() {
                     >
                       <Eye className="w-4 h-4" />
                     </button>
-                    {(pago.status === "pendiente" || pago.status === "suspendido_pendiente") && (
+                    {(pago.status === "pendiente" || pago.status === "suspendido_pendiente" ||
+                      (isSuperAdmin && pago.status === "aprobado" && isLastApproved(pago))) && (
                       <button
                         onClick={() => handleDelete(pago.id)}
                         disabled={deleting === pago.id}

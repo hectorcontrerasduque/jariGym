@@ -558,7 +558,9 @@ function MisPagosContent() {
   const pendientesHome = pagosHome.filter(p => p.status === "pendiente" || p.status === "suspendido_pendiente");
   const totalPendientesHome = pendientesHome.reduce((sum, p) => sum + (p.detail?.reduce((s, d) => s + d.payment_amount, 0) || 0), 0);
 
-  const suspendidosHome = pagosHome.filter(p => p.status === "suspendido");
+  const suspendidosHome = pagosHome.filter(p =>
+    p.status === "aprobado" && (p.detail || []).some(d => d.payment_type === "suspension")
+  );
   const totalSuspendidosHome = suspendidosHome.reduce((sum, p) => sum + (p.detail?.reduce((s, d) => s + d.payment_amount, 0) || 0), 0);
 
   const rechazadosHome = pagosHome.filter(p => p.status === "rechazado");
@@ -1037,13 +1039,13 @@ function MisPagosContent() {
             <button type="button" onClick={() => setExpandedSuspendidos(!expandedSuspendidos)} className="w-full text-left">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4 text-gym-danger" />
+                  <AlertTriangle className="w-4 h-4 text-gym-warning" />
                   <span className="text-xs font-medium text-gym-muted uppercase tracking-wide">Suspendidos</span>
-                  {suspendidosHome.length > 0 && <Badge variant="danger" className="text-[10px]">{suspendidosHome.length}</Badge>}
+                  {suspendidosHome.length > 0 && <Badge variant="warning" className="text-[10px]">{suspendidosHome.length}</Badge>}
                 </div>
                 <div className="flex items-center gap-2">
                   {totalSuspendidosHome > 0 && (
-                    <span className="text-sm font-semibold text-gym-danger">{formatCurrency(totalSuspendidosHome)}</span>
+                    <span className="text-sm font-semibold text-gym-warning">{formatCurrency(totalSuspendidosHome)}</span>
                   )}
                   {expandedSuspendidos ? <ChevronDown className="w-4 h-4 text-gym-muted" /> : <ChevronRight className="w-4 h-4 text-gym-muted" />}
                 </div>
@@ -1057,11 +1059,13 @@ function MisPagosContent() {
                 {suspendidosHome.flatMap(p => (p.detail || []).map(d => (
                   <div key={d.id} className="flex items-center justify-between p-2.5 bg-gym-bg/60 rounded-xl">
                     <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-gym-danger" />
+                      <div className="w-2 h-2 rounded-full bg-gym-warning" />
                       <span className="text-sm text-gym-text">
-                        {d.payment_type === "inscripcion"
-                          ? "Inscripción"
-                          : `${getMonthName(d.month_number!)} ${d.year_number} — Mensualidad`}
+                        {d.payment_type === "suspension"
+                          ? `${getMonthName(d.month_number!)} ${d.year_number} — Solicitud de suspensión`
+                          : d.payment_type === "inscripcion"
+                            ? "Inscripción"
+                            : `${getMonthName(d.month_number!)} ${d.year_number} — Mensualidad`}
                       </span>
                     </div>
                     <span className="text-sm font-medium text-gym-text">{formatCurrency(d.payment_amount)}</span>

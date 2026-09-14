@@ -67,7 +67,7 @@ describe("Payment type", () => {
 
   it("should support all payment statuses", () => {
     const statuses: Payment["status"][] = [
-      "pendiente", "aprobado", "rechazado", "suspendido", "suspendido_pendiente",
+      "pendiente", "aprobado", "rechazado", "suspendido",
     ];
     for (const status of statuses) {
       const pago = createMockPago({ status });

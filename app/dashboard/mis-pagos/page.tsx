@@ -567,7 +567,7 @@ function MisPagosContent() {
   const montoAprobadoMensualidad = aprobadosMensualidad.reduce((sum, p) => sum + (p.detail?.filter(d => d.payment_type === "mensualidad").reduce((s, d) => s + d.payment_amount, 0) || 0), 0);
   const montoAprobadoInscripcion = aprobadosInscripcion.reduce((sum, p) => sum + (p.detail?.filter(d => d.payment_type === "inscripcion").reduce((s, d) => s + d.payment_amount, 0) || 0), 0);
 
-  const pendientesHome = pagosHome.filter(p => p.status === "pendiente" || p.status === "suspendido_pendiente");
+  const pendientesHome = pagosHome.filter(p => p.status === "pendiente");
   const totalPendientesHome = pendientesHome.reduce((sum, p) => sum + (p.detail?.reduce((s, d) => s + d.payment_amount, 0) || 0), 0);
 
   const suspendidosHome = pagosHome.filter(p =>
@@ -1553,7 +1553,7 @@ function MisPagosContent() {
                     >
                       <Eye className="w-4 h-4" />
                     </button>
-                    {(pago.status === "pendiente" || pago.status === "suspendido_pendiente" ||
+                    {(pago.status === "pendiente" ||
                       (isSuperAdmin && pago.status === "aprobado" && isLastApproved(pago))) && (
                       <button
                         onClick={() => handleDelete(pago)}

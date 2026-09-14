@@ -302,7 +302,7 @@ export class PagosService {
         .eq("month_number", mes)
         .eq("year_number", anio)
         .eq("payments.user_id", usuarioId)
-        .in("payments.status", ["pendiente", "suspendido_pendiente"])
+        .in("payments.status", ["pendiente"])
         .maybeSingle();
 
       if (detalleExistente) {

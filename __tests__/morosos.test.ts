@@ -312,14 +312,14 @@ describe("Morosos detection — real getMiembrosMorosos", () => {
     expect(result).toHaveLength(0);
   });
 
-  it("member with suspendido_pendiente payment is still moroso for that month", async () => {
+  it("member with pendiente payment is still moroso for that month", async () => {
     const elegibles = makeElegibles({
       miembros: [makeMiembro({ start_date: "2026-01-01" })],
     });
     const pagos = [1, 2, 3, 4, 5, 6, 7].map((mes) =>
       makePagoRpc({ month_number: mes, status: "aprobado" })
     );
-    pagos.push(makePagoRpc({ month_number: 8, status: "suspendido_pendiente" }));
+    pagos.push(makePagoRpc({ month_number: 8, status: "pendiente" }));
 
     const result = await getMorosos(elegibles, pagos);
 

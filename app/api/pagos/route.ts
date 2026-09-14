@@ -41,11 +41,11 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: "Pago no encontrado" }, { status: 404 });
     }
 
-    const esPendiente = ["pendiente", "suspendido_pendiente"].includes(pagoActual.status);
+    const esPendiente = pagoActual.status === "pendiente";
     const esAprobado = pagoActual.status === "aprobado";
 
     if (isAdmin) {
-      // Super admin: puede borrar pendientes/suspendido_pendiente + el último aprobado
+      // Super admin: puede borrar pendientes + el último aprobado
       if (esAprobado) {
         const { data: ultimo } = await serviceSupabase
           .from("payments")

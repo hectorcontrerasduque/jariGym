@@ -41,7 +41,7 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: "Pago no encontrado" }, { status: 404 });
     }
 
-    const esPendiente = pagoActual.status === "pendiente";
+    const esPendiente = ["pendiente", "suspendido_pendiente"].includes(pagoActual.status);
     const esAprobado = pagoActual.status === "aprobado";
 
     if (isAdmin) {
@@ -53,6 +53,7 @@ export async function DELETE(request: Request) {
           .eq("user_id", pagoActual.user_id)
           .eq("status", "aprobado")
           .order("created_at", { ascending: false })
+          .order("id", { ascending: false })
           .limit(1)
           .single();
 

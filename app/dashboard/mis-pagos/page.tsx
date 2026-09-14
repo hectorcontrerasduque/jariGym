@@ -542,13 +542,17 @@ function MisPagosContent() {
     );
   }, [pagosOrdenados, anioPagos]);
 
-  // Último pago aprobado (el más reciente por created_at desc) — solo super admin puede eliminarlo
+  // Último pago aprobado (el más reciente por created_at desc, id desc como tiebreaker)
+  // Usa pagos (todos, sin filtro de año) para que coincida con la lógica del API
   const isLastApproved = useCallback((pago: Payment) => {
-    const aprobados = pagosFiltrados
+    const aprobados = pagos
       .filter(p => p.status === "aprobado")
-      .sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
+      .sort((a, b) => {
+        const cmp = (b.created_at || "").localeCompare(a.created_at || "");
+        return cmp !== 0 ? cmp : (b.id || "").localeCompare(a.id || "");
+      });
     return aprobados.length > 0 && aprobados[0].id === pago.id;
-  }, [pagosFiltrados]);
+  }, [pagos]);
 
   const aprobados = pagosFiltrados.filter(p => p.status === "aprobado");
   const pendientes = pagosFiltrados.filter(p => p.status === "pendiente");

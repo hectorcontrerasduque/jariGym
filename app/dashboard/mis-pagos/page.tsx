@@ -954,20 +954,44 @@ function MisPagosContent() {
           )}
 
           {/* Pendientes */}
-          <div className="rounded-xl border border-gym-border bg-gym-surface p-4">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <Clock className="w-4 h-4 text-gym-warning" />
-                <span className="text-xs font-medium text-gym-muted uppercase tracking-wide">Pendientes</span>
-              </div>
-              <div className="text-right">
-                <span className="text-lg font-bold text-gym-warning">{pendientesHome.length}</span>
-                {totalPendientesHome > 0 && (
-                  <p className="text-[10px] text-gym-warning">{formatCurrency(totalPendientesHome)}</p>
-                )}
-              </div>
+          {pendientesHome.length > 0 && (
+            <div className="rounded-xl border border-gym-border bg-gym-surface p-4">
+              <button type="button" onClick={() => setExpandedPendientes(!expandedPendientes)} className="w-full text-left">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-gym-warning" />
+                    <span className="text-xs font-medium text-gym-muted uppercase tracking-wide">Pendientes</span>
+                    <Badge variant="warning" className="text-[10px]">{pendientesHome.length}</Badge>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {totalPendientesHome > 0 && (
+                      <span className="text-sm font-semibold text-gym-warning">{formatCurrency(totalPendientesHome)}</span>
+                    )}
+                    {expandedPendientes ? <ChevronDown className="w-4 h-4 text-gym-muted" /> : <ChevronRight className="w-4 h-4 text-gym-muted" />}
+                  </div>
+                </div>
+              </button>
+              {expandedPendientes && (
+                <div className="mt-2 space-y-1.5">
+                  {pendientesHome.flatMap(p => (p.detail || []).map(d => (
+                    <div key={d.id} className="flex items-center justify-between p-2.5 bg-gym-bg/60 rounded-xl">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 rounded-full bg-gym-warning" />
+                        <span className="text-sm text-gym-text">
+                          {d.payment_type === "suspension"
+                            ? `${getMonthName(d.month_number!)} ${d.year_number} — Solicitud de suspensión`
+                            : d.payment_type === "inscripcion"
+                              ? "Inscripción"
+                              : `${getMonthName(d.month_number!)} ${d.year_number} — Mensualidad`}
+                        </span>
+                      </div>
+                      <span className="text-sm font-medium text-gym-text">{formatCurrency(d.payment_amount)}</span>
+                    </div>
+                  )))}
+                </div>
+              )}
             </div>
-          </div>
+          )}
 
           {/* Rechazados */}
           {rechazadosHome.length > 0 && (

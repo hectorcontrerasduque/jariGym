@@ -548,7 +548,6 @@ export default function MiembrosPage() {
 
   return (
     <>
-    <div className="space-y-6 animate-fadeIn relative">
       <Loader show={saving} message={messages.common.creandoMiembro} variant="overlay" />
       <Loader show={togglingMembresia} message={messages.common.actualizandoMembresia} variant="overlay" />
       <Loader show={togglingSuperAdmin} message={messages.common.cambiandoRol} variant="overlay" />
@@ -556,6 +555,7 @@ export default function MiembrosPage() {
       <Loader show={savingMembresia} message={messages.common.guardandoMembresia} variant="overlay" />
       <Loader show={savingNotaAdmin} message={messages.common.guardandoNota} variant="overlay" />
       <Loader show={eliminando} message={messages.common.eliminando} variant="overlay" />
+    <div className="space-y-6 animate-fadeIn relative">
       <div className="absolute top-0 right-0 w-72 h-72 bg-gym-secondary/5 rounded-full blur-3xl animate-pulse" />
 
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 relative z-10">
@@ -1105,12 +1105,14 @@ export default function MiembrosPage() {
         <Save className="w-6 h-6" />
       </button>
     )}
-    <button
-      onClick={() => setModalNuevo(true)}
-      className="sm:hidden fixed bottom-24 right-4 z-[60] w-14 h-14 rounded-full bg-gym-success/80 text-white shadow-lg shadow-gym-success/20 flex items-center justify-center active:scale-95 transition-all"
-    >
-      <Plus className="w-6 h-6" />
-    </button>
+    {!modalNuevo && (
+      <button
+        onClick={() => setModalNuevo(true)}
+        className="sm:hidden fixed bottom-24 right-4 z-[60] w-14 h-14 rounded-full bg-gym-success/80 text-white shadow-lg shadow-gym-success/20 flex items-center justify-center active:scale-95 transition-all"
+      >
+        <Plus className="w-6 h-6" />
+      </button>
+    )}
   </>
   );
 }

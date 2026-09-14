@@ -787,6 +787,19 @@ function MisPagosContent() {
                   )}
                 </div>
               )}
+              {metodosPago.filter(m => m.is_active).length > 0 && (
+                <div className="flex flex-wrap gap-3 mt-3">
+                  {metodosPago.filter(m => m.is_active).map(m => (
+                    <div key={m.payment_method} className="flex items-center gap-1.5 text-xs text-gym-muted">
+                      <CreditCard className="w-3.5 h-3.5 text-gym-secondary" />
+                      <span>{m.amount_monthly > 0 ? formatCurrency(m.amount_monthly) : "Gratis"}/mes</span>
+                      {m.amount_inscription > 0 && (
+                        <span className="text-gym-success">+ {formatCurrency(m.amount_inscription)} insc.</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
               {morosidad && morosidad.totalDeuda > 0 && (
                 <button
                   type="button"

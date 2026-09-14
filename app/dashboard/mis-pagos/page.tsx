@@ -606,7 +606,12 @@ function MisPagosContent() {
       mesesDeuda.push(mes);
     }
 
-    const debeInscripcion = !profile.inscription_paid;
+    // Inscripción es deuda si profile dice NO pagado Y NO existe pago aprobado tipo inscripcion
+    const tieneInscripcionAprobada = pagos.some(p =>
+      p.status === "aprobado" &&
+      (p.detail || []).some(d => d.payment_type === "inscripcion")
+    );
+    const debeInscripcion = !profile.inscription_paid && !tieneInscripcionAprobada;
     const activeMetodo = metodosPago.find(m => m.is_active);
     const montoMensual = activeMetodo?.amount_monthly || 0;
     const montoInscripcion = activeMetodo?.amount_inscription || 0;
@@ -918,15 +923,27 @@ function MisPagosContent() {
               {expandedMoroso && (
                 <CardContent className="relative">
                   <div className="space-y-2">
-                    {morosidad.mesesDeuda.map(mes => (
-                      <div key={mes} className="flex items-center justify-between p-2.5 bg-gym-bg/60 rounded-xl">
-                        <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full bg-gym-danger" />
-                          <span className="text-sm text-gym-text">{getMonthName(mes)} {morosidad.anioActual}</span>
+                    {morosidad.mesesDeuda.map(mes => {
+                      // Si existe payment_detail para este mes → es mensualidad pendiente
+                      // Si NO existe → es inscripción pendiente
+                      const esMensualidad = pagos.some(p =>
+                        (p.detail || []).some(d =>
+                          d.payment_type === "mensualidad" &&
+                          d.month_number === mes &&
+                          d.year_number === morosidad.anioActual
+                        )
+                      );
+                      return (
+                        <div key={mes} className="flex items-center justify-between p-2.5 bg-gym-bg/60 rounded-xl">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2 h-2 rounded-full bg-gym-danger" />
+                            <span className="text-sm text-gym-text">{getMonthName(mes)} {morosidad.anioActual}</span>
+                            <span className="text-[10px] text-gym-muted">— {esMensualidad ? "Mensualidad" : "Inscripción"}</span>
+                          </div>
+                          <span className="text-sm font-medium text-gym-text">{formatCurrency(esMensualidad ? morosidad.montoMensual : morosidad.montoInscripcion)}</span>
                         </div>
-                        <span className="text-sm font-medium text-gym-text">{formatCurrency(morosidad.montoMensual)}</span>
-                      </div>
-                    ))}
+                      );
+                    })}
                     {morosidad.debeInscripcion && (
                       <div className="flex items-center justify-between p-2.5 bg-gym-bg/60 rounded-xl border border-gym-danger/20">
                         <div className="flex items-center gap-2">

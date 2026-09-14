@@ -542,7 +542,9 @@ function MisPagosContent() {
 
   // Último pago aprobado (el más reciente por created_at desc) — solo super admin puede eliminarlo
   const isLastApproved = useCallback((pago: Payment) => {
-    const aprobados = pagosFiltrados.filter(p => p.status === "aprobado");
+    const aprobados = pagosFiltrados
+      .filter(p => p.status === "aprobado")
+      .sort((a, b) => (b.created_at || "").localeCompare(a.created_at || ""));
     return aprobados.length > 0 && aprobados[0].id === pago.id;
   }, [pagosFiltrados]);
 

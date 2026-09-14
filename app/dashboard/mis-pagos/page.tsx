@@ -582,12 +582,20 @@ function MisPagosContent() {
     if (anioDeuda > anioActual) return null;
     const primerMesDeuda = anioDeuda === anioActual ? mesDeuda : 1;
 
+    // Meses que NO son deuda:
+    // - payment_type='suspension': el miembro solicitó suspensión (cualquier status)
+    // - payment_type='mensualidad'/'inscripcion' con status='aprobado' o 'suspendido': ya pagó
     const mesesCubiertos = new Set(
-      pagos
-        .filter(p => p.status === "aprobado" || p.status === "suspendido")
-        .flatMap(p => (p.detail || [])
-          .filter(d => (d.payment_type === "mensualidad" || d.payment_type === "suspension") && d.year_number === anioActual)
-          .map(d => d.month_number!))
+      pagos.flatMap(p => (p.detail || [])
+        .filter(d => {
+          if (d.year_number !== anioActual) return false;
+          if (d.payment_type === "suspension") return true;
+          if (d.payment_type === "mensualidad" || d.payment_type === "inscripcion") {
+            return p.status === "aprobado" || p.status === "suspendido";
+          }
+          return false;
+        })
+        .map(d => d.month_number!))
     );
 
     const mesesDeuda: number[] = [];

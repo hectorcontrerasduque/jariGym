@@ -84,7 +84,7 @@ function MisPagosContent() {
   const [showSearch, setShowSearch] = useState(false);
 
   // Home expand toggles
-  const [expandedPendientes, setExpandedPendientes] = useState(false);
+  const [expandedPendientes, setExpandedPendientes] = useState(true);
   const [expandedMoroso, setExpandedMoroso] = useState(true);
   const [expandedRechazados, setExpandedRechazados] = useState(false);
   const [expandedSuspendidos, setExpandedSuspendidos] = useState(false);

@@ -39,15 +39,15 @@ serve(async (req) => {
     }
 
     const url = new URL(req.url);
-    const estado = url.searchParams.get("estado");
+    const status = url.searchParams.get("status");
 
     let query = supabase
-      .from("pagos")
+      .from("payments")
       .select("*, profile:profiles(full_name, avatar_url)")
       .order("created_at", { ascending: false });
 
-    if (estado) {
-      query = query.eq("estado", estado);
+    if (status) {
+      query = query.eq("status", status);
     }
 
     const { data, error } = await query;

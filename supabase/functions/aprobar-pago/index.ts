@@ -45,27 +45,27 @@ serve(async (req) => {
     }
 
     const { data: existingPago } = await supabase
-      .from("pagos")
-      .select("estado")
+      .from("payments")
+      .select("status")
       .eq("id", pago_id)
       .single();
 
-    if (existingPago && existingPago.estado !== "pendiente") {
+    if (existingPago && existingPago.status !== "pendiente") {
       throw new Error("El pago ya fue procesado");
     }
 
     const updates: Record<string, unknown> = {
-      estado: accion === "aprobar" ? "aprobado" : "rechazado",
+      status: accion === "aprobar" ? "aprobado" : "rechazado",
       approved_by: user.id,
       approved_at: new Date().toISOString(),
     };
 
     if (accion === "rechazar" && notas) {
-      updates.notas = notas;
+      updates.payment_note = notas;
     }
 
     const { data, error } = await supabase
-      .from("pagos")
+      .from("payments")
       .update(updates)
       .eq("id", pago_id)
       .select()

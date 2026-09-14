@@ -34,44 +34,44 @@ serve(async (req) => {
     }
 
     const body = await req.json();
-    const { metodo_pago, comprobante_url, notas, detalles } = body;
+    const { payment_method, receipt_url, payment_note, detalles } = body;
 
     if (!detalles || !Array.isArray(detalles) || detalles.length === 0) {
       throw new Error("Se requiere al menos un detalle de pago");
     }
 
     const { data: pago, error: pagoError } = await supabase
-      .from("pagos")
+      .from("payments")
       .insert({
-        usuario_id: user.id,
-        estado: "pendiente",
-        metodo_pago: metodo_pago || "efectivo",
-        comprobante_url: comprobante_url || null,
-        notas: notas || null,
+        user_id: user.id,
+        status: "pendiente",
+        payment_method: payment_method || "efectivo",
+        receipt_url: receipt_url || null,
+        payment_note: payment_note || null,
       })
       .select()
       .single();
 
     if (pagoError) throw pagoError;
 
-    const detalleRows = detalles.map((d: { mes: number | null; anio: number | null; tipo_pago: string; monto: number }) => ({
-      pago_id: pago.id,
-      mes: d.mes,
-      anio: d.anio,
-      tipo_pago: d.tipo_pago,
-      monto: d.monto,
+    const detalleRows = detalles.map((d: { month_number: number | null; year_number: number | null; payment_type: string; payment_amount: number }) => ({
+      payment_id: pago.id,
+      month_number: d.month_number,
+      year_number: d.year_number,
+      payment_type: d.payment_type,
+      payment_amount: d.payment_amount,
     }));
 
     const { error: detalleError } = await supabase
-      .from("detalle_pago")
+      .from("payment_detail")
       .insert(detalleRows);
 
     if (detalleError) {
-      await supabase.from("pagos").delete().eq("id", pago.id);
+      await supabase.from("payments").delete().eq("id", pago.id);
       throw detalleError;
     }
 
-    return new Response(JSON.stringify({ success: true, data: { ...pago, detalle: detalleRows } }), {
+    return new Response(JSON.stringify({ success: true, data: { ...pago, detail: detalleRows } }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {

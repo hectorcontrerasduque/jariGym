@@ -663,7 +663,7 @@ function MisPagosContent() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-display font-bold text-gym-text neon-text">Mis Pagos</h1>
+          <h1 className="text-2xl font-display font-bold text-gym-text neon-text">{activeTab === "home" ? "Home" : "Mis Pagos"}</h1>
           <p className="text-gym-muted text-sm">
             {activeTab === "home" ? "Resumen de tu cuenta" : miembroSeleccionado ? `Pagos de ${miembroSeleccionado.full_name || miembroSeleccionado.email}` : "Historial y registro de pagos"}
           </p>
@@ -804,6 +804,41 @@ function MisPagosContent() {
               )}
             </div>
           </div>
+
+          {/* Mi Estado */}
+          <Card className="neon-card overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-br from-gym-success/5 to-transparent pointer-events-none" />
+            <CardHeader className="pb-2 relative">
+              <CardTitle className="flex items-center gap-2 text-sm">
+                <div className="w-7 h-7 rounded-lg bg-gym-success/15 flex items-center justify-center">
+                  <CheckCircle className="w-4 h-4 text-gym-success" />
+                </div>
+                Mi Estado
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="relative space-y-2">
+              <div className="flex items-center justify-between p-2.5 bg-gym-bg/60 rounded-xl">
+                <span className="text-sm text-gym-muted">Inscripción</span>
+                {profile?.inscription_paid ? (
+                  <Badge variant="success">Pagada</Badge>
+                ) : (
+                  <Badge variant="warning">Pendiente</Badge>
+                )}
+              </div>
+              {profile?.start_date && (
+                <div className="flex items-center justify-between p-2.5 bg-gym-bg/60 rounded-xl">
+                  <span className="text-sm text-gym-muted">Fecha de inicio</span>
+                  <span className="text-sm text-gym-text">{formatDate(profile.start_date)}</span>
+                </div>
+              )}
+              {montoPendiente > 0 && (
+                <div className="flex items-center justify-between p-2.5 bg-gym-bg/60 rounded-xl border border-gym-warning/20">
+                  <span className="text-sm text-gym-warning font-medium">Deuda</span>
+                  <span className="text-sm font-semibold text-gym-warning">{formatCurrency(montoPendiente)}</span>
+                </div>
+              )}
+            </CardContent>
+          </Card>
 
           {/* Horarios, asistencia */}
           {miembros.length > 0 && (() => {
@@ -1074,73 +1109,6 @@ function MisPagosContent() {
               </div>
             )}
           </div>
-
-          {/* Tarifas */}
-          {metodosPago.filter(m => m.is_active).length > 0 && (
-            <Card className="neon-card overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-br from-gym-secondary/5 to-transparent pointer-events-none" />
-              <CardHeader className="pb-2 relative">
-                <CardTitle className="flex items-center gap-2 text-sm">
-                  <div className="w-7 h-7 rounded-lg bg-gym-secondary/15 flex items-center justify-center">
-                    <CreditCard className="w-4 h-4 text-gym-secondary" />
-                  </div>
-                  Tarifas
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="relative">
-                <div className="space-y-2">
-                  {metodosPago.filter(m => m.is_active).map(m => (
-                    <div key={m.payment_method} className="flex items-center justify-between p-2.5 bg-gym-bg/60 rounded-xl">
-                      <span className="text-sm font-medium text-gym-text">
-                        {m.payment_method === "efectivo" ? "Efectivo" : m.payment_method === "bs" ? "Bs" : "Binance"}
-                      </span>
-                      <div className="flex gap-4 text-sm">
-                        <span className="text-gym-muted">{m.amount_monthly > 0 ? formatCurrency(m.amount_monthly) : "Gratis"}<span className="text-[10px] text-gym-muted ml-1">/mes</span></span>
-                        {m.amount_inscription > 0 && (
-                          <span className="text-gym-success font-medium">{formatCurrency(m.amount_inscription)}<span className="text-[10px] ml-1">insc.</span></span>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Mi Estado */}
-          <Card className="neon-card overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-br from-gym-success/5 to-transparent pointer-events-none" />
-            <CardHeader className="pb-2 relative">
-              <CardTitle className="flex items-center gap-2 text-sm">
-                <div className="w-7 h-7 rounded-lg bg-gym-success/15 flex items-center justify-center">
-                  <CheckCircle className="w-4 h-4 text-gym-success" />
-                </div>
-                Mi Estado
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="relative space-y-2">
-              <div className="flex items-center justify-between p-2.5 bg-gym-bg/60 rounded-xl">
-                <span className="text-sm text-gym-muted">Inscripción</span>
-                {profile?.inscription_paid ? (
-                  <Badge variant="success">Pagada</Badge>
-                ) : (
-                  <Badge variant="warning">Pendiente</Badge>
-                )}
-              </div>
-              {profile?.start_date && (
-                <div className="flex items-center justify-between p-2.5 bg-gym-bg/60 rounded-xl">
-                  <span className="text-sm text-gym-muted">Fecha de inicio</span>
-                  <span className="text-sm text-gym-text">{formatDate(profile.start_date)}</span>
-                </div>
-              )}
-              {montoPendiente > 0 && (
-                <div className="flex items-center justify-between p-2.5 bg-gym-bg/60 rounded-xl border border-gym-warning/20">
-                  <span className="text-sm text-gym-warning font-medium">Deuda</span>
-                  <span className="text-sm font-semibold text-gym-warning">{formatCurrency(montoPendiente)}</span>
-                </div>
-              )}
-            </CardContent>
-          </Card>
 
           {/* Detalle de Pagos */}
           {pagosHomeSorted.length > 0 && (

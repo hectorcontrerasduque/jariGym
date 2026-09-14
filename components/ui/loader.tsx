@@ -1,6 +1,7 @@
 "use client";
 
 import { Zap } from "lucide-react";
+import { createPortal } from "react-dom";
 
 interface LoaderProps {
   show: boolean;
@@ -26,10 +27,11 @@ export function Loader({ show, message = "Cargando...", variant = "page" }: Load
   if (!show) return null;
 
   if (variant === "overlay") {
-    return (
+    return createPortal(
       <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm">
         <LoaderContent message={message} />
-      </div>
+      </div>,
+      document.body
     );
   }
 

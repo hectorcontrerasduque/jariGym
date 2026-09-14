@@ -11,7 +11,7 @@ import { Avatar } from "@/components/ui/avatar";
 import { miembrosService } from "@/lib/services/miembros/miembros.service";
 import { formatDate, formatCurrency } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
-import { Users, Search, Plus, Settings, Save, Pencil, ChevronDown, ChevronUp, CreditCard } from "lucide-react";
+import { Users, Search, Plus, Settings, Pencil, ChevronDown, ChevronUp, CreditCard } from "lucide-react";
 import { Loader } from "@/components/ui/loader";
 import { Pagination } from "@/components/ui/pagination";
 import { usePagination } from "@/hooks/usePagination";
@@ -1084,7 +1084,7 @@ export default function MiembrosPage() {
             El correo será el usuario de inicio de sesión. Si es Gmail, podrá iniciar con Google.
           </p>
           <Button
-            className="hidden sm:flex w-full"
+            className="flex w-full"
             onClick={handleCrearMiembro}
             disabled={!nuevoNombre || !nuevoEmail || (!!nuevoEmail && !isGmail(nuevoEmail) && !nuevoPassword.trim())}
           >
@@ -1095,16 +1095,7 @@ export default function MiembrosPage() {
 
     </div>
 
-    {/* Mobile floating buttons — outside animated div for correct z-index stacking */}
-    {modalNuevo && (
-      <button
-        onClick={handleCrearMiembro}
-        disabled={!nuevoNombre || !nuevoEmail || (!!nuevoEmail && !isGmail(nuevoEmail) && !nuevoPassword.trim())}
-        className="sm:hidden fixed bottom-24 right-4 z-[70] w-14 h-14 rounded-full bg-gym-success/80 text-white shadow-lg shadow-gym-success/20 flex items-center justify-center disabled:opacity-40 active:scale-95 transition-all"
-      >
-        <Save className="w-6 h-6" />
-      </button>
-    )}
+    {/* Mobile floating button — only shows when modal is closed */}
     {!modalNuevo && (
       <button
         onClick={() => setModalNuevo(true)}

@@ -212,6 +212,13 @@ hora_llegada: string | null  // HH:MM format
 hora_salida: string | null   // HH:MM format
 ```
 
+### Payment Status
+```ts
+status: "pendiente" | "aprobado" | "rechazado" | "suspendido"
+// suspendido_pendiente was removed in commit 3360da2
+// Suspension flow: member requests → pendiente → admin approves → aprobado
+```
+
 ### Dashboard Stats Logic
 - **Inscritos**: From `pagos`+`detalle_pago` tables (approved payments with tipo_pago="inscripcion") + `profile.inscripcion_pagada`
 - **Deudores**: Active members (no libre, inscription paid) without approved payment for current month
@@ -224,6 +231,7 @@ hora_salida: string | null   // HH:MM format
 ### Payment Approval
 - `aprobarPago()` now auto-updates `profiles.inscripcion_pagada = true` when approving inscription payments (checks `detalle_pago.tipo_pago`)
 - Super admin can approve payments (not just regular admin)
+- Suspension flow: member requests → `pendiente` → admin approves → `aprobado` (uses `payment_type: "suspension"` with amount 0)
 
 ### Config Service
 - `updateConfig()` strips read-only fields (`id`, `created_at`, `updated_at`, `created_by`, `updated_by`) before Supabase update
@@ -290,17 +298,15 @@ hora_salida: string | null   // HH:MM format
 ## Recent Git History (newest first)
 
 ```
+3360da2 refactor: remove suspendido_pendiente status
+be47bf0 fix: add z-[250] download overlay spinner for morosos report
+13922dc feat: mobile UX - FAB buttons + desktop submit
+b4f94d8 fix: morosos name column no truncate
+84cf911 fix: morosos report - all debtors sorted by debt desc
+3682058 fix: loader stacking - portal to document.body
+fe2898d fix: loader stacking - all loaders at fragment level
+70fcd26 fix: mobile z-index - save button above animated container
 e263c5e refactor: elimina console.* + centraliza strings en messages.ts para i18n
-9b11c5c fix: owner profile + toast duration + auth.users sync + label fix
-a404ecd feat: ajustes Config page + 1 solo método de pago activo
-11f06e6 feat: renombra gym_config a inglés + recrea gym_config_payment_methods (042)
-3ceaab4 feat: renombra profiles a inglés + audit fields (041)
-19d9cd6 fix: UI polish - contraste dropdown, WhatsApp placeholder, email no-flash
-93720e5 fix: rate limiting fail-open + sin rate limit en /api/migracion/list
-5b9a528 fix: dropdown migración con useMemo
-85577de fix: getMiembrosMorosos usa service_role en API routes
-75585b2 fix: boton ejecutar primary + rename Miembros Morosos + logging errores email + fallback deudas vacias
-```
 
 ## Notifications System
 
@@ -359,8 +365,8 @@ a404ecd feat: ajustes Config page + 1 solo método de pago activo
 - **028**: Added `tipo_pago` column to pagos (membresia/inscripcion)
 - **029**: Notifications system — `notificacion_config`, `notificacion_log` tables + RLS
 - **030a**: Added `hora_llegada` and `hora_salida` text columns to profiles
-- **030b**: Suspension workflow — `suspendido_pendiente` estado, `created_by` audit column
-- **031**: RLS DELETE policies for `suspendido_pendiente` pagos
+- **030b**: Suspension workflow — `suspendido_pendiente` estado, `created_by` audit column (historical, `suspendido_pendiente` removed in `3360da2`)
+- **031**: RLS DELETE policies for `suspendido_pendiente` pagos (historical)
 - **032**: Added `frecuencia_diaria` boolean to `notificacion_config`
 - **033**: Added `modo_cobro` text to `gym_config` ('dia_uno' | 'fecha_inscripcion')
 - **034**: Admin INSERT RLS for pagos + comprobantes storage

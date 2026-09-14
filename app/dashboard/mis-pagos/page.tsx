@@ -134,7 +134,7 @@ function MisPagosContent() {
     const currentIsAdmin = profileData?.role === "super_admin";
 
     // Individual queries with error handling - avoid Promise.all that fails entire page load
-    let pagosData = [];
+    let pagosData: Payment[] = [];
     let aniosData = [new Date().getFullYear()];
     let config: GymConfig | null = null;
 
@@ -162,18 +162,13 @@ function MisPagosContent() {
       showToast(messages.toast.errorCargaDatos, "error");
     }
 
-    // 2. Cargar años (query ligera por DISTINCT en payment_detail)
-    try {
-      const { data: detalle, error: detError } = await supabase
-        .from("payment_detail")
-        .select("year_number");
-      if (detError) throw detError;
-      const years = Array.from(new Set((detalle || []).map((d) => d.year_number).filter(Boolean)));
-      aniosData = years.length > 0 ? years : [new Date().getFullYear()];
-    } catch (err) {
-      console.error("Error cargando años:", err);
-      aniosData = [new Date().getFullYear()];
-    }
+    // 2. Derivar años de los pagos del miembro + año actual siempre
+    const yearsFromPagos = Array.from(
+      new Set(pagosData.flatMap(p => (p.detail || []).map(d => d.year_number).filter((y): y is number => y != null)))
+    );
+    const currentYear = new Date().getFullYear();
+    if (!yearsFromPagos.includes(currentYear)) yearsFromPagos.push(currentYear);
+    aniosData = yearsFromPagos.sort((a, b) => a - b);
 
     // 3. Cargar config + métodos via API route
     try {

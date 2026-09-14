@@ -61,7 +61,7 @@ export const messages = {
   },
   reporteMorosos: {
     titulo: "Reporte de Morosos",
-    subtitulo: "Miembros con más de 3 meses de deuda",
+    subtitulo: "Miembros con deuda pendiente",
     descargar: "Descargar imagen",
     totalMorosos: "Total morosos",
     deudaTotal: "Deuda total",

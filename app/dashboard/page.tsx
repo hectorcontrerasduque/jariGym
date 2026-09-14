@@ -296,7 +296,7 @@ export default function DashboardPage() {
       const todos = [
         ...morosos.map((m) => ({ ...m, esMigrado: false })),
         ...migradosFiltrados,
-      ].sort((a, b) => a.full_name.localeCompare(b.full_name));
+      ].sort((a, b) => (b.totalDeuda + b.montoPendiente) - (a.totalDeuda + a.montoPendiente));
       setMorososData(todos);
       setShowReporteMorosos(true);
     } catch {

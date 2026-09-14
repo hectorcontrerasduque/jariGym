@@ -32,8 +32,7 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
   const [downloading, setDownloading] = useState(false);
 
   const morososOrdenados = [...morosos]
-    .filter((m) => m.mesesDeuda.length >= 3)
-    .sort((a, b) => a.full_name.localeCompare(b.full_name));
+    .sort((a, b) => (b.totalDeuda + b.montoPendiente) - (a.totalDeuda + a.montoPendiente));
 
   const todosLosMeses = [...new Set(morososOrdenados.flatMap((m) => m.mesesDeuda))].sort((a, b) => a - b);
 
@@ -65,7 +64,7 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
     return (
       <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/70 backdrop-blur-sm">
         <div className="bg-gym-surface border border-gym-border rounded-2xl p-6 max-w-md w-full mx-4 text-center">
-          <p className="text-gym-muted">No hay morosos con más de 3 meses de deuda.</p>
+          <p className="text-gym-muted">No hay morosos.</p>
           <Button onClick={onClose} className="mt-4">Cerrar</Button>
         </div>
       </div>

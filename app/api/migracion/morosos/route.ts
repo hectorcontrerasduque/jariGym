@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
         .map((f) => f.mes_pagar)
         .sort((a, b) => a - b);
 
-      if (mesesDeuda.length < 3) continue;
+      if (mesesDeuda.length < 1) continue;
 
       morosos.push({
         id: `migracion-${nombre}`,

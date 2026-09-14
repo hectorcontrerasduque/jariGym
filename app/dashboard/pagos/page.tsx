@@ -49,7 +49,7 @@ function getPagoMesesInfo(pago: Payment): string {
   const parts: string[] = [];
   for (const d of sorted) {
     const mes = getMonthName(d.month_number ?? 0).slice(0, 3);
-    const tipo = d.payment_type === "inscripcion" ? "Inscripción" : "Mensualidad";
+    const tipo = d.payment_type === "inscripcion" ? "Inscripción" : d.payment_type === "suspension" ? "Suspensión" : "Mensualidad";
     parts.push(`${mes} ${d.year_number} (${tipo})`);
   }
   

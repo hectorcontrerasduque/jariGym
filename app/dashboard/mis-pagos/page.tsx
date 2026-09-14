@@ -26,6 +26,7 @@ function getPagoLabel(pago: Payment): string {
   const detalles = pago.detail || [];
   if (!detalles.length) return "Pago";
   if (detalles.some(d => d.payment_type === "inscripcion")) return "Inscripción";
+  if (detalles.some(d => d.payment_type === "suspension")) return "Suspensión";
   return "Mensualidad";
 }
 
@@ -396,7 +397,7 @@ function MisPagosContent() {
         if (formData.meses.length === 0) {
           throw new Error("Selecciona al menos un mes para solicitar suspensión");
         }
-        await pagosService.crearPagoSuspendido(targetId, formData.meses, formData.notas || undefined, isSuperAdmin ? "suspendido" : "pendiente");
+        await pagosService.crearPagoSuspendido(targetId, formData.meses, formData.notas || undefined, isSuperAdmin ? "aprobado" : "pendiente");
         showToast(messages.misPagos.solicitudEnviada, "success");
         setFormData({ meses: [], metodo_pago: "efectivo", codigo_billete: "", notas: "", pagar_inscripcion: false, pagar_mensualidad: false, solicitar_suspension: false, fecha_pago: new Date().toISOString().split("T")[0] });
         await fetchMisPagosData();

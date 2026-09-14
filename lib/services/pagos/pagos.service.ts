@@ -285,7 +285,7 @@ export class PagosService {
     return { ...pago, detail: detalles as DetallePago[] };
   }
 
-  async crearPagoSuspendido(usuarioId: string, meses: { month_number: number; year_number: number }[], motivo?: string, status?: "pendiente" | "suspendido"): Promise<number> {
+  async crearPagoSuspendido(usuarioId: string, meses: { month_number: number; year_number: number }[], motivo?: string, status?: "pendiente" | "aprobado" | "suspendido"): Promise<number> {
     const {
       data: { user },
     } = await this.supabase.auth.getUser();
@@ -343,7 +343,7 @@ export class PagosService {
       payment_id: nuevoPago.id,
       month_number,
       year_number,
-      payment_type: "mensualidad" as const,
+      payment_type: "suspension" as const,
       payment_amount: 0,
     }));
 

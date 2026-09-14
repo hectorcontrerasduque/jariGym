@@ -489,11 +489,20 @@ function MisPagosContent() {
     } catch {}
   }, [miembroSeleccionado, anioSeleccionado, loadMiembroPendientes, loadSelfPendientes]);
 
-  const handleDelete = async (pagoId: string) => {
-    if (!confirm(messages.pagos.eliminarPagoConfirm)) return;
-    setDeleting(pagoId);
+  const handleDelete = async (pago: Payment) => {
+    const meses = (pago.detail || [])
+      .filter(d => d.month_number)
+      .map(d => `${getMonthName(d.month_number!)} ${d.year_number}`)
+      .join(", ");
+    const label = pago.detail?.some(d => d.payment_type === "inscripcion") ? "Inscripción" : meses || "Pago";
+    const monto = formatCurrency(pago.detail?.reduce((s, d) => s + d.payment_amount, 0) || 0);
+    const miembro = isSuperAdmin && miembroSeleccionado
+      ? miembroSeleccionado.full_name || miembroSeleccionado.email
+      : profile?.full_name || profile?.email;
+    if (!confirm(`¿Eliminar pago de ${miembro}?\n${label} — ${monto}\n${pago.status === "aprobado" ? "Último aprobado" : "Pendiente"}`)) return;
+    setDeleting(pago.id);
     try {
-      await pagosService.eliminarPago(pagoId);
+      await pagosService.eliminarPago(pago.id);
       showToast(messages.toast.pagoEliminado, "success");
       await fetchMisPagosData();
       await reloadPendientes();
@@ -1545,7 +1554,7 @@ function MisPagosContent() {
                     {(pago.status === "pendiente" || pago.status === "suspendido_pendiente" ||
                       (isSuperAdmin && pago.status === "aprobado" && isLastApproved(pago))) && (
                       <button
-                        onClick={() => handleDelete(pago.id)}
+                        onClick={() => handleDelete(pago)}
                         disabled={deleting === pago.id}
                         className="p-1.5 text-gym-danger hover:bg-gym-danger/10 rounded-lg transition-colors disabled:opacity-50 flex-shrink-0"
                       >

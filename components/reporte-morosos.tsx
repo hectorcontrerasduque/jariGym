@@ -112,41 +112,45 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
       const pageH = doc.internal.pageSize.getHeight();
       const margin = 15;
       const fechaStr = new Date().toLocaleDateString("es-VE", { day: "numeric", month: "long", year: "numeric" });
-      let y = margin;
 
       const monthsNames = todosLosMeses.map((m) => getMonthName(m).slice(0, 3));
+      const totalPdfPages = Math.ceil(morososOrdenados.length / ROWS_PER_PAGE) || 1;
 
-      for (let p = 0; p < totalPages; p++) {
-        // eslint-disable-next-line security/detect-object-injection
-        const pageData = pages[p];
-        if (p > 0) {
-          doc.addPage();
-          y = margin;
-        }
+      // Sort ALL data alphabetically (same as preview)
+      const allSorted = [...morososOrdenados].sort((a, b) => a.full_name.localeCompare(b.full_name));
 
-        // Header
+      const tableHeaders = [["#", "Nombre", messages.reporteMorosos.reportado, "Insc.", ...monthsNames, "Deuda"]];
+
+      const drawHeader = (doc: jsPDF, pageNum: number) => {
+        doc.setFillColor(15, 23, 42);
+        doc.rect(0, 0, pageW, 32, "F");
+
         doc.setFont("helvetica", "bold");
-        doc.setFontSize(20);
-        doc.setTextColor(30, 30, 30);
-        doc.text(gymName, margin, y + 8);
+        doc.setFontSize(18);
+        doc.setTextColor(255, 255, 255);
+        doc.text(gymName, margin, 14);
 
         doc.setFont("helvetica", "normal");
-        doc.setFontSize(10);
-        doc.setTextColor(100, 100, 100);
-        doc.text(`${messages.reporteMorosos.subtitulo} — ${anio}`, margin, y + 15);
-        doc.text(`Fecha: ${fechaStr}`, margin, y + 20);
+        doc.setFontSize(9);
+        doc.setTextColor(180, 200, 220);
+        doc.text(`${messages.reporteMorosos.subtitulo} — ${anio}  |  Fecha: ${fechaStr}`, margin, 21);
 
         doc.setFont("helvetica", "bold");
-        doc.setFontSize(12);
-        doc.setTextColor(0, 100, 200);
-        doc.text(`${p + 1}/${totalPages}`, pageW - margin, y + 8, { align: "right" });
+        doc.setFontSize(10);
+        doc.setTextColor(96, 165, 250);
+        doc.text(`Página ${pageNum} / ${totalPdfPages}`, pageW - margin, 14, { align: "right" });
+      };
 
-        y += 28;
+      for (let p = 0; p < totalPdfPages; p++) {
+        if (p > 0) doc.addPage();
 
-        // Table
-        const tableHeaders = [["#", "Nombre", messages.reporteMorosos.reportado, "Insc.", ...monthsNames, "Deuda"]];
+        drawHeader(doc, p + 1);
+
+        const startIdx = p * ROWS_PER_PAGE;
+        const pageData = allSorted.slice(startIdx, startIdx + ROWS_PER_PAGE);
+
         const tableBody = pageData.map((m, i) => [
-          String(p * ROWS_PER_PAGE + i + 1),
+          String(startIdx + i + 1),
           m.full_name,
           m.esMigrado ? messages.reporteMorosos.no : messages.reporteMorosos.si,
           m.debeInscripcion ? messages.reporteMorosos.no : messages.reporteMorosos.si,
@@ -155,38 +159,46 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
         ]);
 
         autoTable(doc, {
-          startY: y,
+          startY: 38,
           head: tableHeaders,
           body: tableBody,
           theme: "grid",
           styles: {
-            fontSize: 8,
+            fontSize: 7.5,
             cellPadding: 2,
             textColor: [30, 30, 30],
-            lineColor: [200, 200, 200],
-            lineWidth: 0.3,
+            lineColor: [200, 210, 225],
+            lineWidth: 0.25,
+            fillColor: [255, 255, 255],
+            halign: "center",
           },
           headStyles: {
-            fillColor: [30, 40, 60],
+            fillColor: [30, 58, 138],
             textColor: [255, 255, 255],
             fontStyle: "bold",
-            fontSize: 8,
+            fontSize: 7.5,
+            halign: "center",
+            valign: "middle",
+          },
+          bodyStyles: {
+            halign: "center",
+            valign: "middle",
           },
           alternateRowStyles: {
-            fillColor: [245, 245, 250],
+            fillColor: [241, 245, 249],
           },
           columnStyles: {
-            0: { cellWidth: 10 },
-            1: { cellWidth: 45 },
-            [3 + monthsNames.length]: { halign: "right", fontStyle: "bold" },
+            0: { cellWidth: 10, halign: "center" },
+            1: { cellWidth: "auto", halign: "left", fontStyle: "bold" },
+            [3 + monthsNames.length]: { halign: "right", fontStyle: "bold", textColor: [220, 38, 38] },
           },
-          margin: { left: margin, right: margin },
+          margin: { left: margin, right: margin, top: 38 },
         });
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        y = (doc as any).lastAutoTable.finalY + 6;
+        let y = (doc as any).lastAutoTable.finalY + 5;
 
-        // Subtotals
+        const isLast = p === totalPdfPages - 1;
         const dr = pageData.filter((m) => !m.esMigrado);
         const dnr = pageData.filter((m) => m.esMigrado);
         const td = pageData.reduce((s, m) => s + m.totalDeuda + m.montoPendiente, 0);
@@ -194,7 +206,7 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
         const tdnr = dnr.reduce((s, m) => s + m.totalDeuda + m.montoPendiente, 0);
 
         doc.setFont("helvetica", "normal");
-        doc.setFontSize(9);
+        doc.setFontSize(8.5);
         doc.setTextColor(80, 80, 80);
 
         if (dnr.length > 0) {
@@ -208,13 +220,14 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
           y += 5;
         }
 
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(10);
-        doc.setDrawColor(180, 180, 180);
+        doc.setDrawColor(200, 200, 200);
         doc.line(margin, y, pageW - margin, y);
         y += 5;
 
-        if (isLastPage(p)) {
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(9);
+        doc.setTextColor(30, 30, 30);
+        if (isLast) {
           doc.text(`${messages.reporteMorosos.totalMorosos}: ${morososOrdenados.length}`, margin, y);
           doc.text(formatCurrency(totalDeuda), pageW - margin, y, { align: "right" });
         } else {
@@ -222,11 +235,15 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
           doc.text(formatCurrency(td), pageW - margin, y, { align: "right" });
         }
 
-        // Footer page number
+        // Footer line
+        doc.setDrawColor(15, 23, 42);
+        doc.setLineWidth(0.5);
+        doc.line(margin, pageH - 12, pageW - margin, pageH - 12);
         doc.setFont("helvetica", "normal");
-        doc.setFontSize(8);
-        doc.setTextColor(150, 150, 150);
-        doc.text(`${p + 1} / ${totalPages}`, pageW / 2, pageH - 8, { align: "center" });
+        doc.setFontSize(7);
+        doc.setTextColor(140, 140, 140);
+        doc.text(`${gymName} — Reporte de Morosos`, margin, pageH - 8);
+        doc.text(`${p + 1} / ${totalPdfPages}`, pageW - margin, pageH - 8, { align: "right" });
       }
 
       doc.save(`morosos-${gymName.replace(/\s+/g, "-")}-${anio}.pdf`);

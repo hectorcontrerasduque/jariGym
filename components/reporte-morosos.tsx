@@ -54,7 +54,7 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
     try {
       const dataUrl = await toPng(reportRef.current, {
         cacheBust: true,
-        pixelRatio: 4,
+        pixelRatio: 3,
         backgroundColor: "#0B1120",
       });
       const link = document.createElement("a");
@@ -91,45 +91,45 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
 
   const tableHeader = (
     <tr className="border-b border-gym-primary/20">
-      <th className="text-left py-3 px-3 text-gray-400 font-medium w-10">#</th>
-      <th className="text-left py-3 px-3 text-gray-400 font-semibold">Nombre</th>
-      <th className="text-center py-3 px-3 text-gray-400 font-medium">{messages.reporteMorosos.reportado}</th>
-      <th className="text-center py-3 px-3 text-gray-400 font-medium">Insc.</th>
+      <th className="text-left py-5 px-5 text-gray-400 font-medium w-12">#</th>
+      <th className="text-left py-5 px-5 text-gray-400 font-semibold">Nombre</th>
+      <th className="text-center py-5 px-5 text-gray-400 font-medium">{messages.reporteMorosos.reportado}</th>
+      <th className="text-center py-5 px-5 text-gray-400 font-medium">Insc.</th>
       {todosLosMeses.map((mes) => (
-        <th key={mes} className="text-center py-3 px-3 text-gray-400 font-medium">
+        <th key={mes} className="text-center py-5 px-5 text-gray-400 font-medium">
           {getMonthName(mes).slice(0, 3)}
         </th>
       ))}
-      <th className="text-right py-3 px-3 text-gray-400 font-semibold min-w-[100px] whitespace-nowrap">Deuda</th>
+      <th className="text-right py-5 px-5 text-gray-400 font-semibold min-w-[120px] whitespace-nowrap">Deuda</th>
     </tr>
   );
 
   const tableBody = morososOrdenados.map((m, i) => (
     <tr key={m.id} className="border-b border-gray-800/50">
-      <td className="py-3 px-3 text-gray-500">{i + 1}</td>
-      <td className="py-3 px-3 text-white font-semibold whitespace-nowrap">{m.full_name}</td>
-      <td className="text-center py-3 px-3">
-        <span className={`inline-block px-3 py-1 rounded-full font-medium ${m.esMigrado ? "bg-red-500/20 text-red-400" : "bg-green-500/20 text-green-400"}`}>
+      <td className="py-5 px-5 text-gray-500">{i + 1}</td>
+      <td className="py-5 px-5 text-white font-semibold whitespace-nowrap">{m.full_name}</td>
+      <td className="text-center py-5 px-5">
+        <span className={`inline-block px-4 py-1.5 rounded-full font-medium ${m.esMigrado ? "bg-red-500/20 text-red-400" : "bg-green-500/20 text-green-400"}`}>
           {m.esMigrado ? messages.reporteMorosos.no : messages.reporteMorosos.si}
         </span>
       </td>
-      <td className="text-center py-3 px-3">
-        <span className={`inline-block px-3 py-1 rounded-full font-medium ${
+      <td className="text-center py-5 px-5">
+        <span className={`inline-block px-4 py-1.5 rounded-full font-medium ${
           m.debeInscripcion ? "bg-red-500/20 text-red-400" : "bg-green-500/20 text-green-400"
         }`}>
           {m.debeInscripcion ? messages.reporteMorosos.no : messages.reporteMorosos.si}
         </span>
       </td>
       {todosLosMeses.map((mes) => (
-        <td key={mes} className="text-center py-3 px-3">
+        <td key={mes} className="text-center py-5 px-5">
           {m.mesesDeuda.includes(mes) ? (
-            <span className="inline-block rounded-full bg-gym-danger/80 text-white text-[0.6em] leading-none px-2 py-1">✓</span>
+            <span className="inline-block rounded-full bg-gym-danger/80 text-white text-[0.55em] leading-none px-3 py-1.5">✓</span>
           ) : (
             <span className="text-gray-700">—</span>
           )}
         </td>
       ))}
-      <td className="py-3 px-3 text-right text-gym-danger font-bold min-w-[100px] whitespace-nowrap">
+      <td className="py-5 px-5 text-right text-gym-danger font-bold min-w-[120px] whitespace-nowrap">
         {formatCurrency(m.totalDeuda + m.montoPendiente)}
       </td>
     </tr>
@@ -139,29 +139,29 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
     <>
       {morososNoReportados.length > 0 && (
         <tr className="border-t border-gym-primary/20">
-          <td colSpan={colCount} className="py-3 px-3 text-gray-400">
+          <td colSpan={colCount} className="py-5 px-5 text-gray-400">
             Reportado (No): {morososNoReportados.length} moroso(s)
           </td>
-          <td className="py-3 px-3 text-right text-gym-danger font-bold min-w-[100px] whitespace-nowrap">
+          <td className="py-5 px-5 text-right text-gym-danger font-bold min-w-[120px] whitespace-nowrap">
             {formatCurrency(totalDeudaNoReportados)}
           </td>
         </tr>
       )}
       {morososReportados.length > 0 && (
         <tr className="border-t border-gray-800/30">
-          <td colSpan={colCount} className="py-3 px-3 text-gray-400">
+          <td colSpan={colCount} className="py-5 px-5 text-gray-400">
             Reportado (Sí): {morososReportados.length} moroso(s)
           </td>
-          <td className="py-3 px-3 text-right text-gym-danger font-bold min-w-[100px] whitespace-nowrap">
+          <td className="py-5 px-5 text-right text-gym-danger font-bold min-w-[120px] whitespace-nowrap">
             {formatCurrency(totalDeudaReportados)}
           </td>
         </tr>
       )}
-      <tr className="border-t border-gym-primary/30">
-        <td colSpan={colCount} className="py-4 px-3 text-gray-400 font-medium">
+      <tr className="border-t-2 border-gym-primary/40">
+        <td colSpan={colCount} className="py-6 px-5 text-gray-400 font-medium">
           {messages.reporteMorosos.totalMorosos}: {morososOrdenados.length}
         </td>
-        <td className="py-4 px-3 text-right text-gym-danger font-bold min-w-[100px] whitespace-nowrap">
+        <td className="py-6 px-5 text-right text-gym-danger font-bold min-w-[120px] whitespace-nowrap">
           {formatCurrency(totalDeuda)}
         </td>
       </tr>
@@ -182,21 +182,21 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
         </div>
       </div>
 
-      {/* ===== HIDDEN PNG CONTAINER — text-2xl inherits to ALL cells ===== */}
+      {/* ===== HIDDEN PNG CONTAINER — landscape, text-[1.75rem] inherits to ALL cells ===== */}
       <div className="fixed -left-[9999px] top-0 pointer-events-none">
-        <div ref={reportRef} className="bg-[#0B1120] p-10 rounded-xl w-[2000px]">
-          <div className="flex items-center gap-6 mb-8 pb-6 border-b border-gym-primary/20">
+        <div ref={reportRef} className="bg-[#0B1120] p-16 rounded-2xl w-[2800px]">
+          <div className="flex items-center gap-8 mb-10 pb-8 border-b-2 border-gym-primary/30">
             {gymLogo && (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={gymLogo} alt={gymName} className="w-28 h-28 object-contain rounded-xl" />
+              <img src={gymLogo} alt={gymName} className="w-36 h-36 object-contain rounded-2xl" />
             )}
             <div>
-              <h1 className="text-5xl font-bold text-white">{gymName}</h1>
-              <p className="text-2xl text-gray-400">{messages.reporteMorosos.subtitulo} — {anio}</p>
-              <p className="text-xl text-gray-500">Fecha: {fechaStr}</p>
+              <h1 className="text-6xl font-extrabold text-white tracking-tight">{gymName}</h1>
+              <p className="text-3xl text-gray-400 mt-1">{messages.reporteMorosos.subtitulo} — {anio}</p>
+              <p className="text-2xl text-gray-500 mt-1">Fecha: {fechaStr}</p>
             </div>
           </div>
-          <table className="w-full text-2xl">
+          <table className="w-full text-[1.75rem]">
             <thead>{tableHeader}</thead>
             <tbody>{tableBody}</tbody>
             <tfoot>{tableFooter}</tfoot>

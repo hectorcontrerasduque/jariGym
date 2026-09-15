@@ -28,7 +28,8 @@ interface ReporteMorososProps {
 }
 
 export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: ReporteMorososProps) {
-  const reportRef = useRef<HTMLDivElement>(null);
+  const page1Ref = useRef<HTMLDivElement>(null);
+  const page2Ref = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
   const [downloading, setDownloading] = useState(false);
   const downloadingRef = useRef(false);
@@ -45,24 +46,36 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
   const totalDeudaReportados = morososReportados.reduce((sum, m) => sum + m.totalDeuda + m.montoPendiente, 0);
   const totalDeudaNoReportados = morososNoReportados.reduce((sum, m) => sum + m.totalDeuda + m.montoPendiente, 0);
 
+  const midIndex = Math.ceil(morososOrdenados.length / 2);
+  const page1Data = morososOrdenados.slice(0, midIndex);
+  const page2Data = morososOrdenados.slice(midIndex);
+  const hasPage2 = page2Data.length > 0;
+
   const handleDescargar = useCallback(async () => {
-    if (!reportRef.current || downloadingRef.current) return;
+    if (downloadingRef.current) return;
     downloadingRef.current = true;
     if (overlayRef.current) overlayRef.current.style.display = "flex";
     setDownloading(true);
     await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
     try {
-      const dataUrl = await toPng(reportRef.current, {
-        cacheBust: true,
-        pixelRatio: 3,
-        backgroundColor: "#0B1120",
-      });
-      const link = document.createElement("a");
-      link.download = `morosos-${gymName.replace(/\s+/g, "-")}-${anio}.png`;
-      link.href = dataUrl;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      const refs = [page1Ref, page2Ref];
+      const total = hasPage2 ? 2 : 1;
+      for (let i = 0; i < total; i++) {
+        const ref = refs[i];
+        if (!ref.current) continue;
+        await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+        const dataUrl = await toPng(ref.current, {
+          cacheBust: true,
+          pixelRatio: 3,
+          backgroundColor: "#0B1120",
+        });
+        const link = document.createElement("a");
+        link.download = `morosos-${gymName.replace(/\s+/g, "-")}-${anio}-p${i + 1}.png`;
+        link.href = dataUrl;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
     } catch {
       showToast("Error al generar imagen", "error");
     } finally {
@@ -70,7 +83,7 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
       setDownloading(false);
       downloadingRef.current = false;
     }
-  }, [gymName, anio]);
+  }, [gymName, anio, hasPage2]);
 
   if (morososOrdenados.length === 0) {
     return (
@@ -84,13 +97,12 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
   }
 
   const fechaStr = new Date().toLocaleDateString("es-VE", { day: "numeric", month: "long", year: "numeric" });
-
   const colCount = 4 + todosLosMeses.length;
 
-  // ===================== SHARED TABLE (no explicit text-* on cells — inherit from <table>) =====================
+  // ===================== SHARED TABLE PARTS (inherit from <table> text-*) =====================
 
-  const tableHeader = (
-    <tr className="border-b border-gym-primary/20">
+  const renderTableHeader = (
+    <tr className="border-b-2 border-gym-primary/30">
       <th className="text-left py-5 px-5 text-gray-400 font-medium w-12">#</th>
       <th className="text-left py-5 px-5 text-gray-400 font-semibold">Nombre</th>
       <th className="text-center py-5 px-5 text-gray-400 font-medium">{messages.reporteMorosos.reportado}</th>
@@ -104,9 +116,9 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
     </tr>
   );
 
-  const tableBody = morososOrdenados.map((m, i) => (
+  const renderTableBody = (data: Moroso[], startIndex: number) => data.map((m, i) => (
     <tr key={m.id} className="border-b border-gray-800/50">
-      <td className="py-5 px-5 text-gray-500">{i + 1}</td>
+      <td className="py-5 px-5 text-gray-500">{startIndex + i + 1}</td>
       <td className="py-5 px-5 text-white font-semibold whitespace-nowrap">{m.full_name}</td>
       <td className="text-center py-5 px-5">
         <span className={`inline-block px-4 py-1.5 rounded-full font-medium ${m.esMigrado ? "bg-red-500/20 text-red-400" : "bg-green-500/20 text-green-400"}`}>
@@ -135,42 +147,83 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
     </tr>
   ));
 
-  const tableFooter = (
-    <>
-      {morososNoReportados.length > 0 && (
-        <tr className="border-t border-gym-primary/20">
-          <td colSpan={colCount} className="py-5 px-5 text-gray-400">
-            Reportado (No): {morososNoReportados.length} moroso(s)
+  const renderTableFooter = (data: Moroso[], showGrandTotal: boolean) => {
+    const dataReportados = data.filter((m) => !m.esMigrado);
+    const dataNoReportados = data.filter((m) => m.esMigrado);
+    const totalData = data.reduce((sum, m) => sum + m.totalDeuda + m.montoPendiente, 0);
+    const totalDataReportados = dataReportados.reduce((sum, m) => sum + m.totalDeuda + m.montoPendiente, 0);
+    const totalDataNoReportados = dataNoReportados.reduce((sum, m) => sum + m.totalDeuda + m.montoPendiente, 0);
+
+    return (
+      <>
+        {dataNoReportados.length > 0 && (
+          <tr className="border-t border-gym-primary/20">
+            <td colSpan={colCount} className="py-4 px-5 text-gray-400">
+              Reportado (No): {dataNoReportados.length} moroso(s)
+            </td>
+            <td className="py-4 px-5 text-right text-gym-danger font-bold min-w-[120px] whitespace-nowrap">
+              {formatCurrency(totalDataNoReportados)}
+            </td>
+          </tr>
+        )}
+        {dataReportados.length > 0 && (
+          <tr className="border-t border-gray-800/30">
+            <td colSpan={colCount} className="py-4 px-5 text-gray-400">
+              Reportado (Sí): {dataReportados.length} moroso(s)
+            </td>
+            <td className="py-4 px-5 text-right text-gym-danger font-bold min-w-[120px] whitespace-nowrap">
+              {formatCurrency(totalDataReportados)}
+            </td>
+          </tr>
+        )}
+        <tr className="border-t-2 border-gym-primary/40">
+          <td colSpan={colCount} className="py-5 px-5 text-gray-400 font-medium">
+            {showGrandTotal ? `${messages.reporteMorosos.totalMorosos}: ${morososOrdenados.length}` : `Subtotal: ${data.length} moroso(s)`}
           </td>
           <td className="py-5 px-5 text-right text-gym-danger font-bold min-w-[120px] whitespace-nowrap">
-            {formatCurrency(totalDeudaNoReportados)}
+            {formatCurrency(showGrandTotal ? totalDeuda : totalData)}
           </td>
         </tr>
+      </>
+    );
+  };
+
+  const renderPngHeader = (pageNum: number, totalPages: number) => (
+    <div className="flex items-center justify-between mb-8 pb-6 border-b-2 border-gym-primary/30">
+      <div className="flex items-center gap-6">
+        {gymLogo && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={gymLogo} alt={gymName} className="w-28 h-28 object-contain rounded-2xl" />
+        )}
+        <div>
+          <h1 className="text-5xl font-extrabold text-white tracking-tight">{gymName}</h1>
+          <p className="text-2xl text-gray-400 mt-1">{messages.reporteMorosos.subtitulo} — {anio}</p>
+          <p className="text-xl text-gray-500 mt-1">Fecha: {fechaStr}</p>
+        </div>
+      </div>
+      <div className="text-right">
+        <span className="text-3xl font-bold text-gym-primary">Página {pageNum}/{totalPages}</span>
+      </div>
+    </div>
+  );
+
+  const renderPreviewHeader = () => (
+    <div className="flex items-center gap-3 sm:gap-4 mb-4 sm:mb-6 pb-3 sm:pb-4 border-b border-gym-primary/20">
+      {gymLogo && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={gymLogo} alt={gymName} className="w-10 h-10 sm:w-16 sm:h-16 object-contain rounded-xl" />
       )}
-      {morososReportados.length > 0 && (
-        <tr className="border-t border-gray-800/30">
-          <td colSpan={colCount} className="py-5 px-5 text-gray-400">
-            Reportado (Sí): {morososReportados.length} moroso(s)
-          </td>
-          <td className="py-5 px-5 text-right text-gym-danger font-bold min-w-[120px] whitespace-nowrap">
-            {formatCurrency(totalDeudaReportados)}
-          </td>
-        </tr>
-      )}
-      <tr className="border-t-2 border-gym-primary/40">
-        <td colSpan={colCount} className="py-6 px-5 text-gray-400 font-medium">
-          {messages.reporteMorosos.totalMorosos}: {morososOrdenados.length}
-        </td>
-        <td className="py-6 px-5 text-right text-gym-danger font-bold min-w-[120px] whitespace-nowrap">
-          {formatCurrency(totalDeuda)}
-        </td>
-      </tr>
-    </>
+      <div>
+        <h1 className="text-lg sm:text-2xl font-bold text-white">{gymName}</h1>
+        <p className="text-xs sm:text-sm text-gray-400">{messages.reporteMorosos.subtitulo} — {anio}</p>
+        <p className="text-[10px] sm:text-xs text-gray-500">Fecha: {fechaStr}</p>
+      </div>
+    </div>
   );
 
   return (
     <>
-      {/* Overlay — shown via DOM ref for instant feedback */}
+      {/* Overlay */}
       <div
         ref={overlayRef}
         className="fixed inset-0 z-[250] items-center justify-center bg-black/60 backdrop-blur-sm"
@@ -178,31 +231,35 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
       >
         <div className="text-center">
           <div className="animate-spin w-10 h-10 border-2 border-gym-primary border-t-transparent rounded-full mx-auto" />
-          <p className="text-gym-muted text-sm mt-4">Generando imagen...</p>
+          <p className="text-gym-muted text-sm mt-4">Generando imagen{hasPage2 ? "es" : ""}...</p>
         </div>
       </div>
 
-      {/* ===== HIDDEN PNG CONTAINER — landscape, text-[1.75rem] inherits to ALL cells ===== */}
+      {/* ===== HIDDEN PNG PAGE 1 ===== */}
       <div className="fixed -left-[9999px] top-0 pointer-events-none">
-        <div ref={reportRef} className="bg-[#0B1120] p-16 rounded-2xl w-[2800px]">
-          <div className="flex items-center gap-8 mb-10 pb-8 border-b-2 border-gym-primary/30">
-            {gymLogo && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={gymLogo} alt={gymName} className="w-36 h-36 object-contain rounded-2xl" />
-            )}
-            <div>
-              <h1 className="text-6xl font-extrabold text-white tracking-tight">{gymName}</h1>
-              <p className="text-3xl text-gray-400 mt-1">{messages.reporteMorosos.subtitulo} — {anio}</p>
-              <p className="text-2xl text-gray-500 mt-1">Fecha: {fechaStr}</p>
-            </div>
-          </div>
+        <div ref={page1Ref} className="bg-[#0B1120] p-14 rounded-2xl w-[2800px]">
+          {renderPngHeader(1, hasPage2 ? 2 : 1)}
           <table className="w-full text-[1.75rem]">
-            <thead>{tableHeader}</thead>
-            <tbody>{tableBody}</tbody>
-            <tfoot>{tableFooter}</tfoot>
+            <thead>{renderTableHeader}</thead>
+            <tbody>{renderTableBody(page1Data, 0)}</tbody>
+            <tfoot>{renderTableFooter(page1Data, !hasPage2)}</tfoot>
           </table>
         </div>
       </div>
+
+      {/* ===== HIDDEN PNG PAGE 2 ===== */}
+      {hasPage2 && (
+        <div className="fixed -left-[9999px] top-0 pointer-events-none">
+          <div ref={page2Ref} className="bg-[#0B1120] p-14 rounded-2xl w-[2800px]">
+            {renderPngHeader(2, 2)}
+            <table className="w-full text-[1.75rem]">
+              <thead>{renderTableHeader}</thead>
+              <tbody>{renderTableBody(page2Data, midIndex)}</tbody>
+              <tfoot>{renderTableFooter(page2Data, false)}</tfoot>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* ===== MODAL PREVIEW ===== */}
       <div className="fixed inset-0 z-[200] flex items-start justify-center bg-black/70 backdrop-blur-sm overflow-y-auto py-8">
@@ -213,7 +270,7 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
             <div className="flex items-center gap-2">
               <Button onClick={handleDescargar} disabled={downloading} size="sm">
                 <Download className="w-4 h-4 mr-2" />
-                {downloading ? "Generando..." : messages.reporteMorosos.descargar}
+                {downloading ? "Generando..." : hasPage2 ? "Descargar 2 imágenes" : messages.reporteMorosos.descargar}
               </Button>
               <Button onClick={onClose} variant="ghost" size="sm">
                 <X className="w-4 h-4" />
@@ -231,31 +288,21 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
             </div>
             <Button onClick={handleDescargar} disabled={downloading} size="sm" className="w-full">
               <Download className="w-4 h-4 mr-2" />
-              {downloading ? "Generando..." : messages.reporteMorosos.descargar}
+              {downloading ? "Generando..." : hasPage2 ? "Descargar 2 imágenes" : messages.reporteMorosos.descargar}
             </Button>
           </div>
 
           {/* Report preview — dark mode, text-sm inherits to all cells */}
           <div className="p-4 pl-5 sm:pl-5">
             <div className="bg-[#0B1120] p-4 sm:p-6 rounded-xl w-full sm:w-[960px]">
-              <div className="flex items-center gap-3 sm:gap-4 mb-4 sm:mb-6 pb-3 sm:pb-4 border-b border-gym-primary/20">
-                {gymLogo && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={gymLogo} alt={gymName} className="w-10 h-10 sm:w-16 sm:h-16 object-contain rounded-xl" />
-                )}
-                <div>
-                  <h1 className="text-lg sm:text-2xl font-bold text-white">{gymName}</h1>
-                  <p className="text-xs sm:text-sm text-gray-400">{messages.reporteMorosos.subtitulo} — {anio}</p>
-                  <p className="text-[10px] sm:text-xs text-gray-500">Fecha: {fechaStr}</p>
-                </div>
-              </div>
+              {renderPreviewHeader()}
 
-              {/* Desktop: Table — text-sm inherits to all cells */}
+              {/* Desktop: Table */}
               <div className="hidden sm:block">
                 <table className="w-full text-sm">
-                  <thead>{tableHeader}</thead>
-                  <tbody>{tableBody}</tbody>
-                  <tfoot>{tableFooter}</tfoot>
+                  <thead>{renderTableHeader}</thead>
+                  <tbody>{renderTableBody(morososOrdenados, 0)}</tbody>
+                  <tfoot>{renderTableFooter(morososOrdenados, true)}</tfoot>
                 </table>
               </div>
 

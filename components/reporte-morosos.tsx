@@ -34,7 +34,7 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
   const downloadingRef = useRef(false);
 
   const morososOrdenados = [...morosos]
-    .sort((a, b) => (b.totalDeuda + b.montoPendiente) - (a.totalDeuda + a.montoPendiente));
+    .sort((a, b) => a.full_name.localeCompare(b.full_name));
 
   const todosLosMeses = [...new Set(morososOrdenados.flatMap((m) => m.mesesDeuda))].sort((a, b) => a - b);
 

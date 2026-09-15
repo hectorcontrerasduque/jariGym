@@ -132,7 +132,7 @@ function MisPagosContent() {
       .single();
     setProfile(profileData);
 
-    const targetId = miembroSeleccionado?.id || user.id;
+    const targetId = miembroSeleccionado?.id || memberFromUrl || user.id;
     const currentIsAdmin = profileData?.role === "super_admin";
 
     // Individual queries with error handling - avoid Promise.all that fails entire page load

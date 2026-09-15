@@ -214,8 +214,9 @@ hora_salida: string | null   // HH:MM format
 
 ### Payment Status
 ```ts
-status: "pendiente" | "aprobado" | "rechazado" | "suspendido"
+status: "pendiente" | "aprobado" | "rechazado"
 // suspendido_pendiente was removed in commit 3360da2
+// suspendido was removed in commit 5854c41
 // Suspension flow: member requests → pendiente → admin approves → aprobado
 ```
 
@@ -298,6 +299,7 @@ status: "pendiente" | "aprobado" | "rechazado" | "suspendido"
 ## Recent Git History (newest first)
 
 ```
+5854c41 refactor: remove suspendido status
 3360da2 refactor: remove suspendido_pendiente status
 be47bf0 fix: add z-[250] download overlay spinner for morosos report
 13922dc feat: mobile UX - FAB buttons + desktop submit
@@ -307,6 +309,7 @@ b4f94d8 fix: morosos name column no truncate
 fe2898d fix: loader stacking - all loaders at fragment level
 70fcd26 fix: mobile z-index - save button above animated container
 e263c5e refactor: elimina console.* + centraliza strings en messages.ts para i18n
+```
 
 ## Notifications System
 
@@ -371,3 +374,4 @@ e263c5e refactor: elimina console.* + centraliza strings en messages.ts para i18
 - **033**: Added `modo_cobro` text to `gym_config` ('dia_uno' | 'fecha_inscripcion')
 - **034**: Admin INSERT RLS for pagos + comprobantes storage
 - **035**: **Payment normalization** — renames old `pagos` → `pagos_historial`, creates new `pagos` (header) + `detalle_pago` (detail per month/inscription). `CreatePagoInput` now takes `detalles[]` instead of flat fields.
+- **056**: **Remove suspendido status** — updates existing `suspendido` → `aprobado`, tightens CHECK to `('pendiente', 'aprobado', 'rechazado')`. Apply manually in Supabase SQL Editor.

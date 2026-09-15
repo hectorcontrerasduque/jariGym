@@ -117,26 +117,23 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
         </div>
 
         {/* Report preview */}
-        <div className="p-4 overflow-x-auto">
-          <div className="sm:hidden text-center text-xs text-gray-500 mb-2 animate-pulse">
-            {messages.reporteMorosos.deslizar}
-          </div>
-          <div ref={reportRef} className="bg-[#0B1120] p-6 rounded-xl w-[800px]">
+        <div className="p-4">
+          <div ref={reportRef} className="bg-[#0B1120] p-4 sm:p-6 rounded-xl w-full sm:w-[800px]">
             {/* Header */}
-            <div className="flex items-center gap-4 mb-6 pb-4 border-b border-gym-primary/20">
+            <div className="flex items-center gap-3 sm:gap-4 mb-4 sm:mb-6 pb-3 sm:pb-4 border-b border-gym-primary/20">
               {gymLogo && (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={gymLogo} alt={gymName} className="w-16 h-16 object-contain rounded-xl" />
+                <img src={gymLogo} alt={gymName} className="w-10 h-10 sm:w-16 sm:h-16 object-contain rounded-xl" />
               )}
               <div>
-                <h1 className="text-2xl font-bold text-white">{gymName}</h1>
-                <p className="text-sm text-gray-400">{messages.reporteMorosos.subtitulo} — {anio}</p>
-                <p className="text-xs text-gray-500">Fecha: {new Date().toLocaleDateString("es-VE", { day: "numeric", month: "long", year: "numeric" })}</p>
+                <h1 className="text-lg sm:text-2xl font-bold text-white">{gymName}</h1>
+                <p className="text-xs sm:text-sm text-gray-400">{messages.reporteMorosos.subtitulo} — {anio}</p>
+                <p className="text-[10px] sm:text-xs text-gray-500">Fecha: {new Date().toLocaleDateString("es-VE", { day: "numeric", month: "long", year: "numeric" })}</p>
               </div>
             </div>
 
-            {/* Table */}
-            <table className="w-full text-sm">
+            {/* Desktop: Table */}
+            <table className="w-full text-sm hidden sm:table">
               <thead>
                 <tr className="border-b border-gym-primary/20">
                   <th className="text-left py-2 px-2 text-gray-400 font-medium w-8">#</th>
@@ -206,6 +203,55 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
                 </tr>
               </tfoot>
             </table>
+
+            {/* Mobile: Cards */}
+            <div className="sm:hidden space-y-3">
+              {morososOrdenados.map((m, i) => (
+                <div key={m.id} className="bg-gray-800/50 rounded-lg p-3 border border-gray-700/50">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-gray-500 text-xs">{i + 1}.</span>
+                      <span className="text-white font-medium text-sm truncate">{m.full_name}</span>
+                    </div>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium flex-shrink-0 ml-2 ${m.esMigrado ? "bg-red-500/20 text-red-400" : "bg-green-500/20 text-green-400"}`}>
+                      {m.esMigrado ? messages.reporteMorosos.no : messages.reporteMorosos.si}
+                    </span>
+                  </div>
+                  {m.mesesDeuda.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mb-2">
+                      {m.mesesDeuda.map((mes) => (
+                        <span key={mes} className="text-[10px] bg-gym-danger/20 text-gym-danger px-1.5 py-0.5 rounded">
+                          {getMonthName(mes).slice(0, 3)}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] text-gray-500">Deuda</span>
+                    <span className="text-gym-danger font-bold text-sm">{formatCurrency(m.totalDeuda + m.montoPendiente)}</span>
+                  </div>
+                </div>
+              ))}
+              {/* Mobile subtotals */}
+              <div className="space-y-2 pt-2 border-t border-gray-700/50">
+                {morososNoReportados.length > 0 && (
+                  <div className="flex justify-between text-xs text-gray-400">
+                    <span>Reportado (No): {morososNoReportados.length}</span>
+                    <span className="text-gym-danger font-bold">{formatCurrency(totalDeudaNoReportados)}</span>
+                  </div>
+                )}
+                {morososReportados.length > 0 && (
+                  <div className="flex justify-between text-xs text-gray-400">
+                    <span>Reportado (Sí): {morososReportados.length}</span>
+                    <span className="text-gym-danger font-bold">{formatCurrency(totalDeudaReportados)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-sm text-gray-400 font-medium border-t border-gym-primary/30 pt-2">
+                  <span>Total: {morososOrdenados.length} moroso(s)</span>
+                  <span className="text-gym-danger font-bold">{formatCurrency(totalDeuda)}</span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>

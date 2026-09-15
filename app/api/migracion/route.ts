@@ -147,7 +147,6 @@ export async function POST(request: Request) {
 
       const fechaInicioCalc = `${new Date().getFullYear()}-01-01`;
 
-      let userId: string;
       let isNewUser = false;
       try {
         const result = await createOrUpdateUser(supabase, {
@@ -159,7 +158,6 @@ export async function POST(request: Request) {
           isSuperAdmin: true,
           sendWelcome: false,
         });
-        userId = result.userId;
         isNewUser = result.isNewAuthUser;
       } catch (err: unknown) {
         if (err instanceof Error && err.message === "email_duplicate") {
@@ -171,7 +169,6 @@ export async function POST(request: Request) {
           if (!existingProfile) {
             return NextResponse.json({ error: messages.migracion.errorServidor }, { status: 500 });
           }
-          userId = existingProfile.id;
           isNewUser = false;
         } else {
           return NextResponse.json({ error: messages.migracion.errorServidor }, { status: 500 });

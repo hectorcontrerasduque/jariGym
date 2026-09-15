@@ -200,16 +200,17 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
             [4 + monthsNames.length]: { halign: "right", fontStyle: "bold", textColor: [220, 38, 38], cellWidth: 24 },
           },
           didParseCell: (data) => {
-            // Color X marks in month columns
+            // X marks: red background + white bold text
             if (data.section === "body" && data.column.index >= 4 && data.column.index < 4 + monthsNames.length) {
               if (data.cell.raw === "X") {
-                data.cell.styles.textColor = [220, 38, 38];
+                data.cell.styles.fillColor = [220, 38, 38];
+                data.cell.styles.textColor = [255, 255, 255];
                 data.cell.styles.fontStyle = "bold";
               } else {
                 data.cell.styles.textColor = [203, 213, 225];
               }
             }
-            // Color Si/No badges
+            // Si/No badges
             if (data.section === "body" && (data.column.index === 2 || data.column.index === 3)) {
               if (data.cell.raw === "No") {
                 data.cell.styles.textColor = [220, 38, 38];

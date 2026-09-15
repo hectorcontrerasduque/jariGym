@@ -110,93 +110,121 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
       const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "letter" });
       const pageW = doc.internal.pageSize.getWidth();
       const pageH = doc.internal.pageSize.getHeight();
-      const margin = 15;
+      const margin = 14;
+      const PDF_ROWS = 25;
       const fechaStr = new Date().toLocaleDateString("es-VE", { day: "numeric", month: "long", year: "numeric" });
 
       const monthsNames = todosLosMeses.map((m) => getMonthName(m).slice(0, 3));
-      const totalPdfPages = Math.ceil(morososOrdenados.length / ROWS_PER_PAGE) || 1;
-
-      // Sort ALL data alphabetically (same as preview)
+      const totalPdfPages = Math.ceil(morososOrdenados.length / PDF_ROWS) || 1;
       const allSorted = [...morososOrdenados].sort((a, b) => a.full_name.localeCompare(b.full_name));
 
-      const tableHeaders = [["#", "Nombre", messages.reporteMorosos.reportado, "Insc.", ...monthsNames, "Deuda"]];
-
       const drawHeader = (doc: jsPDF, pageNum: number) => {
+        // Dark header bar
         doc.setFillColor(15, 23, 42);
-        doc.rect(0, 0, pageW, 32, "F");
+        doc.rect(0, 0, pageW, 30, "F");
+        // Gold accent line
+        doc.setFillColor(234, 179, 8);
+        doc.rect(0, 30, pageW, 1.2, "F");
 
         doc.setFont("helvetica", "bold");
-        doc.setFontSize(18);
+        doc.setFontSize(16);
         doc.setTextColor(255, 255, 255);
-        doc.text(gymName, margin, 14);
+        doc.text(gymName, margin, 13);
 
         doc.setFont("helvetica", "normal");
-        doc.setFontSize(9);
-        doc.setTextColor(180, 200, 220);
-        doc.text(`${messages.reporteMorosos.subtitulo} — ${anio}  |  Fecha: ${fechaStr}`, margin, 21);
+        doc.setFontSize(8);
+        doc.setTextColor(148, 163, 184);
+        doc.text(`${messages.reporteMorosos.subtitulo} — ${anio}  |  ${fechaStr}`, margin, 20);
 
+        // Page badge
+        doc.setFillColor(234, 179, 8);
+        const badgeText = `${pageNum}/${totalPdfPages}`;
+        const badgeW = doc.getTextWidth(badgeText) + 8;
+        doc.roundedRect(pageW - margin - badgeW, 7, badgeW, 8, 1.5, 1.5, "F");
         doc.setFont("helvetica", "bold");
-        doc.setFontSize(10);
-        doc.setTextColor(96, 165, 250);
-        doc.text(`Página ${pageNum} / ${totalPdfPages}`, pageW - margin, 14, { align: "right" });
+        doc.setFontSize(8);
+        doc.setTextColor(15, 23, 42);
+        doc.text(badgeText, pageW - margin - badgeW / 2, 12.5, { align: "center" });
       };
 
       for (let p = 0; p < totalPdfPages; p++) {
         if (p > 0) doc.addPage();
-
         drawHeader(doc, p + 1);
 
-        const startIdx = p * ROWS_PER_PAGE;
-        const pageData = allSorted.slice(startIdx, startIdx + ROWS_PER_PAGE);
+        const startIdx = p * PDF_ROWS;
+        const pageData = allSorted.slice(startIdx, startIdx + PDF_ROWS);
 
+        const tableHeaders = [["#", "Nombre", "Rep.", "Insc.", ...monthsNames, "Deuda"]];
         const tableBody = pageData.map((m, i) => [
           String(startIdx + i + 1),
           m.full_name,
-          m.esMigrado ? messages.reporteMorosos.no : messages.reporteMorosos.si,
-          m.debeInscripcion ? messages.reporteMorosos.no : messages.reporteMorosos.si,
-          ...todosLosMeses.map((mes) => (m.mesesDeuda.includes(mes) ? "✓" : "—")),
+          m.esMigrado ? "No" : "Si",
+          m.debeInscripcion ? "No" : "Si",
+          ...todosLosMeses.map((mes) => (m.mesesDeuda.includes(mes) ? "X" : "")),
           formatCurrency(m.totalDeuda + m.montoPendiente),
         ]);
 
         autoTable(doc, {
-          startY: 38,
+          startY: 35,
           head: tableHeaders,
           body: tableBody,
-          theme: "grid",
+          theme: "striped",
           styles: {
-            fontSize: 7.5,
-            cellPadding: 2,
-            textColor: [30, 30, 30],
-            lineColor: [200, 210, 225],
-            lineWidth: 0.25,
-            fillColor: [255, 255, 255],
+            fontSize: 8,
+            cellPadding: 1.8,
+            lineColor: [203, 213, 225],
+            lineWidth: 0.15,
             halign: "center",
+            valign: "middle",
           },
           headStyles: {
             fillColor: [30, 58, 138],
             textColor: [255, 255, 255],
             fontStyle: "bold",
-            fontSize: 7.5,
+            fontSize: 8,
             halign: "center",
             valign: "middle",
+            cellPadding: 2.2,
           },
           bodyStyles: {
-            halign: "center",
-            valign: "middle",
+            textColor: [30, 30, 30],
           },
           alternateRowStyles: {
-            fillColor: [241, 245, 249],
+            fillColor: [239, 246, 255],
           },
           columnStyles: {
-            0: { cellWidth: 10, halign: "center" },
-            1: { cellWidth: "auto", halign: "left", fontStyle: "bold" },
-            [3 + monthsNames.length]: { halign: "right", fontStyle: "bold", textColor: [220, 38, 38] },
+            0: { cellWidth: 9, halign: "center", textColor: [100, 116, 139] },
+            1: { cellWidth: "auto", halign: "left", fontStyle: "bold", textColor: [15, 23, 42] },
+            2: { cellWidth: 12 },
+            3: { cellWidth: 12 },
+            [4 + monthsNames.length]: { halign: "right", fontStyle: "bold", textColor: [220, 38, 38], cellWidth: 24 },
           },
-          margin: { left: margin, right: margin, top: 38 },
+          didParseCell: (data) => {
+            // Color X marks in month columns
+            if (data.section === "body" && data.column.index >= 4 && data.column.index < 4 + monthsNames.length) {
+              if (data.cell.raw === "X") {
+                data.cell.styles.textColor = [220, 38, 38];
+                data.cell.styles.fontStyle = "bold";
+              } else {
+                data.cell.styles.textColor = [203, 213, 225];
+              }
+            }
+            // Color Si/No badges
+            if (data.section === "body" && (data.column.index === 2 || data.column.index === 3)) {
+              if (data.cell.raw === "No") {
+                data.cell.styles.textColor = [220, 38, 38];
+                data.cell.styles.fontStyle = "bold";
+              } else {
+                data.cell.styles.textColor = [22, 163, 74];
+                data.cell.styles.fontStyle = "bold";
+              }
+            }
+          },
+          margin: { left: margin, right: margin, top: 35 },
         });
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        let y = (doc as any).lastAutoTable.finalY + 5;
+        let y = (doc as any).lastAutoTable.finalY + 4;
 
         const isLast = p === totalPdfPages - 1;
         const dr = pageData.filter((m) => !m.esMigrado);
@@ -205,45 +233,65 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
         const tdr = dr.reduce((s, m) => s + m.totalDeuda + m.montoPendiente, 0);
         const tdnr = dnr.reduce((s, m) => s + m.totalDeuda + m.montoPendiente, 0);
 
+        // Subtotals box
+        const boxH = (dnr.length > 0 ? 5 : 0) + (dr.length > 0 ? 5 : 0) + 8;
+        doc.setFillColor(248, 250, 252);
+        doc.setDrawColor(203, 213, 225);
+        doc.roundedRect(margin, y - 2, pageW - margin * 2, boxH, 2, 2, "FD");
+
         doc.setFont("helvetica", "normal");
-        doc.setFontSize(8.5);
-        doc.setTextColor(80, 80, 80);
+        doc.setFontSize(8);
+        doc.setTextColor(71, 85, 105);
 
         if (dnr.length > 0) {
-          doc.text(`Reportado (No): ${dnr.length} moroso(s)`, margin, y);
-          doc.text(formatCurrency(tdnr), pageW - margin, y, { align: "right" });
+          doc.text(`Reportado (No): ${dnr.length} moroso(s)`, margin + 4, y + 3);
+          doc.setFont("helvetica", "bold");
+          doc.setTextColor(220, 38, 38);
+          doc.text(formatCurrency(tdnr), pageW - margin - 4, y + 3, { align: "right" });
+          doc.setFont("helvetica", "normal");
+          doc.setTextColor(71, 85, 105);
           y += 5;
         }
         if (dr.length > 0) {
-          doc.text(`Reportado (Sí): ${dr.length} moroso(s)`, margin, y);
-          doc.text(formatCurrency(tdr), pageW - margin, y, { align: "right" });
+          doc.text(`Reportado (Si): ${dr.length} moroso(s)`, margin + 4, y + 3);
+          doc.setFont("helvetica", "bold");
+          doc.setTextColor(220, 38, 38);
+          doc.text(formatCurrency(tdr), pageW - margin - 4, y + 3, { align: "right" });
+          doc.setFont("helvetica", "normal");
+          doc.setTextColor(71, 85, 105);
           y += 5;
         }
 
-        doc.setDrawColor(200, 200, 200);
-        doc.line(margin, y, pageW - margin, y);
+        // Total line
+        y += 2;
+        doc.setDrawColor(30, 58, 138);
+        doc.setLineWidth(0.4);
+        doc.line(margin + 4, y, pageW - margin - 4, y);
         y += 5;
 
         doc.setFont("helvetica", "bold");
-        doc.setFontSize(9);
-        doc.setTextColor(30, 30, 30);
+        doc.setFontSize(9.5);
+        doc.setTextColor(15, 23, 42);
         if (isLast) {
-          doc.text(`${messages.reporteMorosos.totalMorosos}: ${morososOrdenados.length}`, margin, y);
-          doc.text(formatCurrency(totalDeuda), pageW - margin, y, { align: "right" });
+          doc.text(`${messages.reporteMorosos.totalMorosos}: ${morososOrdenados.length}`, margin + 4, y);
+          doc.setTextColor(220, 38, 38);
+          doc.text(formatCurrency(totalDeuda), pageW - margin - 4, y, { align: "right" });
         } else {
-          doc.text(`Subtotal: ${pageData.length} moroso(s)`, margin, y);
-          doc.text(formatCurrency(td), pageW - margin, y, { align: "right" });
+          doc.text(`Subtotal: ${pageData.length} moroso(s)`, margin + 4, y);
+          doc.setTextColor(220, 38, 38);
+          doc.text(formatCurrency(td), pageW - margin - 4, y, { align: "right" });
         }
 
-        // Footer line
-        doc.setDrawColor(15, 23, 42);
-        doc.setLineWidth(0.5);
-        doc.line(margin, pageH - 12, pageW - margin, pageH - 12);
+        // Footer
+        doc.setFillColor(15, 23, 42);
+        doc.rect(0, pageH - 10, pageW, 10, "F");
+        doc.setFillColor(234, 179, 8);
+        doc.rect(0, pageH - 10, pageW, 0.6, "F");
         doc.setFont("helvetica", "normal");
         doc.setFontSize(7);
-        doc.setTextColor(140, 140, 140);
-        doc.text(`${gymName} — Reporte de Morosos`, margin, pageH - 8);
-        doc.text(`${p + 1} / ${totalPdfPages}`, pageW - margin, pageH - 8, { align: "right" });
+        doc.setTextColor(148, 163, 184);
+        doc.text(`${gymName} — Reporte de Morosos — ${fechaStr}`, margin, pageH - 6);
+        doc.text(`${p + 1} / ${totalPdfPages}`, pageW - margin, pageH - 6, { align: "right" });
       }
 
       doc.save(`morosos-${gymName.replace(/\s+/g, "-")}-${anio}.pdf`);

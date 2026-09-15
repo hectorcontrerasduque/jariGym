@@ -169,7 +169,7 @@ function PagosContent() {
   const pagosFiltrados = useMemo(() => {
     let result = filtro === "todos"
       ? pagos
-      : filtro === "rechazados_suspendidos"
+      : filtro === "rechazados"
       ? pagos.filter((p) => p.status === "rechazado")
       : pagos.filter((p) => p.status === filtro);
     if (busquedaMiembro) {

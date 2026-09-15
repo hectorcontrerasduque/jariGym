@@ -89,7 +89,7 @@ function MisPagosContent() {
   const [expandedPendientes, setExpandedPendientes] = useState(true);
   const [expandedMoroso, setExpandedMoroso] = useState(true);
   const [expandedRechazados, setExpandedRechazados] = useState(false);
-  const [expandedSuspendidos, setExpandedSuspendidos] = useState(false);
+  const [expandedSuspension, setExpandedSuspendidos] = useState(false);
 
   // Payment form
   const [selectedPago, setSelectedPago] = useState<Payment | null>(null);
@@ -583,10 +583,10 @@ function MisPagosContent() {
   const pendientesHome = pagosHome.filter(p => p.status === "pendiente");
   const totalPendientesHome = pendientesHome.reduce((sum, p) => sum + (p.detail?.reduce((s, d) => s + d.payment_amount, 0) || 0), 0);
 
-  const suspendidosHome = pagosHome.filter(p =>
+  const suspensionHome = pagosHome.filter(p =>
     p.status === "aprobado" && (p.detail || []).some(d => d.payment_type === "suspension")
   );
-  const totalSuspendidosHome = suspendidosHome.reduce((sum, p) => sum + (p.detail?.reduce((s, d) => s + d.payment_amount, 0) || 0), 0);
+  const totalSuspensionHome = suspensionHome.reduce((sum, p) => sum + (p.detail?.reduce((s, d) => s + d.payment_amount, 0) || 0), 0);
 
   const rechazadosHome = pagosHome.filter(p => p.status === "rechazado");
   const totalRechazadosHome = rechazadosHome.reduce((sum, p) => sum + (p.detail?.reduce((s, d) => s + d.payment_amount, 0) || 0), 0);
@@ -1109,27 +1109,27 @@ function MisPagosContent() {
 
           {/* Suspendidos */}
           <div className="rounded-xl border border-gym-border bg-gym-surface p-4">
-            <button type="button" onClick={() => setExpandedSuspendidos(!expandedSuspendidos)} className="w-full text-left">
+            <button type="button" onClick={() => setExpandedSuspendidos(!expandedSuspension)} className="w-full text-left">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <AlertTriangle className="w-4 h-4 text-gym-warning" />
-                  <span className="text-xs font-medium text-gym-muted uppercase tracking-wide">Suspendidos</span>
-                  {suspendidosHome.length > 0 && <Badge variant="warning" className="text-[10px]">{suspendidosHome.length}</Badge>}
+                  <span className="text-xs font-medium text-gym-muted uppercase tracking-wide">Suspensiones</span>
+                  {suspensionHome.length > 0 && <Badge variant="warning" className="text-[10px]">{suspensionHome.length}</Badge>}
                 </div>
                 <div className="flex items-center gap-2">
-                  {totalSuspendidosHome > 0 && (
-                    <span className="text-sm font-semibold text-gym-warning">{formatCurrency(totalSuspendidosHome)}</span>
+                  {totalSuspensionHome > 0 && (
+                    <span className="text-sm font-semibold text-gym-warning">{formatCurrency(totalSuspensionHome)}</span>
                   )}
-                  {expandedSuspendidos ? <ChevronDown className="w-4 h-4 text-gym-muted" /> : <ChevronRight className="w-4 h-4 text-gym-muted" />}
+                  {expandedSuspension ? <ChevronDown className="w-4 h-4 text-gym-muted" /> : <ChevronRight className="w-4 h-4 text-gym-muted" />}
                 </div>
               </div>
             </button>
-            {expandedSuspendidos && (
+            {expandedSuspension && (
               <div className="mt-2 space-y-1.5">
-                {suspendidosHome.length === 0 && (
-                  <p className="text-xs text-gym-muted py-2">Sin pagos suspendidos</p>
+                {suspensionHome.length === 0 && (
+                  <p className="text-xs text-gym-muted py-2">Sin pagos de suspensión</p>
                 )}
-                {suspendidosHome.flatMap(p => (p.detail || []).map(d => (
+                {suspensionHome.flatMap(p => (p.detail || []).map(d => (
                   <div key={d.id} className="flex items-center justify-between p-2.5 bg-gym-bg/60 rounded-xl">
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 rounded-full bg-gym-warning" />

@@ -235,6 +235,7 @@ export const messages = {
     eliminarConfirm: "¿Eliminar este pago pendiente?",
     inscripcion: "Inscripción",
     solicitarSuspension: "Solicitar Suspensión",
+    suspenderMes: "Suspender mes",
     suspensionDescripcion: "Pide al administrador que suspenda el pago de meses en deuda",
     seleccionarMesesSuspender: "Selecciona los meses que deseas suspender",
     motivoSuspension: "Motivo (opcional)",

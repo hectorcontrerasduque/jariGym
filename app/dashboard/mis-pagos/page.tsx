@@ -1264,7 +1264,7 @@ function MisPagosContent() {
                           className="w-5 h-5 rounded border-gym-border text-gym-primary focus:ring-gym-primary"
                         />
                         <div className="flex-1">
-                          <p className="font-medium text-gym-text">{isSuperAdmin ? "Suspender mes" : messages.misPagos.solicitarSuspension}</p>
+                          <p className="font-medium text-gym-text">{isSuperAdmin ? messages.misPagos.suspenderMes : messages.misPagos.solicitarSuspension}</p>
                           <p className="text-xs text-gym-muted">{messages.misPagos.suspensionDescripcion}</p>
                         </div>
                         <Badge variant="warning">?</Badge>

@@ -54,7 +54,7 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
     try {
       const dataUrl = await toPng(reportRef.current, {
         cacheBust: true,
-        pixelRatio: 4,
+        pixelRatio: 8,
         backgroundColor: "#0B1120",
       });
       const link = document.createElement("a");
@@ -192,19 +192,19 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
 
       {/* Hidden container for PNG capture — dark background, landscape, larger for WhatsApp */}
       <div className="fixed -left-[9999px] top-0 pointer-events-none">
-        <div ref={reportRef} className="bg-[#0B1120] p-10 rounded-xl w-[1400px]">
+        <div ref={reportRef} className="bg-[#0B1120] p-12 rounded-xl w-[1600px]">
           <div className="flex items-center gap-5 mb-8 pb-5 border-b border-gym-primary/20">
             {gymLogo && (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={gymLogo} alt={gymName} className="w-20 h-20 object-contain rounded-xl" />
+              <img src={gymLogo} alt={gymName} className="w-24 h-24 object-contain rounded-xl" />
             )}
             <div>
-              <h1 className="text-3xl font-bold text-white">{gymName}</h1>
-              <p className="text-base text-gray-400">{messages.reporteMorosos.subtitulo} — {anio}</p>
-              <p className="text-sm text-gray-500">Fecha: {fechaStr}</p>
+              <h1 className="text-4xl font-bold text-white">{gymName}</h1>
+              <p className="text-lg text-gray-400">{messages.reporteMorosos.subtitulo} — {anio}</p>
+              <p className="text-base text-gray-500">Fecha: {fechaStr}</p>
             </div>
           </div>
-          <table className="w-full text-lg">
+          <table className="w-full text-xl">
             <thead>{tableHeader}</thead>
             <tbody>{tableBody}</tbody>
             <tfoot>{tableFooter}</tfoot>

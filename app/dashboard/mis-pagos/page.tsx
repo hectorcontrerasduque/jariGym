@@ -194,7 +194,7 @@ function MisPagosContent() {
     setPagos(pagosData);
     setAnios(aniosData);
     setGymConfig(config);
-  }, [miembroSeleccionado]);
+  }, [miembroSeleccionado, memberFromUrl]);
 
   useEffect(() => {
     const loadMiembros = async () => {

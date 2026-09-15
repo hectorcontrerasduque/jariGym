@@ -134,12 +134,6 @@ export class PagosService {
       throw new Error(messages.toast.noAutorizado);
     }
 
-    const { data: pagoActual } = await this.supabase
-      .from("payments")
-      .select("status")
-      .eq("id", pagoId)
-      .single();
-
     const newStatus = "aprobado";
 
     const { data, error } = await this.supabase

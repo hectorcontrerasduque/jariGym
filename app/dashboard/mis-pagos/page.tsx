@@ -309,18 +309,10 @@ function MisPagosContent() {
   const toggleMonth = (month_number: number, year_number: number) => {
     setFormData(prev => {
       const existe = prev.meses.some(m => m.month_number === month_number && m.year_number === year_number);
-      const source = prev.solicitar_suspension ? mesesParaSuspender : mesesDisponiblesParaPagar;
       if (existe) {
-        const idx = source.findIndex(m => m.month_number === month_number && m.year_number === year_number);
-        const nuevosMeses = prev.meses.filter(m => {
-          const mIdx = source.findIndex(sp => sp.month_number === m.month_number && sp.year_number === m.year_number);
-          return mIdx < idx;
-        });
-        return { ...prev, meses: nuevosMeses, pagar_mensualidad: nuevosMeses.length > 0 };
+        return { ...prev, meses: prev.meses.filter(m => !(m.month_number === month_number && m.year_number === year_number)) };
       } else {
-        const idx = source.findIndex(m => m.month_number === month_number && m.year_number === year_number);
-        const nuevosMeses = source.slice(0, idx + 1);
-        return { ...prev, meses: nuevosMeses, pagar_mensualidad: !prev.solicitar_suspension && nuevosMeses.length > 0 };
+        return { ...prev, meses: [...prev.meses, { month_number, year_number }] };
       }
     });
   };
@@ -1272,7 +1264,7 @@ function MisPagosContent() {
                           className="w-5 h-5 rounded border-gym-border text-gym-primary focus:ring-gym-primary"
                         />
                         <div className="flex-1">
-                          <p className="font-medium text-gym-text">{messages.misPagos.solicitarSuspension}</p>
+                          <p className="font-medium text-gym-text">{isSuperAdmin ? "Suspender mes" : messages.misPagos.solicitarSuspension}</p>
                           <p className="text-xs text-gym-muted">{messages.misPagos.suspensionDescripcion}</p>
                         </div>
                         <Badge variant="warning">?</Badge>

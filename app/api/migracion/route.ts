@@ -136,10 +136,82 @@ export async function POST(request: Request) {
     );
 
     if (migrablesRecords.length === 0) {
-      return NextResponse.json(
-        { error: messages.migracion.sinRegistrosMigrables },
-        { status: 400 }
-      );
+      // All records are "debe" — create profile + auth.user only, no pagos
+      const onlyDebeRecords = migracionRecords.every((r) => r.estado === "debe");
+      if (!onlyDebeRecords) {
+        return NextResponse.json(
+          { error: messages.migracion.sinRegistrosMigrables },
+          { status: 400 }
+        );
+      }
+
+      const fechaInicioCalc = `${new Date().getFullYear()}-01-01`;
+
+      let userId: string;
+      let isNewUser = false;
+      try {
+        const result = await createOrUpdateUser(supabase, {
+          email,
+          full_name: profileNombre,
+          password: password || undefined,
+          phone_number: whatsappFormatted,
+          start_date: fechaInicioCalc,
+          isSuperAdmin: true,
+          sendWelcome: false,
+        });
+        userId = result.userId;
+        isNewUser = result.isNewAuthUser;
+      } catch (err: unknown) {
+        if (err instanceof Error && err.message === "email_duplicate") {
+          const { data: existingProfile } = await supabase
+            .from("profiles")
+            .select("id")
+            .ilike("email", email)
+            .maybeSingle();
+          if (!existingProfile) {
+            return NextResponse.json({ error: messages.migracion.errorServidor }, { status: 500 });
+          }
+          userId = existingProfile.id;
+          isNewUser = false;
+        } else {
+          return NextResponse.json({ error: messages.migracion.errorServidor }, { status: 500 });
+        }
+      }
+
+      // Mark debe records as migrated (no pagos created)
+      const debeIds = migracionRecords.map((r) => Number(r.id));
+      await supabase
+        .from("migracion")
+        .update({ migrado: "si" })
+        .in("id", debeIds);
+
+      // Send welcome email
+      let welcomeEmailSent = false;
+      if (isNewUser) {
+        let gymName = "GymApp";
+        let gymLogo: string | null = null;
+        try {
+          const { data: config } = await supabase
+            .from("gym_config")
+            .select("gym_name, logo_url")
+            .maybeSingle();
+          if (config?.gym_name) gymName = config.gym_name;
+          if (config?.logo_url) gymLogo = config.logo_url;
+        } catch { /* silent */ }
+        try {
+          await sendWelcomeEmail(email, email, password, gymName, gymLogo);
+          welcomeEmailSent = true;
+        } catch { /* silent */ }
+      }
+
+      return NextResponse.json({
+        success: true,
+        email,
+        existingUser: !isNewUser,
+        pagosCreados: 0,
+        pagosActualizados: 0,
+        welcomeEmailSent,
+      });
     }
 
     let userId: string;

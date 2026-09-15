@@ -35,7 +35,17 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
   const [downloading, setDownloading] = useState(false);
   const downloadingRef = useRef(false);
   const overlayRef = useRef<HTMLDivElement>(null);
-  const pageRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const page1Ref = useRef<HTMLDivElement>(null);
+  const page2Ref = useRef<HTMLDivElement>(null);
+  const page3Ref = useRef<HTMLDivElement>(null);
+  const page4Ref = useRef<HTMLDivElement>(null);
+
+  const getPageRef = (idx: number) => {
+    if (idx === 0) return page1Ref;
+    if (idx === 1) return page2Ref;
+    if (idx === 2) return page3Ref;
+    return page4Ref;
+  };
 
   const morososOrdenados = [...morosos]
     .sort((a, b) => a.full_name.localeCompare(b.full_name));
@@ -64,7 +74,7 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
     await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
     try {
       for (let i = 0; i < totalPages; i++) {
-        const el = pageRefs.current[i];
+        const el = getPageRef(i).current;
         if (!el) continue;
         await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
         const dataUrl = await toPng(el, {
@@ -192,7 +202,7 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
   const renderPngPage = (pageIdx: number, data: Moroso[], startIndex: number) => (
     <div
       key={pageIdx}
-      ref={(el) => { pageRefs.current[pageIdx] = el; }}
+      ref={getPageRef(pageIdx)}
       className="bg-[#0B1120] p-8 rounded-2xl"
       style={{ width: PAGE_WIDTH }}
     >

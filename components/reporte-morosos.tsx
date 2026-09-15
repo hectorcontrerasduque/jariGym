@@ -54,7 +54,7 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
     try {
       const dataUrl = await toPng(reportRef.current, {
         cacheBust: true,
-        pixelRatio: 8,
+        pixelRatio: 4,
         backgroundColor: "#0B1120",
       });
       const link = document.createElement("a");
@@ -85,59 +85,51 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
 
   const fechaStr = new Date().toLocaleDateString("es-VE", { day: "numeric", month: "long", year: "numeric" });
 
-  const inscBadge = (debe: boolean) => (
-    <span className={`inline-block px-3 py-1 rounded-full text-base font-medium ${
-      debe ? "bg-red-500/20 text-red-400" : "bg-green-500/20 text-green-400"
-    }`}>
-      {debe ? messages.reporteMorosos.no : messages.reporteMorosos.si}
-    </span>
-  );
-
-  const inscBadgeMobile = (debe: boolean) => (
-    <span className={`text-[10px] px-1.5 py-0.5 rounded ${
-      debe ? "bg-red-500/20 text-red-400" : "bg-green-500/20 text-green-400"
-    }`}>
-      Insc: {debe ? messages.reporteMorosos.no : messages.reporteMorosos.si}
-    </span>
-  );
-
   const colCount = 4 + todosLosMeses.length;
+
+  // ===================== SHARED TABLE (no explicit text-* on cells — inherit from <table>) =====================
 
   const tableHeader = (
     <tr className="border-b border-gym-primary/20">
-      <th className="text-left py-3 px-3 text-gray-400 font-medium w-10 text-base">#</th>
-      <th className="text-left py-3 px-3 text-gray-400 font-medium text-lg">Nombre</th>
-      <th className="text-center py-3 px-3 text-gray-400 font-medium text-base">{messages.reporteMorosos.reportado}</th>
-      <th className="text-center py-3 px-3 text-gray-400 font-medium text-base">Insc.</th>
+      <th className="text-left py-3 px-3 text-gray-400 font-medium w-10">#</th>
+      <th className="text-left py-3 px-3 text-gray-400 font-semibold">Nombre</th>
+      <th className="text-center py-3 px-3 text-gray-400 font-medium">{messages.reporteMorosos.reportado}</th>
+      <th className="text-center py-3 px-3 text-gray-400 font-medium">Insc.</th>
       {todosLosMeses.map((mes) => (
-        <th key={mes} className="text-center py-3 px-3 text-gray-400 font-medium text-lg">
+        <th key={mes} className="text-center py-3 px-3 text-gray-400 font-medium">
           {getMonthName(mes).slice(0, 3)}
         </th>
       ))}
-      <th className="text-right py-3 px-3 text-gray-400 font-medium min-w-[100px] whitespace-nowrap text-lg">Deuda</th>
+      <th className="text-right py-3 px-3 text-gray-400 font-semibold min-w-[100px] whitespace-nowrap">Deuda</th>
     </tr>
   );
 
   const tableBody = morososOrdenados.map((m, i) => (
     <tr key={m.id} className="border-b border-gray-800/50">
-      <td className="py-3 px-3 text-gray-500 text-base">{i + 1}</td>
-      <td className="py-3 px-3 text-white font-semibold text-xl whitespace-nowrap">{m.full_name}</td>
+      <td className="py-3 px-3 text-gray-500">{i + 1}</td>
+      <td className="py-3 px-3 text-white font-semibold whitespace-nowrap">{m.full_name}</td>
       <td className="text-center py-3 px-3">
-        <span className={`inline-block px-3 py-1 rounded-full text-base font-medium ${m.esMigrado ? "bg-red-500/20 text-red-400" : "bg-green-500/20 text-green-400"}`}>
+        <span className={`inline-block px-3 py-1 rounded-full font-medium ${m.esMigrado ? "bg-red-500/20 text-red-400" : "bg-green-500/20 text-green-400"}`}>
           {m.esMigrado ? messages.reporteMorosos.no : messages.reporteMorosos.si}
         </span>
       </td>
-      <td className="text-center py-3 px-3">{inscBadge(m.debeInscripcion)}</td>
+      <td className="text-center py-3 px-3">
+        <span className={`inline-block px-3 py-1 rounded-full font-medium ${
+          m.debeInscripcion ? "bg-red-500/20 text-red-400" : "bg-green-500/20 text-green-400"
+        }`}>
+          {m.debeInscripcion ? messages.reporteMorosos.no : messages.reporteMorosos.si}
+        </span>
+      </td>
       {todosLosMeses.map((mes) => (
         <td key={mes} className="text-center py-3 px-3">
           {m.mesesDeuda.includes(mes) ? (
-            <span className="inline-block w-6 h-6 rounded-full bg-gym-danger/80 text-white text-sm leading-6">✓</span>
+            <span className="inline-block rounded-full bg-gym-danger/80 text-white text-[0.6em] leading-none px-2 py-1">✓</span>
           ) : (
-            <span className="text-gray-700 text-lg">—</span>
+            <span className="text-gray-700">—</span>
           )}
         </td>
       ))}
-      <td className="py-3 px-3 text-right text-gym-danger font-bold min-w-[100px] whitespace-nowrap text-lg">
+      <td className="py-3 px-3 text-right text-gym-danger font-bold min-w-[100px] whitespace-nowrap">
         {formatCurrency(m.totalDeuda + m.montoPendiente)}
       </td>
     </tr>
@@ -147,29 +139,29 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
     <>
       {morososNoReportados.length > 0 && (
         <tr className="border-t border-gym-primary/20">
-          <td colSpan={colCount} className="py-3 px-3 text-gray-400 text-lg">
+          <td colSpan={colCount} className="py-3 px-3 text-gray-400">
             Reportado (No): {morososNoReportados.length} moroso(s)
           </td>
-          <td className="py-3 px-3 text-right text-gym-danger font-bold min-w-[100px] whitespace-nowrap text-lg">
+          <td className="py-3 px-3 text-right text-gym-danger font-bold min-w-[100px] whitespace-nowrap">
             {formatCurrency(totalDeudaNoReportados)}
           </td>
         </tr>
       )}
       {morososReportados.length > 0 && (
         <tr className="border-t border-gray-800/30">
-          <td colSpan={colCount} className="py-3 px-3 text-gray-400 text-lg">
+          <td colSpan={colCount} className="py-3 px-3 text-gray-400">
             Reportado (Sí): {morososReportados.length} moroso(s)
           </td>
-          <td className="py-3 px-3 text-right text-gym-danger font-bold min-w-[100px] whitespace-nowrap text-lg">
+          <td className="py-3 px-3 text-right text-gym-danger font-bold min-w-[100px] whitespace-nowrap">
             {formatCurrency(totalDeudaReportados)}
           </td>
         </tr>
       )}
       <tr className="border-t border-gym-primary/30">
-        <td colSpan={colCount} className="py-4 px-3 text-gray-400 font-medium text-xl">
+        <td colSpan={colCount} className="py-4 px-3 text-gray-400 font-medium">
           {messages.reporteMorosos.totalMorosos}: {morososOrdenados.length}
         </td>
-        <td className="py-4 px-3 text-right text-gym-danger font-bold text-2xl min-w-[100px] whitespace-nowrap">
+        <td className="py-4 px-3 text-right text-gym-danger font-bold min-w-[100px] whitespace-nowrap">
           {formatCurrency(totalDeuda)}
         </td>
       </tr>
@@ -190,21 +182,21 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
         </div>
       </div>
 
-      {/* Hidden container for PNG capture — dark background, landscape, larger for WhatsApp */}
+      {/* ===== HIDDEN PNG CONTAINER — text-2xl inherits to ALL cells ===== */}
       <div className="fixed -left-[9999px] top-0 pointer-events-none">
-        <div ref={reportRef} className="bg-[#0B1120] p-12 rounded-xl w-[1600px]">
-          <div className="flex items-center gap-5 mb-8 pb-5 border-b border-gym-primary/20">
+        <div ref={reportRef} className="bg-[#0B1120] p-10 rounded-xl w-[2000px]">
+          <div className="flex items-center gap-6 mb-8 pb-6 border-b border-gym-primary/20">
             {gymLogo && (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={gymLogo} alt={gymName} className="w-24 h-24 object-contain rounded-xl" />
+              <img src={gymLogo} alt={gymName} className="w-28 h-28 object-contain rounded-xl" />
             )}
             <div>
-              <h1 className="text-4xl font-bold text-white">{gymName}</h1>
-              <p className="text-lg text-gray-400">{messages.reporteMorosos.subtitulo} — {anio}</p>
-              <p className="text-base text-gray-500">Fecha: {fechaStr}</p>
+              <h1 className="text-5xl font-bold text-white">{gymName}</h1>
+              <p className="text-2xl text-gray-400">{messages.reporteMorosos.subtitulo} — {anio}</p>
+              <p className="text-xl text-gray-500">Fecha: {fechaStr}</p>
             </div>
           </div>
-          <table className="w-full text-xl">
+          <table className="w-full text-2xl">
             <thead>{tableHeader}</thead>
             <tbody>{tableBody}</tbody>
             <tfoot>{tableFooter}</tfoot>
@@ -212,6 +204,7 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
         </div>
       </div>
 
+      {/* ===== MODAL PREVIEW ===== */}
       <div className="fixed inset-0 z-[200] flex items-start justify-center bg-black/70 backdrop-blur-sm overflow-y-auto py-8">
         <div className="bg-gym-surface border border-gym-border rounded-2xl max-w-5xl w-full mx-4 overflow-hidden">
           {/* Toolbar desktop */}
@@ -242,7 +235,7 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
             </Button>
           </div>
 
-          {/* Report preview — dark mode */}
+          {/* Report preview — dark mode, text-sm inherits to all cells */}
           <div className="p-4 pl-5 sm:pl-5">
             <div className="bg-[#0B1120] p-4 sm:p-6 rounded-xl w-full sm:w-[960px]">
               <div className="flex items-center gap-3 sm:gap-4 mb-4 sm:mb-6 pb-3 sm:pb-4 border-b border-gym-primary/20">
@@ -257,7 +250,7 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
                 </div>
               </div>
 
-              {/* Desktop: Table */}
+              {/* Desktop: Table — text-sm inherits to all cells */}
               <div className="hidden sm:block">
                 <table className="w-full text-sm">
                   <thead>{tableHeader}</thead>
@@ -280,7 +273,11 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
                       </span>
                     </div>
                     <div className="flex items-center gap-2 mb-2">
-                      {inscBadgeMobile(m.debeInscripcion)}
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded ${
+                        m.debeInscripcion ? "bg-red-500/20 text-red-400" : "bg-green-500/20 text-green-400"
+                      }`}>
+                        Insc: {m.debeInscripcion ? messages.reporteMorosos.no : messages.reporteMorosos.si}
+                      </span>
                     </div>
                     {m.mesesDeuda.length > 0 && (
                       <div className="flex flex-wrap gap-1 mb-2">

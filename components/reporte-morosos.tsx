@@ -27,12 +27,15 @@ interface ReporteMorososProps {
   onClose: () => void;
 }
 
+const ROWS_PER_PAGE = 15;
+const MAX_PAGES = 4;
+const PAGE_WIDTH = 1080;
+
 export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: ReporteMorososProps) {
-  const page1Ref = useRef<HTMLDivElement>(null);
-  const page2Ref = useRef<HTMLDivElement>(null);
-  const overlayRef = useRef<HTMLDivElement>(null);
   const [downloading, setDownloading] = useState(false);
   const downloadingRef = useRef(false);
+  const overlayRef = useRef<HTMLDivElement>(null);
+  const pageRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   const morososOrdenados = [...morosos]
     .sort((a, b) => a.full_name.localeCompare(b.full_name));
@@ -46,10 +49,12 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
   const totalDeudaReportados = morososReportados.reduce((sum, m) => sum + m.totalDeuda + m.montoPendiente, 0);
   const totalDeudaNoReportados = morososNoReportados.reduce((sum, m) => sum + m.totalDeuda + m.montoPendiente, 0);
 
-  const midIndex = Math.ceil(morososOrdenados.length / 2);
-  const page1Data = morososOrdenados.slice(0, midIndex);
-  const page2Data = morososOrdenados.slice(midIndex);
-  const hasPage2 = page2Data.length > 0;
+  const totalPages = Math.min(MAX_PAGES, Math.ceil(morososOrdenados.length / ROWS_PER_PAGE));
+  const pages: Moroso[][] = [];
+  for (let i = 0; i < totalPages; i++) {
+    pages.push(morososOrdenados.slice(i * ROWS_PER_PAGE, (i + 1) * ROWS_PER_PAGE));
+  }
+  const isLastPage = (pageIdx: number) => pageIdx === totalPages - 1;
 
   const handleDescargar = useCallback(async () => {
     if (downloadingRef.current) return;
@@ -58,13 +63,11 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
     setDownloading(true);
     await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
     try {
-      const refs = [page1Ref, page2Ref];
-      const total = hasPage2 ? 2 : 1;
-      for (let i = 0; i < total; i++) {
-        const ref = refs[i];
-        if (!ref.current) continue;
+      for (let i = 0; i < totalPages; i++) {
+        const el = pageRefs.current[i];
+        if (!el) continue;
         await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
-        const dataUrl = await toPng(ref.current, {
+        const dataUrl = await toPng(el, {
           cacheBust: true,
           pixelRatio: 3,
           backgroundColor: "#0B1120",
@@ -83,7 +86,7 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
       setDownloading(false);
       downloadingRef.current = false;
     }
-  }, [gymName, anio, hasPage2]);
+  }, [gymName, anio, totalPages]);
 
   if (morososOrdenados.length === 0) {
     return (
@@ -99,111 +102,124 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
   const fechaStr = new Date().toLocaleDateString("es-VE", { day: "numeric", month: "long", year: "numeric" });
   const colCount = 4 + todosLosMeses.length;
 
-  // ===================== SHARED TABLE PARTS (inherit from <table> text-*) =====================
-
   const renderTableHeader = (
     <tr className="border-b-2 border-gym-primary/30">
-      <th className="text-left py-5 px-5 text-gray-400 font-medium w-12">#</th>
-      <th className="text-left py-5 px-5 text-gray-400 font-semibold">Nombre</th>
-      <th className="text-center py-5 px-5 text-gray-400 font-medium">{messages.reporteMorosos.reportado}</th>
-      <th className="text-center py-5 px-5 text-gray-400 font-medium">Insc.</th>
+      <th className="text-left py-4 px-4 text-gray-400 font-medium w-10">#</th>
+      <th className="text-left py-4 px-4 text-gray-400 font-semibold">Nombre</th>
+      <th className="text-center py-4 px-4 text-gray-400 font-medium">{messages.reporteMorosos.reportado}</th>
+      <th className="text-center py-4 px-4 text-gray-400 font-medium">Insc.</th>
       {todosLosMeses.map((mes) => (
-        <th key={mes} className="text-center py-5 px-5 text-gray-400 font-medium">
+        <th key={mes} className="text-center py-4 px-4 text-gray-400 font-medium">
           {getMonthName(mes).slice(0, 3)}
         </th>
       ))}
-      <th className="text-right py-5 px-5 text-gray-400 font-semibold min-w-[120px] whitespace-nowrap">Deuda</th>
+      <th className="text-right py-4 px-4 text-gray-400 font-semibold min-w-[100px] whitespace-nowrap">Deuda</th>
     </tr>
   );
 
   const renderTableBody = (data: Moroso[], startIndex: number) => data.map((m, i) => (
     <tr key={m.id} className="border-b border-gray-800/50">
-      <td className="py-5 px-5 text-gray-500">{startIndex + i + 1}</td>
-      <td className="py-5 px-5 text-white font-semibold whitespace-nowrap">{m.full_name}</td>
-      <td className="text-center py-5 px-5">
-        <span className={`inline-block px-4 py-1.5 rounded-full font-medium ${m.esMigrado ? "bg-red-500/20 text-red-400" : "bg-green-500/20 text-green-400"}`}>
+      <td className="py-4 px-4 text-gray-500">{startIndex + i + 1}</td>
+      <td className="py-4 px-4 text-white font-semibold whitespace-nowrap">{m.full_name}</td>
+      <td className="text-center py-4 px-4">
+        <span className={`inline-block px-3 py-1 rounded-full font-medium ${m.esMigrado ? "bg-red-500/20 text-red-400" : "bg-green-500/20 text-green-400"}`}>
           {m.esMigrado ? messages.reporteMorosos.no : messages.reporteMorosos.si}
         </span>
       </td>
-      <td className="text-center py-5 px-5">
-        <span className={`inline-block px-4 py-1.5 rounded-full font-medium ${
+      <td className="text-center py-4 px-4">
+        <span className={`inline-block px-3 py-1 rounded-full font-medium ${
           m.debeInscripcion ? "bg-red-500/20 text-red-400" : "bg-green-500/20 text-green-400"
         }`}>
           {m.debeInscripcion ? messages.reporteMorosos.no : messages.reporteMorosos.si}
         </span>
       </td>
       {todosLosMeses.map((mes) => (
-        <td key={mes} className="text-center py-5 px-5">
+        <td key={mes} className="text-center py-4 px-4">
           {m.mesesDeuda.includes(mes) ? (
-            <span className="inline-block rounded-full bg-gym-danger/80 text-white text-[0.55em] leading-none px-3 py-1.5">✓</span>
+            <span className="inline-block rounded-full bg-gym-danger/80 text-white text-[0.6em] leading-none px-2 py-1">✓</span>
           ) : (
             <span className="text-gray-700">—</span>
           )}
         </td>
       ))}
-      <td className="py-5 px-5 text-right text-gym-danger font-bold min-w-[120px] whitespace-nowrap">
+      <td className="py-4 px-4 text-right text-gym-danger font-bold min-w-[100px] whitespace-nowrap">
         {formatCurrency(m.totalDeuda + m.montoPendiente)}
       </td>
     </tr>
   ));
 
-  const renderTableFooter = (data: Moroso[], showGrandTotal: boolean) => {
-    const dataReportados = data.filter((m) => !m.esMigrado);
-    const dataNoReportados = data.filter((m) => m.esMigrado);
-    const totalData = data.reduce((sum, m) => sum + m.totalDeuda + m.montoPendiente, 0);
-    const totalDataReportados = dataReportados.reduce((sum, m) => sum + m.totalDeuda + m.montoPendiente, 0);
-    const totalDataNoReportados = dataNoReportados.reduce((sum, m) => sum + m.totalDeuda + m.montoPendiente, 0);
+  const renderTableFooter = (data: Moroso[], grandTotal: boolean) => {
+    const dr = data.filter((m) => !m.esMigrado);
+    const dnr = data.filter((m) => m.esMigrado);
+    const td = data.reduce((s, m) => s + m.totalDeuda + m.montoPendiente, 0);
+    const tdr = dr.reduce((s, m) => s + m.totalDeuda + m.montoPendiente, 0);
+    const tdnr = dnr.reduce((s, m) => s + m.totalDeuda + m.montoPendiente, 0);
 
     return (
       <>
-        {dataNoReportados.length > 0 && (
+        {dnr.length > 0 && (
           <tr className="border-t border-gym-primary/20">
-            <td colSpan={colCount} className="py-4 px-5 text-gray-400">
-              Reportado (No): {dataNoReportados.length} moroso(s)
+            <td colSpan={colCount} className="py-3 px-4 text-gray-400">
+              Reportado (No): {dnr.length} moroso(s)
             </td>
-            <td className="py-4 px-5 text-right text-gym-danger font-bold min-w-[120px] whitespace-nowrap">
-              {formatCurrency(totalDataNoReportados)}
+            <td className="py-3 px-4 text-right text-gym-danger font-bold min-w-[100px] whitespace-nowrap">
+              {formatCurrency(tdnr)}
             </td>
           </tr>
         )}
-        {dataReportados.length > 0 && (
+        {dr.length > 0 && (
           <tr className="border-t border-gray-800/30">
-            <td colSpan={colCount} className="py-4 px-5 text-gray-400">
-              Reportado (Sí): {dataReportados.length} moroso(s)
+            <td colSpan={colCount} className="py-3 px-4 text-gray-400">
+              Reportado (Sí): {dr.length} moroso(s)
             </td>
-            <td className="py-4 px-5 text-right text-gym-danger font-bold min-w-[120px] whitespace-nowrap">
-              {formatCurrency(totalDataReportados)}
+            <td className="py-3 px-4 text-right text-gym-danger font-bold min-w-[100px] whitespace-nowrap">
+              {formatCurrency(tdr)}
             </td>
           </tr>
         )}
         <tr className="border-t-2 border-gym-primary/40">
-          <td colSpan={colCount} className="py-5 px-5 text-gray-400 font-medium">
-            {showGrandTotal ? `${messages.reporteMorosos.totalMorosos}: ${morososOrdenados.length}` : `Subtotal: ${data.length} moroso(s)`}
+          <td colSpan={colCount} className="py-4 px-4 text-gray-400 font-medium">
+            {grandTotal ? `${messages.reporteMorosos.totalMorosos}: ${morososOrdenados.length}` : `Subtotal: ${data.length} moroso(s)`}
           </td>
-          <td className="py-5 px-5 text-right text-gym-danger font-bold min-w-[120px] whitespace-nowrap">
-            {formatCurrency(showGrandTotal ? totalDeuda : totalData)}
+          <td className="py-4 px-4 text-right text-gym-danger font-bold min-w-[100px] whitespace-nowrap">
+            {formatCurrency(grandTotal ? totalDeuda : td)}
           </td>
         </tr>
       </>
     );
   };
 
-  const renderPngHeader = (pageNum: number, totalPages: number) => (
-    <div className="flex items-center justify-between mb-8 pb-6 border-b-2 border-gym-primary/30">
-      <div className="flex items-center gap-6">
-        {gymLogo && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={gymLogo} alt={gymName} className="w-28 h-28 object-contain rounded-2xl" />
-        )}
-        <div>
-          <h1 className="text-5xl font-extrabold text-white tracking-tight">{gymName}</h1>
-          <p className="text-2xl text-gray-400 mt-1">{messages.reporteMorosos.subtitulo} — {anio}</p>
-          <p className="text-xl text-gray-500 mt-1">Fecha: {fechaStr}</p>
+  const renderPngPage = (pageIdx: number, data: Moroso[], startIndex: number) => (
+    <div
+      key={pageIdx}
+      ref={(el) => { pageRefs.current[pageIdx] = el; }}
+      className="bg-[#0B1120] p-10 rounded-2xl"
+      style={{ width: PAGE_WIDTH }}
+    >
+      {/* Header */}
+      <div className="flex items-center justify-between mb-8 pb-6 border-b-2 border-gym-primary/30">
+        <div className="flex items-center gap-5">
+          {gymLogo && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={gymLogo} alt={gymName} className="w-20 h-20 object-contain rounded-xl" />
+          )}
+          <div>
+            <h1 className="text-4xl font-extrabold text-white tracking-tight">{gymName}</h1>
+            <p className="text-xl text-gray-400 mt-1">{messages.reporteMorosos.subtitulo} — {anio}</p>
+            <p className="text-lg text-gray-500 mt-1">Fecha: {fechaStr}</p>
+          </div>
         </div>
+        <span className="text-2xl font-bold text-gym-primary whitespace-nowrap">
+          {pageIdx + 1}/{totalPages}
+        </span>
       </div>
-      <div className="text-right">
-        <span className="text-3xl font-bold text-gym-primary">Página {pageNum}/{totalPages}</span>
-      </div>
+
+      {/* Table */}
+      <table className="w-full text-xl">
+        <thead>{renderTableHeader}</thead>
+        <tbody>{renderTableBody(data, startIndex)}</tbody>
+        <tfoot>{renderTableFooter(data, isLastPage(pageIdx))}</tfoot>
+      </table>
     </div>
   );
 
@@ -231,35 +247,16 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
       >
         <div className="text-center">
           <div className="animate-spin w-10 h-10 border-2 border-gym-primary border-t-transparent rounded-full mx-auto" />
-          <p className="text-gym-muted text-sm mt-4">Generando imagen{hasPage2 ? "es" : ""}...</p>
+          <p className="text-gym-muted text-sm mt-4">
+            Generando {totalPages > 1 ? `${totalPages} imágenes...` : "imagen..."}
+          </p>
         </div>
       </div>
 
-      {/* ===== HIDDEN PNG PAGE 1 ===== */}
+      {/* ===== HIDDEN PNG PAGES — vertical portrait ===== */}
       <div className="fixed -left-[9999px] top-0 pointer-events-none">
-        <div ref={page1Ref} className="bg-[#0B1120] p-14 rounded-2xl w-[2800px]">
-          {renderPngHeader(1, hasPage2 ? 2 : 1)}
-          <table className="w-full text-[1.75rem]">
-            <thead>{renderTableHeader}</thead>
-            <tbody>{renderTableBody(page1Data, 0)}</tbody>
-            <tfoot>{renderTableFooter(page1Data, !hasPage2)}</tfoot>
-          </table>
-        </div>
+        {pages.map((pageData, idx) => renderPngPage(idx, pageData, idx * ROWS_PER_PAGE))}
       </div>
-
-      {/* ===== HIDDEN PNG PAGE 2 ===== */}
-      {hasPage2 && (
-        <div className="fixed -left-[9999px] top-0 pointer-events-none">
-          <div ref={page2Ref} className="bg-[#0B1120] p-14 rounded-2xl w-[2800px]">
-            {renderPngHeader(2, 2)}
-            <table className="w-full text-[1.75rem]">
-              <thead>{renderTableHeader}</thead>
-              <tbody>{renderTableBody(page2Data, midIndex)}</tbody>
-              <tfoot>{renderTableFooter(page2Data, false)}</tfoot>
-            </table>
-          </div>
-        </div>
-      )}
 
       {/* ===== MODAL PREVIEW ===== */}
       <div className="fixed inset-0 z-[200] flex items-start justify-center bg-black/70 backdrop-blur-sm overflow-y-auto py-8">
@@ -270,7 +267,7 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
             <div className="flex items-center gap-2">
               <Button onClick={handleDescargar} disabled={downloading} size="sm">
                 <Download className="w-4 h-4 mr-2" />
-                {downloading ? "Generando..." : hasPage2 ? "Descargar 2 imágenes" : messages.reporteMorosos.descargar}
+                {downloading ? "Generando..." : totalPages > 1 ? `Descargar ${totalPages} imágenes` : messages.reporteMorosos.descargar}
               </Button>
               <Button onClick={onClose} variant="ghost" size="sm">
                 <X className="w-4 h-4" />
@@ -288,11 +285,11 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
             </div>
             <Button onClick={handleDescargar} disabled={downloading} size="sm" className="w-full">
               <Download className="w-4 h-4 mr-2" />
-              {downloading ? "Generando..." : hasPage2 ? "Descargar 2 imágenes" : messages.reporteMorosos.descargar}
+              {downloading ? "Generando..." : totalPages > 1 ? `Descargar ${totalPages} imágenes` : messages.reporteMorosos.descargar}
             </Button>
           </div>
 
-          {/* Report preview — dark mode, text-sm inherits to all cells */}
+          {/* Report preview — dark mode */}
           <div className="p-4 pl-5 sm:pl-5">
             <div className="bg-[#0B1120] p-4 sm:p-6 rounded-xl w-full sm:w-[960px]">
               {renderPreviewHeader()}
@@ -341,7 +338,6 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
                     </div>
                   </div>
                 ))}
-                {/* Mobile subtotals */}
                 <div className="space-y-2 pt-2 border-t border-gray-700/50">
                   {morososNoReportados.length > 0 && (
                     <div className="flex justify-between text-xs text-gray-400">

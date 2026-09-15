@@ -241,8 +241,6 @@ export const messages = {
     enviarSolicitud: "Enviar Solicitud",
     solicitudEnviada: "Solicitud de suspensión enviada",
     errorSolicitud: "Error al enviar solicitud de suspension",
-    suspendidoPendiente: "Suspendido (Pendiente)",
-    suspendido: "Suspendido",
     suspensionAprobada: "Suspensión aprobada",
     suspensionRechazada: "Suspensión rechazada",
     aprobarSuspension: "Aprobar Suspensión",

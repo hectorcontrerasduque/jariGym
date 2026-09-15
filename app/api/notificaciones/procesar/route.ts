@@ -123,7 +123,7 @@ async function ejecutarRecordatorioPago(
         .from("payments")
         .select("id, user_id")
         .in("id", pagoIds)
-        .in("status", ["aprobado", "suspendido"])
+        .in("status", ["aprobado"])
     : { data: [] };
 
   const pagoUsuarioMap = new Map((pagosHeader || []).map((p) => [p.id, p.user_id]));
@@ -224,7 +224,7 @@ async function ejecutarResumenDueno(supabase: SupabaseClient, gymConfig: Record<
   const pagosAprobadosDetalles = (pagosMesDetalles || []).filter((d) => statusMap.get(d.payment_id) === "aprobado");
   const pagosPendientesDetalles = (pagosMesDetalles || []).filter((d) => {
     const s = statusMap.get(d.payment_id);
-    return s === "pendiente" || s === "suspendido";
+    return s === "pendiente";
   });
 
   const { count: miembrosActivos } = await supabase
@@ -286,7 +286,7 @@ async function ejecutarEstatusSistema(supabase: SupabaseClient, gymConfig: Recor
   const { count: pagosPendientesMes } = await supabase
     .from("payments")
     .select("id", { count: "exact", head: true })
-    .in("status", ["pendiente", "suspendido"]);
+    .in("status", ["pendiente"]);
 
   const { data: ultimoPago } = await supabase
     .from("payments")

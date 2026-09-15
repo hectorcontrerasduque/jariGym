@@ -616,14 +616,14 @@ function MisPagosContent() {
 
     // Meses que NO son deuda:
     // - payment_type='suspension': el miembro solicitó suspensión (cualquier status)
-    // - payment_type='mensualidad'/'inscripcion' con status='aprobado' o 'suspendido': ya pagó
+    // - payment_type='mensualidad'/'inscripcion' con status='aprobado': ya pagó
     const mesesCubiertos = new Set(
       pagos.flatMap(p => (p.detail || [])
         .filter(d => {
           if (d.year_number !== anioActual) return false;
           if (d.payment_type === "suspension") return true;
           if (d.payment_type === "mensualidad" || d.payment_type === "inscripcion") {
-            return p.status === "aprobado" || p.status === "suspendido";
+            return p.status === "aprobado";
           }
           return false;
         })
@@ -665,9 +665,9 @@ function MisPagosContent() {
       pagos
         .filter(p => {
           if (isSuperAdmin && miembroSeleccionado) {
-            return p.status === "pendiente" || p.status === "aprobado" || p.status === "suspendido";
+            return p.status === "pendiente" || p.status === "aprobado";
           }
-          return p.status === "pendiente" || p.status === "aprobado" || p.status === "suspendido";
+          return p.status === "pendiente" || p.status === "aprobado";
         })
         .flatMap(p => (p.detail || []).map(d => d.month_number && d.year_number ? `${d.year_number}-${d.month_number}` : null))
         .filter(Boolean)
@@ -1185,7 +1185,7 @@ function MisPagosContent() {
                         <div className="flex items-center justify-between">
                           <span className="text-sm font-bold text-white">{getPagoLabel(p)}</span>
                           <Badge variant={p.status === "aprobado" ? "success" : p.status === "pendiente" ? "warning" : "secondary"} className="text-[10px]">
-                            {p.status === "aprobado" ? "Aprobado" : p.status === "pendiente" ? "Pendiente" : p.status === "suspendido" ? "Suspendido" : "Rechazado"}
+                            {p.status === "aprobado" ? "Aprobado" : p.status === "pendiente" ? "Pendiente" : "Rechazado"}
                           </Badge>
                         </div>
                         <div className="flex items-center gap-2 text-[11px] text-gym-muted mt-1">
@@ -1537,10 +1537,10 @@ function MisPagosContent() {
                           {getPagoLabel(pago)}
                         </span>
                         <Badge
-                          variant={pago.status === "aprobado" ? "success" : pago.status === "rechazado" ? "danger" : pago.status === "suspendido" ? "secondary" : "warning"}
+                          variant={pago.status === "aprobado" ? "success" : pago.status === "rechazado" ? "danger" : "warning"}
                           className="text-[10px] px-1.5 py-0 flex-shrink-0"
                         >
-                          {pago.status === "aprobado" ? "Aprobado" : pago.status === "rechazado" ? "Rechazado" : pago.status === "suspendido" ? "Suspendido" : "Pendiente"}
+                          {pago.status === "aprobado" ? "Aprobado" : pago.status === "rechazado" ? "Rechazado" : "Pendiente"}
                         </Badge>
                       </div>
                       <div className="flex items-center gap-2 text-[11px] text-gym-muted mt-1">
@@ -1663,8 +1663,6 @@ function MisPagosContent() {
                     ? "success"
                     : selectedPago.status === "rechazado"
                     ? "danger"
-                    : selectedPago.status === "suspendido"
-                    ? "secondary"
                     : "warning"
                 }
               >
@@ -1672,8 +1670,6 @@ function MisPagosContent() {
                   ? "Aprobado"
                   : selectedPago.status === "rechazado"
                   ? "Rechazado"
-                  : selectedPago.status === "suspendido"
-                  ? "Suspendido"
                   : "Pendiente"}
               </Badge>
             </div>

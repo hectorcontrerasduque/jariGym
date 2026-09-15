@@ -170,7 +170,7 @@ function PagosContent() {
     let result = filtro === "todos"
       ? pagos
       : filtro === "rechazados_suspendidos"
-      ? pagos.filter((p) => p.status === "rechazado" || p.status === "suspendido")
+      ? pagos.filter((p) => p.status === "rechazado")
       : pagos.filter((p) => p.status === filtro);
     if (busquedaMiembro) {
       const q = busquedaMiembro.toLowerCase();
@@ -289,7 +289,7 @@ function PagosContent() {
           { key: "todos", label: "Todos" },
           { key: "pendiente", label: "Pendiente" },
           { key: "aprobado", label: "Aprobado" },
-          { key: "rechazados_suspendidos", label: "Rechazados/Suspendidos" },
+          { key: "rechazados", label: "Rechazados" },
         ].map((f) => (
           <Button
             key={f.key}
@@ -381,8 +381,6 @@ function PagosContent() {
                             ? "Aprobado"
                             : pago.status === "rechazado"
                             ? "Rechazado"
-                            : pago.status === "suspendido"
-                            ? "Suspendido"
                             : "Pendiente"}
                         </Badge>
                       </div>

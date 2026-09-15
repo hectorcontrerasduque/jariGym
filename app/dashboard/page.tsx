@@ -683,14 +683,14 @@ export default function DashboardPage() {
                         const tipo = d.payment_type === "inscripcion" ? "Insc." : d.payment_type === "suspension" ? "Susp." : "Mens.";
                         return d.month_number ? `${mes} ${anio} (${tipo})` : tipo;
                       }).join(" | ") || "—";
-                      const statusLabel = pago.status === "aprobado" ? "Aprobado" : pago.status === "rechazado" ? "Rechazado" : pago.status === "suspendido" ? "Suspendido" : "Pendiente";
+                      const statusLabel = pago.status === "aprobado" ? "Aprobado" : pago.status === "rechazado" ? "Rechazado" : "Pendiente";
                       return (
                         <div key={pago.id} className="flex items-center justify-between p-3 bg-gym-bg rounded-xl hover:bg-gym-surface/80 transition-colors">
                           <div className="min-w-0">
                             <div className="flex items-center gap-2">
                               <p className="font-medium text-gym-text text-sm truncate">{getNombreMiembro(pago)}</p>
                               <Badge
-                                variant={pago.status === "aprobado" ? "success" : pago.status === "rechazado" ? "danger" : pago.status === "suspendido" ? "secondary" : "warning"}
+                                variant={pago.status === "aprobado" ? "success" : pago.status === "rechazado" ? "danger" : "warning"}
                                 className="text-[10px] px-1.5 py-0 flex-shrink-0"
                               >
                                 {statusLabel}

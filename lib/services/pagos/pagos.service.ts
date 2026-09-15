@@ -140,7 +140,7 @@ export class PagosService {
       .eq("id", pagoId)
       .single();
 
-    const newStatus = pagoActual?.status === "suspendido" ? "suspendido" : "aprobado";
+    const newStatus = "aprobado";
 
     const { data, error } = await this.supabase
       .from("payments")
@@ -285,7 +285,7 @@ export class PagosService {
     return { ...pago, detail: detalles as DetallePago[] };
   }
 
-  async crearPagoSuspendido(usuarioId: string, meses: { month_number: number; year_number: number }[], motivo?: string, status?: "pendiente" | "aprobado" | "suspendido"): Promise<number> {
+  async crearPagoSuspendido(usuarioId: string, meses: { month_number: number; year_number: number }[], motivo?: string, status?: "pendiente" | "aprobado"): Promise<number> {
     const {
       data: { user },
     } = await this.supabase.auth.getUser();
@@ -416,7 +416,7 @@ export class PagosService {
       .from("payment_detail")
       .select("month_number, year_number, payments!inner(id, status, user_id)")
       .eq("payments.user_id", usuarioId)
-      .in("payments.status", ["aprobado", "pendiente", "suspendido"])
+      .in("payments.status", ["aprobado", "pendiente"])
       .not("month_number", "is", null);
 
     if (error || !detalles) return [];
@@ -575,7 +575,7 @@ export class PagosService {
     const montoDeuda = montoDeudaInscripcion + montoDeudaMensualidad;
 
     const pagosMesActual = pagosConDetalle.filter(
-      (p) => ["aprobado", "suspendido"].includes(p.status) && p.month_number === mesActual && p.year_number === anioConsulta && (p.payment_type === "mensualidad" || p.payment_type === "suspension")
+      (p) => p.status === "aprobado" && p.month_number === mesActual && p.year_number === anioConsulta && (p.payment_type === "mensualidad" || p.payment_type === "suspension")
     );
     const usuariosAlDia = new Set(
       pagosMesActual.filter((p) => miembrosConInscripcionPagada.has(p.user_id)).map((p) => p.user_id)
@@ -703,7 +703,7 @@ export class PagosService {
     }));
 
     const pagosAprobados = todosPagos.filter((p) => p.status === "aprobado");
-    const pagosQueCubrenMes = todosPagos.filter((p) => p.status === "aprobado" || p.status === "suspendido");
+    const pagosQueCubrenMes = todosPagos.filter((p) => p.status === "aprobado");
 
     const miembrosConInscripcionPagada = new Set<string>();
     for (const pago of pagosAprobados) {
@@ -941,7 +941,7 @@ export class PagosService {
       const pagosMes = pagosAll.filter((p) => p.month_number === m.mes && p.year_number === m.anio);
 
       const pagados = new Set(
-        pagosMes.filter((p) => (p.status === "aprobado" || p.status === "suspendido") && m.idsMes.has(p.user_id)).map((p) => p.user_id)
+        pagosMes.filter((p) => (p.status === "aprobado") && m.idsMes.has(p.user_id)).map((p) => p.user_id)
       ).size;
 
       const pendientes = new Set(
@@ -1002,7 +1002,7 @@ export class PagosService {
           .from("payments")
           .select("id, user_id")
           .in("id", pagoIds)
-          .in("status", ["aprobado", "suspendido"])
+          .in("status", ["aprobado"])
       : { data: [] };
 
     const idsAlDia = new Set((pagosHeader || []).map((p) => p.user_id));

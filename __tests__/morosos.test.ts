@@ -105,12 +105,12 @@ describe("Morosos detection — real getMiembrosMorosos", () => {
     expect(result[0].totalDeuda).toBe(20);
   });
 
-  it("member with suspendido payment covers that month", async () => {
+  it("member with aprobado payment covers that month", async () => {
     const elegibles = makeElegibles({
       miembros: [makeMiembro({ start_date: "2026-01-01" })],
     });
     const pagos = [1, 2, 3, 4, 5, 6, 7, 8, 9].map((mes) =>
-      makePagoRpc({ month_number: mes, status: mes === 8 ? "suspendido" : "aprobado" })
+      makePagoRpc({ month_number: mes, status: "aprobado" })
     );
 
     const result = await getMorosos(elegibles, pagos);

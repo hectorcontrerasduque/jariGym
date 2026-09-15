@@ -54,7 +54,7 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
     try {
       const dataUrl = await toPng(reportRef.current, {
         cacheBust: true,
-        pixelRatio: 3,
+        pixelRatio: 4,
         backgroundColor: "#0B1120",
       });
       const link = document.createElement("a");
@@ -192,7 +192,7 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
 
       {/* Hidden container for PNG capture — dark background, landscape, larger for WhatsApp */}
       <div className="fixed -left-[9999px] top-0 pointer-events-none">
-        <div ref={reportRef} className="bg-[#0B1120] p-8 rounded-xl w-[1200px]">
+        <div ref={reportRef} className="bg-[#0B1120] p-10 rounded-xl w-[1400px]">
           <div className="flex items-center gap-5 mb-8 pb-5 border-b border-gym-primary/20">
             {gymLogo && (
               // eslint-disable-next-line @next/next/no-img-element
@@ -204,7 +204,7 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
               <p className="text-sm text-gray-500">Fecha: {fechaStr}</p>
             </div>
           </div>
-          <table className="w-full text-base">
+          <table className="w-full text-lg">
             <thead>{tableHeader}</thead>
             <tbody>{tableBody}</tbody>
             <tfoot>{tableFooter}</tfoot>

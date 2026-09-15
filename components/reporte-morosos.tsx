@@ -224,65 +224,6 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
           margin: { left: margin, right: margin, top: 35 },
         });
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        let y = (doc as any).lastAutoTable.finalY + 4;
-
-        const isLast = p === totalPdfPages - 1;
-        const dr = pageData.filter((m) => !m.esMigrado);
-        const dnr = pageData.filter((m) => m.esMigrado);
-        const td = pageData.reduce((s, m) => s + m.totalDeuda + m.montoPendiente, 0);
-        const tdr = dr.reduce((s, m) => s + m.totalDeuda + m.montoPendiente, 0);
-        const tdnr = dnr.reduce((s, m) => s + m.totalDeuda + m.montoPendiente, 0);
-
-        // Subtotals box
-        const boxH = (dnr.length > 0 ? 5 : 0) + (dr.length > 0 ? 5 : 0) + 8;
-        doc.setFillColor(248, 250, 252);
-        doc.setDrawColor(203, 213, 225);
-        doc.roundedRect(margin, y - 2, pageW - margin * 2, boxH, 2, 2, "FD");
-
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(8);
-        doc.setTextColor(71, 85, 105);
-
-        if (dnr.length > 0) {
-          doc.text(`Reportado (No): ${dnr.length} moroso(s)`, margin + 4, y + 3);
-          doc.setFont("helvetica", "bold");
-          doc.setTextColor(220, 38, 38);
-          doc.text(formatCurrency(tdnr), pageW - margin - 4, y + 3, { align: "right" });
-          doc.setFont("helvetica", "normal");
-          doc.setTextColor(71, 85, 105);
-          y += 5;
-        }
-        if (dr.length > 0) {
-          doc.text(`Reportado (Si): ${dr.length} moroso(s)`, margin + 4, y + 3);
-          doc.setFont("helvetica", "bold");
-          doc.setTextColor(220, 38, 38);
-          doc.text(formatCurrency(tdr), pageW - margin - 4, y + 3, { align: "right" });
-          doc.setFont("helvetica", "normal");
-          doc.setTextColor(71, 85, 105);
-          y += 5;
-        }
-
-        // Total line
-        y += 2;
-        doc.setDrawColor(30, 58, 138);
-        doc.setLineWidth(0.4);
-        doc.line(margin + 4, y, pageW - margin - 4, y);
-        y += 5;
-
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(9.5);
-        doc.setTextColor(15, 23, 42);
-        if (isLast) {
-          doc.text(`${messages.reporteMorosos.totalMorosos}: ${morososOrdenados.length}`, margin + 4, y);
-          doc.setTextColor(220, 38, 38);
-          doc.text(formatCurrency(totalDeuda), pageW - margin - 4, y, { align: "right" });
-        } else {
-          doc.text(`Subtotal: ${pageData.length} moroso(s)`, margin + 4, y);
-          doc.setTextColor(220, 38, 38);
-          doc.text(formatCurrency(td), pageW - margin - 4, y, { align: "right" });
-        }
-
         // Footer
         doc.setFillColor(15, 23, 42);
         doc.rect(0, pageH - 10, pageW, 10, "F");

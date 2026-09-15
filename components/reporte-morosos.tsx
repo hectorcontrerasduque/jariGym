@@ -104,29 +104,29 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
 
   const renderTableHeader = (
     <tr className="border-b-2 border-gym-primary/30">
-      <th className="text-left py-4 px-4 text-gray-400 font-medium w-10">#</th>
-      <th className="text-left py-4 px-4 text-gray-400 font-semibold">Nombre</th>
-      <th className="text-center py-4 px-4 text-gray-400 font-medium">{messages.reporteMorosos.reportado}</th>
-      <th className="text-center py-4 px-4 text-gray-400 font-medium">Insc.</th>
+      <th className="text-left py-3 px-3 text-gray-400 font-medium w-8">#</th>
+      <th className="text-left py-3 px-3 text-gray-400 font-semibold">Nombre</th>
+      <th className="text-center py-3 px-3 text-gray-400 font-medium">{messages.reporteMorosos.reportado}</th>
+      <th className="text-center py-3 px-3 text-gray-400 font-medium">Insc.</th>
       {todosLosMeses.map((mes) => (
-        <th key={mes} className="text-center py-4 px-4 text-gray-400 font-medium">
+        <th key={mes} className="text-center py-3 px-3 text-gray-400 font-medium">
           {getMonthName(mes).slice(0, 3)}
         </th>
       ))}
-      <th className="text-right py-4 px-4 text-gray-400 font-semibold min-w-[100px] whitespace-nowrap">Deuda</th>
+      <th className="text-right py-3 px-3 text-gray-400 font-semibold whitespace-nowrap">Deuda</th>
     </tr>
   );
 
   const renderTableBody = (data: Moroso[], startIndex: number) => data.map((m, i) => (
     <tr key={m.id} className="border-b border-gray-800/50">
-      <td className="py-4 px-4 text-gray-500">{startIndex + i + 1}</td>
-      <td className="py-4 px-4 text-white font-semibold whitespace-nowrap">{m.full_name}</td>
-      <td className="text-center py-4 px-4">
+      <td className="py-3 px-3 text-gray-500">{startIndex + i + 1}</td>
+      <td className="py-3 px-3 text-white font-semibold whitespace-nowrap">{m.full_name}</td>
+      <td className="text-center py-3 px-3">
         <span className={`inline-block px-3 py-1 rounded-full font-medium ${m.esMigrado ? "bg-red-500/20 text-red-400" : "bg-green-500/20 text-green-400"}`}>
           {m.esMigrado ? messages.reporteMorosos.no : messages.reporteMorosos.si}
         </span>
       </td>
-      <td className="text-center py-4 px-4">
+      <td className="text-center py-3 px-3">
         <span className={`inline-block px-3 py-1 rounded-full font-medium ${
           m.debeInscripcion ? "bg-red-500/20 text-red-400" : "bg-green-500/20 text-green-400"
         }`}>
@@ -134,7 +134,7 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
         </span>
       </td>
       {todosLosMeses.map((mes) => (
-        <td key={mes} className="text-center py-4 px-4">
+        <td key={mes} className="text-center py-3 px-3">
           {m.mesesDeuda.includes(mes) ? (
             <span className="inline-block rounded-full bg-gym-danger/80 text-white text-[0.6em] leading-none px-2 py-1">✓</span>
           ) : (
@@ -142,7 +142,7 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
           )}
         </td>
       ))}
-      <td className="py-4 px-4 text-right text-gym-danger font-bold min-w-[100px] whitespace-nowrap">
+      <td className="py-3 px-3 text-right text-gym-danger font-bold whitespace-nowrap">
         {formatCurrency(m.totalDeuda + m.montoPendiente)}
       </td>
     </tr>
@@ -159,29 +159,29 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
       <>
         {dnr.length > 0 && (
           <tr className="border-t border-gym-primary/20">
-            <td colSpan={colCount} className="py-3 px-4 text-gray-400">
+            <td colSpan={colCount} className="py-3 px-3 text-gray-400">
               Reportado (No): {dnr.length} moroso(s)
             </td>
-            <td className="py-3 px-4 text-right text-gym-danger font-bold min-w-[100px] whitespace-nowrap">
+            <td className="py-3 px-3 text-right text-gym-danger font-bold whitespace-nowrap">
               {formatCurrency(tdnr)}
             </td>
           </tr>
         )}
         {dr.length > 0 && (
           <tr className="border-t border-gray-800/30">
-            <td colSpan={colCount} className="py-3 px-4 text-gray-400">
+            <td colSpan={colCount} className="py-3 px-3 text-gray-400">
               Reportado (Sí): {dr.length} moroso(s)
             </td>
-            <td className="py-3 px-4 text-right text-gym-danger font-bold min-w-[100px] whitespace-nowrap">
+            <td className="py-3 px-3 text-right text-gym-danger font-bold whitespace-nowrap">
               {formatCurrency(tdr)}
             </td>
           </tr>
         )}
         <tr className="border-t-2 border-gym-primary/40">
-          <td colSpan={colCount} className="py-4 px-4 text-gray-400 font-medium">
+          <td colSpan={colCount} className="py-4 px-3 text-gray-400 font-medium">
             {grandTotal ? `${messages.reporteMorosos.totalMorosos}: ${morososOrdenados.length}` : `Subtotal: ${data.length} moroso(s)`}
           </td>
-          <td className="py-4 px-4 text-right text-gym-danger font-bold min-w-[100px] whitespace-nowrap">
+          <td className="py-4 px-3 text-right text-gym-danger font-bold whitespace-nowrap">
             {formatCurrency(grandTotal ? totalDeuda : td)}
           </td>
         </tr>
@@ -193,7 +193,7 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
     <div
       key={pageIdx}
       ref={(el) => { pageRefs.current[pageIdx] = el; }}
-      className="bg-[#0B1120] p-10 rounded-2xl"
+      className="bg-[#0B1120] p-8 rounded-2xl"
       style={{ width: PAGE_WIDTH }}
     >
       {/* Header */}
@@ -215,7 +215,7 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
       </div>
 
       {/* Table */}
-      <table className="w-full text-xl">
+      <table className="w-full text-lg">
         <thead>{renderTableHeader}</thead>
         <tbody>{renderTableBody(data, startIndex)}</tbody>
         <tfoot>{renderTableFooter(data, isLastPage(pageIdx))}</tfoot>

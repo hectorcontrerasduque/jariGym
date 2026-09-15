@@ -61,8 +61,22 @@ export async function POST(request: Request) {
       .eq("is_active", true)
       .maybeSingle();
 
-    const montoMensual = metodoEfectivo?.amount_monthly || 0;
-    const montoInscripcion = metodoEfectivo?.amount_inscription || 0;
+    if (!metodoEfectivo) {
+      return NextResponse.json(
+        { error: messages.migracion.metodoPagoNoConfigurado },
+        { status: 400 }
+      );
+    }
+
+    const montoMensual = metodoEfectivo.amount_monthly || 0;
+    const montoInscripcion = metodoEfectivo.amount_inscription || 0;
+
+    if (montoMensual <= 0) {
+      return NextResponse.json(
+        { error: messages.migracion.montoMensualCero },
+        { status: 400 }
+      );
+    }
 
     const searchName = selectedNombre || nombre;
     const words = searchName.split(/\s+/).filter((w: string) => w.length >= 1);
@@ -120,6 +134,13 @@ export async function POST(request: Request) {
     const migrablesRecords = migracionRecords.filter(
       (r) => r.estado === "pagado" || r.estado === "suspendido"
     );
+
+    if (migrablesRecords.length === 0) {
+      return NextResponse.json(
+        { error: messages.migracion.sinRegistrosMigrables },
+        { status: 400 }
+      );
+    }
 
     let userId: string;
     let isNewUser = false;
@@ -206,6 +227,10 @@ export async function POST(request: Request) {
     });
 
     if (rpcError) {
+      // Rollback: if we created a new auth user, delete it (profile cascades via FK)
+      if (isNewUser && userId) {
+        await supabase.auth.admin.deleteUser(userId);
+      }
       return NextResponse.json({ error: messages.migracion.errorServidor }, { status: 500 });
     }
 

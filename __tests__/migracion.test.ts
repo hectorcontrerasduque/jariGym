@@ -110,6 +110,7 @@ describe("Migración API", () => {
   it("falla si no hay registros en tabla migracion", async () => {
     mockSupabase.from.mockImplementation((table: string) => {
       if (table === "gym_config") return chainReturn({ id: "1" });
+      if (table === "gym_config_payment_methods") return chainReturn({ amount_monthly: 20, amount_inscription: 10 });
       if (table === "migracion") return chainReturn([]);
       return chainReturn(null);
     });

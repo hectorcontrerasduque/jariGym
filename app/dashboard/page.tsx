@@ -523,12 +523,12 @@ export default function DashboardPage() {
                   <p className="text-[10px] sm:text-xs text-gym-muted mb-0.5 sm:mb-1 uppercase tracking-wider">Al Día</p>
                   <div className="stat-number text-gym-success">
                     <span className="text-gym-text">{stats?.alDiaMensualidad || 0}</span>
-                    <span className="text-xs sm:text-lg text-gym-muted mx-0.5 sm:mx-1">/</span>
+                    <span className="text-[length:inherit] text-gym-muted mx-0.5 sm:mx-1">/</span>
                     <span className="text-gym-text">{stats?.miembrosActivos || 0}</span>
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm sm:text-lg font-bold text-gym-text">{formatCurrency(stats?.montoPagado || 0)}</p>
+                  <p className="text-xs sm:text-sm font-bold text-gym-text truncate" title={formatCurrency(stats?.montoPagado || 0)}>{formatCurrency(stats?.montoPagado || 0)}</p>
                   <p className="text-[9px] sm:text-[10px] text-gym-muted">cobrado</p>
                 </div>
               </div>

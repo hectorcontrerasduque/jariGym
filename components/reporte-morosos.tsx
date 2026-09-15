@@ -38,6 +38,11 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
 
   const totalDeuda = morososOrdenados.reduce((sum, m) => sum + m.totalDeuda + m.montoPendiente, 0);
 
+  const morososReportados = morososOrdenados.filter((m) => !m.esMigrado);
+  const morososNoReportados = morososOrdenados.filter((m) => m.esMigrado);
+  const totalDeudaReportados = morososReportados.reduce((sum, m) => sum + m.totalDeuda + m.montoPendiente, 0);
+  const totalDeudaNoReportados = morososNoReportados.reduce((sum, m) => sum + m.totalDeuda + m.montoPendiente, 0);
+
   const handleDescargar = useCallback(async () => {
     if (!reportRef.current) return;
     setDownloading(true);
@@ -171,6 +176,26 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
                 ))}
               </tbody>
               <tfoot>
+                {morososNoReportados.length > 0 && (
+                  <tr className="border-t border-gym-primary/20">
+                    <td colSpan={3 + todosLosMeses.length} className="py-2 px-2 text-gray-400 text-sm">
+                      Reportado (No): {morososNoReportados.length} moroso(s)
+                    </td>
+                    <td className="py-2 px-2 text-right text-gym-danger font-bold">
+                      {formatCurrency(totalDeudaNoReportados)}
+                    </td>
+                  </tr>
+                )}
+                {morososReportados.length > 0 && (
+                  <tr className="border-t border-gray-800/30">
+                    <td colSpan={3 + todosLosMeses.length} className="py-2 px-2 text-gray-400 text-sm">
+                      Reportado (Sí): {morososReportados.length} moroso(s)
+                    </td>
+                    <td className="py-2 px-2 text-right text-gym-danger font-bold">
+                      {formatCurrency(totalDeudaReportados)}
+                    </td>
+                  </tr>
+                )}
                 <tr className="border-t border-gym-primary/30">
                   <td colSpan={3 + todosLosMeses.length} className="py-3 px-2 text-gray-400 font-medium">
                     {messages.reporteMorosos.totalMorosos}: {morososOrdenados.length}

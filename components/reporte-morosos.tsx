@@ -2,8 +2,10 @@
 
 import { useRef, useState, useCallback } from "react";
 import { toPng } from "html-to-image";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import { Button } from "@/components/ui/button";
-import { Download, X } from "lucide-react";
+import { Download, FileDown, X } from "lucide-react";
 import { formatCurrency, getMonthName } from "@/lib/utils";
 import { messages } from "@/lib/messages";
 import { showToast } from "@/components/ui/toast";
@@ -97,6 +99,145 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
       downloadingRef.current = false;
     }
   }, [gymName, anio, totalPages]);
+
+  const handleDescargarPdf = async () => {
+    if (downloadingRef.current) return;
+    downloadingRef.current = true;
+    if (overlayRef.current) overlayRef.current.style.display = "flex";
+    setDownloading(true);
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    try {
+      const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "letter" });
+      const pageW = doc.internal.pageSize.getWidth();
+      const pageH = doc.internal.pageSize.getHeight();
+      const margin = 15;
+      const fechaStr = new Date().toLocaleDateString("es-VE", { day: "numeric", month: "long", year: "numeric" });
+      let y = margin;
+
+      const monthsNames = todosLosMeses.map((m) => getMonthName(m).slice(0, 3));
+
+      for (let p = 0; p < totalPages; p++) {
+        // eslint-disable-next-line security/detect-object-injection
+        const pageData = pages[p];
+        if (p > 0) {
+          doc.addPage();
+          y = margin;
+        }
+
+        // Header
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(20);
+        doc.setTextColor(30, 30, 30);
+        doc.text(gymName, margin, y + 8);
+
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(10);
+        doc.setTextColor(100, 100, 100);
+        doc.text(`${messages.reporteMorosos.subtitulo} — ${anio}`, margin, y + 15);
+        doc.text(`Fecha: ${fechaStr}`, margin, y + 20);
+
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(12);
+        doc.setTextColor(0, 100, 200);
+        doc.text(`${p + 1}/${totalPages}`, pageW - margin, y + 8, { align: "right" });
+
+        y += 28;
+
+        // Table
+        const tableHeaders = [["#", "Nombre", messages.reporteMorosos.reportado, "Insc.", ...monthsNames, "Deuda"]];
+        const tableBody = pageData.map((m, i) => [
+          String(p * ROWS_PER_PAGE + i + 1),
+          m.full_name,
+          m.esMigrado ? messages.reporteMorosos.no : messages.reporteMorosos.si,
+          m.debeInscripcion ? messages.reporteMorosos.no : messages.reporteMorosos.si,
+          ...todosLosMeses.map((mes) => (m.mesesDeuda.includes(mes) ? "✓" : "—")),
+          formatCurrency(m.totalDeuda + m.montoPendiente),
+        ]);
+
+        autoTable(doc, {
+          startY: y,
+          head: tableHeaders,
+          body: tableBody,
+          theme: "grid",
+          styles: {
+            fontSize: 8,
+            cellPadding: 2,
+            textColor: [30, 30, 30],
+            lineColor: [200, 200, 200],
+            lineWidth: 0.3,
+          },
+          headStyles: {
+            fillColor: [30, 40, 60],
+            textColor: [255, 255, 255],
+            fontStyle: "bold",
+            fontSize: 8,
+          },
+          alternateRowStyles: {
+            fillColor: [245, 245, 250],
+          },
+          columnStyles: {
+            0: { cellWidth: 10 },
+            1: { cellWidth: 45 },
+            [3 + monthsNames.length]: { halign: "right", fontStyle: "bold" },
+          },
+          margin: { left: margin, right: margin },
+        });
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        y = (doc as any).lastAutoTable.finalY + 6;
+
+        // Subtotals
+        const dr = pageData.filter((m) => !m.esMigrado);
+        const dnr = pageData.filter((m) => m.esMigrado);
+        const td = pageData.reduce((s, m) => s + m.totalDeuda + m.montoPendiente, 0);
+        const tdr = dr.reduce((s, m) => s + m.totalDeuda + m.montoPendiente, 0);
+        const tdnr = dnr.reduce((s, m) => s + m.totalDeuda + m.montoPendiente, 0);
+
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(9);
+        doc.setTextColor(80, 80, 80);
+
+        if (dnr.length > 0) {
+          doc.text(`Reportado (No): ${dnr.length} moroso(s)`, margin, y);
+          doc.text(formatCurrency(tdnr), pageW - margin, y, { align: "right" });
+          y += 5;
+        }
+        if (dr.length > 0) {
+          doc.text(`Reportado (Sí): ${dr.length} moroso(s)`, margin, y);
+          doc.text(formatCurrency(tdr), pageW - margin, y, { align: "right" });
+          y += 5;
+        }
+
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(10);
+        doc.setDrawColor(180, 180, 180);
+        doc.line(margin, y, pageW - margin, y);
+        y += 5;
+
+        if (isLastPage(p)) {
+          doc.text(`${messages.reporteMorosos.totalMorosos}: ${morososOrdenados.length}`, margin, y);
+          doc.text(formatCurrency(totalDeuda), pageW - margin, y, { align: "right" });
+        } else {
+          doc.text(`Subtotal: ${pageData.length} moroso(s)`, margin, y);
+          doc.text(formatCurrency(td), pageW - margin, y, { align: "right" });
+        }
+
+        // Footer page number
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(8);
+        doc.setTextColor(150, 150, 150);
+        doc.text(`${p + 1} / ${totalPages}`, pageW / 2, pageH - 8, { align: "center" });
+      }
+
+      doc.save(`morosos-${gymName.replace(/\s+/g, "-")}-${anio}.pdf`);
+    } catch {
+      showToast("Error al generar PDF", "error");
+    } finally {
+      if (overlayRef.current) overlayRef.current.style.display = "none";
+      setDownloading(false);
+      downloadingRef.current = false;
+    }
+  };
 
   if (morososOrdenados.length === 0) {
     return (
@@ -279,6 +420,10 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
                 <Download className="w-4 h-4 mr-2" />
                 {downloading ? "Generando..." : totalPages > 1 ? `Descargar ${totalPages} imágenes` : messages.reporteMorosos.descargar}
               </Button>
+              <Button onClick={handleDescargarPdf} disabled={downloading} size="sm" variant="secondary">
+                <FileDown className="w-4 h-4 mr-2" />
+                Descargar PDF
+              </Button>
               <Button onClick={onClose} variant="ghost" size="sm">
                 <X className="w-4 h-4" />
               </Button>
@@ -296,6 +441,10 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
             <Button onClick={handleDescargar} disabled={downloading} size="sm" className="w-full">
               <Download className="w-4 h-4 mr-2" />
               {downloading ? "Generando..." : totalPages > 1 ? `Descargar ${totalPages} imágenes` : messages.reporteMorosos.descargar}
+            </Button>
+            <Button onClick={handleDescargarPdf} disabled={downloading} size="sm" variant="secondary" className="w-full">
+              <FileDown className="w-4 h-4 mr-2" />
+              Descargar PDF
             </Button>
           </div>
 

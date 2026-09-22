@@ -83,28 +83,6 @@ export function Sidebar() {
     };
     getGymConfig();
 
-    const triggerNotifications = async () => {
-      try {
-        const supabase = createClient();
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session?.access_token) return;
-        const { data: p } = await supabase
-          .from("profiles")
-          .select("role")
-          .eq("id", session.user.id)
-          .single();
-        if (p?.role !== "super_admin") return;
-        await fetch("/api/notificaciones", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${session.access_token}`,
-          },
-        }).catch(() => {});
-      } catch {}
-    };
-    triggerNotifications();
-
     const handleConfigUpdated = () => getGymConfig();
     window.addEventListener("config:updated", handleConfigUpdated);
     return () => window.removeEventListener("config:updated", handleConfigUpdated);

@@ -566,7 +566,6 @@ export class PagosService {
     const deudoresMensualidad = morosos.filter((m) => m.mesesDeuda.length > 0).length;
     const montoDeudaInscripcion = morosos.filter((m) => m.debeInscripcion).length * montoInscripcion;
     const montoDeudaMensualidad = morosos.reduce((sum, m) => sum + m.mesesDeuda.length, 0) * montoMensual;
-    const montoPendiente = morosos.reduce((sum, m) => sum + m.montoPendiente, 0);
     const montoDeuda = montoDeudaInscripcion + montoDeudaMensualidad;
 
     const pagosMesActual = pagosConDetalle.filter(

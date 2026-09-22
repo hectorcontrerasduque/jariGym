@@ -385,7 +385,7 @@ export async function POST(request: Request) {
       .limit(1)
       .single();
 
-    if (!gymConfig || !gymConfig.notificaciones_enabled) {
+    if (!gymConfig || !gymConfig.notifications_enabled) {
       return NextResponse.json({ ejecutadas: 0, enviados: 0, errores: 0 });
     }
 

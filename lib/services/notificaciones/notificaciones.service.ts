@@ -25,7 +25,7 @@ export class NotificacionesService {
     if (!existing) return;
     const { error } = await this.supabase
       .from("gym_config")
-      .update({ notificaciones_enabled: updates.notificaciones_enabled })
+      .update({ notifications_enabled: updates.notifications_enabled })
       .eq("id", existing.id);
     if (error) throw error;
   }

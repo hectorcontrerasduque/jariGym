@@ -97,7 +97,7 @@ export default function NotificacionesPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ config: { notificaciones_enabled: gymConfig.notificaciones_enabled } }),
+        body: JSON.stringify({ config: { notifications_enabled: gymConfig.notifications_enabled } }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: "Error desconocido" }));
@@ -213,16 +213,16 @@ export default function NotificacionesPage() {
               <input
                 type="checkbox"
                 className="sr-only peer"
-                checked={gymConfig.notificaciones_enabled || false}
+                checked={gymConfig.notifications_enabled || false}
                 onChange={async (e) => {
                   const newValue = e.target.checked;
-                  setGymConfig({ ...gymConfig, notificaciones_enabled: newValue });
+                  setGymConfig({ ...gymConfig, notifications_enabled: newValue });
                   try {
                     const res = await fetch("/api/config", {
                       method: "POST",
                       headers: { "Content-Type": "application/json" },
                       credentials: "include",
-                      body: JSON.stringify({ config: { notificaciones_enabled: newValue } }),
+                      body: JSON.stringify({ config: { notifications_enabled: newValue } }),
                     });
                     if (!res.ok) {
                       const err = await res.json().catch(() => ({ error: "Error desconocido" }));
@@ -230,7 +230,7 @@ export default function NotificacionesPage() {
                     }
                   } catch {
                     showToast(messages.notificaciones.errorGuardar, "error");
-                    setGymConfig({ ...gymConfig, notificaciones_enabled: !newValue });
+                    setGymConfig({ ...gymConfig, notifications_enabled: !newValue });
                   }
                 }}
               />
@@ -240,7 +240,7 @@ export default function NotificacionesPage() {
         </CardContent>
       </Card>
 
-      {gymConfig.notificaciones_enabled && (
+      {gymConfig.notifications_enabled && (
         <>
           <div className="flex justify-end mb-4 sm:hidden">
             <Button onClick={handleSave} loading={saving} className="w-full">
@@ -257,7 +257,7 @@ export default function NotificacionesPage() {
         </>
       )}
 
-      {gymConfig.notificaciones_enabled && <>
+      {gymConfig.notifications_enabled && <>
         {configs.map((config) => {
           const info = tipoLabels[config.notification_type];
           return (
@@ -416,7 +416,7 @@ export default function NotificacionesPage() {
     </div>
 
       {/* Mobile floating save button */}
-      {gymConfig.notificaciones_enabled && (
+      {gymConfig.notifications_enabled && (
       <button
         onClick={handleSave}
         disabled={saving}

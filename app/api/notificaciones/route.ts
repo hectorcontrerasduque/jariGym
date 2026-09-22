@@ -56,11 +56,11 @@ export async function POST(request: NextRequest) {
   try {
     const { data: gymConfig } = await supabase
       .from("gym_config")
-      .select("notificaciones_enabled, gym_name, logo_url, owner_email, max_members, address, billing_mode")
+      .select("notifications_enabled, gym_name, logo_url, owner_email, max_members, address, billing_mode")
       .limit(1)
       .single();
 
-    if (!gymConfig || !gymConfig.notificaciones_enabled) {
+    if (!gymConfig || !gymConfig.notifications_enabled) {
       return NextResponse.json({
         success: true,
         message: messages.notificaciones.notificacionesDeshabilitadas,

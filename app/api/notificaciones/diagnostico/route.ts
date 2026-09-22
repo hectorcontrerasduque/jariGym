@@ -74,14 +74,14 @@ export async function POST(request: Request) {
     // 3. Tabla gym_config
     const { data: gymConfig } = await supabase
       .from("gym_config")
-      .select("id, notificaciones_enabled")
+      .select("id, notifications_enabled")
       .limit(1)
       .single();
     resultados.push({
       paso: "Tabla gym_config",
       estado: gymConfig ? "ok" : "error",
       detalle: gymConfig
-        ? `Config existe. Notificaciones: ${gymConfig.notificaciones_enabled ? "habilitadas" : "deshabilitadas"}`
+        ? `Config existe. Notificaciones: ${gymConfig.notifications_enabled ? "habilitadas" : "deshabilitadas"}`
         : "No hay configuracion del gym",
     });
 

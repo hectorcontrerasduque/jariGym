@@ -274,7 +274,7 @@ export default function DashboardPage() {
     return morosos.map((m) => ({
       id: m.id,
       nombre: m.full_name,
-      detalle: `${m.mesesDeuda.length > 0 ? `${m.mesesDeuda.length} mes(es) sin pago` : ""}${m.debeInscripcion ? `${m.mesesDeuda.length > 0 ? " + " : ""}inscripción` : ""}${m.pagosPendientes > 0 ? `${m.mesesDeuda.length > 0 || m.debeInscripcion ? " + " : ""}${m.pagosPendientes} pago(s) pendiente(s)` : ""} — ${formatCurrency(m.totalDeuda + m.montoPendiente)}`,
+      detalle: `${m.mesesDeuda.length > 0 ? `${m.mesesDeuda.length} mes(es) sin pago` : ""}${m.debeInscripcion ? `${m.mesesDeuda.length > 0 ? " + " : ""}inscripción` : ""}${m.pagosPendientes > 0 ? `${m.mesesDeuda.length > 0 || m.debeInscripcion ? " + " : ""}${m.pagosPendientes} pago(s) pendiente(s)` : ""} — ${formatCurrency(m.totalDeuda)}`,
     }));
   });
 
@@ -296,7 +296,7 @@ export default function DashboardPage() {
       const todos = [
         ...morosos.map((m) => ({ ...m, esMigrado: false })),
         ...migradosFiltrados,
-      ].sort((a, b) => (b.totalDeuda + b.montoPendiente) - (a.totalDeuda + a.montoPendiente));
+      ].sort((a, b) => b.totalDeuda - a.totalDeuda);
       setMorososData(todos);
       setShowReporteMorosos(true);
     } catch {

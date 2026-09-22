@@ -54,12 +54,12 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
 
   const todosLosMeses = [...new Set(morososOrdenados.flatMap((m) => m.mesesDeuda))].sort((a, b) => a - b);
 
-  const totalDeuda = morososOrdenados.reduce((sum, m) => sum + m.totalDeuda + m.montoPendiente, 0);
+  const totalDeuda = morososOrdenados.reduce((sum, m) => sum + m.totalDeuda, 0);
 
   const morososReportados = morososOrdenados.filter((m) => !m.esMigrado);
   const morososNoReportados = morososOrdenados.filter((m) => m.esMigrado);
-  const totalDeudaReportados = morososReportados.reduce((sum, m) => sum + m.totalDeuda + m.montoPendiente, 0);
-  const totalDeudaNoReportados = morososNoReportados.reduce((sum, m) => sum + m.totalDeuda + m.montoPendiente, 0);
+  const totalDeudaReportados = morososReportados.reduce((sum, m) => sum + m.totalDeuda, 0);
+  const totalDeudaNoReportados = morososNoReportados.reduce((sum, m) => sum + m.totalDeuda, 0);
 
   const totalPages = Math.min(MAX_PAGES, Math.ceil(morososOrdenados.length / ROWS_PER_PAGE));
   const pages: Moroso[][] = [];
@@ -161,7 +161,7 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
           m.esMigrado ? "No" : "Si",
           m.debeInscripcion ? "No" : "Si",
           ...todosLosMeses.map((mes) => (m.mesesDeuda.includes(mes) ? "X" : "")),
-          formatCurrency(m.totalDeuda + m.montoPendiente),
+          formatCurrency(m.totalDeuda),
         ]);
 
         autoTable(doc, {
@@ -301,7 +301,7 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
         </td>
       ))}
       <td className="py-3 px-3 text-right text-gym-danger font-bold whitespace-nowrap">
-        {formatCurrency(m.totalDeuda + m.montoPendiente)}
+        {formatCurrency(m.totalDeuda)}
       </td>
     </tr>
   ));
@@ -309,9 +309,9 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
   const renderTableFooter = (data: Moroso[], grandTotal: boolean) => {
     const dr = data.filter((m) => !m.esMigrado);
     const dnr = data.filter((m) => m.esMigrado);
-    const td = data.reduce((s, m) => s + m.totalDeuda + m.montoPendiente, 0);
-    const tdr = dr.reduce((s, m) => s + m.totalDeuda + m.montoPendiente, 0);
-    const tdnr = dnr.reduce((s, m) => s + m.totalDeuda + m.montoPendiente, 0);
+    const td = data.reduce((s, m) => s + m.totalDeuda, 0);
+    const tdr = dr.reduce((s, m) => s + m.totalDeuda, 0);
+    const tdnr = dnr.reduce((s, m) => s + m.totalDeuda, 0);
 
     return (
       <>
@@ -500,7 +500,7 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
                     )}
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] text-gray-500">Deuda</span>
-                      <span className="text-gym-danger font-bold text-sm">{formatCurrency(m.totalDeuda + m.montoPendiente)}</span>
+                      <span className="text-gym-danger font-bold text-sm">{formatCurrency(m.totalDeuda)}</span>
                     </div>
                   </div>
                 ))}

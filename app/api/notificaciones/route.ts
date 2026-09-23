@@ -447,7 +447,17 @@ async function procesarResumenDueno(supabase: SupabaseClient, gymConfig: Record<
   const mesActual = new Date().getMonth() + 1;
   const anioActual = new Date().getFullYear();
 
-  // Step 1: query payment_detail by month+year (small result set)
+  const elegibles = await pagosService.getMiembrosElegibles(supabase);
+  const ownerEmail = elegibles.ownerEmail;
+
+  const miembrosActivos = elegibles.miembros.filter(
+    (m) => m.email?.toLowerCase() !== ownerEmail
+  ).length;
+
+  const morosos = await pagosService.getMiembrosMorosos(anioActual, supabase, elegibles);
+  const miembrosDeudores = morosos.filter((m) => m.mesesDeuda.length > 0).length;
+  const montoDeuda = morosos.reduce((sum, m) => sum + m.totalDeuda, 0);
+
   const { data: pagosMesDetalles } = await supabase
     .from("payment_detail")
     .select("payment_id, payment_amount")
@@ -456,7 +466,6 @@ async function procesarResumenDueno(supabase: SupabaseClient, gymConfig: Record<
 
   const pagosMesIds = [...new Set((pagosMesDetalles || []).map((d) => d.payment_id))];
 
-  // Step 2: fetch only relevant headers
   const { data: pagosMesHeaders } = pagosMesIds.length > 0
     ? await supabase
         .from("payments")
@@ -467,19 +476,7 @@ async function procesarResumenDueno(supabase: SupabaseClient, gymConfig: Record<
   const statusMap = new Map((pagosMesHeaders || []).map((p) => [p.id, p.status]));
 
   const pagosAprobadosDetalles = (pagosMesDetalles || []).filter((d) => statusMap.get(d.payment_id) === "aprobado");
-  const pagosPendientesDetalles = (pagosMesDetalles || []).filter((d) => {
-    const s = statusMap.get(d.payment_id);
-    return s === "pendiente";
-  });
-
-  const { count: miembrosActivos } = await supabase
-    .from("profiles")
-    .select("id", { count: "exact", head: true })
-    .eq("role", "miembro")
-    .eq("activo", true);
-
-  const morosos = await pagosService.getMiembrosMorosos(anioActual, supabase);
-  const miembrosDeudores = morosos.filter((m) => m.mesesDeuda.length > 0).length;
+  const pagosPendientesDetalles = (pagosMesDetalles || []).filter((d) => statusMap.get(d.payment_id) === "pendiente");
 
   const { count: migraciones } = await supabase
     .from("migracion")
@@ -494,17 +491,14 @@ async function procesarResumenDueno(supabase: SupabaseClient, gymConfig: Record<
       gymConfig.owner_email as string,
       (gymConfig.gym_name as string) || "GymApp",
       {
-        pagosAprobados: (pagosAprobadosDetalles || []).length,
-        pagosPendientes: (pagosPendientesDetalles || []).length,
-        montoCobrado: (pagosAprobadosDetalles || []).reduce(
+        pagosAprobados: pagosAprobadosDetalles.length,
+        pagosPendientes: pagosPendientesDetalles.length,
+        montoCobrado: pagosAprobadosDetalles.reduce(
           (sum, p) => sum + p.payment_amount,
           0
         ),
-        montoPendiente: (pagosPendientesDetalles || []).reduce(
-          (sum, p) => sum + p.payment_amount,
-          0
-        ),
-        miembrosAlDia: (miembrosActivos || 0) - miembrosDeudores,
+        montoDeuda,
+        miembrosAlDia: miembrosActivos - miembrosDeudores,
         miembrosDeudores,
         migraciones: migraciones || 0,
       },

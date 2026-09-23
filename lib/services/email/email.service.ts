@@ -310,7 +310,7 @@ export async function sendAdminSummaryEmail(
     pagosAprobados: number;
     pagosPendientes: number;
     montoCobrado: number;
-    montoPendiente: number;
+    montoDeuda: number;
     miembrosAlDia: number;
     miembrosDeudores: number;
     migraciones: number;

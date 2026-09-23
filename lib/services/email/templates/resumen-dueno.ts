@@ -9,7 +9,7 @@ export function resumenDuenoTemplate(
     pagosAprobados: number;
     pagosPendientes: number;
     montoCobrado: number;
-    montoPendiente: number;
+    montoDeuda: number;
     miembrosAlDia: number;
     miembrosDeudores: number;
     migraciones: number;
@@ -41,7 +41,7 @@ export function resumenDuenoTemplate(
   } else if (resumen.miembrosDeudores > 0) {
     insightHtml = `
       <p style="color:#1e293b;font-size:14px;line-height:1.6;margin:0;">
-        <strong>${resumen.miembrosDeudores}</strong> ${resumen.miembrosDeudores === 1 ? "miembro tiene" : "miembros tienen"} deuda pendiente por <strong>$${resumen.montoPendiente.toFixed(2)}</strong>.
+        <strong>${resumen.miembrosDeudores}</strong> ${resumen.miembrosDeudores === 1 ? "miembro tiene" : "miembros tienen"} deuda pendiente por <strong>$${resumen.montoDeuda.toFixed(2)}</strong>.
         ${resumen.miembrosDeudores <= 3 ? "Envía un recordatorio personalizado para mejorar tu flujo de caja." : "Considera enviar un recordatorio general para reducir la morosidad."}
       </p>`;
   } else {
@@ -119,7 +119,7 @@ export function resumenDuenoTemplate(
                         <td style="padding:16px;">
                           <p style="color:#dc2626;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin:0 0 6px;">Pagos Pendientes</p>
                           <p style="color:#b91c1c;font-size:28px;font-weight:bold;margin:0 0 4px;">${resumen.pagosPendientes}</p>
-                          <p style="color:#dc2626;font-size:13px;margin:0;">$${resumen.montoPendiente.toFixed(2)}</p>
+                          <p style="color:#dc2626;font-size:13px;margin:0;">$${resumen.montoDeuda.toFixed(2)}</p>
                         </td>
                       </tr>
                     </table>
@@ -147,7 +147,7 @@ export function resumenDuenoTemplate(
                         <td style="padding:16px;">
                           <p style="color:#dc2626;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin:0 0 6px;">Miembros Deudores</p>
                           <p style="color:#b91c1c;font-size:28px;font-weight:bold;margin:0 0 4px;">${resumen.miembrosDeudores}</p>
-                          <p style="color:#dc2626;font-size:13px;margin:0;">Deuda: $${resumen.montoPendiente.toFixed(2)}</p>
+                          <p style="color:#dc2626;font-size:13px;margin:0;">Deuda: $${resumen.montoDeuda.toFixed(2)}</p>
                         </td>
                       </tr>
                     </table>

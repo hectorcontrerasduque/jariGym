@@ -131,6 +131,7 @@ interface SendEmailParams {
   subject: string;
   html: string;
   fromName?: string;
+  skipQr?: boolean;
 }
 
 async function sendEmail({
@@ -138,6 +139,7 @@ async function sendEmail({
   subject,
   html,
   fromName,
+  skipQr,
 }: SendEmailParams): Promise<void> {
   if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) {
     throw new Error("GMAIL_USER and GMAIL_APP_PASSWORD must be configured");
@@ -145,8 +147,8 @@ async function sendEmail({
 
   await rateLimit();
 
-  const attachments = await qrAttachment();
-  const finalHtml = injectQrAfterHeader(html);
+  const attachments = skipQr ? [] : await qrAttachment();
+  const finalHtml = skipQr ? html : injectQrAfterHeader(html);
 
   const result = await transporter.sendMail({
     from: `"${fromName || "GymApp"}" <${process.env.GMAIL_USER}>`,
@@ -232,6 +234,7 @@ export async function sendWelcomeEmail(
     subject: `${gymName} - Bienvenido`,
     html: baseHtml + sharedFooter(gymName, address),
     fromName: gymName,
+    skipQr: true,
   });
 }
 

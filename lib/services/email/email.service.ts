@@ -178,8 +178,9 @@ async function sendNotificationEmail({
 
   await rateLimit();
 
-  const attachments = await qrAttachment();
-  const finalHtml = injectQrAfterHeader(html);
+  const skipQr = campaign === "resumen-dueno";
+  const attachments = skipQr ? [] : await qrAttachment();
+  const finalHtml = skipQr ? html : injectQrAfterHeader(html);
 
   const result = await transporter.sendMail({
     from: `"${fromName || "GymApp"}" <${process.env.GMAIL_USER}>`,
@@ -316,12 +317,13 @@ export async function sendAdminSummaryEmail(
   },
   appUrl: string,
   gymLogo?: string | null,
-  address?: string | null
+  address?: string | null,
+  frecuencia?: string
 ): Promise<void> {
-  const baseHtml = resumenDuenoTemplate(gymName, resumen, appUrl, gymLogo);
+  const baseHtml = resumenDuenoTemplate(gymName, resumen, appUrl, gymLogo, frecuencia);
   await sendNotificationEmail({
     to,
-    subject: `${gymName} - Resumen semanal de pagos`,
+    subject: `${gymName} - Resumen ${frecuencia?.toLowerCase() || "mensual"} de pagos`,
     html: baseHtml + unsubscribeFooter(gymName, address),
     fromName: gymName,
     campaign: "resumen-dueno",

@@ -158,6 +158,10 @@ async function ejecutarTipo(
     id: string;
     notification_type: string;
     days_before: number;
+    daily_frequency?: boolean;
+    weekly_frequency?: boolean;
+    biweekly_frequency?: boolean;
+    monthly_frequency?: boolean;
   },
   gymConfig: {
     gym_name: string | null;
@@ -184,9 +188,14 @@ async function ejecutarTipo(
           forzar
         );
         break;
-      case "resumen_dueno":
-        miembrosNotificados = await procesarResumenDueno(supabase, gymConfig);
+      case "resumen_dueno": {
+        let frecuencia = "Mensual";
+        if (config.daily_frequency) frecuencia = "Diario";
+        else if (config.weekly_frequency) frecuencia = "Semanal";
+        else if (config.biweekly_frequency) frecuencia = "Quincenal";
+        miembrosNotificados = await procesarResumenDueno(supabase, gymConfig, frecuencia);
         break;
+      }
       case "estatus_sistema":
         miembrosNotificados = await procesarEstatusSistema(supabase, gymConfig);
         break;
@@ -432,7 +441,7 @@ async function procesarRecordatorioPago(
   return count;
 }
 
-async function procesarResumenDueno(supabase: SupabaseClient, gymConfig: Record<string, unknown>): Promise<number> {
+async function procesarResumenDueno(supabase: SupabaseClient, gymConfig: Record<string, unknown>, frecuencia?: string): Promise<number> {
   if (!gymConfig.owner_email) throw new Error(messages.notificaciones.noDuenoEmail);
 
   const mesActual = new Date().getMonth() + 1;
@@ -495,12 +504,13 @@ async function procesarResumenDueno(supabase: SupabaseClient, gymConfig: Record<
           (sum, p) => sum + p.payment_amount,
           0
         ),
-        miembrosAlDia: miembrosActivos || 0,
+        miembrosAlDia: (miembrosActivos || 0) - miembrosDeudores,
         miembrosDeudores,
         migraciones: migraciones || 0,
       },
       `${process.env.NEXT_PUBLIC_SITE_URL}/dashboard/pagos`,
-      gymConfig.logo_url as string | null
+      gymConfig.logo_url as string | null,
+      frecuencia
     );
     return 1;
   } catch {

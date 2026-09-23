@@ -84,7 +84,8 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json({ created: true });
-  } catch {
-    return NextResponse.json({ created: false });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Error creando profile del propietario";
+    return NextResponse.json({ error: msg, created: false }, { status: 500 });
   }
 }

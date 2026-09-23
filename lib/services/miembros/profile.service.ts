@@ -274,11 +274,11 @@ export async function createOrUpdateUser(
   let isNewAuthUser = false;
   let generatedPassword = params.password || "";
 
-  const { data: { users } } = await supabase.auth.admin.listUsers();
-  const existingAuth = users?.find(u => u.email?.toLowerCase() === emailLower);
+  const { data: existingAuth } = await supabase.auth.admin.listUsers({ page: 1, perPage: 1000 });
+  const foundAuth = existingAuth?.users?.find(u => u.email?.toLowerCase() === emailLower);
 
-  if (existingAuth) {
-    userId = existingAuth.id;
+  if (foundAuth) {
+    userId = foundAuth.id;
   } else {
     // Generate password if requested
     if (params.generatePassword || !generatedPassword) {
@@ -294,9 +294,9 @@ export async function createOrUpdateUser(
 
     if (authError) {
       if (authError.message?.includes("already") || authError.message?.includes("exists")) {
-        // Auth user exists but wasn't found by listUsers — try to get by email
-        const { data: retryUsers } = await supabase.auth.admin.listUsers();
-        const retryAuth = retryUsers?.users?.find(u => u.email?.toLowerCase() === emailLower);
+        // Auth user exists but wasn't found initially — retry with larger page
+        const { data: retryData } = await supabase.auth.admin.listUsers({ page: 1, perPage: 1000 });
+        const retryAuth = retryData?.users?.find(u => u.email?.toLowerCase() === emailLower);
         if (retryAuth) {
           userId = retryAuth.id;
         } else {
@@ -360,7 +360,7 @@ export async function createOrUpdateUser(
         if (config?.logo_url) gymLogo = config.logo_url;
         if (config?.address) address = config.address;
       }
-      const isOAuthUser = params.isOAuth || (existingAuth?.app_metadata?.providers?.length ?? 0) > 0;
+      const isOAuthUser = params.isOAuth || (foundAuth?.app_metadata?.providers?.length ?? 0) > 0;
       await sendWelcomeEmail(emailLower, emailLower, generatedPassword, gymName, gymLogo, undefined, isOAuthUser, address || undefined);
       welcomeEmailSent = true;
     } catch { /* silent */ }

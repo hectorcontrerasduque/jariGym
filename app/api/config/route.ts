@@ -46,17 +46,19 @@ export async function POST(request: Request) {
       .single();
 
     // Handle owner email change
-    if (configUpdates?.owner_email && existing && configUpdates.owner_email !== existing.owner_email) {
-      const { data: oldProfile } = await serviceSupabase
-        .from("profiles")
-        .select("id")
-        .eq("email", existing.owner_email)
-        .maybeSingle();
-      if (oldProfile) {
-        await serviceSupabase
+    if (configUpdates?.owner_email && (!existing || configUpdates.owner_email !== existing.owner_email)) {
+      if (existing?.owner_email) {
+        const { data: oldProfile } = await serviceSupabase
           .from("profiles")
-          .update({ activo: false })
-          .eq("id", oldProfile.id);
+          .select("id")
+          .eq("email", existing.owner_email)
+          .maybeSingle();
+        if (oldProfile) {
+          await serviceSupabase
+            .from("profiles")
+            .update({ activo: false })
+            .eq("id", oldProfile.id);
+        }
       }
 
       const { data: { session } } = await supabase.auth.getSession();

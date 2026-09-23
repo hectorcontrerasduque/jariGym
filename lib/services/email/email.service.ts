@@ -147,7 +147,7 @@ async function sendEmail({
 
   await rateLimit();
 
-  const attachments = skipQr ? [] : await qrAttachment();
+  const attachments = await qrAttachment();
   const finalHtml = skipQr ? html : injectQrAfterHeader(html);
 
   const result = await transporter.sendMail({

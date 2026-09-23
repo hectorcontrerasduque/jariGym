@@ -502,7 +502,7 @@ async function procesarResumenDueno(supabase: SupabaseClient, gymConfig: Record<
         miembrosDeudores,
         migraciones: migraciones || 0,
       },
-      `${process.env.NEXT_PUBLIC_SITE_URL}/dashboard/pagos`,
+      `${process.env.NEXT_PUBLIC_SITE_URL}/login`,
       gymConfig.logo_url as string | null,
       frecuencia
     );

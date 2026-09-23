@@ -251,7 +251,7 @@ async function ejecutarResumenDueno(supabase: SupabaseClient, gymConfig: Record<
       miembrosDeudores,
       migraciones: migraciones || 0,
     },
-    process.env.NEXT_PUBLIC_SITE_URL || "",
+    `${process.env.NEXT_PUBLIC_SITE_URL}/login`,
     gymConfig.logo_url as string | null,
     gymConfig.address as string | null
   );

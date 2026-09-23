@@ -51,7 +51,7 @@ export function resumenDuenoTemplate(
       </p>`;
   }
 
-  const ctaLabel = resumen.pagosPendientes > 0 ? "Gestionar Cobros" : "Ver Pagos";
+
 
   return `<!DOCTYPE html>
 <html>
@@ -178,7 +178,7 @@ export function resumenDuenoTemplate(
                 <tr>
                   <td align="center">
                     <a href="${appUrl}" style="display:inline-block;background:linear-gradient(135deg,#38bdf8,#0ea5e9);color:#ffffff;text-decoration:none;padding:14px 32px;border-radius:8px;font-size:15px;font-weight:bold;box-shadow:0 2px 8px rgba(56,189,248,0.25);">
-                      ${ctaLabel}
+                      Ir al Sistema
                     </a>
                   </td>
                 </tr>

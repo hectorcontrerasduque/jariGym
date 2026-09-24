@@ -19,9 +19,9 @@ export interface FakeReply {
 }
 
 export interface FakeCall {
-  kind: "from" | "rpc";
+  kind: "from" | "rpc" | "auth";
   table: string;
-  op: FakeOp | "rpc";
+  op: FakeOp | "rpc" | "auth";
   payload?: unknown;
   /** Filter / modifier calls in order, e.g. ["eq", "status", "pendiente"]. */
   filters: unknown[][];
@@ -90,6 +90,12 @@ export function createSupabaseFake() {
     return builder;
   }
 
+  /** auth.<name>(...) and auth.admin.<name>(...): recorded, replied from the "auth:<name>" queue. */
+  const authCall = (name: string) => async (...args: unknown[]) => {
+    calls.push({ kind: "auth", table: name, op: "auth", payload: args, filters: [] });
+    return next(`auth:${name}`);
+  };
+
   const client = {
     from: (table: string) => makeBuilder(table),
     rpc: (name: string, args?: unknown) => {
@@ -98,6 +104,13 @@ export function createSupabaseFake() {
     },
     auth: {
       getUser: async () => ({ data: { user }, error: null }),
+      signInWithPassword: authCall("signInWithPassword"),
+      admin: {
+        updateUserById: authCall("admin.updateUserById"),
+        createUser: authCall("admin.createUser"),
+        listUsers: authCall("admin.listUsers"),
+        deleteUser: authCall("admin.deleteUser"),
+      },
     },
   };
 
@@ -106,6 +119,7 @@ export function createSupabaseFake() {
     calls,
     on: (table: string, op: FakeOp) => enqueue(`${table}:${op}`),
     onRpc: (name: string) => enqueue(`rpc:${name}`),
+    onAuth: (name: string) => enqueue(`auth:${name}`),
     setUser: (u: { id: string; email?: string } | null) => {
       user = u;
     },

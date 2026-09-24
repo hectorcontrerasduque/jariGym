@@ -701,6 +701,8 @@ paths:
       summary: Actualiza un perfil (propio o, para super_admin, de otro usuario)
       description: |
         Sin `user_id` (o con el propio) edita el perfil del usuario. Con otro `user_id` requiere super_admin.
+        Actualización parcial: solo se modifican los campos enviados en `updates` (p. ej. solo `role` +
+        `inscription_admin_note` desde la pantalla de Miembros); email y nombre se validan solo si vienen.
         `role` e `inscription_admin_note` solo se aplican si es admin completo. Si quien edita **no** es super_admin:
         cambiar la contraseña exige `currentPassword` y no puede cambiar el email. Usa service role.
         Límite: 30 por hora por IP.

@@ -99,17 +99,24 @@ export async function createOrUpdateUser(
     gymLogo?: string | null;
   }
 ): Promise<CreateUserResult> {
+  // Creating a user requires email and name. Updating an existing profile by id
+  // validates them only when provided (partial updates, e.g. changing only the role).
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(params.email)) {
-    throw new Error("email_invalid");
+  const esActualizacionPorId = !!params.id;
+  const hayEmail = typeof params.email === "string" && params.email.trim() !== "";
+  const hayNombre = typeof params.full_name === "string" && params.full_name.trim() !== "";
+  if (hayEmail || !esActualizacionPorId) {
+    if (!emailRegex.test(params.email)) {
+      throw new Error("email_invalid");
+    }
+    if (params.email.length > 254) {
+      throw new Error("email_too_long");
+    }
   }
-  if (params.email.length > 254) {
-    throw new Error("email_too_long");
-  }
-  if (!params.full_name || !params.full_name.trim()) {
+  if (!hayNombre && !esActualizacionPorId) {
     throw new Error("name_required");
   }
-  if (params.full_name.length > 200) {
+  if (hayNombre && params.full_name.length > 200) {
     throw new Error("name_too_long");
   }
   if (params.password && params.password.length < 6) {
@@ -119,8 +126,8 @@ export async function createOrUpdateUser(
     throw new Error("password_too_short");
   }
 
-  const emailLower = params.email.toLowerCase().trim();
-  const fullName = params.full_name.trim().toUpperCase();
+  const emailLower = hayEmail ? params.email.toLowerCase().trim() : "";
+  const fullName = hayNombre ? params.full_name.trim().toUpperCase() : "";
 
   // ── BUSCAR PROFILE EXISTENTE ──
   let existingProfile: Record<string, unknown> | null = null;
@@ -134,13 +141,21 @@ export async function createOrUpdateUser(
     existingProfile = data;
   }
 
-  if (!existingProfile) {
+  if (!existingProfile && emailLower) {
     const { data } = await supabase
       .from("profiles")
       .select("*")
       .eq("email", emailLower)
       .maybeSingle();
     existingProfile = data;
+  }
+
+  // Nothing to update: creating a new user still needs a valid email and a name.
+  if (!existingProfile && !hayEmail) {
+    throw new Error("email_invalid");
+  }
+  if (!existingProfile && !hayNombre) {
+    throw new Error("name_required");
   }
 
   // ── CASO: ACTUALIZACIÓN ──
@@ -154,7 +169,7 @@ export async function createOrUpdateUser(
           throw new Error("current_password_required");
         }
         const { error: verifyError } = await supabase.auth.signInWithPassword({
-          email: emailLower,
+          email: emailLower || (existingProfile.email as string),
           password: params.currentPassword,
         });
         if (verifyError) {

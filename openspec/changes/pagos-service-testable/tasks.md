@@ -8,14 +8,14 @@ Cada tarea se considera terminada solo si `npm run test`, `npx tsc --noEmit` y `
 
 ## 2. Tests de caracterización sobre el código actual (sin tocar el servicio)
 
-- [ ] 2.1 Crear `__tests__/pagos.service.test.ts` con `vi.mock("@/lib/supabase/client")` devolviendo el cliente falso, y cubrir el requirement "Miembros elegibles para cobro" (4 escenarios). Verificar que pasan contra `pagos.service.ts` sin modificar (`git diff --stat lib/` vacío).
-- [ ] 2.2 Cubrir "Cálculo de miembros morosos": los 6 escenarios del spec más los casos límite de `fechaInicioMap` (membresía futura con y sin `start_date`) y el año anterior (mes tope = 12). Verificar que pasan sin modificar el servicio.
-- [ ] 2.3 Cubrir "Miembros al día" y "Estadísticas anuales del dashboard", incluido que `stats` consulta `get_pagos_por_anio` para el año pedido. Verificar que pasan sin modificar el servicio.
-- [ ] 2.4 Cubrir "Estadísticas mensuales del dashboard" (mes tope, filtro por fecha de inicio, usuario con aprobado y pendiente, `montoAcumulado` incluye a no miembros). Verificar que pasan sin modificar el servicio.
-- [ ] 2.5 Cubrir "Meses pendientes de un miembro" (meses futuros, pendiente bloquea el mes, inicio en año posterior, error de consulta → `[]`). Verificar que pasan sin modificar el servicio.
-- [ ] 2.6 Cubrir "Registrar un pago" y "Registrar un pago ya aprobado": sin sesión, RLS, falla del detalle con borrado compensatorio (verificar vía `calls` el `delete` sobre `payments` con el id), efectivo sin comprobante, rol no autorizado, inscripción que actualiza el perfil. Verificar que pasan sin modificar el servicio.
-- [ ] 2.7 Cubrir "Aprobar y rechazar pagos" y "Solicitar suspensión de meses", incluido el filtro `status = pendiente` en el rechazo, la nota por defecto, que aprobar no filtra por estado, la actualización de pendientes existentes y el retorno `0` ante error. Verificar que pasan sin modificar el servicio.
-- [ ] 2.8 Commit "test: characterization tests for PagosService" con la suite completa en verde.
+- [x] 2.1 Crear `__tests__/pagos.service.test.ts` con `vi.mock("@/lib/supabase/client")` devolviendo el cliente falso, y cubrir el requirement "Miembros elegibles para cobro" (4 escenarios). Verificar que pasan contra `pagos.service.ts` sin modificar (`git diff --stat lib/` vacío).
+- [x] 2.2 Cubrir "Cálculo de miembros morosos": los 6 escenarios del spec más los casos límite de `fechaInicioMap` (membresía futura con y sin `start_date`) y el año anterior (mes tope = 12). Verificar que pasan sin modificar el servicio.
+- [x] 2.3 Cubrir "Miembros al día" y "Estadísticas anuales del dashboard", incluido que `stats` consulta `get_pagos_por_anio` para el año pedido. Verificar que pasan sin modificar el servicio.
+- [x] 2.4 Cubrir "Estadísticas mensuales del dashboard" (mes tope, filtro por fecha de inicio, usuario con aprobado y pendiente, `montoAcumulado` incluye a no miembros). Verificar que pasan sin modificar el servicio.
+- [x] 2.5 Cubrir "Meses pendientes de un miembro" (meses futuros, pendiente bloquea el mes, inicio en año posterior, error de consulta → `[]`). Verificar que pasan sin modificar el servicio.
+- [x] 2.6 Cubrir "Registrar un pago" y "Registrar un pago ya aprobado": sin sesión, RLS, falla del detalle con borrado compensatorio (verificar vía `calls` el `delete` sobre `payments` con el id), efectivo sin comprobante, rol no autorizado, inscripción que actualiza el perfil. Verificar que pasan sin modificar el servicio.
+- [x] 2.7 Cubrir "Aprobar y rechazar pagos" y "Solicitar suspensión de meses", incluido el filtro `status = pendiente` en el rechazo, la nota por defecto, que aprobar no filtra por estado, la actualización de pendientes existentes y el retorno `0` ante error. Verificar que pasan sin modificar el servicio.
+- [x] 2.8 Commit "test: characterization tests for PagosService" con la suite completa en verde.
 
 ## 3. Inyección de dependencias en PagosService
 

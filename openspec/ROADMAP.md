@@ -30,7 +30,7 @@ supabase/      transacciones e invariantes en RPC plpgsql + RLS
 | 1 | `pagos-service-testable` | ✅ archivado | Cliente inyectado + tests de caracterización + `lib/features/pagos/domain` |
 | 2 | `pagos-transacciones-atomicas` | ⏳ pendiente | Crear/aprobar pago en una sola transacción (RPC plpgsql); consultas a `data/` |
 | 3 | `notificaciones-unificar` | ⏳ pendiente | Una sola implementación de los 4 tipos (hoy duplicados en `api/notificaciones/route.ts` y `procesar/route.ts`) |
-| 4 | `dashboard-stats-rpc` | ⏳ pendiente | Agregados del dashboard en Postgres; eliminar la doble llamada a `get_pagos_por_anio` |
+| 4 | `dashboard-carga-unica` | 🔨 en curso | Dashboard en una ronda paralela y 1 descarga del RPC del año (antes 3). Sin migraciones SQL |
 | 5 | `rls-tests` | ⏳ pendiente | Tests de políticas RLS contra Supabase local |
 | 6 | `ci-minimo` | ⏳ pendiente | Lint + typecheck + tests automáticos en GitHub |
 | 7 | `server-first-pages` | ✅ aprobado, pendiente | Páginas con Server Components + streaming. Cambia la experiencia de carga (sin loader a pantalla completa) |
@@ -43,7 +43,7 @@ Orden de ejecución acordado: 1 → 4 → 7, luego 2, 3, 5, 6.
 
 **1 `pagos-service-testable`** — Spec `openspec/specs/pagos/spec.md` (10 requisitos, comportamiento vigente).
 - Tests: 207 → 296. 60 de caracterización (escritos contra el código sin tocar, verificados con mutaciones), 22 de dominio puro, 3 de inyección, 5 del doble de Supabase.
-- `lib/services/pagos/pagos.service.ts` (1022 líneas) → `lib/features/pagos/service.ts` (~660) + `domain/` puro.
+- `lib/services/pagos/pagos.service.ts` (1022 líneas) → `lib/features/pagos/service.ts` (703) + `domain/` puro.
 - `next build` ya no falla en `pagos.service` por falta de variables de entorno.
 
 ## Pendientes detectados que no cambian comportamiento

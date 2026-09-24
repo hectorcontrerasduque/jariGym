@@ -655,6 +655,31 @@ export class PagosService {
     return calcularMonthlyStats(elegiblesData, rpcData, anioConsulta, hoy);
   }
 
+  /**
+   * Dashboard load: elegibles and the year's payments are fetched once, in parallel,
+   * and every figure is computed from that single snapshot with one `hoy`.
+   * Same result as getMiembrosElegibles() + stats() + monthlyStats(), but with
+   * 1 call to get_pagos_por_anio instead of 3. Keep the dashboard on this method.
+   */
+  async cargarDashboard(anio?: number, supabaseClient?: SupabaseLike) {
+    const supabase = supabaseClient || this.supabase;
+    const hoy = new Date();
+    const anioConsulta = anio || hoy.getFullYear();
+
+    const [elegibles, pagosDelAnio] = await Promise.all([
+      this.getMiembrosElegibles(supabase),
+      this.getPagosPorAnio(anioConsulta, supabase),
+    ]);
+
+    const morosos = calcularMorosos(elegibles, pagosDelAnio, anioConsulta, hoy);
+
+    return {
+      elegibles,
+      stats: calcularStats(elegibles, pagosDelAnio, morosos, anioConsulta, hoy),
+      monthlyStats: calcularMonthlyStats(elegibles, pagosDelAnio, anioConsulta, hoy),
+    };
+  }
+
   async getMiembrosAlDia(anio?: number, supabaseClient?: ReturnType<typeof createClient>, elegibles?: ElegiblesResult): Promise<string[]> {
     const supabase = supabaseClient || this.supabase;
     const hoy = new Date();

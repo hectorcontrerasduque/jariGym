@@ -6,7 +6,8 @@
 import { describe, it, expect } from "vitest";
 import { filtrarElegibles } from "@/lib/features/pagos/domain/elegibles";
 import { calcularMesesPendientes } from "@/lib/features/pagos/domain/meses-pendientes";
-import type { MiembroElegible } from "@/lib/features/pagos/domain/types";
+import { calcularMorosos, calcularMiembrosAlDia, miembrosConInscripcionPagada } from "@/lib/features/pagos/domain/morosos";
+import type { ElegiblesResult, MiembroElegible, PagoRPCRow } from "@/lib/features/pagos/domain/types";
 
 const HOY = new Date(2026, 8, 12, 12);
 
@@ -90,5 +91,82 @@ describe("calcularMesesPendientes", () => {
 
   it("inicio en año posterior → []", () => {
     expect(calcularMesesPendientes([], 2026, "2027-01-01")).toEqual([]);
+  });
+});
+
+// ─── morosos / al día ────────────────────────────────────────────────────────
+
+function eleg(overrides: Partial<ElegiblesResult> = {}): ElegiblesResult {
+  return {
+    miembros: [perfil()],
+    miembrosLibresIds: new Set(),
+    fechaInicioMap: new Map(),
+    ownerEmail: "owner@gym.com",
+    modoCobro: "dia_uno",
+    montoMensual: 10,
+    montoInscripcion: 5,
+    ...overrides,
+  };
+}
+
+function pago(overrides: Partial<PagoRPCRow> = {}): PagoRPCRow {
+  return {
+    id: "p", user_id: "m1", status: "aprobado", payment_note: null, payment_method: "efectivo",
+    bill_code: null, receipt_url: null, created_at: "2026-01-01", month_number: 1, year_number: 2026,
+    payment_amount: 10, payment_type: "mensualidad", ...overrides,
+  };
+}
+
+describe("calcularMorosos", () => {
+  it("sin pagos debe hasta el mes actual de hoy", () => {
+    expect(calcularMorosos(eleg(), [], 2026, HOY)[0].mesesDeuda).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    expect(calcularMorosos(eleg(), [], 2026, new Date(2026, 2, 5))[0].mesesDeuda).toEqual([1, 2, 3]);
+  });
+
+  it("día de cobro: el mes actual cuenta desde ese día (fecha_inscripcion)", () => {
+    const e = eleg({ modoCobro: "fecha_inscripcion", miembros: [perfil({ start_date: "2026-01-20" })] });
+    expect(calcularMorosos(e, [], 2026, new Date(2026, 8, 19, 12))[0].mesesDeuda).not.toContain(9);
+    expect(calcularMorosos(e, [], 2026, new Date(2026, 8, 20, 12))[0].mesesDeuda).toContain(9);
+  });
+
+  it("año anterior: hasta diciembre", () => {
+    expect(calcularMorosos(eleg({ miembros: [perfil({ start_date: "2025-11-01" })] }), [], 2025, HOY)[0].mesesDeuda).toEqual([11, 12]);
+  });
+
+  it("deuda total e inscripción", () => {
+    const e = eleg({ miembros: [perfil({ inscription_paid: false, start_date: "2026-08-01" })] });
+    expect(calcularMorosos(e, [], 2026, HOY)[0]).toMatchObject({ debeInscripcion: true, mesesDeuda: [8, 9], totalDeuda: 25 });
+  });
+
+  it("dueño y libres fuera; cubiertos por cualquier pago aprobado", () => {
+    const e = eleg({
+      miembros: [perfil({ id: "o", email: "Owner@gym.com" }), perfil({ id: "l" }), perfil({ id: "m1", start_date: "2026-09-01" })],
+      miembrosLibresIds: new Set(["l"]),
+    });
+    expect(calcularMorosos(e, [pago({ month_number: 9, payment_type: "suspension" })], 2026, HOY)).toEqual([]);
+  });
+
+  it("pendientes: monto usa el mensual si el pago es 0", () => {
+    const e = eleg({ miembros: [perfil({ start_date: "2026-09-01" })] });
+    const r = calcularMorosos(e, [pago({ month_number: 9 }), pago({ month_number: 10, status: "pendiente", payment_amount: 0 })], 2026, HOY);
+    expect(r[0]).toMatchObject({ mesesDeuda: [], pagosPendientes: 1, montoPendiente: 10 });
+  });
+});
+
+describe("miembrosConInscripcionPagada", () => {
+  it("por pago aprobado de inscripción o por perfil; pendiente no cuenta", () => {
+    const miembros = [perfil({ id: "a", inscription_paid: false }), perfil({ id: "b", inscription_paid: true }), perfil({ id: "c", inscription_paid: false })];
+    const pagos = [pago({ user_id: "a", payment_type: "inscripcion" }), pago({ user_id: "c", payment_type: "inscripcion", status: "pendiente" })];
+    expect([...miembrosConInscripcionPagada(miembros, pagos)].sort()).toEqual(["a", "b"]);
+  });
+});
+
+describe("calcularMiembrosAlDia", () => {
+  it("filtra dueño y libres, conserva el orden de los miembros", () => {
+    const e = eleg({
+      miembros: [perfil({ id: "b" }), perfil({ id: "a" }), perfil({ id: "o", email: "owner@gym.com" }), perfil({ id: "l" })],
+      miembrosLibresIds: new Set(["l"]),
+    });
+    expect(calcularMiembrosAlDia(e, ["a", "b", "o", "l", "x"])).toEqual(["b", "a"]);
   });
 });

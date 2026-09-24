@@ -26,6 +26,7 @@ supabase/      transacciones e invariantes en RPC plpgsql + RLS
 | # | Change | Estado | Objetivo |
 |---|--------|--------|----------|
 | 0 | — | ✅ hecho | Tests corriendo en local (207/207), OpenSpec instalado |
+| 0.6 | `entorno-local` | ✅ archivado | Supabase local + seed de 80 miembros + benchmark del dashboard |
 | 0.5 | `quality-gates` | ✅ archivado | husky + lint-staged: pre-commit (eslint, tsc, vitest), pre-push (build) |
 | 1 | `pagos-service-testable` | ✅ archivado | Cliente inyectado + tests de caracterización + `lib/features/pagos/domain` |
 | 2 | `pagos-transacciones-atomicas` | ⏳ pendiente | Crear/aprobar pago en una sola transacción (RPC plpgsql); consultas a `data/` |
@@ -56,11 +57,24 @@ Fase 4 original ("agregados del dashboard en Postgres") descartada: exigía apli
 | Peticiones de red | 13 | **11** |
 | Saltos secuenciales teléfono ↔ Supabase | 4 | **3** |
 
-Sin migraciones SQL. Equivalencia demostrada en 5 escenarios (`__tests__/dashboard-carga.test.ts`, verificado con mutaciones). Falta la medición en milisegundos con datos reales (requiere `.env.development`).
+Sin migraciones SQL. Equivalencia demostrada en 5 escenarios (`__tests__/dashboard-carga.test.ts`, verificado con mutaciones).
+
+**Medición real** (`scripts/bench-dashboard.mjs`, builds de producción, base local con seed de 80 miembros, red de teléfono simulada con 150 ms de latencia y 4 Mbps, mediana de 2×7 cargas):
+
+| | Rama `dev` (antes) | Fase 4 |
+|---|---|---|
+| Hasta ver los datos | ~1950 ms | **~1005 ms (−48 %)** |
+| KB descargados de Supabase | 532 | **218 (−59 %)** |
+| Peticiones a Supabase (toda la página) | 15 | 13 |
+| Texto visible del dashboard | — | idéntico |
 
 ## Pendientes detectados que no cambian comportamiento
 
 - `AuthService` (`lib/services/auth/auth.service.ts:6`) y `lib/services/supabase-browser.ts` crean el cliente de navegador al importar; sin variables de entorno el prerender de `/login` y `/dashboard` falla. Mismo arreglo que `PagosService`; se incluye en la fase 7.
+
+## Riesgo de proceso detectado
+
+- **`.gitignore` ignora `supabase/migrations/*.sql`**: toda migración nueva queda fuera de Git. Las 051–054 y 056 (incluida la que define `get_pagos_por_anio`) solo existen en la base real. Recomendación: quitar esa regla y versionar las migraciones que faltan, a partir de un `supabase db dump` del esquema real. Requiere decisión del equipo.
 
 ## Hallazgos que **no** se tocan en este refactor porque cambiarían el comportamiento (requieren decisión explícita y su propio change):
 - `aniosConPagos(usuarioId)` filtra por `payments.user_id` sin join.

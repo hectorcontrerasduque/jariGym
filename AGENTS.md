@@ -30,6 +30,22 @@ Installed automatically by `npm install` / `npm ci` (`prepare` script).
 - Emergency bypass: `git commit --no-verify` / `git push --no-verify`. Do not use it to skip failing tests.
 - `.gitattributes` forces LF on `.husky/*` so the hooks run under Git for Windows `sh`.
 
+### Local database (Supabase local, Docker)
+
+Everything runs on your machine; nothing touches the cloud projects.
+
+```bash
+npm run db:local:start   # start Supabase local (first run downloads images; Docker Desktop must be running)
+npm run db:local:reset   # wipe + schema + seed, writes .env.development.local (npm run dev then uses the local DB)
+npm run db:local:stop    # stop it
+node scripts/bench-dashboard.mjs http://localhost:3000 7 150   # dashboard load benchmark (phone-like latency)
+```
+
+- Seed users (password `Local1234!`): `admin@gym.local` (super_admin/owner), `miembro@gym.local`, `socio01..78@gym.local`. 80 members, ~800 payments over last + current year, 6 legacy `migracion` people. Deterministic: every reset produces the same data.
+- Studio: http://127.0.0.1:54323 · API: http://127.0.0.1:54321 · DB: `postgresql://postgres:postgres@127.0.0.1:54322/postgres`.
+- Delete `.env.development.local` to point `npm run dev` back at the cloud dev project.
+- Schema = `supabase/local/000_*.sql` → `supabase/migrations/*.sql` → `supabase/local/001_*.sql`. The `supabase/local/` files reconstruct objects that exist in the real DB but were never committed (`migracion` table, `get_pagos_por_anio`). **`.gitignore` ignores `supabase/migrations/*.sql`**, so migrations 051–054 and 056 exist only in the real DB; the local schema can drift (e.g. `payments.status` still allows `suspendido`). Replace the reconstructions with a real schema dump when possible.
+
 ### Refactor tracking (OpenSpec)
 
 Changes live in `openspec/changes/<name>/` (proposal, specs, design, tasks); roadmap in `openspec/ROADMAP.md`; project rules in `openspec/config.yaml`. Commands: `/opsx:propose`, `/opsx:apply`, `/opsx:archive`.
@@ -411,3 +427,13 @@ e263c5e refactor: elimina console.* + centraliza strings en messages.ts para i18
 - **034**: Admin INSERT RLS for pagos + comprobantes storage
 - **035**: **Payment normalization** — renames old `pagos` → `pagos_historial`, creates new `pagos` (header) + `detalle_pago` (detail per month/inscription). `CreatePagoInput` now takes `detalles[]` instead of flat fields.
 - **056**: **Remove suspendido status** — updates existing `suspendido` → `aprobado`, tightens CHECK to `('pendiente', 'aprobado', 'rechazado')`. Apply manually in Supabase SQL Editor.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

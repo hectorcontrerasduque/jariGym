@@ -58,3 +58,6 @@ check.ps1
 .opencode/
 db/
 test-results/
+
+# local benchmark output (scripts/bench-dashboard.mjs)
+bench-out/

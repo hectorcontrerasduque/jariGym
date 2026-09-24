@@ -3,7 +3,12 @@ import { messages } from "@/lib/messages";
 import type { Profile } from "@/lib/types";
 
 export class AuthService {
-  private supabase = createClient();
+  private client?: ReturnType<typeof createClient>;
+
+  /** Browser client created on first use, not at import (keeps prerender/build free of env vars). */
+  private get supabase() {
+    return (this.client ??= createClient());
+  }
 
   async signInWithGoogle() {
     const { data, error } = await this.supabase.auth.signInWithOAuth({

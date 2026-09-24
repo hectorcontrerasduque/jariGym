@@ -9,9 +9,9 @@ Cada tarea termina con `npm run test`, `npx tsc --noEmit` y `npm run lint` en ve
 
 ## 2. Server Component + cliente
 
-- [ ] 2.1 Mover la UI a `app/dashboard/dashboard-client.tsx` (`DashboardClient`) y hacer que `loadData` use los mismos helpers de aplicación de estado que la carga inicial. La primera carga usa `datosIniciales` si no es `null` y su año coincide con el del navegador; si no, usa `loadData`. Seguro con StrictMode (el efecto doble no descarta los datos).
-- [ ] 2.2 `app/dashboard/page.tsx` como Server Component: `createClient()` de servidor + `consultarDashboard(...)` sin `await`, pasado como prop.
-- [ ] 2.3 `AuthService` con cliente perezoso. Verificar que `next build` sin variables de entorno ya no falla en el prerender de `/login`.
+- [x] 2.1 Mover la UI a `app/dashboard/dashboard-client.tsx` (`DashboardClient`) y hacer que `loadData` use los mismos helpers de aplicación de estado que la carga inicial. La primera carga usa `datosIniciales` si no es `null` y su año coincide con el del navegador; si no, usa `loadData`. Seguro con StrictMode (el efecto doble no descarta los datos).
+- [x] 2.2 `app/dashboard/page.tsx` como Server Component: `createClient()` de servidor + `consultarDashboard(...)` sin `await`, pasado como prop.
+- [x] 2.3 `AuthService` con cliente perezoso. Verificar que `next build` sin variables de entorno ya no falla en el prerender de `/login`. — Resultado: `/login` ya prerenderiza sin variables. Sin variables, `/dashboard` falla ahora en `components/ui/avatar.tsx:15` (crea el cliente en cada render); solo afecta builds sin variables, anotado en ROADMAP.
 
 ## 3. Verificación con la app real (base local)
 

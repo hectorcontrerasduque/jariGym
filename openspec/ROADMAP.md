@@ -34,9 +34,10 @@ supabase/      transacciones e invariantes en RPC plpgsql + RLS
 | 4 | `dashboard-carga-unica` | ✅ archivado | Dashboard en una ronda paralela y 1 descarga del RPC del año (antes 3). Sin migraciones SQL |
 | 5 | `rls-tests` | ⏳ pendiente | Tests de políticas RLS contra Supabase local |
 | 6 | `ci-minimo` | ⏳ pendiente | Lint + typecheck + tests automáticos en GitHub |
-| 7 | `server-first-pages` | ✅ aprobado, pendiente | Páginas con Server Components + streaming. Cambia la experiencia de carga (sin loader a pantalla completa) |
+| 7 | `server-first-dashboard` | 🔨 en curso | Dashboard como Server Component: consultas iniciadas en el servidor, cálculos en el navegador (hora local). Mismo loader |
+| 8 | `api-docs` | ⏳ pendiente | Documentar los 20 endpoints en `docs/api/openapi.yaml` + test que falla si un `route.ts` no está documentado |
 
-Orden de ejecución acordado: 1 → 4 → 7, luego 2, 3, 5, 6.
+Orden de ejecución acordado: 1 → 4 → 7 → 8, luego 2, 3, 5, 6.
 
 Fase 4 original ("agregados del dashboard en Postgres") descartada: exigía aplicar una migración a mano en producción antes del deploy y, con un tope de 80 miembros, el costo real eran los viajes repetidos, no el cálculo.
 

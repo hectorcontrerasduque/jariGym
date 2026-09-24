@@ -134,7 +134,7 @@ describe("resumenDuenoTemplate", () => {
     pagosAprobados: 15,
     pagosPendientes: 4,
     montoCobrado: 375,
-    montoPendiente: 100,
+    montoDeuda: 100,
     miembrosAlDia: 12,
     miembrosDeudores: 3,
     migraciones: 8,
@@ -206,7 +206,7 @@ describe("welcomeTemplate", () => {
 
   it("shows migration message when no password and no OAuth", () => {
     const html = welcomeTemplate("user@test.com", "", gymName);
-    expect(html).toContain("Migrados");
+    expect(html).toContain("migrados");
     expect(html).toContain("iniciar sesión");
   });
 
@@ -226,7 +226,8 @@ describe("welcomeTemplate", () => {
   it("renders initial fallback when no logo", () => {
     const html = welcomeTemplate("user@test.com", "abc123", gymName, null);
     expect(html).toContain("M");
-    expect(html).not.toContain("<img");
+    // The QR image (cid:qr-login) is always present; only the logo <img> must be absent
+    expect(html).not.toMatch(/<img src="(?!cid:)/);
   });
 
   it("includes gym name in header", () => {

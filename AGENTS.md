@@ -84,6 +84,8 @@ lib/
     pagos/
       domain/       # PURE calculations: elegibles, morosos, al día, stats, meses pendientes
       service.ts    # PagosService: Supabase queries + delegates to domain/
+    dashboard/
+      carga.ts      # consultarDashboard (server-side raw fetch) + mapearMiembros
   services/         # Legacy modules, migrated to features/ phase by phase
     auth/           # signIn, resetPassword, getProfile
     config/         # Config CRUD + dueno email promotion on change
@@ -276,7 +278,12 @@ status: "pendiente" | "aprobado" | "rechazado"
 - **Source of truth for every figure** (inscritos, deudores, al día, monthly stats, meses pendientes): `openspec/specs/pagos/spec.md`, implemented as pure functions in `lib/features/pagos/domain/`.
 - **Pagos recientes**: Approved payments only, with fallback when profile join fails
 
-**Loading rule (perf)**: the dashboard fetches `get_pagos_por_anio` **once** and computes everything with `pagosService.calcularDashboard(elegibles, pagosDelAnio, anio)` (or `cargarDashboard(anio)` in one call). Do **not** call `stats()` and `monthlyStats()` separately there: together they download the year's payments 3 times. `loadData` fires all queries right after `getUser` but consumes them in two steps (profile/elegibles, then the rest) to keep the original error behavior.
+**Loading rule (perf)** — `/dashboard` is server-first:
+- `app/dashboard/page.tsx` is a **Server Component**: it creates the server client (user cookies + anon key → same RLS as the browser; **never** the service role) and starts `consultarDashboard(supabase, year)` **without awaiting it**, passing the promise to `DashboardClient`. The HTML with the loader goes out immediately and the data streams in the same response.
+- `app/dashboard/dashboard-client.tsx` (the UI) uses that data on first load and **computes every figure in the browser** (`filtrarElegibles` + `pagosService.calcularDashboard`) with the user's local date. Do not move these calculations to the server: Vercel runs in UTC and "current month"/billing day would shift in the evening at month end.
+- Year changes and modals load from the browser (`loadData`), which fetches `get_pagos_por_anio` once. Both paths apply state through the same `aplicarPaso1`/`aplicarPaso2` helpers; keep it that way so they cannot diverge.
+- If the server data is `null` (no session, any error) or its year differs from the browser's, the client falls back to `loadData` with the original error handling.
+- Measured with `scripts/bench-dashboard.mjs` (prod build, phone-like network): 1934 ms on the original code → 238 ms, 15 → 2 browser requests to Supabase.
 
 ### Miembros Stats
 - Total card shows `active/max` format (e.g. `11/80`) using `gym_config.max_members`

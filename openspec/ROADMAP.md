@@ -34,10 +34,10 @@ supabase/      transacciones e invariantes en RPC plpgsql + RLS
 | 4 | `dashboard-carga-unica` | ✅ archivado | Dashboard en una ronda paralela y 1 descarga del RPC del año (antes 3). Sin migraciones SQL |
 | 5 | `rls-tests` | ⏳ pendiente | Tests de políticas RLS contra Supabase local |
 | 6 | `ci-minimo` | ⏳ pendiente | Lint + typecheck + tests automáticos en GitHub |
-| 7 | `server-first-dashboard` | 🔨 en curso | Dashboard como Server Component: consultas iniciadas en el servidor, cálculos en el navegador (hora local). Mismo loader |
+| 7 | `server-first-dashboard` | ✅ archivado | Dashboard como Server Component: consultas iniciadas en el servidor, cálculos en el navegador (hora local). Mismo loader |
 | 8 | `api-docs` | ⏳ pendiente | Documentar los 20 endpoints en `docs/api/openapi.yaml` + test que falla si un `route.ts` no está documentado |
 
-Orden de ejecución acordado: 1 → 4 → 7 → 8, luego 2, 3, 5, 6.
+Orden de ejecución acordado: 1 → 4 → 7 → 8, luego 2, 3, 5, 6. Hechas: 0.5, 0.6, 1, 4, 7.
 
 Fase 4 original ("agregados del dashboard en Postgres") descartada: exigía aplicar una migración a mano en producción antes del deploy y, con un tope de 80 miembros, el costo real eran los viajes repetidos, no el cálculo.
 
@@ -69,9 +69,23 @@ Sin migraciones SQL. Equivalencia demostrada en 5 escenarios (`__tests__/dashboa
 | Peticiones a Supabase (toda la página) | 15 | 13 |
 | Texto visible del dashboard | — | idéntico |
 
+**7 `server-first-dashboard`** — `/dashboard` como Server Component que inicia las consultas; los cálculos siguen en el navegador (hora local). Mismo loader. Medido con el admin (builds de producción, red de teléfono simulada, 2×7 cargas):
+
+| | Rama `dev` | Fase 4 | **Fase 7** |
+|---|---|---|---|
+| Hasta ver los datos (mediana) | 1934 ms | 1007 ms | **238 ms (−88 %)** |
+| Peticiones navegador → Supabase | 15 | 13 | **2** |
+| KB navegador ← Supabase | 532 | 218 | **2** |
+| Cambio de año (carga desde el navegador) | 1397 ms | 672 ms | 677 ms |
+
+Texto visible idéntico en las tres versiones (año actual, 2025 y vuelta); 0 errores de consola. Nota: en local, el servidor está junto a Supabase; en producción, las consultas del servidor pagan la latencia Vercel ↔ Supabase (baja si están en la misma región), así que el número real será algo mayor que 238 ms.
+
 ## Pendientes detectados que no cambian comportamiento
 
-- `AuthService` (`lib/services/auth/auth.service.ts:6`) y `lib/services/supabase-browser.ts` crean el cliente de navegador al importar; sin variables de entorno el prerender de `/login` y `/dashboard` falla. Mismo arreglo que `PagosService`; se incluye en la fase 7.
+- ~~`AuthService` crea el cliente al importar~~ — resuelto en la fase 7 (cliente perezoso).
+- `components/ui/avatar.tsx:15` crea un cliente de Supabase en cada render para construir la URL pública del avatar; sin variables de entorno, el prerender de `/dashboard` falla. Solo afecta builds sin variables.
+- `lib/services/supabase-browser.ts` no lo importa nadie (código muerto).
+- Otras páginas (`pagos`, `miembros`, `mis-pagos`…) siguen cargando todo desde el navegador; se pueden migrar con el mismo patrón que `/dashboard` si hace falta.
 
 ## Riesgo de proceso detectado
 

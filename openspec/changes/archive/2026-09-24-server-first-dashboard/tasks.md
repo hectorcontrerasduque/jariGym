@@ -15,9 +15,9 @@ Cada tarea termina con `npm run test`, `npx tsc --noEmit` y `npm run lint` en ve
 
 ## 3. Verificación con la app real (base local)
 
-- [ ] 3.1 Benchmark (build de producción, red de teléfono simulada): rama `dev`, fase 4 y fase 7, admin y miembro. Registrar ms, peticiones y KB.
-- [ ] 3.2 Texto visible idéntico a la rama `dev` para admin y para miembro; cambio de año (a 2025 y de vuelta) funciona y coincide con la rama `dev`.
+- [x] 3.1 Benchmark (build de producción, red de teléfono simulada): rama `dev`, fase 4 y fase 7. Registrar ms, peticiones y KB. — Resultado: admin 1934 → 1007 → **238 ms**; navegador → Supabase 15 → 13 → **2** peticiones, 532 → 218 → **2 KB**. Miembro: no aplica, porque el sidebar redirige a los miembros a `/dashboard/mis-pagos?tab=home` en todas las versiones (sin cambios).
+- [x] 3.2 Texto visible idéntico a la rama `dev` (admin): año actual, cambio a 2025 y vuelta, todo idéntico en las tres versiones (tras esperar el banner de 5 s, que se oculta por tiempo). Consola del navegador: 0 errores en `dev` y en la fase 7.
 
 ## 4. Documentación
 
-- [ ] 4.1 `AGENTS.md` (Dashboard Stats Logic y Architecture) y `openspec/ROADMAP.md` con resultados.
+- [x] 4.1 `AGENTS.md` (Dashboard Stats Logic y Architecture) y `openspec/ROADMAP.md` con resultados.

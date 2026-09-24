@@ -11,8 +11,8 @@ El roadmap preveía mover los agregados a Postgres. Se descarta en esta fase: ex
 
 ## What Changes
 
-- Nuevo método `PagosService.cargarDashboard(anio, supabaseClient?)`: obtiene `elegibles` y el RPC del año **en paralelo, una sola vez**, y calcula `stats`, `monthlyStats` y morosos con las funciones puras de `lib/features/pagos/domain` usando un único `hoy`. Devuelve `{ elegibles, stats, monthlyStats }`.
-- `app/dashboard/page.tsx` (`loadData`): una sola ronda paralela con perfil, `cargarDashboard`, recientes, años y config. La consulta de pagos pendientes propios (solo no-admin) sigue ejecutándose después, porque depende del rol.
+- Nuevos métodos en `PagosService`: `pagosDelAnio(anio)` (el RPC, una vez), `calcularDashboard(elegibles, pagos, anio)` (stats, monthlyStats y morosos desde una sola foto de datos con un único `hoy`, usando `lib/features/pagos/domain`) y `cargarDashboard(anio)`, que combina ambos en paralelo (lo usará la fase `server-first-pages`).
+- `app/dashboard/page.tsx` (`loadData`): tras `getUser`, **dispara todas las consultas a la vez** (perfil, elegibles, RPC del año, recientes, años, config) pero **consume los resultados en los mismos dos pasos que antes**: primero perfil + elegibles (estado de perfil, banner, `adminLevel`, pendientes propios del no-admin) y luego el resto. Así, si falla el segundo paso, el estado del perfil queda igual que hoy.
 - Resultado esperado por carga del dashboard (admin): RPC del año 3 → 1; peticiones 13 → 11; saltos secuenciales 4 → 3.
 
 ## Non-goals

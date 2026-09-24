@@ -9,8 +9,8 @@ Cada tarea termina con `npm run test`, `npx tsc --noEmit` y `npm run lint` en ve
 
 ## 2. Dashboard en una ronda
 
-- [ ] 2.1 Reescribir `loadData` en `app/dashboard/page.tsx` para usar una sola ronda paralela (perfil, `cargarDashboard`, recientes, años, config) conservando: el mismo manejo de `cancelled`, el mismo toast de error, la consulta de pendientes propios para no-admin, el cálculo de `adminLevel` y el mapeo de `miembros`. Verificar con `npx tsc --noEmit`, lint y revisión del diff (mismos `set*` con los mismos valores).
-- [ ] 2.2 Verificar con `next build` (variables ficticias en línea de comando) que la página compila y se prerenderiza.
+- [x] 2.1 Reescribir `loadData` en `app/dashboard/page.tsx`: disparar todas las consultas tras `getUser` y consumirlas en los dos pasos originales (perfil + elegibles; luego RPC del año, recientes, años, config), calculando con `calcularDashboard`. Conservar `cancelled`, el toast de error, la consulta de pendientes propios del no-admin, `adminLevel` y el mapeo de `miembros`. Verificar con tsc, lint y revisión del diff (mismos `set*` con los mismos valores, mismo orden).
+- [x] 2.2 Verificar con `next build` (variables ficticias en línea de comando) que la página compila y se prerenderiza.
 
 ## 3. Documentación
 

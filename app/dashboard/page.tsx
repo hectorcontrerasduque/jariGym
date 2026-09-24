@@ -151,6 +151,17 @@ export default function DashboardPage() {
 
         const isSuperAdminUser = user.email === process.env.NEXT_PUBLIC_ADMIN_EMAIL;
 
+        // Fire every query now, in parallel. Results are still consumed in two steps
+        // (profile/elegibles first, then the rest) so a failure in the second step
+        // leaves the profile state set, exactly as before.
+        const restoPromise = Promise.all([
+          pagosService.pagosDelAnio(anioSeleccionado),
+          pagosService.pagosRecientesAprobados(anioSeleccionado),
+          pagosService.aniosConPagos(),
+          supabase.from("gym_config").select("*").limit(1).maybeSingle(),
+        ]);
+        restoPromise.catch(() => {}); // handled below; avoids an unhandled rejection while step 1 runs
+
         const [profileResult, elegibles] = await Promise.all([
           supabase
             .from("profiles")
@@ -192,13 +203,9 @@ export default function DashboardPage() {
           departure_time: m.departure_time,
         })) as Profile[];
 
-        const [statsResult, pagosResult, aniosResult, monthlyResult, configResult] = await Promise.all([
-          pagosService.stats(anioSeleccionado, undefined, elegibles),
-          pagosService.pagosRecientesAprobados(anioSeleccionado),
-          pagosService.aniosConPagos(),
-          pagosService.monthlyStats(anioSeleccionado, undefined, elegibles),
-          supabase.from("gym_config").select("*").limit(1).maybeSingle(),
-        ]);
+        const [pagosAnio, pagosResult, aniosResult, configResult] = await restoPromise;
+        const { stats: statsResult, monthlyStats: monthlyResult } =
+          pagosService.calcularDashboard(elegibles, pagosAnio, anioSeleccionado);
 
         if (!cancelled) {
           setStats(statsResult);

@@ -655,29 +655,37 @@ export class PagosService {
     return calcularMonthlyStats(elegiblesData, rpcData, anioConsulta, hoy);
   }
 
+  /** Rows of get_pagos_por_anio for the year (one per payment detail line). */
+  async pagosDelAnio(anio?: number, supabaseClient?: SupabaseLike): Promise<PagoRPCRow[]> {
+    return this.getPagosPorAnio(anio || new Date().getFullYear(), supabaseClient || this.supabase);
+  }
+
   /**
-   * Dashboard load: elegibles and the year's payments are fetched once, in parallel,
-   * and every figure is computed from that single snapshot with one `hoy`.
-   * Same result as getMiembrosElegibles() + stats() + monthlyStats(), but with
-   * 1 call to get_pagos_por_anio instead of 3. Keep the dashboard on this method.
+   * Every dashboard figure from one snapshot (elegibles + the year's payments) and one `hoy`.
+   * Same result as stats() + monthlyStats() with those elegibles, without re-fetching.
    */
-  async cargarDashboard(anio?: number, supabaseClient?: SupabaseLike) {
-    const supabase = supabaseClient || this.supabase;
+  calcularDashboard(elegibles: ElegiblesResult, pagosDelAnio: PagoRPCRow[], anio?: number) {
     const hoy = new Date();
     const anioConsulta = anio || hoy.getFullYear();
-
-    const [elegibles, pagosDelAnio] = await Promise.all([
-      this.getMiembrosElegibles(supabase),
-      this.getPagosPorAnio(anioConsulta, supabase),
-    ]);
-
     const morosos = calcularMorosos(elegibles, pagosDelAnio, anioConsulta, hoy);
-
     return {
-      elegibles,
       stats: calcularStats(elegibles, pagosDelAnio, morosos, anioConsulta, hoy),
       monthlyStats: calcularMonthlyStats(elegibles, pagosDelAnio, anioConsulta, hoy),
     };
+  }
+
+  /**
+   * Dashboard load: elegibles and the year's payments fetched once, in parallel.
+   * Same result as getMiembrosElegibles() + stats() + monthlyStats(), but with
+   * 1 call to get_pagos_por_anio instead of 3. Keep the dashboard on this path.
+   */
+  async cargarDashboard(anio?: number, supabaseClient?: SupabaseLike) {
+    const supabase = supabaseClient || this.supabase;
+    const [elegibles, pagos] = await Promise.all([
+      this.getMiembrosElegibles(supabase),
+      this.pagosDelAnio(anio, supabase),
+    ]);
+    return { elegibles, ...this.calcularDashboard(elegibles, pagos, anio) };
   }
 
   async getMiembrosAlDia(anio?: number, supabaseClient?: ReturnType<typeof createClient>, elegibles?: ElegiblesResult): Promise<string[]> {

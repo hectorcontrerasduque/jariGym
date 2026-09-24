@@ -30,12 +30,14 @@ supabase/      transacciones e invariantes en RPC plpgsql + RLS
 | 1 | `pagos-service-testable` | ✅ archivado | Cliente inyectado + tests de caracterización + `lib/features/pagos/domain` |
 | 2 | `pagos-transacciones-atomicas` | ⏳ pendiente | Crear/aprobar pago en una sola transacción (RPC plpgsql); consultas a `data/` |
 | 3 | `notificaciones-unificar` | ⏳ pendiente | Una sola implementación de los 4 tipos (hoy duplicados en `api/notificaciones/route.ts` y `procesar/route.ts`) |
-| 4 | `dashboard-carga-unica` | 🔨 en curso | Dashboard en una ronda paralela y 1 descarga del RPC del año (antes 3). Sin migraciones SQL |
+| 4 | `dashboard-carga-unica` | ✅ archivado | Dashboard en una ronda paralela y 1 descarga del RPC del año (antes 3). Sin migraciones SQL |
 | 5 | `rls-tests` | ⏳ pendiente | Tests de políticas RLS contra Supabase local |
 | 6 | `ci-minimo` | ⏳ pendiente | Lint + typecheck + tests automáticos en GitHub |
 | 7 | `server-first-pages` | ✅ aprobado, pendiente | Páginas con Server Components + streaming. Cambia la experiencia de carga (sin loader a pantalla completa) |
 
 Orden de ejecución acordado: 1 → 4 → 7, luego 2, 3, 5, 6.
+
+Fase 4 original ("agregados del dashboard en Postgres") descartada: exigía aplicar una migración a mano en producción antes del deploy y, con un tope de 80 miembros, el costo real eran los viajes repetidos, no el cálculo.
 
 ## Resultados por fase
 
@@ -45,6 +47,16 @@ Orden de ejecución acordado: 1 → 4 → 7, luego 2, 3, 5, 6.
 - Tests: 207 → 296. 60 de caracterización (escritos contra el código sin tocar, verificados con mutaciones), 22 de dominio puro, 3 de inyección, 5 del doble de Supabase.
 - `lib/services/pagos/pagos.service.ts` (1022 líneas) → `lib/features/pagos/service.ts` (703) + `domain/` puro.
 - `next build` ya no falla en `pagos.service` por falta de variables de entorno.
+
+**4 `dashboard-carga-unica`** — Carga del dashboard (admin), contada por código y verificada con tests:
+
+| | Antes | Después |
+|---|---|---|
+| Descargas de `get_pagos_por_anio` (todos los pagos del año) | 3 | **1** |
+| Peticiones de red | 13 | **11** |
+| Saltos secuenciales teléfono ↔ Supabase | 4 | **3** |
+
+Sin migraciones SQL. Equivalencia demostrada en 5 escenarios (`__tests__/dashboard-carga.test.ts`, verificado con mutaciones). Falta la medición en milisegundos con datos reales (requiere `.env.development`).
 
 ## Pendientes detectados que no cambian comportamiento
 

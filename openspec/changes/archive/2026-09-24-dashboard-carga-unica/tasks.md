@@ -14,4 +14,4 @@ Cada tarea termina con `npm run test`, `npx tsc --noEmit` y `npm run lint` en ve
 
 ## 3. Documentación
 
-- [ ] 3.1 Documentar en `AGENTS.md` (Dashboard Stats Logic) que el dashboard usa `cargarDashboard` y por qué no debe volver a llamar a `stats`/`monthlyStats` por separado. Actualizar `openspec/ROADMAP.md` con el resultado medido (llamadas y saltos).
+- [x] 3.1 Documentar en `AGENTS.md` (Dashboard Stats Logic) que el dashboard usa `cargarDashboard` y por qué no debe volver a llamar a `stats`/`monthlyStats` por separado. Actualizar `openspec/ROADMAP.md` con el resultado medido (llamadas y saltos).

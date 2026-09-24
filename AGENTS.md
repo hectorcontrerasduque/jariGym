@@ -257,10 +257,10 @@ status: "pendiente" | "aprobado" | "rechazado"
 ```
 
 ### Dashboard Stats Logic
-- **Inscritos**: From `pagos`+`detalle_pago` tables (approved payments with tipo_pago="inscripcion") + `profile.inscripcion_pagada`
-- **Deudores**: Active members (no libre, inscription paid) without approved payment for current month
-- **Al día**: Active members with approved payment for current month
+- **Source of truth for every figure** (inscritos, deudores, al día, monthly stats, meses pendientes): `openspec/specs/pagos/spec.md`, implemented as pure functions in `lib/features/pagos/domain/`.
 - **Pagos recientes**: Approved payments only, with fallback when profile join fails
+
+**Loading rule (perf)**: the dashboard fetches `get_pagos_por_anio` **once** and computes everything with `pagosService.calcularDashboard(elegibles, pagosDelAnio, anio)` (or `cargarDashboard(anio)` in one call). Do **not** call `stats()` and `monthlyStats()` separately there: together they download the year's payments 3 times. `loadData` fires all queries right after `getUser` but consumes them in two steps (profile/elegibles, then the rest) to keep the original error behavior.
 
 ### Miembros Stats
 - Total card shows `active/max` format (e.g. `11/80`) using `gym_config.max_members`

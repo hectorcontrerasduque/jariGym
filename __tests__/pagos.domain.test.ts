@@ -7,6 +7,7 @@ import { describe, it, expect } from "vitest";
 import { filtrarElegibles } from "@/lib/features/pagos/domain/elegibles";
 import { calcularMesesPendientes } from "@/lib/features/pagos/domain/meses-pendientes";
 import { calcularMorosos, calcularMiembrosAlDia, miembrosConInscripcionPagada } from "@/lib/features/pagos/domain/morosos";
+import { calcularStats, calcularMonthlyStats } from "@/lib/features/pagos/domain/stats";
 import type { ElegiblesResult, MiembroElegible, PagoRPCRow } from "@/lib/features/pagos/domain/types";
 
 const HOY = new Date(2026, 8, 12, 12);
@@ -168,5 +169,53 @@ describe("calcularMiembrosAlDia", () => {
       miembrosLibresIds: new Set(["l"]),
     });
     expect(calcularMiembrosAlDia(e, ["a", "b", "o", "l", "x"])).toEqual(["b", "a"]);
+  });
+});
+
+describe("calcularStats", () => {
+  it("deuda, inscritos y al día (requiere inscripción) sobre activos sin dueño", () => {
+    const e = eleg({
+      miembros: [
+        perfil({ id: "a", inscription_paid: false, start_date: "2026-08-01" }),
+        perfil({ id: "b", start_date: "2026-09-01" }),
+        perfil({ id: "o", email: "owner@gym.com" }),
+      ],
+    });
+    const pagos = [pago({ user_id: "b", month_number: 9 }), pago({ user_id: "a", month_number: 9 })];
+    const morosos = calcularMorosos(e, pagos, 2026, HOY);
+    const r = calcularStats(e, pagos, morosos, 2026, HOY);
+    expect(r).toMatchObject({
+      totalMiembros: 2,
+      inscritosPagados: 1,
+      inscritosPendientes: 1,
+      deudoresTotal: 1,
+      deudoresInscripcion: 1,
+      deudoresMensualidad: 1,
+      montoDeuda: 15,
+      alDiaMensualidad: 1,
+      montoPagado: 10,
+      pagosConfirmados: 2,
+    });
+  });
+
+  it("el mes de 'al día' es el mes calendario de hoy", () => {
+    const e = eleg({ miembros: [perfil()] });
+    const pagos = [pago({ month_number: 3 })];
+    expect(calcularStats(e, pagos, [], 2026, new Date(2026, 2, 15)).alDiaMensualidad).toBe(1);
+    expect(calcularStats(e, pagos, [], 2026, HOY).alDiaMensualidad).toBe(0);
+  });
+});
+
+describe("calcularMonthlyStats", () => {
+  it("un mes por mes transcurrido; sinPago y monto adeudado", () => {
+    const e = eleg({ miembros: [perfil({ id: "a", start_date: null }), perfil({ id: "m", start_date: "2026-05-10" })] });
+    const r = calcularMonthlyStats(e, [pago({ user_id: "a", month_number: 5 })], 2026, HOY);
+    expect(r.meses.map((m) => m.month_number)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    expect(r.meses[3]).toMatchObject({ pagados: 0, sinPago: 1, montoAdeudado: 10 });
+    expect(r.meses[4]).toMatchObject({ pagados: 1, sinPago: 1, montoAcumulado: 10, montoAdeudado: 10 });
+  });
+
+  it("año anterior: 12 meses", () => {
+    expect(calcularMonthlyStats(eleg(), [], 2025, HOY).meses).toHaveLength(12);
   });
 });

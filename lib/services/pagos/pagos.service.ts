@@ -1,9 +1,9 @@
 import { createClient } from "@/lib/supabase/client";
-import { getMonthName } from "@/lib/utils";
 import { messages } from "@/lib/messages";
 import type { Pago, MetodoPago, TipoPago, Profile, DetallePago } from "@/lib/types";
 import type { ElegiblesResult, Moroso, PagoRPCRow } from "@/lib/features/pagos/domain/types";
 import { calcularMorosos, calcularMiembrosAlDia } from "@/lib/features/pagos/domain/morosos";
+import { calcularStats, calcularMonthlyStats } from "@/lib/features/pagos/domain/stats";
 import { filtrarElegibles } from "@/lib/features/pagos/domain/elegibles";
 import { calcularMesesPendientes } from "@/lib/features/pagos/domain/meses-pendientes";
 
@@ -493,79 +493,13 @@ export class PagosService {
     const supabase = supabaseClient || this.supabase;
     const hoy = new Date();
     const anioConsulta = anio || hoy.getFullYear();
-    const mesActual = hoy.getMonth() + 1;
 
     const elegiblesData = elegibles || await this.getMiembrosElegibles(supabase);
-    const { miembros: allMiembros, miembrosLibresIds, ownerEmail, montoMensual, montoInscripcion } = elegiblesData;
-
-    const miembrosActivos = allMiembros.filter((m) => m.email?.toLowerCase() !== ownerEmail);
 
     const rpcData = await this.getPagosPorAnio(anioConsulta, supabase);
-
-    const pagosConDetalle = rpcData.map((d) => ({
-      payment_id: d.id,
-      month_number: d.month_number,
-      year_number: d.year_number,
-      payment_amount: d.payment_amount,
-      payment_type: d.payment_type,
-      status: d.status,
-      user_id: d.user_id,
-      payment_note: d.payment_note,
-    }));
-
-    const todosPagosAprobados = pagosConDetalle.filter((p) => p.status === "aprobado");
-    const miembrosConInscripcionPagada = new Set<string>();
-    for (const pago of todosPagosAprobados) {
-      if (pago.payment_type === "inscripcion") {
-        miembrosConInscripcionPagada.add(pago.user_id);
-      }
-    }
-
-    for (const m of allMiembros) {
-      if (m.inscription_paid) {
-        miembrosConInscripcionPagada.add(m.id);
-      }
-    }
-
-    const inscritosPagados = miembrosActivos.filter((m) => miembrosConInscripcionPagada.has(m.id)).length;
-    const inscritosPendientes = miembrosActivos.filter((m) => !miembrosConInscripcionPagada.has(m.id)).length;
-
     const morosos = await this.getMiembrosMorosos(anioConsulta, supabase, elegiblesData);
-    const deudoresInscripcion = morosos.filter((m) => m.debeInscripcion).length;
-    const deudoresMensualidad = morosos.filter((m) => m.mesesDeuda.length > 0).length;
-    const montoDeudaInscripcion = morosos.filter((m) => m.debeInscripcion).length * montoInscripcion;
-    const montoDeudaMensualidad = morosos.reduce((sum, m) => sum + m.mesesDeuda.length, 0) * montoMensual;
-    const montoDeuda = montoDeudaInscripcion + montoDeudaMensualidad;
 
-    const pagosMesActual = pagosConDetalle.filter(
-      (p) => p.status === "aprobado" && p.month_number === mesActual && p.year_number === anioConsulta && (p.payment_type === "mensualidad" || p.payment_type === "suspension")
-    );
-    const usuariosAlDia = new Set(
-      pagosMesActual.filter((p) => miembrosConInscripcionPagada.has(p.user_id)).map((p) => p.user_id)
-    );
-    const alDiaMensualidad = usuariosAlDia.size;
-    const montoPagado = pagosMesActual
-      .filter((p) => usuariosAlDia.has(p.user_id))
-      .reduce((sum, p) => sum + (p.payment_amount || 0), 0);
-
-    return {
-      totalMiembros: miembrosActivos.length,
-      miembrosActivos: miembrosActivos.length,
-      inscritosPagados,
-      inscritosPendientes,
-      deudoresTotal: morosos.length,
-      deudoresInscripcion,
-      deudoresMensualidad,
-      alDiaMensualidad,
-      montoDeuda,
-      montoDeudaInscripcion,
-      montoDeudaMensualidad,
-      montoPagado,
-      membresiaLibre: miembrosLibresIds.size,
-      pagosConfirmados: todosPagosAprobados.length,
-      pagosPendientes: pagosConDetalle.filter((p) => p.status === "pendiente").length,
-      ingresosMes: montoPagado,
-    };
+    return calcularStats(elegiblesData, rpcData, morosos, anioConsulta, hoy);
   }
 
   /**
@@ -712,87 +646,12 @@ export class PagosService {
     const supabase = supabaseClient || this.supabase;
     const hoy = new Date();
     const anioConsulta = anio || hoy.getFullYear();
-    const mesMaximo = anioConsulta === hoy.getFullYear() ? hoy.getMonth() + 1 : 12;
 
     const elegiblesData = elegibles || await this.getMiembrosElegibles(supabase);
-    const { miembros: allProfiles, miembrosLibresIds: libresIds, ownerEmail, montoMensual } = elegiblesData;
-
-    const profiles = allProfiles.filter((p) => p.email?.toLowerCase() !== ownerEmail);
-    const libresCount = libresIds.size;
-
-    const meses = [];
-    for (let mes = 1; mes <= mesMaximo; mes++) {
-      meses.push({
-        mes,
-        anio: anioConsulta,
-        nombre: getMonthName(mes),
-      });
-    }
-
-    const statsMeses = await Promise.all(
-      meses.map(async (m) => {
-        const finMes = new Date(m.anio, m.mes, 0);
-
-        const miembrosMes = profiles.filter((p) => {
-          const fechaInsc = p.start_date ? new Date(p.start_date) : null;
-          if (fechaInsc && fechaInsc > finMes) return false;
-          return true;
-        });
-
-        const totalMiembrosMes = miembrosMes.length;
-        const idsMes = new Set(miembrosMes.map((p) => p.id));
-
-        return { mes: m.mes, anio: m.anio, nombre: m.nombre, totalMiembrosMes, idsMes };
-      })
-    );
 
     const rpcData = await this.getPagosPorAnio(anioConsulta, supabase);
 
-    const pagosAll = rpcData.map((d) => ({
-      user_id: d.user_id,
-      status: d.status,
-      payment_amount: d.payment_amount,
-      month_number: d.month_number,
-      year_number: d.year_number,
-    }));
-
-    const mesesFinal = statsMeses.map((m) => {
-      const pagosMes = pagosAll.filter((p) => p.month_number === m.mes && p.year_number === m.anio);
-
-      const pagados = new Set(
-        pagosMes.filter((p) => (p.status === "aprobado") && m.idsMes.has(p.user_id)).map((p) => p.user_id)
-      ).size;
-
-      const pendientes = new Set(
-        pagosMes.filter((p) => p.status === "pendiente" && m.idsMes.has(p.user_id)).map((p) => p.user_id)
-      ).size;
-
-      const montoAcumulado = pagosMes
-        .filter((p) => p.status === "aprobado")
-        .reduce((sum, p) => sum + (p.payment_amount || 0), 0);
-
-      const montoPendiente = pagosMes
-        .filter((p) => p.status === "pendiente")
-        .reduce((sum, p) => sum + (p.payment_amount || 0), 0);
-
-      const sinPago = Math.max(0, m.totalMiembrosMes - pagados - pendientes);
-      const montoAdeudado = sinPago * montoMensual;
-
-      return {
-        month_number: m.mes,
-        year_number: m.anio,
-        nombre: m.nombre,
-        pagados,
-        pendientes,
-        sinPago,
-        libres: 0,
-        montoAcumulado,
-        montoAdeudado,
-        montoPendiente,
-      };
-    });
-
-    return { totalMiembros: profiles.length, libres: libresCount, meses: mesesFinal };
+    return calcularMonthlyStats(elegiblesData, rpcData, anioConsulta, hoy);
   }
 
   async getMiembrosAlDia(anio?: number, supabaseClient?: ReturnType<typeof createClient>, elegibles?: ElegiblesResult): Promise<string[]> {

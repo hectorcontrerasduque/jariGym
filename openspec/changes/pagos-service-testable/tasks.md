@@ -43,5 +43,5 @@ Cada tarea se considera terminada solo si `npm run test`, `npx tsc --noEmit` y `
 
 ## 7. Documentación y cierre
 
-- [ ] 7.1 Actualizar en `AGENTS.md` la sección "The `pagosService` trap" y el árbol de Architecture (`lib/features/pagos/`, `domain/`, helper `__tests__/helpers/supabase-fake.ts`). Verificar que los ejemplos de código coinciden con las firmas reales.
-- [ ] 7.2 Verificación final: `npm run test`, `npx tsc --noEmit`, `npm run lint` y `npm run build` (con `.env.development`) en verde; `openspec validate pagos-service-testable --strict` sin errores.
+- [x] 7.1 Actualizar en `AGENTS.md` la sección "The `pagosService` trap" y el árbol de Architecture (`lib/features/pagos/`, `domain/`, helper `__tests__/helpers/supabase-fake.ts`). Verificar que los ejemplos de código coinciden con las firmas reales.
+- [x] 7.2 Verificación final: `npm run test`, `npx tsc --noEmit`, `npm run lint` y `npm run build` (con `.env.development`) en verde; `openspec validate pagos-service-testable --strict` sin errores. — Resultado: 296 tests, tsc, lint en verde; `next build` 34/34 páginas con variables ficticias en línea de comando (no hay `.env.development` en esta máquina).

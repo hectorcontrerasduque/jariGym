@@ -64,13 +64,16 @@ lib/
     client.ts       # Browser client (createBrowserClient)
     server.ts       # Server client (async cookies())
     middleware.ts   # Auth guard middleware
-  services/
+  features/         # Target architecture: one module per feature (see openspec/ROADMAP.md)
+    pagos/
+      domain/       # PURE calculations: elegibles, morosos, al día, stats, meses pendientes
+      service.ts    # PagosService: Supabase queries + delegates to domain/
+  services/         # Legacy modules, migrated to features/ phase by phase
     auth/           # signIn, resetPassword, getProfile
     config/         # Config CRUD + dueno email promotion on change
     email/          # nodemailer Gmail SMTP service
     email/templates/ # HTML email templates (reset password, welcome)
     miembros/       # Miembros CRUD + stats
-    pagos/          # Pagos CRUD + approval
     notificaciones/ # Notification service
   types.ts          # All TypeScript interfaces
   utils.ts          # cn(), formatCurrency(), formatDate(), getMonthName()
@@ -88,7 +91,10 @@ supabase/
   migrations/       # SQL migrations (run manually in Supabase SQL Editor)
   functions/        # Deno Edge Functions (deploy via Supabase CLI)
 __tests__/
-  migracion.test.ts # Unit tests for migration flow
+  helpers/supabase-fake.ts  # Programmable Supabase client double (queue replies, inspect calls)
+  pagos.service.test.ts     # Characterization tests of PagosService (pin current behavior)
+  pagos.domain.test.ts      # Pure unit tests of lib/features/pagos/domain
+  migracion.test.ts         # Unit tests for migration flow
 ```
 
 ## Supabase Client Pattern (CRITICAL)
@@ -100,23 +106,39 @@ Three separate clients exist for three contexts:
 
 **Do not mix these up.** Server client is `async` — always `await` the call.
 
-### The `pagosService` trap (fixed in commit 85577de)
+### The `pagosService` trap
 
-`PagosService` (`lib/services/pagos/pagos.service.ts`) creates a **browser client** at module level:
+`PagosService` (`lib/features/pagos/service.ts`) resolves its Supabase client like this:
+- `new PagosService(client)` → uses `client` for every method.
+- `new PagosService()` / the exported `pagosService` → lazily creates the **browser client** (anon key + user cookies) on first use.
+
+In **server-side API routes** the browser client has **NO user session**, so queries run as unauthenticated anon and RLS returns empty results.
+
+**Rule**: server code must inject its client — via the constructor, or via the optional `supabaseClient` argument of read methods (it wins over the constructor client).
+
 ```ts
-private supabase = createClient(); // → createBrowserClient() with anon key
-```
-
-When imported in **server-side API routes**, this client has **NO user session** (no cookies), so all Supabase queries run as **unauthenticated anon**. RLS blocks reads → returns empty results.
-
-**Rule**: Any service method called from API routes that queries RLS-protected tables **must** accept an optional Supabase client parameter. Pass the route's `service_role` client from the API route.
-
-```ts
-// CORRECT — API route passes service_role client
+// CORRECT — API route injects its service_role client
+const service = new PagosService(supabase);
+const morosos = await service.getMiembrosMorosos();
+// also correct (existing routes)
 const morosos = await pagosService.getMiembrosMorosos(undefined, supabase);
 
-// WRONG — uses browser client with no auth in server context
+// WRONG — browser client with no auth in server context
 const morosos = await pagosService.getMiembrosMorosos();
+```
+
+### Testing a service
+
+Calculations go in `lib/features/<feature>/domain/` as pure functions that receive `hoy: Date` instead of calling `new Date()`; test them with literal data. For the service itself, inject the fake client:
+
+```ts
+import { createSupabaseFake } from "./helpers/supabase-fake";
+const fake = createSupabaseFake();
+fake.setUser({ id: "admin-1" });
+fake.on("profiles", "select").reply({ data: { role: "super_admin" } });
+fake.onRpc("get_pagos_por_anio").reply({ data: [] });
+const service = new PagosService(fake.client);
+// ...then assert on fake.callsTo("payments", "update")[0].payload / .filters
 ```
 
 ## Environment Variables

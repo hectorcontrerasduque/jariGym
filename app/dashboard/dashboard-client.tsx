@@ -36,6 +36,7 @@ import { messages } from "@/lib/messages";
 import { getAdminLevel, isFullAdmin, type AdminLevel } from "@/lib/admin-level";
 import { ReporteMorosos } from "@/components/reporte-morosos";
 import type { GymConfig } from "@/lib/types";
+import { FloatingParticles } from "@/components/ui/floating-particles";
 
 interface MonthlyStat {
   month_number: number;
@@ -72,43 +73,6 @@ interface DashboardStats {
 interface ModalData {
   title: string;
   members: Array<{ id: string; nombre: string; detalle?: string }>;
-}
-
-const particleCount = 12;
-
-function generateParticles() {
-  return Array.from({ length: particleCount }, () => ({
-    left: Math.random() * 100,
-    top: Math.random() * 100,
-    delay: Math.random() * 6,
-    duration: 4 + Math.random() * 4,
-    size: 2 + Math.random() * 3,
-    colorIndex: Math.floor(Math.random() * 3),
-  }));
-}
-
-const particles = generateParticles();
-
-function FloatingParticles() {
-  return (
-    <div className="particles-container">
-      {particles.map((p, i) => (
-        <div
-          key={i}
-          className="particle"
-          style={{
-            left: `${p.left}%`,
-            top: `${p.top}%`,
-            animationDelay: `${p.delay}s`,
-            animationDuration: `${p.duration}s`,
-            width: `${p.size}px`,
-            height: `${p.size}px`,
-            background: p.colorIndex === 0 ? "rgba(56, 189, 248, 0.3)" : p.colorIndex === 1 ? "rgba(129, 140, 248, 0.2)" : "rgba(52, 211, 153, 0.2)",
-          }}
-        />
-      ))}
-    </div>
-  );
 }
 
 export function DashboardClient({ datosIniciales }: { datosIniciales: Promise<DashboardRaw | null> }) {
@@ -376,7 +340,7 @@ export function DashboardClient({ datosIniciales }: { datosIniciales: Promise<Da
 
   return (
     <div className="relative min-h-screen bg-gym-bg">
-      <FloatingParticles />
+      <FloatingParticles id="dashboard" count={12} colors={["rgba(56, 189, 248, 0.3)", "rgba(129, 140, 248, 0.2)", "rgba(52, 211, 153, 0.2)"]} />
 
       <div className="relative z-10 dashboard-container">
         {isSuperAdmin && showBanner && (

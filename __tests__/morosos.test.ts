@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import type { ElegiblesResult } from "@/lib/services/pagos/pagos.service";
+import type { ElegiblesResult } from "@/lib/features/pagos/service";
 
 const mockRpc = vi.fn();
 
@@ -61,7 +61,7 @@ function makePagoRpc(overrides: Record<string, unknown> = {}) {
 
 async function getMorosos(elegibles: ElegiblesResult, pagosRpc: ReturnType<typeof makePagoRpc>[], anio = 2026) {
   mockRpc.mockResolvedValueOnce({ data: pagosRpc, error: null });
-  const { PagosService } = await import("@/lib/services/pagos/pagos.service");
+  const { PagosService } = await import("@/lib/features/pagos/service");
   const service = new PagosService();
   return service.getMiembrosMorosos(anio, undefined, elegibles);
 }

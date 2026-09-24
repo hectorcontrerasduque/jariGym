@@ -8,7 +8,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createSupabaseFake, type SupabaseFake } from "./helpers/supabase-fake";
 import { messages } from "@/lib/messages";
 import { getMonthName } from "@/lib/utils";
-import { PagosService, type ElegiblesResult } from "@/lib/services/pagos/pagos.service";
+import { PagosService, type ElegiblesResult } from "@/lib/features/pagos/service";
 
 const h = vi.hoisted(() => ({ fake: undefined as SupabaseFake | undefined }));
 vi.mock("@/lib/supabase/client", () => ({ createClient: () => h.fake?.client }));

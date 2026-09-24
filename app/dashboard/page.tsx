@@ -24,7 +24,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
 import { createClient } from "@/lib/supabase/client";
-import { pagosService } from "@/lib/services/pagos/pagos.service";
+import { pagosService } from "@/lib/features/pagos/service";
 import { formatCurrency, getMonthName } from "@/lib/utils";
 import type { Payment, Profile } from "@/lib/types";
 import { showToast } from "@/components/ui/toast";

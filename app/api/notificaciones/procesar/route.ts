@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { messages } from "@/lib/messages";
 import { getDiaCobro, getDiaNotificacion } from "@/lib/utils";
-import { pagosService } from "@/lib/services/pagos/pagos.service";
+import { pagosService } from "@/lib/features/pagos/service";
 import { applyRateLimit } from "@/lib/middleware/rate-limit";
 import type { SupabaseClient } from "@supabase/supabase-js";
 

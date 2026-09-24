@@ -1,30 +1,15 @@
 import { createClient } from "@/lib/supabase/client";
 import { messages } from "@/lib/messages";
 import type { Pago, MetodoPago, TipoPago, Profile, DetallePago } from "@/lib/types";
-import type { ElegiblesResult, Moroso, PagoRPCRow } from "@/lib/features/pagos/domain/types";
-import { calcularMorosos, calcularMiembrosAlDia } from "@/lib/features/pagos/domain/morosos";
-import { calcularStats, calcularMonthlyStats } from "@/lib/features/pagos/domain/stats";
-import { filtrarElegibles } from "@/lib/features/pagos/domain/elegibles";
-import { calcularMesesPendientes } from "@/lib/features/pagos/domain/meses-pendientes";
+import type { ElegiblesResult, Moroso, PagoRPCRow } from "./domain/types";
+import { calcularMorosos, calcularMiembrosAlDia } from "./domain/morosos";
+import { calcularStats, calcularMonthlyStats } from "./domain/stats";
+import { filtrarElegibles } from "./domain/elegibles";
+import { calcularMesesPendientes } from "./domain/meses-pendientes";
 
 export type { ElegiblesResult };
 
 
-
-/**
- * PagosService - Service for payment operations.
- * 
- * IMPORTANT: This service creates a browser client (createClient()) at module level.
- * When called from Server Components / API Routes, you MUST pass a service_role client
- * as the optional `supabaseClient` parameter to all read methods.
- * 
- * Example:
- *   const supabase = createServiceClient(url, serviceKey);
- *   await pagosService.getMiembrosMorosos(year, supabase);
- *   await pagosService.stats(year, supabase);
- * 
- * Otherwise RLS will block queries (runs as anonymous anon key).
- */
 export interface PaymentDetailInput {
   month_number: number | null;
   year_number: number | null;
@@ -43,6 +28,22 @@ export interface CreatePaymentInput {
 
 type SupabaseLike = ReturnType<typeof createClient>;
 
+/**
+ * PagosService - data access + orchestration for payments.
+ * Calculations live in ./domain (pure functions, unit-tested without Supabase).
+ *
+ * Client resolution:
+ * - `new PagosService(client)`: every method uses `client`. Preferred on the server
+ *   (pass the route's service_role client) and in tests (pass a fake).
+ * - `new PagosService()` / the exported `pagosService`: lazily creates the BROWSER
+ *   client (anon key + user cookies) on first use. Fine in client components.
+ *
+ * IMPORTANT (server): the browser client has no user session in API routes, so RLS
+ * blocks reads. Server code must inject its client, either via the constructor or
+ * via the optional `supabaseClient` argument of read methods (which wins over the
+ * constructor client):
+ *   await pagosService.getMiembrosMorosos(year, supabase);
+ */
 export class PagosService {
   private client?: SupabaseLike;
 

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { pagosService } from "@/lib/services/pagos/pagos.service";
+import { pagosService } from "@/lib/features/pagos/service";
 import { messages } from "@/lib/messages";
 import { sleep } from "@/lib/services/email/email.service";
 import { getDiaCobro, getDiaNotificacion } from "@/lib/utils";

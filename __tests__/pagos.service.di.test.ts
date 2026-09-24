@@ -4,7 +4,7 @@ import { createSupabaseFake } from "./helpers/supabase-fake";
 const h = vi.hoisted(() => ({ createClient: vi.fn() }));
 vi.mock("@/lib/supabase/client", () => ({ createClient: h.createClient }));
 
-import { PagosService } from "@/lib/services/pagos/pagos.service";
+import { PagosService } from "@/lib/features/pagos/service";
 
 describe("PagosService — client injection", () => {
   beforeEach(() => {

@@ -32,8 +32,8 @@ Cada tarea se considera terminada solo si `npm run test`, `npx tsc --noEmit` y `
 
 ## 5. Mover a `lib/features/pagos/` (design D6)
 
-- [ ] 5.1 `git mv lib/services/pagos/pagos.service.ts lib/features/pagos/service.ts` y actualizar los imports en los 6 llamadores y en los tests. Verificar con `npx tsc --noEmit`, `npm run test` y `grep -rn "services/pagos" app lib components __tests__` sin resultados.
-- [ ] 5.2 Actualizar el comentario de la clase para documentar la inyección por constructor, manteniendo la advertencia de uso en servidor.
+- [x] 5.1 `git mv lib/services/pagos/pagos.service.ts lib/features/pagos/service.ts` y actualizar los imports en los 6 llamadores y en los tests. Verificar con `npx tsc --noEmit`, `npm run test` y `grep -rn "services/pagos" app lib components __tests__` sin resultados.
+- [x] 5.2 Actualizar el comentario de la clase para documentar la inyección por constructor, manteniendo la advertencia de uso en servidor.
 
 ## 6. Migrar los tests a inyección por constructor
 

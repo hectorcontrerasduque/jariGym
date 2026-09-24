@@ -16,9 +16,23 @@ npm run build      # production build
 npm run lint       # ESLint
 npm run test       # Vitest (single run)
 npm run test:watch # Vitest (watch mode)
+npm run typecheck  # tsc --noEmit
 ```
 
-No CI pipelines. No Node.js in WSL — run npm from Windows PowerShell.
+No CI pipelines. No Node.js in WSL — run npm from Windows PowerShell (macOS: Homebrew Node works too).
+
+### Git hooks (husky + lint-staged)
+
+Installed automatically by `npm install` / `npm ci` (`prepare` script).
+
+- **pre-commit** (`.husky/pre-commit`, ~4 s): `eslint --max-warnings=0` on staged files, `tsc --noEmit`, `vitest run`.
+- **pre-push** (`.husky/pre-push`): `next build`. Requires `.env.development` with the Supabase variables; without them the build fails while collecting API routes.
+- Emergency bypass: `git commit --no-verify` / `git push --no-verify`. Do not use it to skip failing tests.
+- `.gitattributes` forces LF on `.husky/*` so the hooks run under Git for Windows `sh`.
+
+### Refactor tracking (OpenSpec)
+
+Changes live in `openspec/changes/<name>/` (proposal, specs, design, tasks); roadmap in `openspec/ROADMAP.md`; project rules in `openspec/config.yaml`. Commands: `/opsx:propose`, `/opsx:apply`, `/opsx:archive`.
 
 ## Architecture
 

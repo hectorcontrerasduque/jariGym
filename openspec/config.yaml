@@ -1,0 +1,44 @@
+schema: spec-driven
+
+context: |
+  Language: es
+  All artifacts must be written in es.
+  Keep OpenSpec structural headings and SHALL/MUST keywords in English.
+
+  Proyecto: GymApp (jariGym) — gestión de un gimnasio (single-tenant; la migración 009
+  eliminó tenants). Stack real: Next.js 16 (App Router) + React 19 + TypeScript,
+  Supabase (Auth, Postgres con RLS, Storage), Tailwind 4, nodemailer (Gmail SMTP),
+  Vitest (unit) y Playwright (e2e). Tablas en inglés: profiles, payments,
+  payment_detail, memberships, gym_config, gym_config_payment_methods, migracion,
+  notificacion_config, notificacion_log, password_reset_tokens.
+  Migraciones SQL numeradas en supabase/migrations/, aplicadas a mano en el SQL Editor.
+  Ver AGENTS.md para patrones (clientes Supabase, messages.ts, createOrUpdateProfile).
+
+  REGLA PRINCIPAL DEL PROYECTO DE REFACTOR (rama refactor/arquitectura-calidad):
+  Es un refactor. NO se cambia el funcionamiento actual: mismas pantallas, mismos
+  textos, mismos correos, mismos resultados de cálculo, mismas respuestas de API,
+  mismos permisos. Solo se mejora estructura, testabilidad, rendimiento e integridad.
+
+rules:
+  proposal:
+    - Incluir una sección "Non-goals" que liste explícitamente qué comportamiento NO cambia.
+    - Justificar el cambio con el hallazgo concreto (archivo:línea) que lo motiva.
+  specs:
+    - Los specs describen el comportamiento ACTUAL observado en el código; un refactor no agrega requisitos nuevos de negocio.
+    - Cada escenario debe poder verificarse con un test automatizado.
+  design:
+    - Documentar cómo se garantiza la equivalencia de comportamiento (tests de caracterización antes del cambio).
+    - Cualquier migración SQL nueva debe ser aditiva y reversible, e incluir su script de rollback.
+  tasks:
+    - La primera tarea de cada change es escribir tests de caracterización que pasen con el código actual.
+    - Tareas de máximo ~2 horas, cada una termina con npm run test, npx tsc --noEmit y npm run lint en verde.
+    - Un commit por tarea o grupo pequeño de tareas.
+
+operations:
+  apply:
+    guidance:
+      - No modificar un test de caracterización para que pase; si falla, el refactor cambió comportamiento y debe corregirse el código.
+      - Correr la suite completa antes de marcar una tarea como hecha.
+  archive:
+    guidance:
+      - Confirmar que la suite completa, typecheck y lint están en verde antes de archivar.

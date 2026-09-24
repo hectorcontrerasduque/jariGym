@@ -3,15 +3,37 @@
 Regla: refactor sin cambios de comportamiento (ver `openspec/config.yaml`).
 Cada fase es un change de OpenSpec en `openspec/changes/<nombre>/`; se propone cuando la anterior está aplicada, para diseñarla sobre el código real.
 
+## Arquitectura objetivo: módulos por feature con núcleo puro
+
+```
+lib/features/<feature>/
+  domain/      funciones puras (sin Supabase, sin reloj global: reciben "hoy")
+  data/        consultas Supabase; reciben el cliente como parámetro
+  service.ts   orquesta data → domain
+app/           páginas y rutas API: solo delegan a lib/features/*
+supabase/      transacciones e invariantes en RPC plpgsql + RLS
+```
+
+1. Lógica de negocio pura y testeable en milisegundos.
+2. Acceso a datos con el cliente inyectado: se acaba la trampa del cliente de navegador en el servidor.
+3. Atomicidad y agregados pesados en Postgres.
+4. Carga de datos en el servidor (Server Components) — fase 7, opcional.
+5. Pirámide de tests: unit (domain) › integración (data/RLS contra Supabase local) › pocos E2E.
+6. Controles de calidad: pre-commit, pre-push, CI.
+
+## Fases
+
 | # | Change | Estado | Objetivo |
 |---|--------|--------|----------|
 | 0 | — | ✅ hecho | Tests corriendo en local (207/207), OpenSpec instalado |
-| 1 | `pagos-service-testable` | 📝 propuesto | Inyección del cliente Supabase en `PagosService` + tests de caracterización |
-| 2 | `pagos-transacciones-atomicas` | ⏳ pendiente | Crear/aprobar pago en una sola transacción (RPC plpgsql) |
+| 0.5 | `quality-gates` | ✅ hecho | husky + lint-staged: pre-commit (eslint, tsc, vitest), pre-push (build) |
+| 1 | `pagos-service-testable` | 📝 propuesto | Cliente inyectado + tests de caracterización + `lib/features/pagos/domain` |
+| 2 | `pagos-transacciones-atomicas` | ⏳ pendiente | Crear/aprobar pago en una sola transacción (RPC plpgsql); consultas a `data/` |
 | 3 | `notificaciones-unificar` | ⏳ pendiente | Una sola implementación de los 4 tipos (hoy duplicados en `api/notificaciones/route.ts` y `procesar/route.ts`) |
 | 4 | `dashboard-stats-rpc` | ⏳ pendiente | Agregados del dashboard en Postgres; eliminar la doble llamada a `get_pagos_por_anio` |
 | 5 | `rls-tests` | ⏳ pendiente | Tests de políticas RLS contra Supabase local |
-| 6 | `ci-minimo` | ⏳ pendiente | Lint + typecheck + tests automáticos |
+| 6 | `ci-minimo` | ⏳ pendiente | Lint + typecheck + tests automáticos en GitHub |
+| 7 | `server-first-pages` | ❔ requiere aprobación | Páginas con Server Components + streaming. Cambia la experiencia de carga (sin loader a pantalla completa) |
 
 Hallazgos que **no** se tocan en este refactor porque cambiarían el comportamiento (requieren decisión explícita y su propio change):
 - `aniosConPagos(usuarioId)` filtra por `payments.user_id` sin join.

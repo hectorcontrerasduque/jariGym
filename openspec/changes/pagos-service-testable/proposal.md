@@ -9,6 +9,8 @@ Resultado: la lógica de dinero no tiene red de seguridad. `__tests__/pagos.test
 ## What Changes
 
 - `PagosService` acepta un cliente Supabase opcional en el constructor. Sin argumento conserva el comportamiento actual (cliente de navegador). El cliente por defecto se crea de forma perezosa en el primer uso en vez de al importar el módulo.
+- Los cálculos puros (miembros elegibles, morosos, al día, estadísticas anuales y mensuales, meses pendientes) se extraen a funciones sin Supabase ni reloj global en `lib/features/pagos/domain/`, que reciben los datos y la fecha de "hoy" como parámetros. `PagosService` consulta los datos y delega en ellas.
+- `PagosService` se mueve a `lib/features/pagos/service.ts` (primer módulo de la arquitectura por features) y se actualizan los 6 imports de los llamadores. No se deja un archivo puente en la ruta antigua.
 - Se mantienen **sin cambios** la instancia exportada `pagosService`, todas las firmas públicas (incluido el parámetro opcional `supabaseClient` de los métodos de lectura), los tipos exportados y los alias `DetallePagoInput`/`CreatePagoInput`.
 - Nuevo helper de test: un cliente Supabase falso y programable (`__tests__/helpers/supabase-fake.ts`) que registra las llamadas (`from`, `select`, `eq`, `insert`, `update`, `delete`, `rpc`, `auth.getUser`) y devuelve respuestas configuradas por tabla/operación.
 - Tests de caracterización nuevos que fijan el comportamiento actual de: `stats`, `monthlyStats`, `getMiembrosMorosos`, `getMiembrosAlDia`, `getMiembrosElegibles`, `mesesPendientes`, `crearPago`, `crearPagoAprobado`, `aprobarPago`, `rechazarPago`, `crearPagoSuspendido`.
@@ -40,8 +42,9 @@ No cambia ningún comportamiento observable:
 
 ## Impact
 
-- **Código**: `lib/services/pagos/pagos.service.ts` (solo constructor y creación del cliente por defecto).
-- **Tests**: nuevo `__tests__/helpers/supabase-fake.ts`, nuevo `__tests__/pagos.service.test.ts`, refactor de `__tests__/morosos.test.ts`, limpieza de `__tests__/pagos.test.ts`.
-- **Llamadores** (sin cambios requeridos): `app/dashboard/page.tsx`, `app/dashboard/pagos/page.tsx`, `app/dashboard/mis-pagos/page.tsx`, `app/dashboard/reportar-pago/page.tsx`, `app/api/notificaciones/route.ts`, `app/api/notificaciones/procesar/route.ts`.
+- **Código**: `lib/services/pagos/pagos.service.ts` → `lib/features/pagos/service.ts` (constructor, cliente perezoso, delegación a `domain/`); nuevo `lib/features/pagos/domain/`.
+- **Build**: el cliente perezoso elimina la creación del cliente de navegador al importar el módulo, que hoy hace fallar `next build` cuando faltan las variables de Supabase (`api/notificaciones/procesar/route.ts:5`).
+- **Tests**: nuevo `__tests__/helpers/supabase-fake.ts`, nuevo `__tests__/pagos.service.test.ts`, nuevos tests unitarios de `domain/` (`__tests__/pagos.domain.test.ts`), refactor de `__tests__/morosos.test.ts`, limpieza de `__tests__/pagos.test.ts`.
+- **Llamadores** (solo cambia la ruta del import): `app/dashboard/page.tsx`, `app/dashboard/pagos/page.tsx`, `app/dashboard/mis-pagos/page.tsx`, `app/dashboard/reportar-pago/page.tsx`, `app/api/notificaciones/route.ts`, `app/api/notificaciones/procesar/route.ts`.
 - **Dependencias**: ninguna nueva.
 - **Habilita**: las fases `pagos-transacciones-atomicas`, `dashboard-stats-rpc` y `notificaciones-unificar`, que modificarán este servicio con los tests ya en su lugar.

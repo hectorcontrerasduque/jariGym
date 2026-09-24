@@ -20,16 +20,28 @@ Cada tarea se considera terminada solo si `npm run test`, `npx tsc --noEmit` y `
 ## 3. Inyección de dependencias en PagosService
 
 - [ ] 3.1 Aplicar design D1 en `lib/services/pagos/pagos.service.ts`: constructor con cliente opcional y getter perezoso `supabase`. Sin otros cambios en el archivo. Verificar que todos los tests de la sección 2 pasan sin modificarlos.
-- [ ] 3.2 Añadir tests: `new PagosService(fake)` usa el cliente inyectado en escrituras y lecturas; `new PagosService()` no llama a `createClient` hasta el primer uso; el parámetro `supabaseClient` sigue teniendo prioridad sobre el cliente del constructor en los métodos de lectura. Verificar con `npm run test`.
-- [ ] 3.3 Actualizar el comentario de la clase (`pagos.service.ts:34-47`) para documentar la inyección por constructor, manteniendo la advertencia sobre el uso en el servidor.
+- [ ] 3.2 Añadir tests: `new PagosService(fake)` usa el cliente inyectado en escrituras y lecturas; `new PagosService()` no llama a `createClient` hasta el primer uso; el parámetro `supabaseClient` sigue teniendo prioridad sobre el del constructor en los métodos de lectura. Verificar con `npm run test`.
+- [ ] 3.3 Verificar que `next build` ya no falla por falta de variables de Supabase al recolectar `api/notificaciones/procesar` (con `NEXT_PUBLIC_SUPABASE_*` vacías, el error de `createBrowserClient` en import no aparece en el log).
 
-## 4. Migrar los tests a inyección por constructor
+## 4. Núcleo de dominio puro (design D5)
 
-- [ ] 4.1 Cambiar `__tests__/pagos.service.test.ts` para construir `new PagosService(fake.client)` y eliminar su `vi.mock`. Las aserciones no cambian. Verificar con `npm run test`.
-- [ ] 4.2 Cambiar `__tests__/morosos.test.ts` al mismo patrón (mismos 31 casos, mismas aserciones). Verificar que la cantidad de tests no baja.
-- [ ] 4.3 Revisar `__tests__/pagos.test.ts`: eliminar solo los casos que solo validan objetos mock y ya quedan cubiertos por los tests nuevos; conservar los que prueban `utils`. Verificar que el total de tests y la cobertura de `lib/services/pagos` no bajan (`npx vitest run --coverage` si está disponible, o conteo de tests por archivo).
+- [ ] 4.1 Crear `lib/features/pagos/domain/` y extraer `filtrarElegibles` y `calcularMesesPendientes`; `PagosService` las llama con los mismos datos. Añadir `__tests__/pagos.domain.test.ts` con los escenarios del spec para ambas y verificar que la sección 2 sigue en verde sin modificarse.
+- [ ] 4.2 Extraer `calcularMorosos` y `calcularMiembrosAlDia` (con `hoy` como parámetro). Tests unitarios con los escenarios del spec; sección 2 en verde sin modificarse.
+- [ ] 4.3 Extraer `calcularStats` y `calcularMonthlyStats`. Tests unitarios con los escenarios del spec; sección 2 en verde sin modificarse.
+- [ ] 4.4 Verificar que `domain/` no importa Supabase, `next/*` ni llama a `new Date()` sin argumentos (`grep -rnE "supabase|next/|new Date\(\)" lib/features/pagos/domain` sin resultados).
 
-## 5. Documentación y cierre
+## 5. Mover a `lib/features/pagos/` (design D6)
 
-- [ ] 5.1 Actualizar la sección "The `pagosService` trap" de `AGENTS.md` para describir la inyección por constructor y el helper `__tests__/helpers/supabase-fake.ts`. Verificar que los ejemplos de código del documento compilan con las firmas reales.
-- [ ] 5.2 Verificación final: `npm run test`, `npx tsc --noEmit`, `npm run lint` y `npm run build` en verde; `openspec validate pagos-service-testable --strict` sin errores.
+- [ ] 5.1 `git mv lib/services/pagos/pagos.service.ts lib/features/pagos/service.ts` y actualizar los imports en los 6 llamadores y en los tests. Verificar con `npx tsc --noEmit`, `npm run test` y `grep -rn "services/pagos" app lib components __tests__` sin resultados.
+- [ ] 5.2 Actualizar el comentario de la clase para documentar la inyección por constructor, manteniendo la advertencia de uso en servidor.
+
+## 6. Migrar los tests a inyección por constructor
+
+- [ ] 6.1 Cambiar `__tests__/pagos.service.test.ts` para construir `new PagosService(fake.client)` y eliminar su `vi.mock`. Las aserciones no cambian. Verificar con `npm run test`.
+- [ ] 6.2 Cambiar `__tests__/morosos.test.ts` al mismo patrón (mismos 31 casos, mismas aserciones). Verificar que la cantidad de tests no baja.
+- [ ] 6.3 Revisar `__tests__/pagos.test.ts`: eliminar solo los casos que únicamente validan objetos mock y ya quedan cubiertos; conservar los que prueban `utils`. Verificar que el total de tests no baja respecto al inicio de la sección 6.
+
+## 7. Documentación y cierre
+
+- [ ] 7.1 Actualizar en `AGENTS.md` la sección "The `pagosService` trap" y el árbol de Architecture (`lib/features/pagos/`, `domain/`, helper `__tests__/helpers/supabase-fake.ts`). Verificar que los ejemplos de código coinciden con las firmas reales.
+- [ ] 7.2 Verificación final: `npm run test`, `npx tsc --noEmit`, `npm run lint` y `npm run build` (con `.env.development`) en verde; `openspec validate pagos-service-testable --strict` sin errores.

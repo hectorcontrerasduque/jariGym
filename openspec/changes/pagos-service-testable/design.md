@@ -60,13 +60,37 @@ export class PagosService {
 
 1. Crear el doble y los tests nuevos usando el patrón actual (`vi.mock("@/lib/supabase/client")` hace que `createClient()` devuelva el cliente falso). Deben pasar contra el código **sin modificar**.
 2. Aplicar D1.
-3. Cambiar los tests para inyectar por constructor. Las aserciones no cambian; si alguna falla, el refactor alteró el comportamiento y se corrige el servicio, no el test.
+3. Extraer `domain/` (D5) y mover a `lib/features/pagos/` (D6), con los tests de caracterización en verde en cada paso.
+4. Cambiar los tests para inyectar por constructor. Las aserciones no cambian; si alguna falla, el refactor alteró el comportamiento y se corrige el servicio, no el test.
 
 ### D4. Tiempo y zonas horarias
 
 Varias reglas dependen de "hoy" (mes tope, día de cobro, fecha de inscripción con `toISOString()` en UTC). Los tests usan `vi.useFakeTimers()` + `vi.setSystemTime()` con horas del mediodía local (por ejemplo `new Date(2026, 8, 12, 12)`) para que la fecha local y la UTC coincidan en cualquier zona razonable.
 
+### D5. Núcleo de dominio puro
+
+`lib/features/pagos/domain/` contiene funciones puras, una por cálculo del spec:
+
+- `filtrarElegibles(perfiles, membresias, config, metodoPago, hoy)` → `ElegiblesResult`
+- `calcularMorosos(elegibles, pagosDelAnio, anio, hoy)`
+- `calcularMiembrosAlDia(elegibles, pagoIdsAprobadosDelMes...)` (misma entrada que hoy recibe el método)
+- `calcularStats(elegibles, pagosDelAnio, morosos, anio, hoy)`
+- `calcularMonthlyStats(elegibles, pagosDelAnio, anio, hoy)`
+- `calcularMesesPendientes(detalles, anio, startDate)`
+
+Reglas: sin imports de Supabase ni de `next/*`; `hoy` siempre como parámetro (nunca `new Date()` dentro); las entradas son los mismos datos que hoy devuelven las consultas, sin transformarlos. `PagosService` conserva las consultas en el mismo orden y cantidad, y reemplaza el bloque de cálculo por la llamada a la función.
+
+- **Por qué**: la lógica de dinero se prueba en milisegundos con datos literales, sin dobles de Supabase. Las fases 3 (notificaciones) y 4 (RPC de estadísticas) reutilizan estas funciones, y la 4 puede comparar su resultado SQL contra ellas.
+- **Alternativa descartada: extraer también la capa `data/` ahora.** Duplicaría el alcance; las consultas se mueven a `data/` en `pagos-transacciones-atomicas`, que de todos modos las reescribe.
+- **Alternativa descartada: Clean/Hexagonal completa (puertos, adaptadores, repositorios con interfaces).** Demasiada ceremonia para una app de un solo gimnasio con un desarrollador.
+
+### D6. Ubicación: `lib/features/pagos/`
+
+Primer módulo de la arquitectura por features (`domain/`, `data/`, `service.ts`). Se mueve el archivo con `git mv` para conservar el historial y se actualizan los imports. Los tipos y alias exportados se conservan con el mismo nombre.
+
 ## Risks / Trade-offs
+
+- [Extraer el cálculo cambia sutilmente el orden de evaluación o el manejo de `new Date()`] → Los tests de caracterización del paso D3 se escriben antes y no se modifican; además, se prueba cada función de `domain/` con los mismos escenarios del spec.
 
 - [El doble no reproduce la semántica real de PostgREST: filtros sobre relaciones con `!inner`, `.single()` con 0 filas] → Los tests verifican qué consultas se construyen y cómo el servicio interpreta respuestas dadas, no la semántica de la base. La semántica real se valida en `rls-tests`.
 - [Los tests de caracterización fijan también las particularidades listadas en proposal.md (Non-goals)] → Es intencional. Cada test de ese tipo lleva un comentario `// Comportamiento actual preservado:` para que, si luego se decide corregirlo, sea un cambio explícito con su propio change de OpenSpec.

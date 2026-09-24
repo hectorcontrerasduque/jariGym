@@ -4,7 +4,7 @@ Cada tarea se considera terminada solo si `npm run test`, `npx tsc --noEmit` y `
 
 ## 1. Doble de prueba del cliente Supabase
 
-- [ ] 1.1 Crear `__tests__/helpers/supabase-fake.ts` con `createSupabaseFake()` (query builder encadenable y thenable, respuestas FIFO por tabla/operación, `rpc`, `auth.getUser`, registro `calls`), según design D2. Verificar con `__tests__/helpers/supabase-fake.test.ts`: encadenamiento, orden FIFO, respuesta por defecto `{ data: null, error: null }` y registro de filtros.
+- [x] 1.1 Crear `__tests__/helpers/supabase-fake.ts` con `createSupabaseFake()` (query builder encadenable y thenable, respuestas FIFO por tabla/operación, `rpc`, `auth.getUser`, registro `calls`), según design D2. Verificar con `__tests__/helpers/supabase-fake.test.ts`: encadenamiento, orden FIFO, respuesta por defecto `{ data: null, error: null }` y registro de filtros.
 
 ## 2. Tests de caracterización sobre el código actual (sin tocar el servicio)
 

@@ -2,6 +2,9 @@ import { createClient } from "@/lib/supabase/client";
 import { getMonthName, getDiaCobro } from "@/lib/utils";
 import { messages } from "@/lib/messages";
 import type { Pago, MetodoPago, TipoPago, Profile, DetallePago } from "@/lib/types";
+import type { ElegiblesResult } from "@/lib/features/pagos/domain/types";
+import { filtrarElegibles } from "@/lib/features/pagos/domain/elegibles";
+import { calcularMesesPendientes } from "@/lib/features/pagos/domain/meses-pendientes";
 
 interface PagoRPCRow {
   id: string;
@@ -18,15 +21,7 @@ interface PagoRPCRow {
   payment_type: string;
 }
 
-export interface ElegiblesResult {
-  miembros: Array<{ id: string; email: string | null; full_name: string | null; inscription_paid: boolean; activo: boolean | null; start_date: string | null; avatar_url: string | null; role: string | null; inscription_admin_note: string | null; arrival_time: string | null; departure_time: string | null }>;
-  miembrosLibresIds: Set<string>;
-  fechaInicioMap: Map<string, string>;
-  ownerEmail: string;
-  modoCobro: "dia_uno" | "fecha_inscripcion";
-  montoMensual: number;
-  montoInscripcion: number;
-}
+export type { ElegiblesResult };
 
 
 
@@ -426,30 +421,7 @@ export class PagosService {
 
     if (error || !detalles) return [];
 
-    const mesesConPago = new Set<string>();
-    for (const d of detalles || []) {
-      if (d.year_number === anioFiltro && d.month_number) {
-        mesesConPago.add(`${d.month_number}-${d.year_number}`);
-      }
-    }
-
-    let primerMesDeuda = 1;
-    if (startDate) {
-      const parts = startDate.split("-").map(Number);
-      const anioInicio = parts[0];
-      const mesInicio = parts[1];
-      if (anioInicio > anioFiltro) return [];
-      if (anioInicio === anioFiltro) primerMesDeuda = mesInicio;
-    }
-
-    const mesesPendientes: { month_number: number; year_number: number }[] = [];
-    for (let mes = 12; mes >= primerMesDeuda; mes--) {
-      if (!mesesConPago.has(`${mes}-${anioFiltro}`)) {
-        mesesPendientes.push({ month_number: mes, year_number: anioFiltro });
-      }
-    }
-
-    return mesesPendientes.reverse();
+    return calcularMesesPendientes(detalles, anioFiltro, startDate);
   }
 
   async mesesPendientesAdmin(usuarioId: string, anio?: number, supabaseClient?: ReturnType<typeof createClient>, startDate?: string): Promise<{ month_number: number; year_number: number }[]> {
@@ -642,34 +614,15 @@ export class PagosService {
         .maybeSingle(),
     ]);
 
-    const miembros = (miembrosResult.data || []).filter((m) => m.activo !== false && m.activo !== 0 && String(m.activo).toLowerCase() !== "false");
-    const now = new Date();
-    const miembrosLibresIds = new Set(
-      (libresResult.data || [])
-        .filter((l) => {
-          if (!l.start_date) return true;
-          return new Date(l.start_date) <= now;
-        })
-        .map((l) => l.user_id)
+    return filtrarElegibles(
+      {
+        perfiles: miembrosResult.data,
+        metodoPago: configResult.data,
+        membresias: libresResult.data,
+        gymConfig: ownerResult.data,
+      },
+      new Date()
     );
-    const fechaInicioMap = new Map<string, string>();
-    for (const l of libresResult.data || []) {
-      if (l.start_date) fechaInicioMap.set(l.user_id, l.start_date);
-    }
-    const ownerEmail = ownerResult.data?.owner_email?.toLowerCase() || "";
-    const modoCobro = (ownerResult.data?.billing_mode as "dia_uno" | "fecha_inscripcion") || "dia_uno";
-    const montoMensual = configResult.data?.amount_monthly || 0;
-    const montoInscripcion = configResult.data?.amount_inscription || 0;
-
-    return {
-      miembros,
-      miembrosLibresIds,
-      fechaInicioMap,
-      ownerEmail,
-      modoCobro,
-      montoMensual,
-      montoInscripcion,
-    };
   }
 
   async getMiembrosMorosos(anio?: number, supabaseClient?: ReturnType<typeof createClient>, elegibles?: ElegiblesResult): Promise<

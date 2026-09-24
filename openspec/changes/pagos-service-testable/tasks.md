@@ -25,7 +25,7 @@ Cada tarea se considera terminada solo si `npm run test`, `npx tsc --noEmit` y `
 
 ## 4. Núcleo de dominio puro (design D5)
 
-- [ ] 4.1 Crear `lib/features/pagos/domain/` y extraer `filtrarElegibles` y `calcularMesesPendientes`; `PagosService` las llama con los mismos datos. Añadir `__tests__/pagos.domain.test.ts` con los escenarios del spec para ambas y verificar que la sección 2 sigue en verde sin modificarse.
+- [x] 4.1 Crear `lib/features/pagos/domain/` y extraer `filtrarElegibles` y `calcularMesesPendientes`; `PagosService` las llama con los mismos datos. Añadir `__tests__/pagos.domain.test.ts` con los escenarios del spec para ambas y verificar que la sección 2 sigue en verde sin modificarse.
 - [ ] 4.2 Extraer `calcularMorosos` y `calcularMiembrosAlDia` (con `hoy` como parámetro). Tests unitarios con los escenarios del spec; sección 2 en verde sin modificarse.
 - [ ] 4.3 Extraer `calcularStats` y `calcularMonthlyStats`. Tests unitarios con los escenarios del spec; sección 2 en verde sin modificarse.
 - [ ] 4.4 Verificar que `domain/` no importa Supabase, `next/*` ni llama a `new Date()` sin argumentos (`grep -rnE "supabase|next/|new Date\(\)" lib/features/pagos/domain` sin resultados).

@@ -1,0 +1,866 @@
+openapi: 3.1.0
+info:
+  title: GymApp API
+  version: "1.0.0"
+  description: |
+    Endpoints HTTP de GymApp (`app/api/**/route.ts`, Next.js App Router).
+
+    **Cómo se autentica cada endpoint** (ver `security` en cada operación):
+    - `sesion`: cookies de sesión de Supabase que el navegador envía solo (`@supabase/ssr`). Se usa desde las páginas de la app.
+    - `bearerUsuario`: `Authorization: Bearer <access_token de Supabase>` del usuario.
+    - `cronSecret`: `Authorization: Bearer <CRON_SECRET>` para el cron externo.
+    - `security: []`: endpoint **público**, sin autenticación.
+
+    "Requiere super_admin" significa que el perfil del usuario (`profiles.role`) debe ser `super_admin`;
+    "admin completo" significa además ser el dueño (`gym_config.owner_email`) o `NEXT_PUBLIC_ADMIN_EMAIL` (`lib/admin-level.ts`).
+
+    **Límite de peticiones** (`lib/middleware/rate-limit.ts`): cuando aplica, responde `429` con `Retry-After` y
+    `X-RateLimit-*`. Si el RPC de rate limit falla, la petición pasa (fail-open).
+
+    Los endpoints marcados con ⚠️ tienen hallazgos pendientes documentados en `openspec/ROADMAP.md`.
+
+    Este archivo se valida en `__tests__/api-docs.test.ts`: cada `route.ts` debe estar documentado aquí y viceversa.
+servers:
+  - url: http://localhost:3000
+    description: Local (`npm run dev`)
+tags:
+  - name: auth
+    description: Confirmación de correo, recuperación de contraseña y alta del dueño.
+  - name: config
+    description: Configuración del gimnasio y métodos de pago.
+  - name: miembros
+    description: Alta, baja y activación de miembros (solo super_admin).
+  - name: migracion
+    description: Migración de miembros antiguos (Excel) al sistema, flujo "Ya soy miembro" del login.
+  - name: notificaciones
+    description: Envío de correos programados (cron) y manuales.
+  - name: pagos
+    description: Eliminación de pagos y correos de aprobación/rechazo.
+  - name: perfil
+    description: Edición de perfil propio o de otros (super_admin).
+
+paths:
+  /api/auth/confirm-email:
+    get:
+      tags: [auth]
+      operationId: confirmarCorreo
+      summary: Confirma el correo con el token del email de bienvenida
+      description: |
+        Valida el token de `password_reset_tokens`, lo marca como usado y confirma el email en `auth.users`.
+        Siempre responde con una redirección a `/login` con `?message=` (éxito) o `?error=` (fallo).
+        Rechaza orígenes distintos de `NEXT_PUBLIC_SITE_URL`.
+        Límite: 5 peticiones cada 20 min por IP (prefijo `auth`).
+      security: []
+      parameters:
+        - name: token
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        "302":
+          description: Redirección a `/login?message=...` o `/login?error=...` (token faltante, inválido, usado, expirado u origen inválido).
+          headers:
+            Location: { schema: { type: string } }
+        "429": { $ref: "#/components/responses/RateLimited" }
+
+  /api/auth/ensure-super-admin:
+    post:
+      tags: [auth]
+      operationId: asegurarSuperAdmin
+      summary: Crea o promueve el perfil super_admin del dueño
+      description: |
+        Llamado por `POST /api/config` cuando cambia `owner_email`. Si el email ya tiene perfil, lo promueve a
+        `super_admin` (activo y registrado). Si no, crea el usuario de Auth + perfil con contraseña aleatoria y
+        envía correo de bienvenida. Usa service role.
+        Autorización: token de un usuario `super_admin`, o `CRON_SECRET` (solo si la variable está definida).
+        Límite: 5 peticiones cada 20 min por IP (prefijo `auth`).
+      security:
+        - bearerUsuario: []
+        - cronSecret: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
+                nombre: { type: string, description: "Nombre completo; por defecto, la parte local del email." }
+                inscription_paid: { type: boolean }
+      responses:
+        "200":
+          description: |
+            `{ created: true }` usuario nuevo creado; `{ created: false, promoted: true }` perfil existente promovido;
+            `{ created: false }` si no se envió `email`.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  created: { type: boolean }
+                  promoted: { type: boolean }
+        "401": { $ref: "#/components/responses/Error" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "500":
+          description: Error creando el perfil.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error: { type: string }
+                  created: { type: boolean, const: false }
+
+  /api/auth/forgot-password:
+    post:
+      tags: [auth]
+      operationId: olvideContrasena
+      summary: Envía el correo de recuperación de contraseña
+      description: |
+        Genera un token de 24 h en `password_reset_tokens` y envía un email (Gmail SMTP) con el enlace
+        `/reset-password?token=...&email=...`. Responde lo mismo exista o no el email (no revela usuarios).
+        Límite propio: 5 solicitudes cada 20 min por usuario (responde `429` sin cabeceras `X-RateLimit-*`).
+
+        ⚠️ Si falla la limpieza de tokens vencidos, borra **todos** los tokens de todos los usuarios.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
+      responses:
+        "200": { $ref: "#/components/responses/Message" }
+        "400": { $ref: "#/components/responses/Error" }
+        "429": { $ref: "#/components/responses/Error" }
+        "500": { $ref: "#/components/responses/Error" }
+
+  /api/auth/reset-password:
+    post:
+      tags: [auth]
+      operationId: restablecerContrasena
+      summary: Cambia la contraseña con un token de recuperación
+      description: |
+        Valida el token (existe, no usado, no expirado), lo marca como usado y actualiza la contraseña en Auth.
+        Límite: 5 peticiones cada 20 min por IP (prefijo `auth`).
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, password]
+              properties:
+                token: { type: string }
+                password: { type: string }
+      responses:
+        "200": { $ref: "#/components/responses/Message" }
+        "400":
+          description: Token faltante, inválido, usado o expirado.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "500": { $ref: "#/components/responses/Error" }
+
+  /api/config/public:
+    get:
+      tags: [config]
+      operationId: configPublica
+      summary: Configuración del gimnasio y métodos de pago (público)
+      description: |
+        Usado por el sidebar y el login (nombre, logo, montos). Usa service role.
+
+        ⚠️ Es público y devuelve `gym_config` completo (`select *`), incluidos email y teléfono del dueño,
+        y todos los métodos de pago (activos e históricos).
+      security: []
+      responses:
+        "200":
+          description: Configuración (o `null` si no existe) y métodos de pago ordenados por tipo.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  config:
+                    oneOf:
+                      - { $ref: "#/components/schemas/GymConfig" }
+                      - { type: "null" }
+                  metodos:
+                    type: array
+                    items: { $ref: "#/components/schemas/MetodoPago" }
+
+  /api/config:
+    post:
+      tags: [config]
+      operationId: guardarConfig
+      summary: Guarda la configuración del gimnasio y el método de pago activo
+      description: |
+        Requiere super_admin **y** admin completo. Si cambia `owner_email`: desactiva el perfil del dueño anterior y
+        llama a `POST /api/auth/ensure-super-admin` para el nuevo. Ignora los campos de solo lectura
+        (`id`, `created_at`, `updated_at`, `created_by`, `updated_by`).
+        Si llega `metodos`: cierra (`is_active=false`, `effective_to=hoy`) los métodos activos e inserta el marcado como activo.
+      security:
+        - sesion: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                config:
+                  $ref: "#/components/schemas/GymConfig"
+                metodos:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      payment_method: { $ref: "#/components/schemas/TipoMetodoPago" }
+                      amount_monthly: { type: number }
+                      amount_inscription: { type: number }
+                      is_active: { type: boolean }
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+        "400":
+          description: Error de base de datos al guardar `gym_config` (mensaje de Postgres).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "500": { $ref: "#/components/responses/Error" }
+
+  /api/miembros:
+    post:
+      tags: [miembros]
+      operationId: crearMiembro
+      summary: Crea un miembro (usuario de Auth + perfil) y envía bienvenida
+      description: |
+        Requiere super_admin. Si el usuario de Auth ya existe, lo reutiliza. Sin `password`, genera una aleatoria.
+        Límite: 30 por hora por usuario administrador.
+      security:
+        - sesion: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, nombre]
+              properties:
+                email: { type: string, format: email }
+                nombre: { type: string }
+                password: { type: string, description: "Opcional; obligatoria para emails que no son de Gmail (validado en el cliente)." }
+      responses:
+        "200":
+          description: Miembro creado.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  miembro: { $ref: "#/components/schemas/Profile" }
+                  password: { type: [string, "null"], description: "Contraseña generada o usada" }
+                  loginEmail: { type: string }
+                  welcomeEmailSent: { type: boolean }
+        "400":
+          description: Validación (email inválido o muy largo, nombre requerido o muy largo, contraseña corta).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "409":
+          description: El email ya está registrado.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+    delete:
+      tags: [miembros]
+      operationId: eliminarMiembro
+      summary: Elimina un miembro sin pagos
+      description: Requiere super_admin. Borra el perfil y el usuario de Auth. Rechaza si el miembro tiene pagos.
+      security:
+        - sesion: []
+      parameters:
+        - name: id
+          in: query
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "409":
+          description: El miembro tiene pagos registrados.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "500": { $ref: "#/components/responses/Error" }
+
+  /api/miembros/toggle-status:
+    post:
+      tags: [miembros]
+      operationId: cambiarEstadoMiembro
+      summary: Activa o desactiva un miembro
+      description: |
+        Requiere super_admin. Actualiza `profiles.activo` y banea (desactivar) o desbanea (activar) el usuario en Auth.
+      security:
+        - sesion: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [user_id, activar]
+              properties:
+                user_id: { type: string, format: uuid }
+                activar: { type: boolean }
+      responses:
+        "200":
+          description: Perfil actualizado.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  profile: { $ref: "#/components/schemas/Profile" }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "500": { $ref: "#/components/responses/Error" }
+
+  /api/migracion:
+    post:
+      tags: [migracion]
+      operationId: migrarMiembro
+      summary: Migra un miembro antiguo (flujo "Ya soy miembro" del login)
+      description: |
+        Público (lo usa el login). Busca al miembro en la tabla `migracion`, crea o reutiliza el usuario de Auth y el
+        perfil, y convierte sus meses `pagado`/`suspendido` en pagos + inscripción. Envía correo de bienvenida.
+        Requisitos: `gym_config` existente y método `efectivo` activo con monto mensual > 0.
+        Teléfonos sin `+` se prefijan con `+58`.
+        Límite: 5 peticiones cada 20 min por IP.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [nombreCompleto, correo]
+              properties:
+                nombreCompleto: { type: string }
+                correo: { type: string, format: email }
+                phone_number: { type: string }
+                password: { type: string, minLength: 6 }
+                selectedNombre: { type: string, description: "Nombre elegido entre varias coincidencias de /api/migracion/search." }
+      responses:
+        "200":
+          description: Migración realizada.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, const: true }
+                  email: { type: string }
+                  existingUser: { type: boolean }
+                  pagosCreados: { type: integer }
+                  pagosActualizados: { type: integer }
+                  welcomeEmailSent: { type: boolean }
+        "400":
+          description: Campos requeridos, email inválido, contraseña corta, configuración o método de pago faltante, monto 0, o ya migrado.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404":
+          description: No hay registros de migración para ese nombre.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "500": { $ref: "#/components/responses/Error" }
+
+  /api/migracion/search:
+    post:
+      tags: [migracion]
+      operationId: buscarMigracion
+      summary: Busca nombres pendientes de migrar
+      description: |
+        Público. Coincidencia por prefijo de cada palabra (≥ 2 letras) contra `migracion.nombre` con `migrado = 'no'`;
+        máximo 10 nombres únicos. Límite: 30 por hora por IP.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [nombreCompleto]
+              properties:
+                nombreCompleto: { type: string }
+      responses:
+        "200":
+          description: Nombres encontrados (vacío si el texto tiene menos de 2 letras).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  matches: { type: array, items: { type: string } }
+        "400":
+          description: Parámetro inválido, o el nombre ya fue migrado.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "500": { $ref: "#/components/responses/Error" }
+
+  /api/migracion/list:
+    get:
+      tags: [migracion]
+      operationId: listarMigracion
+      summary: Lista las personas de la tabla de migración
+      description: |
+        Una entrada por nombre, con todos sus correos; `migrado = "si"` si cualquiera de sus filas está migrada.
+
+        ⚠️ Público, sin autenticación ni límite, con service role: expone nombres y correos de todos los miembros antiguos.
+      security: []
+      responses:
+        "200":
+          description: Registros agrupados por nombre.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  records:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        nombre: { type: string }
+                        correos: { type: array, items: { type: string } }
+                        migrado: { type: string, enum: [si, "no", migrado] }
+        "500": { $ref: "#/components/responses/Error" }
+
+  /api/migracion/morosos:
+    get:
+      tags: [migracion]
+      operationId: morososMigracion
+      summary: Miembros antiguos (no migrados) con meses en deuda
+      description: |
+        Usado por el reporte de morosos del dashboard. Agrupa por nombre las filas `estado = 'debe'` del año.
+
+        ⚠️ Público, sin autenticación ni límite, con service role: expone nombres, correos y deudas.
+      security: []
+      parameters:
+        - name: anio
+          in: query
+          required: false
+          description: Año; por defecto, el actual (del servidor).
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Morosos migrados.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  morosos:
+                    type: array
+                    items: { $ref: "#/components/schemas/MorosoMigrado" }
+        "500": { $ref: "#/components/responses/Error" }
+
+  /api/migracion/pending:
+    get:
+      tags: [migracion]
+      operationId: migracionPendiente
+      summary: Indica si quedan personas por migrar
+      description: Público. Lo usa el login para mostrar el enlace "Ya soy miembro". Ante error responde `pending false`.
+      security: []
+      responses:
+        "200":
+          description: Hay (o no) filas con `migrado = 'no'`.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  pending: { type: boolean }
+
+  /api/migracion/ping:
+    get:
+      tags: [migracion]
+      operationId: pingMigracion
+      summary: Comprueba si un email ya tiene perfil o ya migró
+      description: |
+        Público. Ante cualquier error responde `{ exists: false }`.
+
+        ⚠️ Sin autenticación ni límite: permite comprobar si un email está registrado y obtener el nombre completo (enumeración de usuarios).
+      security: []
+      parameters:
+        - name: email
+          in: query
+          required: true
+          schema: { type: string, format: email }
+      responses:
+        "200":
+          description: Resultado de la comprobación. `invalid true` si el email no tiene formato válido.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  exists: { type: boolean }
+                  alreadyMigrated: { type: boolean }
+                  nombre: { type: [string, "null"] }
+                  invalid: { type: boolean }
+
+  /api/notificaciones:
+    post:
+      tags: [notificaciones]
+      operationId: ejecutarNotificaciones
+      summary: Ejecuta las notificaciones habilitadas (cron diario)
+      description: |
+        Recomendado: cron diario a medianoche. Si `gym_config.notifications_enabled` es falso o no hay tipos habilitados,
+        no hace nada. Para cada tipo habilitado en `notificacion_config`, respeta su frecuencia y envía los correos
+        (deudores, recordatorio de pago, resumen al dueño, estatus del sistema); registra en `notificacion_log`.
+        Límite de 5 cada 20 min solo cuando llama un usuario (no con `CRON_SECRET`).
+
+        ⚠️ `CRON_SECRET` tiene un valor por defecto en el código (`app/api/notificaciones/route.ts:10`):
+        si la variable no está definida en el entorno, ese valor público permite disparar los envíos.
+      security:
+        - cronSecret: []
+        - bearerUsuario: []
+      responses:
+        "200":
+          description: Resultado de la ejecución.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  message: { type: string, description: "Solo cuando no se ejecutó nada (deshabilitadas o sin configuraciones)." }
+                  ejecutadas: { type: integer }
+                  enviados: { type: integer }
+                  errores: { type: integer }
+        "401": { $ref: "#/components/responses/Error" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "500":
+          description: Error inesperado.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, const: false }
+                  error: { type: string }
+
+  /api/notificaciones/procesar:
+    post:
+      tags: [notificaciones]
+      operationId: procesarNotificaciones
+      summary: Ejecuta notificaciones manualmente ("Ejecutar ahora")
+      description: |
+        Requiere super_admin (token Bearer del usuario). Con `tipo`, ejecuta solo ese tipo; con `forzar: true`,
+        ignora la frecuencia. Si las notificaciones están deshabilitadas o no hay configuraciones, devuelve ceros.
+      security:
+        - bearerUsuario: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                tipo:
+                  type: string
+                  enum: [miembros_deudores, recordatorio_pago, resumen_dueno, estatus_sistema]
+                forzar: { type: boolean, default: false }
+      responses:
+        "200":
+          description: Resultado de la ejecución.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ejecutadas: { type: integer }
+                  enviados: { type: integer }
+                  errores: { type: integer }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "500": { $ref: "#/components/responses/Error" }
+
+  /api/notificaciones/diagnostico:
+    post:
+      tags: [notificaciones]
+      operationId: diagnosticoNotificaciones
+      summary: Diagnóstico del sistema de correos
+      description: |
+        Requiere super_admin (token Bearer). Revisa variables de Gmail, conexión SMTP y configuración, y envía el
+        resultado por correo a `NEXT_PUBLIC_ADMIN_EMAIL` (si está definido).
+      security:
+        - bearerUsuario: []
+      responses:
+        "200":
+          description: Pasos del diagnóstico. `exitoso` es falso si algún paso terminó en `error`.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  exitoso: { type: boolean }
+                  resultados:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        paso: { type: string }
+                        estado: { type: string, enum: [ok, error, warning] }
+                        detalle: { type: string }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "500": { $ref: "#/components/responses/Error" }
+
+  /api/pagos:
+    delete:
+      tags: [pagos]
+      operationId: eliminarPago
+      summary: Elimina un pago
+      description: |
+        super_admin: puede eliminar pagos pendientes y **solo el último** pago aprobado del miembro (por año/mes del detalle).
+        Miembro: solo sus propios pagos pendientes. Las líneas de `payment_detail` se borran en cascada.
+      security:
+        - sesion: []
+      parameters:
+        - name: id
+          in: query
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403":
+          description: Sin permiso, no es el último aprobado, o su estado no permite eliminarlo.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+        "500": { $ref: "#/components/responses/Error" }
+
+  /api/pagos/notify:
+    post:
+      tags: [pagos]
+      operationId: notificarPago
+      summary: Envía al miembro el correo de pago aprobado o rechazado
+      description: |
+        Requiere super_admin.
+
+        ⚠️ Hoy siempre responde `404 "Pago no encontrado"`: consulta `payments.payment_amount`, columna que no existe
+        (el monto está en `payment_detail`). Los correos de aprobación/rechazo no se envían.
+      security:
+        - sesion: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [pagoId, action]
+              properties:
+                pagoId: { type: string, format: uuid }
+                action: { type: string, enum: [aprobado, rechazado] }
+                notas: { type: string, description: "Motivo del rechazo." }
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+        "500": { $ref: "#/components/responses/Error" }
+
+  /api/profile:
+    put:
+      tags: [perfil]
+      operationId: actualizarPerfil
+      summary: Actualiza un perfil (propio o, para super_admin, de otro usuario)
+      description: |
+        Sin `user_id` (o con el propio) edita el perfil del usuario. Con otro `user_id` requiere super_admin.
+        `role` e `inscription_admin_note` solo se aplican si es admin completo. Si quien edita **no** es super_admin:
+        cambiar la contraseña exige `currentPassword` y no puede cambiar el email. Usa service role.
+        Límite: 30 por hora por IP.
+      security:
+        - sesion: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [updates]
+              properties:
+                user_id: { type: string, format: uuid }
+                updates:
+                  type: object
+                  properties:
+                    email: { type: string, format: email }
+                    full_name: { type: string }
+                    phone_number: { type: string }
+                    document_id: { type: string }
+                    arrival_time: { type: string, description: "HH:MM" }
+                    departure_time: { type: string, description: "HH:MM" }
+                    role: { type: string, enum: [super_admin, miembro] }
+                    inscription_admin_note: { type: string }
+                    start_date: { type: string, format: date }
+                password: { type: string, description: "Nueva contraseña." }
+                currentPassword: { type: string }
+      responses:
+        "200":
+          description: Perfil actualizado.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  profile: { $ref: "#/components/schemas/Profile" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "409":
+          description: El email ya está registrado.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "500":
+          description: Validación o error al actualizar (contraseña actual requerida o incorrecta, cambio de email no permitido, email inválido, etc.).
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+components:
+  securitySchemes:
+    sesion:
+      type: apiKey
+      in: cookie
+      name: sb-<project-ref>-auth-token
+      description: Cookies de sesión de Supabase (`@supabase/ssr`); el navegador las envía solo.
+    bearerUsuario:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Access token de Supabase del usuario (`supabase.auth.getSession()`).
+    cronSecret:
+      type: http
+      scheme: bearer
+      description: Valor de la variable de entorno `CRON_SECRET`.
+
+  responses:
+    Error:
+      description: Error con mensaje para el usuario (textos de `lib/messages.ts`).
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Success:
+      description: Operación realizada.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success: { type: boolean, const: true }
+    Message:
+      description: Operación realizada, con mensaje para el usuario.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message: { type: string }
+    RateLimited:
+      description: Límite de peticiones superado.
+      headers:
+        Retry-After: { schema: { type: integer }, description: Segundos hasta poder reintentar. }
+        X-RateLimit-Limit: { schema: { type: integer } }
+        X-RateLimit-Remaining: { schema: { type: integer } }
+        X-RateLimit-Reset: { schema: { type: integer }, description: Epoch en segundos. }
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string }
+    TipoMetodoPago:
+      type: string
+      enum: [efectivo, bs, binance]
+    MetodoPago:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        payment_method: { $ref: "#/components/schemas/TipoMetodoPago" }
+        amount_monthly: { type: number }
+        amount_inscription: { type: number }
+        is_active: { type: boolean }
+        effective_from: { type: string, format: date }
+        effective_to: { type: [string, "null"], format: date }
+    GymConfig:
+      type: object
+      description: Fila de `gym_config`.
+      properties:
+        id: { type: string, format: uuid }
+        gym_name: { type: string }
+        logo_url: { type: [string, "null"] }
+        max_members: { type: integer }
+        address: { type: [string, "null"] }
+        phone_number: { type: [string, "null"] }
+        contact_email: { type: [string, "null"] }
+        schedule: { type: [string, "null"] }
+        owner_name: { type: [string, "null"] }
+        owner_email: { type: [string, "null"] }
+        owner_phone: { type: [string, "null"] }
+        billing_mode: { type: string, enum: [dia_uno, fecha_inscripcion] }
+        notifications_enabled: { type: boolean }
+    Profile:
+      type: object
+      description: Fila de `profiles` (`lib/types.ts`).
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: [string, "null"] }
+        full_name: { type: string }
+        role: { type: string, enum: [super_admin, miembro] }
+        activo: { type: [boolean, "null"], description: "null = activo" }
+        registered: { type: boolean }
+        start_date: { type: [string, "null"] }
+        inscription_paid: { type: boolean }
+        arrival_time: { type: [string, "null"] }
+        departure_time: { type: [string, "null"] }
+    MorosoMigrado:
+      type: object
+      properties:
+        id: { type: string, description: "`migracion-<NOMBRE>`" }
+        email: { type: string }
+        full_name: { type: string }
+        mesesDeuda: { type: array, items: { type: integer } }
+        totalDeuda: { type: number }
+        debeInscripcion: { type: boolean, const: false }
+        pagosPendientes: { type: integer }
+        montoPendiente: { type: number }
+        esMigrado: { type: boolean, const: true }

@@ -35,9 +35,9 @@ supabase/      transacciones e invariantes en RPC plpgsql + RLS
 | 5 | `rls-tests` | ⏳ pendiente | Tests de políticas RLS contra Supabase local |
 | 6 | `ci-minimo` | ⏳ pendiente | Lint + typecheck + tests automáticos en GitHub |
 | 7 | `server-first-dashboard` | ✅ archivado | Dashboard como Server Component: consultas iniciadas en el servidor, cálculos en el navegador (hora local). Mismo loader |
-| 8 | `api-docs` | ⏳ pendiente | Documentar los 20 endpoints en `docs/api/openapi.yaml` + test que falla si un `route.ts` no está documentado |
+| 8 | `api-docs` | ✅ archivado | Documentar los 20 endpoints en `docs/api/openapi.yaml` + test que falla si un `route.ts` no está documentado |
 
-Orden de ejecución acordado: 1 → 4 → 7 → 8, luego 2, 3, 5, 6. Hechas: 0.5, 0.6, 1, 4, 7.
+Orden de ejecución acordado: 1 → 4 → 7 → 8, luego 2, 3, 5, 6. Hechas: 0.5, 0.6, 1, 4, 7, 8.
 
 Fase 4 original ("agregados del dashboard en Postgres") descartada: exigía aplicar una migración a mano en producción antes del deploy y, con un tope de 80 miembros, el costo real eran los viajes repetidos, no el cálculo.
 
@@ -86,6 +86,24 @@ Texto visible idéntico en las tres versiones (año actual, 2025 y vuelta); 0 er
 - `components/ui/avatar.tsx:15` crea un cliente de Supabase en cada render para construir la URL pública del avatar; sin variables de entorno, el prerender de `/dashboard` falla. Solo afecta builds sin variables.
 - `lib/services/supabase-browser.ts` no lo importa nadie (código muerto).
 - Otras páginas (`pagos`, `miembros`, `mis-pagos`…) siguen cargando todo desde el navegador; se pueden migrar con el mismo patrón que `/dashboard` si hace falta.
+
+**8 `api-docs`** — 21 operaciones de 20 endpoints en `docs/api/openapi.yaml` (válido según Redocly), página navegable con `npm run docs:api:build` y `__tests__/api-docs.test.ts`, que impide que código y documentación se desincronicen (verificado creando y quitando endpoints de prueba).
+
+## Hallazgos de la fase 8 (requieren decisión: corregirlos cambia comportamiento)
+
+Ordenados por gravedad. Ninguno se tocó.
+
+| # | Gravedad | Dónde | Qué pasa | Verificado |
+|---|---|---|---|---|
+| 1 | 🔴 Alta | `app/api/notificaciones/route.ts:10` | `CRON_SECRET` tiene un valor por defecto en el código (`"gym-notifications-cron-secret"`). Si la variable no está definida en Vercel, cualquiera puede disparar el envío masivo de correos. | Código |
+| 2 | 🔴 Alta | `GET /api/migracion/list`, `GET /api/migracion/morosos` | Públicos, sin límite, con service role: exponen nombres, correos y deudas de los miembros antiguos. El middleware no protege `/api`. | Código |
+| 3 | 🟠 Media | `GET /api/migracion/ping` | Público y sin límite: dice si un email está registrado y devuelve el nombre completo (enumeración de usuarios). | Código |
+| 4 | 🟠 Media | `GET /api/config/public` | Público: devuelve `gym_config` completo (`select *`, con email y teléfono del dueño) y todos los métodos de pago. | Código |
+| 5 | 🟠 Media | `POST /api/pagos/notify` | **Bug:** consulta `payments.payment_amount`, columna que no existe → siempre 404 → los correos de pago aprobado/rechazado nunca se envían. | Base local: `ERROR 42703` |
+| 6 | 🟠 Media | `POST /api/miembros/toggle-status` | **Bug:** `ban_duration: "52560000"` no tiene unidad → Auth lo rechaza y el error se ignora. El login de la app bloquea al inactivo (`profiles.activo`), pero una sesión ya abierta sigue válida contra la API. | Auth local: `missing unit in duration` |
+| 7 | 🟡 Baja | `POST /api/auth/forgot-password` | Si falla la limpieza de tokens vencidos, borra **todos** los tokens de recuperación de todos los usuarios. | Código |
+
+Propuesta: un change `seguridad-api` para 1–4 (autenticación en los endpoints de admin y quitar el secreto por defecto) y un change `bugs-api` para 5–7. Los usuarios legítimos no notarían diferencia en 1–4; en 5–6 empezarían a llegar los correos y a funcionar el baneo, que es lo que el código pretendía.
 
 ## Riesgo de proceso detectado
 

@@ -46,6 +46,12 @@ node scripts/bench-dashboard.mjs http://localhost:3000 7 150   # dashboard load 
 - Delete `.env.development.local` to point `npm run dev` back at the cloud dev project.
 - Schema = `supabase/local/000_*.sql` → `supabase/migrations/*.sql` → `supabase/local/001_*.sql`. The `supabase/local/` files reconstruct objects that exist in the real DB but were never committed (`migracion` table, `get_pagos_por_anio`). **`.gitignore` ignores `supabase/migrations/*.sql`**, so migrations 051–054 and 056 exist only in the real DB; the local schema can drift (e.g. `payments.status` still allows `suspendido`). Replace the reconstructions with a real schema dump when possible.
 
+### API documentation
+
+- `docs/api/openapi.yaml` (OpenAPI 3.1) documents every `app/api/**/route.ts`; `docs/api/README.md` has the summary table.
+- **Adding/removing/renaming an endpoint or method requires updating `openapi.yaml`**: `__tests__/api-docs.test.ts` fails otherwise (and blocks the commit). Each operation needs `operationId`, `summary`, explicit `security` (`[]` when public) and a success response.
+- `npm run docs:api:lint` validates the spec (Redocly, config in `redocly.yaml`); `npm run docs:api:build` generates `docs/api/index.html` (gitignored).
+
 ### Refactor tracking (OpenSpec)
 
 Changes live in `openspec/changes/<name>/` (proposal, specs, design, tasks); roadmap in `openspec/ROADMAP.md`; project rules in `openspec/config.yaml`. Commands: `/opsx:propose`, `/opsx:apply`, `/opsx:archive`.

@@ -61,3 +61,6 @@ test-results/
 
 # local benchmark output (scripts/bench-dashboard.mjs)
 bench-out/
+
+# generated API docs page (npm run docs:api:build)
+docs/api/index.html

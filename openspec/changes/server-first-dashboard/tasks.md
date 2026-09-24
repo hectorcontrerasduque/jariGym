@@ -4,8 +4,8 @@ Cada tarea termina con `npm run test`, `npx tsc --noEmit` y `npm run lint` en ve
 
 ## 1. Consultas y derivación compartidas
 
-- [ ] 1.1 `PagosService.consultarElegibles()` (las 4 consultas, sin filtrar) y `getMiembrosElegibles()` = `filtrarElegibles(await consultarElegibles(), new Date())`. Verificar que los tests de caracterización pasan sin cambios.
-- [ ] 1.2 `lib/features/dashboard/carga.ts`: `consultarDashboard(supabase, anio)` → datos crudos o `null` (sin sesión o ante cualquier error, nunca rechaza), con pendientes propios solo para no-admin; `derivarDashboard(...)` puro (miembros mapeados, stats, monthlyStats, recientes[0..5]). Tests con el doble de Supabase: estructura, `null` sin usuario, `null` ante error, pendientes solo para no-admin, y que `derivarDashboard` coincide con lo que calculaba `loadData`.
+- [x] 1.1 `PagosService.consultarElegibles()` (las 4 consultas, sin filtrar) y `getMiembrosElegibles()` = `filtrarElegibles(await consultarElegibles(), new Date())`. Verificar que los tests de caracterización pasan sin cambios.
+- [x] 1.2 `lib/features/dashboard/carga.ts`: `consultarDashboard(supabase, anio)` → datos crudos o `null` (sin sesión o ante cualquier error, nunca rechaza), con pendientes propios solo para no-admin; `derivarDashboard(...)` puro (miembros mapeados, stats, monthlyStats, recientes[0..5]). Tests con el doble de Supabase: estructura, `null` sin usuario, `null` ante error, pendientes solo para no-admin, y que `derivarDashboard` coincide con lo que calculaba `loadData`.
 
 ## 2. Server Component + cliente
 

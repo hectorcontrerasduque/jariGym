@@ -4,7 +4,7 @@ import type { Pago, MetodoPago, TipoPago, Profile, DetallePago } from "@/lib/typ
 import type { ElegiblesResult, Moroso, PagoRPCRow } from "./domain/types";
 import { calcularMorosos, calcularMiembrosAlDia } from "./domain/morosos";
 import { calcularStats, calcularMonthlyStats } from "./domain/stats";
-import { filtrarElegibles } from "./domain/elegibles";
+import { filtrarElegibles, type ElegiblesInput } from "./domain/elegibles";
 import { calcularMesesPendientes } from "./domain/meses-pendientes";
 
 export type { ElegiblesResult };
@@ -509,6 +509,15 @@ export class PagosService {
    * la configuración de cobro. Todas las funciones de morosos/deudas usan esto.
    */
   async getMiembrosElegibles(supabaseClient?: ReturnType<typeof createClient>): Promise<ElegiblesResult> {
+    const input = await this.consultarElegibles(supabaseClient);
+    return filtrarElegibles(input, new Date());
+  }
+
+  /**
+   * Raw rows behind getMiembrosElegibles (4 parallel queries, unfiltered).
+   * Lets the server fetch them while the browser applies the date-dependent filter.
+   */
+  async consultarElegibles(supabaseClient?: SupabaseLike): Promise<ElegiblesInput> {
     const supabase = supabaseClient || this.supabase;
 
     const [miembrosResult, configResult, libresResult, ownerResult] = await Promise.all([
@@ -535,15 +544,12 @@ export class PagosService {
         .maybeSingle(),
     ]);
 
-    return filtrarElegibles(
-      {
-        perfiles: miembrosResult.data,
-        metodoPago: configResult.data,
-        membresias: libresResult.data,
-        gymConfig: ownerResult.data,
-      },
-      new Date()
-    );
+    return {
+      perfiles: miembrosResult.data,
+      metodoPago: configResult.data,
+      membresias: libresResult.data,
+      gymConfig: ownerResult.data,
+    };
   }
 
   async getMiembrosMorosos(anio?: number, supabaseClient?: ReturnType<typeof createClient>, elegibles?: ElegiblesResult): Promise<Moroso[]> {

@@ -1,15 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import type { ElegiblesResult } from "@/lib/features/pagos/service";
-
-const mockRpc = vi.fn();
-
-vi.mock("@/lib/supabase/client", () => ({
-  createClient: vi.fn(() => ({
-    rpc: mockRpc,
-    from: vi.fn(),
-    auth: { getUser: vi.fn() },
-  })),
-}));
+import { PagosService, type ElegiblesResult } from "@/lib/features/pagos/service";
+import { createSupabaseFake } from "./helpers/supabase-fake";
 
 function makeElegibles(overrides: Partial<ElegiblesResult> = {}): ElegiblesResult {
   return {
@@ -60,9 +51,9 @@ function makePagoRpc(overrides: Record<string, unknown> = {}) {
 }
 
 async function getMorosos(elegibles: ElegiblesResult, pagosRpc: ReturnType<typeof makePagoRpc>[], anio = 2026) {
-  mockRpc.mockResolvedValueOnce({ data: pagosRpc, error: null });
-  const { PagosService } = await import("@/lib/features/pagos/service");
-  const service = new PagosService();
+  const fake = createSupabaseFake();
+  fake.onRpc("get_pagos_por_anio").reply({ data: pagosRpc });
+  const service = new PagosService(fake.client);
   return service.getMiembrosMorosos(anio, undefined, elegibles);
 }
 

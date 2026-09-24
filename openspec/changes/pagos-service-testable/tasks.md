@@ -37,9 +37,9 @@ Cada tarea se considera terminada solo si `npm run test`, `npx tsc --noEmit` y `
 
 ## 6. Migrar los tests a inyección por constructor
 
-- [ ] 6.1 Cambiar `__tests__/pagos.service.test.ts` para construir `new PagosService(fake.client)` y eliminar su `vi.mock`. Las aserciones no cambian. Verificar con `npm run test`.
-- [ ] 6.2 Cambiar `__tests__/morosos.test.ts` al mismo patrón (mismos 31 casos, mismas aserciones). Verificar que la cantidad de tests no baja.
-- [ ] 6.3 Revisar `__tests__/pagos.test.ts`: eliminar solo los casos que únicamente validan objetos mock y ya quedan cubiertos; conservar los que prueban `utils`. Verificar que el total de tests no baja respecto al inicio de la sección 6.
+- [x] 6.1 Cambiar `__tests__/pagos.service.test.ts` para construir `new PagosService(fake.client)` y eliminar su `vi.mock`. Las aserciones no cambian. Verificar con `npm run test`.
+- [x] 6.2 Cambiar `__tests__/morosos.test.ts` al mismo patrón (mismos 31 casos, mismas aserciones). Verificar que la cantidad de tests no baja.
+- [x] 6.3 Revisar `__tests__/pagos.test.ts`: eliminar solo los casos que únicamente validan objetos mock y ya quedan cubiertos; conservar los que prueban `utils`. Verificar que el total de tests no baja respecto al inicio de la sección 6. — Resultado de la revisión: se conservan todos. Los 23 casos de tipos no duplican a los nuevos (p. ej. "should not have legacy fields" protege contra campos eliminados) y borrarlos bajaría el total.
 
 ## 7. Documentación y cierre
 

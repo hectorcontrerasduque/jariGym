@@ -10,9 +10,6 @@ import { messages } from "@/lib/messages";
 import { getMonthName } from "@/lib/utils";
 import { PagosService, type ElegiblesResult } from "@/lib/features/pagos/service";
 
-const h = vi.hoisted(() => ({ fake: undefined as SupabaseFake | undefined }));
-vi.mock("@/lib/supabase/client", () => ({ createClient: () => h.fake?.client }));
-
 const HOY = new Date(2026, 8, 12, 12); // 12 Sep 2026, midday local
 const HOY_ISO_DATE = HOY.toISOString().split("T")[0];
 const ADMIN = { id: "admin-1", email: "owner@gym.com" };
@@ -22,8 +19,7 @@ let service: PagosService;
 
 function makeService() {
   fake = createSupabaseFake();
-  h.fake = fake;
-  return new PagosService();
+  return new PagosService(fake.client);
 }
 
 function miembro(overrides: Record<string, unknown> = {}) {

@@ -60,8 +60,19 @@ export interface CreatePaymentInput {
   detalles: PaymentDetailInput[];
 }
 
+type SupabaseLike = ReturnType<typeof createClient>;
+
 export class PagosService {
-  private supabase = createClient();
+  private client?: SupabaseLike;
+
+  constructor(client?: SupabaseLike) {
+    this.client = client;
+  }
+
+  /** Injected client, or the browser client created lazily on first use. */
+  private get supabase(): SupabaseLike {
+    return (this.client ??= createClient());
+  }
 
   private async getPagosPorAnio(anio: number, supabaseClient?: ReturnType<typeof createClient>): Promise<PagoRPCRow[]> {
     const supabase = supabaseClient || this.supabase;

@@ -19,9 +19,9 @@ Cada tarea se considera terminada solo si `npm run test`, `npx tsc --noEmit` y `
 
 ## 3. Inyección de dependencias en PagosService
 
-- [ ] 3.1 Aplicar design D1 en `lib/services/pagos/pagos.service.ts`: constructor con cliente opcional y getter perezoso `supabase`. Sin otros cambios en el archivo. Verificar que todos los tests de la sección 2 pasan sin modificarlos.
-- [ ] 3.2 Añadir tests: `new PagosService(fake)` usa el cliente inyectado en escrituras y lecturas; `new PagosService()` no llama a `createClient` hasta el primer uso; el parámetro `supabaseClient` sigue teniendo prioridad sobre el del constructor en los métodos de lectura. Verificar con `npm run test`.
-- [ ] 3.3 Verificar que `next build` ya no falla por falta de variables de Supabase al recolectar `api/notificaciones/procesar` (con `NEXT_PUBLIC_SUPABASE_*` vacías, el error de `createBrowserClient` en import no aparece en el log).
+- [x] 3.1 Aplicar design D1 en `lib/services/pagos/pagos.service.ts`: constructor con cliente opcional y getter perezoso `supabase`. Sin otros cambios en el archivo. Verificar que todos los tests de la sección 2 pasan sin modificarlos.
+- [x] 3.2 Añadir tests: `new PagosService(fake)` usa el cliente inyectado en escrituras y lecturas; `new PagosService()` no llama a `createClient` hasta el primer uso; el parámetro `supabaseClient` sigue teniendo prioridad sobre el del constructor en los métodos de lectura. Verificar con `npm run test`.
+- [x] 3.3 Verificar que `next build` ya no falla por falta de variables de Supabase al recolectar `api/notificaciones/procesar` (con `NEXT_PUBLIC_SUPABASE_*` vacías, el error de `createBrowserClient` en import no aparece en el log). — Resultado: `pagos.service.ts` ya no aparece; el build avanza hasta el prerender, donde falla por el mismo patrón en `AuthService` (`lib/services/auth/auth.service.ts:6`), fuera de este change (anotado en ROADMAP).
 
 ## 4. Núcleo de dominio puro (design D5)
 

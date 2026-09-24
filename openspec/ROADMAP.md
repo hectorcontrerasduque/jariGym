@@ -39,5 +39,6 @@ Hallazgos que **no** se tocan en este refactor porque cambiarían el comportamie
 - `aniosConPagos(usuarioId)` filtra por `payments.user_id` sin join.
 - `tieneInscripcionPendiente` solo revisa el primer pago encontrado.
 - `crearPagoSuspendido` devuelve `0` en vez de lanzar error.
+- `AuthService` (`lib/services/auth/auth.service.ts:6`) y `lib/services/supabase-browser.ts` crean el cliente de navegador al importar; sin variables de entorno el prerender de `/login` y `/dashboard` falla. Mismo arreglo que `PagosService` (cliente perezoso); no cambia comportamiento, candidato a incluirse en la fase 7.
 - El rate limit deja pasar el request si falla el RPC (`lib/middleware/rate-limit.ts`).
 - Envío de correos de notificación en serie: pasarlo a paralelo cambia el ritmo de envío a Gmail y se evaluará en la fase 3.

@@ -412,7 +412,7 @@ function MisPagosContent() {
         comprobanteUrl = urlData.publicUrl;
       }
 
-      const useAutoApprove = isSelf && isAdmin;
+      const useAutoApprove = isAdmin;
 
       const detalles: Array<{ month_number: number | null; year_number: number | null; payment_type: "mensualidad" | "inscripcion"; payment_amount: number }> = [];
 

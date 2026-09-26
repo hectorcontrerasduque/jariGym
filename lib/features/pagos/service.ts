@@ -445,7 +445,7 @@ export class PagosService {
 
     let query = supabase
       .from("payments")
-      .select("*, detail:payment_detail!inner(*), profile:profiles(full_name)")
+      .select("*, detail:payment_detail!inner(*), profile:profiles!user_id(full_name)")
       .eq("status", "aprobado")
       .order("created_at", { ascending: false });
 

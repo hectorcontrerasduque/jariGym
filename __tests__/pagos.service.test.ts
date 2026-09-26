@@ -459,25 +459,29 @@ describe("monthlyStats", () => {
 // ─── Requirement: Meses pendientes de un miembro ─────────────────────────────
 
 describe("mesesPendientes", () => {
-  const meses = (...m: number[]) => m.map((month_number) => ({ month_number, year_number: 2026 }));
+  const meses = (...pairs: [number, number][]) => pairs.map(([month_number, year_number]) => ({ month_number, year_number }));
 
-  it("incluye meses futuros del año desde el mes de inicio", async () => {
+  it("siempre retorna 12 meses, extendiendo al siguiente año", async () => {
     fake.on("payment_detail", "select").reply({ data: [] });
-    expect(await service.mesesPendientes("u1", 2026, undefined, "2026-10-01")).toEqual(meses(10, 11, 12));
+    expect(await service.mesesPendientes("u1", 2026, undefined, "2026-10-01")).toEqual(
+      meses([10, 2026], [11, 2026], [12, 2026], [1, 2027], [2, 2027], [3, 2027], [4, 2027], [5, 2027], [6, 2027], [7, 2027], [8, 2027], [9, 2027])
+    );
     const [call] = fake.callsTo("payment_detail", "select");
     expect(call.filters).toContainEqual(["eq", "payments.user_id", "u1"]);
     expect(call.filters).toContainEqual(["in", "payments.status", ["aprobado", "pendiente"]]);
     expect(call.filters).toContainEqual(["not", "month_number", "is", null]);
   });
 
-  it("un detalle aprobado o pendiente bloquea el mes; ignora otros años", async () => {
+  it("un detalle aprobado o pendiente bloquea el mes; se extiende al siguiente año", async () => {
     fake.on("payment_detail", "select").reply({ data: [{ month_number: 11, year_number: 2026 }, { month_number: 12, year_number: 2025 }] });
-    expect(await service.mesesPendientes("u1", 2026, undefined, "2026-10-01")).toEqual(meses(10, 12));
+    expect(await service.mesesPendientes("u1", 2026, undefined, "2026-10-01")).toEqual(
+      meses([10, 2026], [12, 2026], [1, 2027], [2, 2027], [3, 2027], [4, 2027], [5, 2027], [6, 2027], [7, 2027], [8, 2027], [9, 2027], [10, 2027])
+    );
   });
 
   it("sin fecha de inicio y año por defecto: enero a diciembre del año actual", async () => {
     fake.on("payment_detail", "select").reply({ data: [] });
-    expect(await service.mesesPendientes("u1")).toEqual(meses(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12));
+    expect(await service.mesesPendientes("u1")).toEqual(meses([1, 2026], [2, 2026], [3, 2026], [4, 2026], [5, 2026], [6, 2026], [7, 2026], [8, 2026], [9, 2026], [10, 2026], [11, 2026], [12, 2026]));
   });
 
   it("inicio en año posterior → []", async () => {
@@ -492,7 +496,9 @@ describe("mesesPendientes", () => {
 
   it("mesesPendientesAdmin delega con los mismos argumentos", async () => {
     fake.on("payment_detail", "select").reply({ data: [] });
-    expect(await service.mesesPendientesAdmin("u1", 2026, undefined, "2026-11-15")).toEqual(meses(11, 12));
+    expect(await service.mesesPendientesAdmin("u1", 2026, undefined, "2026-11-15")).toEqual(
+      meses([11, 2026], [12, 2026], [1, 2027], [2, 2027], [3, 2027], [4, 2027], [5, 2027], [6, 2027], [7, 2027], [8, 2027], [9, 2027], [10, 2027])
+    );
   });
 });
 

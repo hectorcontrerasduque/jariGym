@@ -2,6 +2,8 @@ import type { MesPendiente } from "./types";
 
 /**
  * Spec: "Meses pendientes de un miembro".
+ * Always returns up to 12 consecutive months without approved/pending payments.
+ * Extends into the next year if needed to reach 12 months.
  * @param detalles detail lines of the member's approved/pending payments (any year)
  */
 export function calcularMesesPendientes(
@@ -11,12 +13,13 @@ export function calcularMesesPendientes(
 ): MesPendiente[] {
   const mesesConPago = new Set<string>();
   for (const d of detalles) {
-    if (d.year_number === anio && d.month_number) {
+    if (d.year_number && d.month_number) {
       mesesConPago.add(`${d.month_number}-${d.year_number}`);
     }
   }
 
   let primerMesDeuda = 1;
+  const primerAnioDeuda = anio;
   if (startDate) {
     const parts = startDate.split("-").map(Number);
     const anioInicio = parts[0];
@@ -26,11 +29,20 @@ export function calcularMesesPendientes(
   }
 
   const mesesPendientes: MesPendiente[] = [];
-  for (let mes = 12; mes >= primerMesDeuda; mes--) {
-    if (!mesesConPago.has(`${mes}-${anio}`)) {
-      mesesPendientes.push({ month_number: mes, year_number: anio });
+  const objetivo = 12;
+  let year = primerAnioDeuda;
+  let mes = primerMesDeuda;
+
+  while (mesesPendientes.length < objetivo) {
+    if (!mesesConPago.has(`${mes}-${year}`)) {
+      mesesPendientes.push({ month_number: mes, year_number: year });
+    }
+    mes++;
+    if (mes > 12) {
+      mes = 1;
+      year++;
     }
   }
 
-  return mesesPendientes.reverse();
+  return mesesPendientes;
 }

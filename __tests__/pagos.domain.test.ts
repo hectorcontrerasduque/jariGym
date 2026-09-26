@@ -70,10 +70,12 @@ describe("filtrarElegibles", () => {
 });
 
 describe("calcularMesesPendientes", () => {
-  const meses = (...m: number[]) => m.map((month_number) => ({ month_number, year_number: 2026 }));
+  const meses = (...pairs: [number, number][]) => pairs.map(([month_number, year_number]) => ({ month_number, year_number }));
 
-  it("incluye meses futuros desde el mes de inicio", () => {
-    expect(calcularMesesPendientes([], 2026, "2026-10-01")).toEqual(meses(10, 11, 12));
+  it("siempre retorna 12 meses, extendiendo al siguiente año", () => {
+    expect(calcularMesesPendientes([], 2026, "2026-10-01")).toEqual(
+      meses([10, 2026], [11, 2026], [12, 2026], [1, 2027], [2, 2027], [3, 2027], [4, 2027], [5, 2027], [6, 2027], [7, 2027], [8, 2027], [9, 2027])
+    );
   });
 
   it("un detalle del año bloquea el mes; otros años y meses nulos se ignoran", () => {
@@ -82,16 +84,28 @@ describe("calcularMesesPendientes", () => {
       { month_number: 12, year_number: 2025 },
       { month_number: null, year_number: 2026 },
     ];
-    expect(calcularMesesPendientes(detalles, 2026, "2026-10-01")).toEqual(meses(10, 12));
+    expect(calcularMesesPendientes(detalles, 2026, "2026-10-01")).toEqual(
+      meses([10, 2026], [12, 2026], [1, 2027], [2, 2027], [3, 2027], [4, 2027], [5, 2027], [6, 2027], [7, 2027], [8, 2027], [9, 2027], [10, 2027])
+    );
   });
 
-  it("inicio en año anterior o sin fecha: desde enero", () => {
+  it("inicio en año anterior o sin fecha: desde enero del año target", () => {
     expect(calcularMesesPendientes([], 2026, "2025-06-01")).toHaveLength(12);
     expect(calcularMesesPendientes([], 2026)).toHaveLength(12);
   });
 
   it("inicio en año posterior → []", () => {
     expect(calcularMesesPendientes([], 2026, "2027-01-01")).toEqual([]);
+  });
+
+  it("meses pagados en año siguiente se excluyen", () => {
+    const detalles = [
+      { month_number: 1, year_number: 2027 },
+      { month_number: 2, year_number: 2027 },
+    ];
+    expect(calcularMesesPendientes(detalles, 2026, "2026-11-01")).toEqual(
+      meses([11, 2026], [12, 2026], [3, 2027], [4, 2027], [5, 2027], [6, 2027], [7, 2027], [8, 2027], [9, 2027], [10, 2027], [11, 2027], [12, 2027])
+    );
   });
 });
 

@@ -1,0 +1,117 @@
+# Roadmap del refactor (rama `refactor/arquitectura-calidad`)
+
+Regla: refactor sin cambios de comportamiento (ver `openspec/config.yaml`).
+Cada fase es un change de OpenSpec en `openspec/changes/<nombre>/`; se propone cuando la anterior está aplicada, para diseñarla sobre el código real.
+
+## Arquitectura objetivo: módulos por feature con núcleo puro
+
+```
+lib/features/<feature>/
+  domain/      funciones puras (sin Supabase, sin reloj global: reciben "hoy")
+  data/        consultas Supabase; reciben el cliente como parámetro
+  service.ts   orquesta data → domain
+app/           páginas y rutas API: solo delegan a lib/features/*
+supabase/      transacciones e invariantes en RPC plpgsql + RLS
+```
+
+1. Lógica de negocio pura y testeable en milisegundos.
+2. Acceso a datos con el cliente inyectado: se acaba la trampa del cliente de navegador en el servidor.
+3. Atomicidad y agregados pesados en Postgres.
+4. Carga de datos en el servidor (Server Components) — fase 7, opcional.
+5. Pirámide de tests: unit (domain) › integración (data/RLS contra Supabase local) › pocos E2E.
+6. Controles de calidad: pre-commit, pre-push, CI.
+
+## Fases
+
+| # | Change | Estado | Objetivo |
+|---|--------|--------|----------|
+| 0 | — | ✅ hecho | Tests corriendo en local (207/207), OpenSpec instalado |
+| 0.6 | `entorno-local` | ✅ archivado | Supabase local + seed de 80 miembros + benchmark del dashboard |
+| 0.5 | `quality-gates` | ✅ archivado | husky + lint-staged: pre-commit (eslint, tsc, vitest), pre-push (build) |
+| 1 | `pagos-service-testable` | ✅ archivado | Cliente inyectado + tests de caracterización + `lib/features/pagos/domain` |
+| 2 | `pagos-transacciones-atomicas` | ⏳ pendiente | Crear/aprobar pago en una sola transacción (RPC plpgsql); consultas a `data/` |
+| 3 | `notificaciones-unificar` | ⏳ pendiente | Una sola implementación de los 4 tipos (hoy duplicados en `api/notificaciones/route.ts` y `procesar/route.ts`) |
+| 4 | `dashboard-carga-unica` | ✅ archivado | Dashboard en una ronda paralela y 1 descarga del RPC del año (antes 3). Sin migraciones SQL |
+| 5 | `rls-tests` | ⏳ pendiente | Tests de políticas RLS contra Supabase local |
+| 6 | `ci-minimo` | ⏳ pendiente | Lint + typecheck + tests automáticos en GitHub |
+| 7 | `server-first-dashboard` | ✅ archivado | Dashboard como Server Component: consultas iniciadas en el servidor, cálculos en el navegador (hora local). Mismo loader |
+| 8 | `api-docs` | ✅ archivado | Documentar los 20 endpoints en `docs/api/openapi.yaml` + test que falla si un `route.ts` no está documentado |
+
+Orden de ejecución acordado: 1 → 4 → 7 → 8, luego 2, 3, 5, 6. Hechas: 0.5, 0.6, 1, 4, 7, 8.
+
+Fase 4 original ("agregados del dashboard en Postgres") descartada: exigía aplicar una migración a mano en producción antes del deploy y, con un tope de 80 miembros, el costo real eran los viajes repetidos, no el cálculo.
+
+## Resultados por fase
+
+**0.5 `quality-gates`** — pre-commit ~4 s (eslint staged, tsc, vitest), pre-push `next build`. Verificado que bloquea lint, tipos y tests rotos.
+
+**1 `pagos-service-testable`** — Spec `openspec/specs/pagos/spec.md` (10 requisitos, comportamiento vigente).
+- Tests: 207 → 296. 60 de caracterización (escritos contra el código sin tocar, verificados con mutaciones), 22 de dominio puro, 3 de inyección, 5 del doble de Supabase.
+- `lib/services/pagos/pagos.service.ts` (1022 líneas) → `lib/features/pagos/service.ts` (703) + `domain/` puro.
+- `next build` ya no falla en `pagos.service` por falta de variables de entorno.
+
+**4 `dashboard-carga-unica`** — Carga del dashboard (admin), contada por código y verificada con tests:
+
+| | Antes | Después |
+|---|---|---|
+| Descargas de `get_pagos_por_anio` (todos los pagos del año) | 3 | **1** |
+| Peticiones de red | 13 | **11** |
+| Saltos secuenciales teléfono ↔ Supabase | 4 | **3** |
+
+Sin migraciones SQL. Equivalencia demostrada en 5 escenarios (`__tests__/dashboard-carga.test.ts`, verificado con mutaciones).
+
+**Medición real** (`scripts/bench-dashboard.mjs`, builds de producción, base local con seed de 80 miembros, red de teléfono simulada con 150 ms de latencia y 4 Mbps, mediana de 2×7 cargas):
+
+| | Rama `dev` (antes) | Fase 4 |
+|---|---|---|
+| Hasta ver los datos | ~1950 ms | **~1005 ms (−48 %)** |
+| KB descargados de Supabase | 532 | **218 (−59 %)** |
+| Peticiones a Supabase (toda la página) | 15 | 13 |
+| Texto visible del dashboard | — | idéntico |
+
+**7 `server-first-dashboard`** — `/dashboard` como Server Component que inicia las consultas; los cálculos siguen en el navegador (hora local). Mismo loader. Medido con el admin (builds de producción, red de teléfono simulada, 2×7 cargas):
+
+| | Rama `dev` | Fase 4 | **Fase 7** |
+|---|---|---|---|
+| Hasta ver los datos (mediana) | 1934 ms | 1007 ms | **238 ms (−88 %)** |
+| Peticiones navegador → Supabase | 15 | 13 | **2** |
+| KB navegador ← Supabase | 532 | 218 | **2** |
+| Cambio de año (carga desde el navegador) | 1397 ms | 672 ms | 677 ms |
+
+Texto visible idéntico en las tres versiones (año actual, 2025 y vuelta); 0 errores de consola. Nota: en local, el servidor está junto a Supabase; en producción, las consultas del servidor pagan la latencia Vercel ↔ Supabase (baja si están en la misma región), así que el número real será algo mayor que 238 ms.
+
+## Pendientes detectados que no cambian comportamiento
+
+- ~~`AuthService` crea el cliente al importar~~ — resuelto en la fase 7 (cliente perezoso).
+- `components/ui/avatar.tsx:15` crea un cliente de Supabase en cada render para construir la URL pública del avatar; sin variables de entorno, el prerender de `/dashboard` falla. Solo afecta builds sin variables.
+- `lib/services/supabase-browser.ts` no lo importa nadie (código muerto).
+- Otras páginas (`pagos`, `miembros`, `mis-pagos`…) siguen cargando todo desde el navegador; se pueden migrar con el mismo patrón que `/dashboard` si hace falta.
+
+**8 `api-docs`** — 21 operaciones de 20 endpoints en `docs/api/openapi.yaml` (válido según Redocly), página navegable con `npm run docs:api:build` y `__tests__/api-docs.test.ts`, que impide que código y documentación se desincronicen (verificado creando y quitando endpoints de prueba).
+
+## Hallazgos de la fase 8 (requieren decisión: corregirlos cambia comportamiento)
+
+Ordenados por gravedad. Ninguno se tocó.
+
+| # | Gravedad | Dónde | Qué pasa | Verificado |
+|---|---|---|---|---|
+| 1 | 🔴 Alta | `app/api/notificaciones/route.ts:10` | `CRON_SECRET` tiene un valor por defecto en el código (`"gym-notifications-cron-secret"`). Si la variable no está definida en Vercel, cualquiera puede disparar el envío masivo de correos. | Código |
+| 2 | 🔴 Alta | `GET /api/migracion/list`, `GET /api/migracion/morosos` | Públicos, sin límite, con service role: exponen nombres, correos y deudas de los miembros antiguos. El middleware no protege `/api`. | Código |
+| 3 | 🟠 Media | `GET /api/migracion/ping` | Público y sin límite: dice si un email está registrado y devuelve el nombre completo (enumeración de usuarios). | Código |
+| 4 | 🟠 Media | `GET /api/config/public` | Público: devuelve `gym_config` completo (`select *`, con email y teléfono del dueño) y todos los métodos de pago. | Código |
+| 5 | 🟠 Media | `POST /api/pagos/notify` | **Bug:** consulta `payments.payment_amount`, columna que no existe → siempre 404 → los correos de pago aprobado/rechazado nunca se envían. | Base local: `ERROR 42703` |
+| 6 | 🟠 Media | `POST /api/miembros/toggle-status` | **Bug:** `ban_duration: "52560000"` no tiene unidad → Auth lo rechaza y el error se ignora. El login de la app bloquea al inactivo (`profiles.activo`), pero una sesión ya abierta sigue válida contra la API. | Auth local: `missing unit in duration` |
+| 7 | 🟡 Baja | `POST /api/auth/forgot-password` | Si falla la limpieza de tokens vencidos, borra **todos** los tokens de recuperación de todos los usuarios. | Código |
+
+Propuesta: un change `seguridad-api` para 1–4 (autenticación en los endpoints de admin y quitar el secreto por defecto) y un change `bugs-api` para 5–7. Los usuarios legítimos no notarían diferencia en 1–4; en 5–6 empezarían a llegar los correos y a funcionar el baneo, que es lo que el código pretendía.
+
+## Riesgo de proceso detectado
+
+- **`.gitignore` ignora `supabase/migrations/*.sql`**: toda migración nueva queda fuera de Git. Las 051–054 y 056 (incluida la que define `get_pagos_por_anio`) solo existen en la base real. Recomendación: quitar esa regla y versionar las migraciones que faltan, a partir de un `supabase db dump` del esquema real. Requiere decisión del equipo.
+
+## Hallazgos que **no** se tocan en este refactor porque cambiarían el comportamiento (requieren decisión explícita y su propio change):
+- `aniosConPagos(usuarioId)` filtra por `payments.user_id` sin join.
+- `tieneInscripcionPendiente` solo revisa el primer pago encontrado.
+- `crearPagoSuspendido` devuelve `0` en vez de lanzar error.
+- El rate limit deja pasar el request si falla el RPC (`lib/middleware/rate-limit.ts`).
+- Envío de correos de notificación en serie: pasarlo a paralelo cambia el ritmo de envío a Gmail y se evaluará en la fase 3.

@@ -1,0 +1,8 @@
+# Redocly CLI config for docs/api/openapi.yaml (npm run docs:api:lint / docs:api:build)
+extends:
+  - recommended
+rules:
+  info-license: off                  # private repo
+  no-server-example.com: off         # localhost is the documented dev server
+  operation-4xx-response: off        # several public GET endpoints never return 4xx (documented as they are)
+  operation-2xx-response: off        # /api/auth/confirm-email only redirects (302)

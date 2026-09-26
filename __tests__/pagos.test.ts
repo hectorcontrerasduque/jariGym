@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { Payment, PaymentDetail, CreatePaymentInput, TipoPago } from "@/lib/types";
-import type { PaymentDetailInput } from "@/lib/services/pagos/pagos.service";
+import type { PaymentDetailInput } from "@/lib/features/pagos/service";
 import { getMonthName, formatCurrency, formatDate } from "@/lib/utils";
 
 function createMockPago(overrides: Partial<Payment> = {}): Payment {

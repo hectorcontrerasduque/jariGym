@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
-import { pagosService } from "@/lib/services/pagos/pagos.service";
+import { pagosService } from "@/lib/features/pagos/service";
 import { miembrosService } from "@/lib/services/miembros/miembros.service";
 import { formatCurrency, getMonthName } from "@/lib/utils";
 import { Check, X, Eye, CreditCard, Clock, CheckCircle, AlertTriangle, Search, Plus } from "lucide-react";

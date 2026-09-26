@@ -16,9 +16,45 @@ npm run build      # production build
 npm run lint       # ESLint
 npm run test       # Vitest (single run)
 npm run test:watch # Vitest (watch mode)
+npm run typecheck  # tsc --noEmit
 ```
 
-No CI pipelines. No Node.js in WSL — run npm from Windows PowerShell.
+No CI pipelines. No Node.js in WSL — run npm from Windows PowerShell (macOS: Homebrew Node works too).
+
+### Git hooks (husky + lint-staged)
+
+Installed automatically by `npm install` / `npm ci` (`prepare` script).
+
+- **pre-commit** (`.husky/pre-commit`, ~4 s): `eslint --max-warnings=0` on staged files, `tsc --noEmit`, `vitest run`.
+- **pre-push** (`.husky/pre-push`): `next build`. Requires `.env.development` with the Supabase variables; without them the build fails while collecting API routes.
+- Emergency bypass: `git commit --no-verify` / `git push --no-verify`. Do not use it to skip failing tests.
+- `.gitattributes` forces LF on `.husky/*` so the hooks run under Git for Windows `sh`.
+
+### Local database (Supabase local, Docker)
+
+Everything runs on your machine; nothing touches the cloud projects.
+
+```bash
+npm run db:local:start   # start Supabase local (first run downloads images; Docker Desktop must be running)
+npm run db:local:reset   # wipe + schema + seed, writes .env.development.local (npm run dev then uses the local DB)
+npm run db:local:stop    # stop it
+node scripts/bench-dashboard.mjs http://localhost:3000 7 150   # dashboard load benchmark (phone-like latency)
+```
+
+- Seed users (password `Local1234!`): `admin@gym.local` (super_admin/owner), `miembro@gym.local`, `socio01..78@gym.local`. 80 members, ~800 payments over last + current year, 6 legacy `migracion` people. Deterministic: every reset produces the same data.
+- Studio: http://127.0.0.1:54323 · API: http://127.0.0.1:54321 · DB: `postgresql://postgres:postgres@127.0.0.1:54322/postgres`.
+- Delete `.env.development.local` to point `npm run dev` back at the cloud dev project.
+- Schema = `supabase/local/000_*.sql` → `supabase/migrations/*.sql` → `supabase/local/001_*.sql`. The `supabase/local/` files reconstruct objects that exist in the real DB but were never committed (`migracion` table, `get_pagos_por_anio`). **`.gitignore` ignores `supabase/migrations/*.sql`**, so migrations 051–054 and 056 exist only in the real DB; the local schema can drift (e.g. `payments.status` still allows `suspendido`). Replace the reconstructions with a real schema dump when possible.
+
+### API documentation
+
+- `docs/api/openapi.yaml` (OpenAPI 3.1) documents every `app/api/**/route.ts`; `docs/api/README.md` has the summary table.
+- **Adding/removing/renaming an endpoint or method requires updating `openapi.yaml`**: `__tests__/api-docs.test.ts` fails otherwise (and blocks the commit). Each operation needs `operationId`, `summary`, explicit `security` (`[]` when public) and a success response.
+- `npm run docs:api:lint` validates the spec (Redocly, config in `redocly.yaml`); `npm run docs:api:build` generates `docs/api/index.html` (gitignored).
+
+### Refactor tracking (OpenSpec)
+
+Changes live in `openspec/changes/<name>/` (proposal, specs, design, tasks); roadmap in `openspec/ROADMAP.md`; project rules in `openspec/config.yaml`. Commands: `/opsx:propose`, `/opsx:apply`, `/opsx:archive`.
 
 ## Architecture
 
@@ -50,13 +86,18 @@ lib/
     client.ts       # Browser client (createBrowserClient)
     server.ts       # Server client (async cookies())
     middleware.ts   # Auth guard middleware
-  services/
+  features/         # Target architecture: one module per feature (see openspec/ROADMAP.md)
+    pagos/
+      domain/       # PURE calculations: elegibles, morosos, al día, stats, meses pendientes
+      service.ts    # PagosService: Supabase queries + delegates to domain/
+    dashboard/
+      carga.ts      # consultarDashboard (server-side raw fetch) + mapearMiembros
+  services/         # Legacy modules, migrated to features/ phase by phase
     auth/           # signIn, resetPassword, getProfile
     config/         # Config CRUD + dueno email promotion on change
     email/          # nodemailer Gmail SMTP service
     email/templates/ # HTML email templates (reset password, welcome)
     miembros/       # Miembros CRUD + stats
-    pagos/          # Pagos CRUD + approval
     notificaciones/ # Notification service
   types.ts          # All TypeScript interfaces
   utils.ts          # cn(), formatCurrency(), formatDate(), getMonthName()
@@ -74,7 +115,10 @@ supabase/
   migrations/       # SQL migrations (run manually in Supabase SQL Editor)
   functions/        # Deno Edge Functions (deploy via Supabase CLI)
 __tests__/
-  migracion.test.ts # Unit tests for migration flow
+  helpers/supabase-fake.ts  # Programmable Supabase client double (queue replies, inspect calls)
+  pagos.service.test.ts     # Characterization tests of PagosService (pin current behavior)
+  pagos.domain.test.ts      # Pure unit tests of lib/features/pagos/domain
+  migracion.test.ts         # Unit tests for migration flow
 ```
 
 ## Supabase Client Pattern (CRITICAL)
@@ -86,23 +130,39 @@ Three separate clients exist for three contexts:
 
 **Do not mix these up.** Server client is `async` — always `await` the call.
 
-### The `pagosService` trap (fixed in commit 85577de)
+### The `pagosService` trap
 
-`PagosService` (`lib/services/pagos/pagos.service.ts`) creates a **browser client** at module level:
+`PagosService` (`lib/features/pagos/service.ts`) resolves its Supabase client like this:
+- `new PagosService(client)` → uses `client` for every method.
+- `new PagosService()` / the exported `pagosService` → lazily creates the **browser client** (anon key + user cookies) on first use.
+
+In **server-side API routes** the browser client has **NO user session**, so queries run as unauthenticated anon and RLS returns empty results.
+
+**Rule**: server code must inject its client — via the constructor, or via the optional `supabaseClient` argument of read methods (it wins over the constructor client).
+
 ```ts
-private supabase = createClient(); // → createBrowserClient() with anon key
-```
-
-When imported in **server-side API routes**, this client has **NO user session** (no cookies), so all Supabase queries run as **unauthenticated anon**. RLS blocks reads → returns empty results.
-
-**Rule**: Any service method called from API routes that queries RLS-protected tables **must** accept an optional Supabase client parameter. Pass the route's `service_role` client from the API route.
-
-```ts
-// CORRECT — API route passes service_role client
+// CORRECT — API route injects its service_role client
+const service = new PagosService(supabase);
+const morosos = await service.getMiembrosMorosos();
+// also correct (existing routes)
 const morosos = await pagosService.getMiembrosMorosos(undefined, supabase);
 
-// WRONG — uses browser client with no auth in server context
+// WRONG — browser client with no auth in server context
 const morosos = await pagosService.getMiembrosMorosos();
+```
+
+### Testing a service
+
+Calculations go in `lib/features/<feature>/domain/` as pure functions that receive `hoy: Date` instead of calling `new Date()`; test them with literal data. For the service itself, inject the fake client:
+
+```ts
+import { createSupabaseFake } from "./helpers/supabase-fake";
+const fake = createSupabaseFake();
+fake.setUser({ id: "admin-1" });
+fake.on("profiles", "select").reply({ data: { role: "super_admin" } });
+fake.onRpc("get_pagos_por_anio").reply({ data: [] });
+const service = new PagosService(fake.client);
+// ...then assert on fake.callsTo("payments", "update")[0].payload / .filters
 ```
 
 ## Environment Variables
@@ -221,10 +281,15 @@ status: "pendiente" | "aprobado" | "rechazado"
 ```
 
 ### Dashboard Stats Logic
-- **Inscritos**: From `pagos`+`detalle_pago` tables (approved payments with tipo_pago="inscripcion") + `profile.inscripcion_pagada`
-- **Deudores**: Active members (no libre, inscription paid) without approved payment for current month
-- **Al día**: Active members with approved payment for current month
+- **Source of truth for every figure** (inscritos, deudores, al día, monthly stats, meses pendientes): `openspec/specs/pagos/spec.md`, implemented as pure functions in `lib/features/pagos/domain/`.
 - **Pagos recientes**: Approved payments only, with fallback when profile join fails
+
+**Loading rule (perf)** — `/dashboard` is server-first:
+- `app/dashboard/page.tsx` is a **Server Component**: it creates the server client (user cookies + anon key → same RLS as the browser; **never** the service role) and starts `consultarDashboard(supabase, year)` **without awaiting it**, passing the promise to `DashboardClient`. The HTML with the loader goes out immediately and the data streams in the same response.
+- `app/dashboard/dashboard-client.tsx` (the UI) uses that data on first load and **computes every figure in the browser** (`filtrarElegibles` + `pagosService.calcularDashboard`) with the user's local date. Do not move these calculations to the server: Vercel runs in UTC and "current month"/billing day would shift in the evening at month end.
+- Year changes and modals load from the browser (`loadData`), which fetches `get_pagos_por_anio` once. Both paths apply state through the same `aplicarPaso1`/`aplicarPaso2` helpers; keep it that way so they cannot diverge.
+- If the server data is `null` (no session, any error) or its year differs from the browser's, the client falls back to `loadData` with the original error handling.
+- Measured with `scripts/bench-dashboard.mjs` (prod build, phone-like network): 1934 ms on the original code → 238 ms, 15 → 2 browser requests to Supabase.
 
 ### Miembros Stats
 - Total card shows `active/max` format (e.g. `11/80`) using `gym_config.max_members`
@@ -375,3 +440,13 @@ e263c5e refactor: elimina console.* + centraliza strings en messages.ts para i18
 - **034**: Admin INSERT RLS for pagos + comprobantes storage
 - **035**: **Payment normalization** — renames old `pagos` → `pagos_historial`, creates new `pagos` (header) + `detalle_pago` (detail per month/inscription). `CreatePagoInput` now takes `detalles[]` instead of flat fields.
 - **056**: **Remove suspendido status** — updates existing `suspendido` → `aprobado`, tightens CHECK to `('pendiente', 'aprobado', 'rechazado')`. Apply manually in Supabase SQL Editor.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

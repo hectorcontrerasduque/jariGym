@@ -1,0 +1,2 @@
+# Husky hooks run under sh (also Git for Windows); CRLF breaks them
+.husky/* text eol=lf

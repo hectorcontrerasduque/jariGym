@@ -1,49 +1,15 @@
 import { createClient } from "@/lib/supabase/client";
-import { getMonthName, getDiaCobro } from "@/lib/utils";
 import { messages } from "@/lib/messages";
 import type { Pago, MetodoPago, TipoPago, Profile, DetallePago } from "@/lib/types";
+import type { ElegiblesResult, Moroso, PagoRPCRow } from "./domain/types";
+import { calcularMorosos, calcularMiembrosAlDia } from "./domain/morosos";
+import { calcularStats, calcularMonthlyStats } from "./domain/stats";
+import { filtrarElegibles, type ElegiblesInput } from "./domain/elegibles";
+import { calcularMesesPendientes } from "./domain/meses-pendientes";
 
-interface PagoRPCRow {
-  id: string;
-  user_id: string;
-  status: string;
-  payment_note: string | null;
-  payment_method: string | null;
-  bill_code: string | null;
-  receipt_url: string | null;
-  created_at: string;
-  month_number: number;
-  year_number: number;
-  payment_amount: number;
-  payment_type: string;
-}
-
-export interface ElegiblesResult {
-  miembros: Array<{ id: string; email: string | null; full_name: string | null; inscription_paid: boolean; activo: boolean | null; start_date: string | null; avatar_url: string | null; role: string | null; inscription_admin_note: string | null; arrival_time: string | null; departure_time: string | null }>;
-  miembrosLibresIds: Set<string>;
-  fechaInicioMap: Map<string, string>;
-  ownerEmail: string;
-  modoCobro: "dia_uno" | "fecha_inscripcion";
-  montoMensual: number;
-  montoInscripcion: number;
-}
+export type { ElegiblesResult };
 
 
-
-/**
- * PagosService - Service for payment operations.
- * 
- * IMPORTANT: This service creates a browser client (createClient()) at module level.
- * When called from Server Components / API Routes, you MUST pass a service_role client
- * as the optional `supabaseClient` parameter to all read methods.
- * 
- * Example:
- *   const supabase = createServiceClient(url, serviceKey);
- *   await pagosService.getMiembrosMorosos(year, supabase);
- *   await pagosService.stats(year, supabase);
- * 
- * Otherwise RLS will block queries (runs as anonymous anon key).
- */
 export interface PaymentDetailInput {
   month_number: number | null;
   year_number: number | null;
@@ -60,8 +26,35 @@ export interface CreatePaymentInput {
   detalles: PaymentDetailInput[];
 }
 
+type SupabaseLike = ReturnType<typeof createClient>;
+
+/**
+ * PagosService - data access + orchestration for payments.
+ * Calculations live in ./domain (pure functions, unit-tested without Supabase).
+ *
+ * Client resolution:
+ * - `new PagosService(client)`: every method uses `client`. Preferred on the server
+ *   (pass the route's service_role client) and in tests (pass a fake).
+ * - `new PagosService()` / the exported `pagosService`: lazily creates the BROWSER
+ *   client (anon key + user cookies) on first use. Fine in client components.
+ *
+ * IMPORTANT (server): the browser client has no user session in API routes, so RLS
+ * blocks reads. Server code must inject its client, either via the constructor or
+ * via the optional `supabaseClient` argument of read methods (which wins over the
+ * constructor client):
+ *   await pagosService.getMiembrosMorosos(year, supabase);
+ */
 export class PagosService {
-  private supabase = createClient();
+  private client?: SupabaseLike;
+
+  constructor(client?: SupabaseLike) {
+    this.client = client;
+  }
+
+  /** Injected client, or the browser client created lazily on first use. */
+  private get supabase(): SupabaseLike {
+    return (this.client ??= createClient());
+  }
 
   private async getPagosPorAnio(anio: number, supabaseClient?: ReturnType<typeof createClient>): Promise<PagoRPCRow[]> {
     const supabase = supabaseClient || this.supabase;
@@ -415,30 +408,7 @@ export class PagosService {
 
     if (error || !detalles) return [];
 
-    const mesesConPago = new Set<string>();
-    for (const d of detalles || []) {
-      if (d.year_number === anioFiltro && d.month_number) {
-        mesesConPago.add(`${d.month_number}-${d.year_number}`);
-      }
-    }
-
-    let primerMesDeuda = 1;
-    if (startDate) {
-      const parts = startDate.split("-").map(Number);
-      const anioInicio = parts[0];
-      const mesInicio = parts[1];
-      if (anioInicio > anioFiltro) return [];
-      if (anioInicio === anioFiltro) primerMesDeuda = mesInicio;
-    }
-
-    const mesesPendientes: { month_number: number; year_number: number }[] = [];
-    for (let mes = 12; mes >= primerMesDeuda; mes--) {
-      if (!mesesConPago.has(`${mes}-${anioFiltro}`)) {
-        mesesPendientes.push({ month_number: mes, year_number: anioFiltro });
-      }
-    }
-
-    return mesesPendientes.reverse();
+    return calcularMesesPendientes(detalles, anioFiltro, startDate);
   }
 
   async mesesPendientesAdmin(usuarioId: string, anio?: number, supabaseClient?: ReturnType<typeof createClient>, startDate?: string): Promise<{ month_number: number; year_number: number }[]> {
@@ -524,79 +494,13 @@ export class PagosService {
     const supabase = supabaseClient || this.supabase;
     const hoy = new Date();
     const anioConsulta = anio || hoy.getFullYear();
-    const mesActual = hoy.getMonth() + 1;
 
     const elegiblesData = elegibles || await this.getMiembrosElegibles(supabase);
-    const { miembros: allMiembros, miembrosLibresIds, ownerEmail, montoMensual, montoInscripcion } = elegiblesData;
-
-    const miembrosActivos = allMiembros.filter((m) => m.email?.toLowerCase() !== ownerEmail);
 
     const rpcData = await this.getPagosPorAnio(anioConsulta, supabase);
-
-    const pagosConDetalle = rpcData.map((d) => ({
-      payment_id: d.id,
-      month_number: d.month_number,
-      year_number: d.year_number,
-      payment_amount: d.payment_amount,
-      payment_type: d.payment_type,
-      status: d.status,
-      user_id: d.user_id,
-      payment_note: d.payment_note,
-    }));
-
-    const todosPagosAprobados = pagosConDetalle.filter((p) => p.status === "aprobado");
-    const miembrosConInscripcionPagada = new Set<string>();
-    for (const pago of todosPagosAprobados) {
-      if (pago.payment_type === "inscripcion") {
-        miembrosConInscripcionPagada.add(pago.user_id);
-      }
-    }
-
-    for (const m of allMiembros) {
-      if (m.inscription_paid) {
-        miembrosConInscripcionPagada.add(m.id);
-      }
-    }
-
-    const inscritosPagados = miembrosActivos.filter((m) => miembrosConInscripcionPagada.has(m.id)).length;
-    const inscritosPendientes = miembrosActivos.filter((m) => !miembrosConInscripcionPagada.has(m.id)).length;
-
     const morosos = await this.getMiembrosMorosos(anioConsulta, supabase, elegiblesData);
-    const deudoresInscripcion = morosos.filter((m) => m.debeInscripcion).length;
-    const deudoresMensualidad = morosos.filter((m) => m.mesesDeuda.length > 0).length;
-    const montoDeudaInscripcion = morosos.filter((m) => m.debeInscripcion).length * montoInscripcion;
-    const montoDeudaMensualidad = morosos.reduce((sum, m) => sum + m.mesesDeuda.length, 0) * montoMensual;
-    const montoDeuda = montoDeudaInscripcion + montoDeudaMensualidad;
 
-    const pagosMesActual = pagosConDetalle.filter(
-      (p) => p.status === "aprobado" && p.month_number === mesActual && p.year_number === anioConsulta && (p.payment_type === "mensualidad" || p.payment_type === "suspension")
-    );
-    const usuariosAlDia = new Set(
-      pagosMesActual.filter((p) => miembrosConInscripcionPagada.has(p.user_id)).map((p) => p.user_id)
-    );
-    const alDiaMensualidad = usuariosAlDia.size;
-    const montoPagado = pagosMesActual
-      .filter((p) => usuariosAlDia.has(p.user_id))
-      .reduce((sum, p) => sum + (p.payment_amount || 0), 0);
-
-    return {
-      totalMiembros: miembrosActivos.length,
-      miembrosActivos: miembrosActivos.length,
-      inscritosPagados,
-      inscritosPendientes,
-      deudoresTotal: morosos.length,
-      deudoresInscripcion,
-      deudoresMensualidad,
-      alDiaMensualidad,
-      montoDeuda,
-      montoDeudaInscripcion,
-      montoDeudaMensualidad,
-      montoPagado,
-      membresiaLibre: miembrosLibresIds.size,
-      pagosConfirmados: todosPagosAprobados.length,
-      pagosPendientes: pagosConDetalle.filter((p) => p.status === "pendiente").length,
-      ingresosMes: montoPagado,
-    };
+    return calcularStats(elegiblesData, rpcData, morosos, anioConsulta, hoy);
   }
 
   /**
@@ -605,6 +509,15 @@ export class PagosService {
    * la configuración de cobro. Todas las funciones de morosos/deudas usan esto.
    */
   async getMiembrosElegibles(supabaseClient?: ReturnType<typeof createClient>): Promise<ElegiblesResult> {
+    const input = await this.consultarElegibles(supabaseClient);
+    return filtrarElegibles(input, new Date());
+  }
+
+  /**
+   * Raw rows behind getMiembrosElegibles (4 parallel queries, unfiltered).
+   * Lets the server fetch them while the browser applies the date-dependent filter.
+   */
+  async consultarElegibles(supabaseClient?: SupabaseLike): Promise<ElegiblesInput> {
     const supabase = supabaseClient || this.supabase;
 
     const [miembrosResult, configResult, libresResult, ownerResult] = await Promise.all([
@@ -631,173 +544,26 @@ export class PagosService {
         .maybeSingle(),
     ]);
 
-    const miembros = (miembrosResult.data || []).filter((m) => m.activo !== false && m.activo !== 0 && String(m.activo).toLowerCase() !== "false");
-    const now = new Date();
-    const miembrosLibresIds = new Set(
-      (libresResult.data || [])
-        .filter((l) => {
-          if (!l.start_date) return true;
-          return new Date(l.start_date) <= now;
-        })
-        .map((l) => l.user_id)
-    );
-    const fechaInicioMap = new Map<string, string>();
-    for (const l of libresResult.data || []) {
-      if (l.start_date) fechaInicioMap.set(l.user_id, l.start_date);
-    }
-    const ownerEmail = ownerResult.data?.owner_email?.toLowerCase() || "";
-    const modoCobro = (ownerResult.data?.billing_mode as "dia_uno" | "fecha_inscripcion") || "dia_uno";
-    const montoMensual = configResult.data?.amount_monthly || 0;
-    const montoInscripcion = configResult.data?.amount_inscription || 0;
-
     return {
-      miembros,
-      miembrosLibresIds,
-      fechaInicioMap,
-      ownerEmail,
-      modoCobro,
-      montoMensual,
-      montoInscripcion,
+      perfiles: miembrosResult.data,
+      metodoPago: configResult.data,
+      membresias: libresResult.data,
+      gymConfig: ownerResult.data,
     };
   }
 
-  async getMiembrosMorosos(anio?: number, supabaseClient?: ReturnType<typeof createClient>, elegibles?: ElegiblesResult): Promise<
-    Array<{
-      id: string;
-      email: string;
-      full_name: string;
-      deudas: Array<{ month_number: number; year_number: number; payment_amount: number }>;
-      totalDeuda: number;
-      debeInscripcion: boolean;
-      mesesDeuda: number[];
-      pagosPendientes: number;
-      montoPendiente: number;
-    }>
-  > {
+  async getMiembrosMorosos(anio?: number, supabaseClient?: ReturnType<typeof createClient>, elegibles?: ElegiblesResult): Promise<Moroso[]> {
     const supabase = supabaseClient || this.supabase;
     const hoy = new Date();
     const anioConsulta = anio || hoy.getFullYear();
-    const mesActual = anioConsulta === hoy.getFullYear() ? hoy.getMonth() + 1 : 12;
 
     const elegiblesData = elegibles || await this.getMiembrosElegibles(supabase);
-    const { miembros, miembrosLibresIds, fechaInicioMap, ownerEmail, modoCobro, montoMensual, montoInscripcion } = elegiblesData;
 
-    if (miembros.length === 0) return [];
+    if (elegiblesData.miembros.length === 0) return [];
 
     const rpcData = await this.getPagosPorAnio(anioConsulta, supabase);
 
-    const todosPagos = rpcData.map((d) => ({
-      user_id: d.user_id,
-      month_number: d.month_number,
-      year_number: d.year_number,
-      payment_amount: d.payment_amount,
-      status: d.status,
-      payment_note: d.payment_note,
-      payment_type: d.payment_type,
-    }));
-
-    const pagosAprobados = todosPagos.filter((p) => p.status === "aprobado");
-    const pagosQueCubrenMes = todosPagos.filter((p) => p.status === "aprobado");
-
-    const miembrosConInscripcionPagada = new Set<string>();
-    for (const pago of pagosAprobados) {
-      if (pago.payment_type === "inscripcion") {
-        miembrosConInscripcionPagada.add(pago.user_id);
-      }
-    }
-    for (const m of miembros) {
-      if (m.inscription_paid) miembrosConInscripcionPagada.add(m.id);
-    }
-
-    const morosos: Array<{
-      id: string;
-      email: string;
-      full_name: string;
-      deudas: Array<{ month_number: number; year_number: number; payment_amount: number }>;
-      totalDeuda: number;
-      debeInscripcion: boolean;
-      mesesDeuda: number[];
-      pagosPendientes: number;
-      montoPendiente: number;
-    }> = [];
-
-    for (const miembro of miembros) {
-      if (miembrosLibresIds.has(miembro.id)) continue;
-      if (miembro.email?.toLowerCase() === ownerEmail) continue;
-
-      const debeInscripcion = !miembrosConInscripcionPagada.has(miembro.id);
-
-      const fechaInicioMembresia = fechaInicioMap.get(miembro.id);
-      const fechaInscripcion = miembro.start_date;
-
-      let fechaInicioStr = fechaInicioMembresia || fechaInscripcion;
-      if (fechaInicioMembresia) {
-        const membershipStart = new Date(fechaInicioMembresia);
-        if (membershipStart > hoy) {
-          fechaInicioStr = fechaInscripcion;
-          if (!fechaInicioStr) continue;
-        }
-      }
-
-      let primerMesDeuda = 1;
-      if (fechaInicioStr) {
-        const parts = fechaInicioStr.split("-").map(Number);
-        const anioInicio = parts[0];
-        const mesInicio = parts[1];
-
-        const anioDeuda = anioInicio;
-        const mesDeuda = mesInicio;
-
-        if (anioDeuda > anioConsulta) continue;
-        if (anioDeuda === anioConsulta) {
-          primerMesDeuda = mesDeuda;
-        }
-      }
-
-      const pagosMiembroQueCubren = pagosQueCubrenMes.filter((p) => p.user_id === miembro.id);
-      const mesesCubiertos = new Set(pagosMiembroQueCubren.map((p) => p.month_number));
-
-      const mesesDeuda: number[] = [];
-      for (let mes = primerMesDeuda; mes <= mesActual; mes++) {
-        if (mesesCubiertos.has(mes)) continue;
-
-        const diaCobro = getDiaCobro(fechaInicioStr || "2000-01-01", mes, anioConsulta, modoCobro);
-
-        if (mes === mesActual && hoy.getDate() < diaCobro) continue;
-
-        mesesDeuda.push(mes);
-      }
-
-      const pagosPendientesMiembro = todosPagos.filter(
-        (p) => p.user_id === miembro.id && p.year_number === anioConsulta &&
-          p.payment_type === "mensualidad" && p.status === "pendiente"
-      );
-      const montoPendiente = pagosPendientesMiembro.reduce((sum, p) => sum + (p.payment_amount || montoMensual), 0);
-
-      if (!debeInscripcion && mesesDeuda.length === 0 && pagosPendientesMiembro.length === 0) continue;
-
-      const deudas = mesesDeuda.map((mes) => ({
-        month_number: mes,
-        year_number: anioConsulta,
-        payment_amount: montoMensual,
-      }));
-
-      const totalDeuda = mesesDeuda.length * montoMensual + (debeInscripcion ? montoInscripcion : 0);
-
-      morosos.push({
-        id: miembro.id,
-        email: miembro.email!,
-        full_name: miembro.full_name || "",
-        deudas,
-        totalDeuda,
-        debeInscripcion,
-        mesesDeuda,
-        pagosPendientes: pagosPendientesMiembro.length,
-        montoPendiente,
-      });
-    }
-
-    return morosos;
+    return calcularMorosos(elegiblesData, rpcData, anioConsulta, hoy);
   }
 
   async getMigradosConDeuda(anio: number, supabaseClient?: ReturnType<typeof createClient>): Promise<
@@ -887,87 +653,45 @@ export class PagosService {
     const supabase = supabaseClient || this.supabase;
     const hoy = new Date();
     const anioConsulta = anio || hoy.getFullYear();
-    const mesMaximo = anioConsulta === hoy.getFullYear() ? hoy.getMonth() + 1 : 12;
 
     const elegiblesData = elegibles || await this.getMiembrosElegibles(supabase);
-    const { miembros: allProfiles, miembrosLibresIds: libresIds, ownerEmail, montoMensual } = elegiblesData;
-
-    const profiles = allProfiles.filter((p) => p.email?.toLowerCase() !== ownerEmail);
-    const libresCount = libresIds.size;
-
-    const meses = [];
-    for (let mes = 1; mes <= mesMaximo; mes++) {
-      meses.push({
-        mes,
-        anio: anioConsulta,
-        nombre: getMonthName(mes),
-      });
-    }
-
-    const statsMeses = await Promise.all(
-      meses.map(async (m) => {
-        const finMes = new Date(m.anio, m.mes, 0);
-
-        const miembrosMes = profiles.filter((p) => {
-          const fechaInsc = p.start_date ? new Date(p.start_date) : null;
-          if (fechaInsc && fechaInsc > finMes) return false;
-          return true;
-        });
-
-        const totalMiembrosMes = miembrosMes.length;
-        const idsMes = new Set(miembrosMes.map((p) => p.id));
-
-        return { mes: m.mes, anio: m.anio, nombre: m.nombre, totalMiembrosMes, idsMes };
-      })
-    );
 
     const rpcData = await this.getPagosPorAnio(anioConsulta, supabase);
 
-    const pagosAll = rpcData.map((d) => ({
-      user_id: d.user_id,
-      status: d.status,
-      payment_amount: d.payment_amount,
-      month_number: d.month_number,
-      year_number: d.year_number,
-    }));
+    return calcularMonthlyStats(elegiblesData, rpcData, anioConsulta, hoy);
+  }
 
-    const mesesFinal = statsMeses.map((m) => {
-      const pagosMes = pagosAll.filter((p) => p.month_number === m.mes && p.year_number === m.anio);
+  /** Rows of get_pagos_por_anio for the year (one per payment detail line). */
+  async pagosDelAnio(anio?: number, supabaseClient?: SupabaseLike): Promise<PagoRPCRow[]> {
+    return this.getPagosPorAnio(anio || new Date().getFullYear(), supabaseClient || this.supabase);
+  }
 
-      const pagados = new Set(
-        pagosMes.filter((p) => (p.status === "aprobado") && m.idsMes.has(p.user_id)).map((p) => p.user_id)
-      ).size;
+  /**
+   * Every dashboard figure from one snapshot (elegibles + the year's payments) and one `hoy`.
+   * Same result as stats() + monthlyStats() with those elegibles, without re-fetching.
+   */
+  calcularDashboard(elegibles: ElegiblesResult, pagosDelAnio: PagoRPCRow[], anio?: number) {
+    const hoy = new Date();
+    const anioConsulta = anio || hoy.getFullYear();
+    const morosos = calcularMorosos(elegibles, pagosDelAnio, anioConsulta, hoy);
+    return {
+      stats: calcularStats(elegibles, pagosDelAnio, morosos, anioConsulta, hoy),
+      monthlyStats: calcularMonthlyStats(elegibles, pagosDelAnio, anioConsulta, hoy),
+    };
+  }
 
-      const pendientes = new Set(
-        pagosMes.filter((p) => p.status === "pendiente" && m.idsMes.has(p.user_id)).map((p) => p.user_id)
-      ).size;
-
-      const montoAcumulado = pagosMes
-        .filter((p) => p.status === "aprobado")
-        .reduce((sum, p) => sum + (p.payment_amount || 0), 0);
-
-      const montoPendiente = pagosMes
-        .filter((p) => p.status === "pendiente")
-        .reduce((sum, p) => sum + (p.payment_amount || 0), 0);
-
-      const sinPago = Math.max(0, m.totalMiembrosMes - pagados - pendientes);
-      const montoAdeudado = sinPago * montoMensual;
-
-      return {
-        month_number: m.mes,
-        year_number: m.anio,
-        nombre: m.nombre,
-        pagados,
-        pendientes,
-        sinPago,
-        libres: 0,
-        montoAcumulado,
-        montoAdeudado,
-        montoPendiente,
-      };
-    });
-
-    return { totalMiembros: profiles.length, libres: libresCount, meses: mesesFinal };
+  /**
+   * Dashboard load: elegibles and the year's payments fetched once, in parallel.
+   * Same result as getMiembrosElegibles() + stats() + monthlyStats(), but with
+   * 1 call to get_pagos_por_anio instead of 3. Keep the dashboard on this path.
+   */
+  async cargarDashboard(anio?: number, supabaseClient?: SupabaseLike) {
+    const supabase = supabaseClient || this.supabase;
+    const [elegibles, pagos] = await Promise.all([
+      this.getMiembrosElegibles(supabase),
+      this.pagosDelAnio(anio, supabase),
+    ]);
+    return { elegibles, ...this.calcularDashboard(elegibles, pagos, anio) };
   }
 
   async getMiembrosAlDia(anio?: number, supabaseClient?: ReturnType<typeof createClient>, elegibles?: ElegiblesResult): Promise<string[]> {
@@ -977,8 +701,6 @@ export class PagosService {
     const mesActual = hoy.getMonth() + 1;
 
     const elegiblesData = elegibles || await this.getMiembrosElegibles(supabase);
-    const { miembros, ownerEmail, miembrosLibresIds } = elegiblesData;
-    const miembrosActivos = miembros.filter((m) => m.email?.toLowerCase() !== ownerEmail && !miembrosLibresIds.has(m.id));
 
     // Step 1: query payment_detail by month+year (small result set)
     const { data: pagosDetalles } = await supabase
@@ -999,9 +721,7 @@ export class PagosService {
           .in("status", ["aprobado"])
       : { data: [] };
 
-    const idsAlDia = new Set((pagosHeader || []).map((p) => p.user_id));
-
-    return miembrosActivos.filter((m) => idsAlDia.has(m.id)).map((m) => m.id);
+    return calcularMiembrosAlDia(elegiblesData, (pagosHeader || []).map((p) => p.user_id));
   }
 
   async getMiembrosLibres(supabaseClient?: ReturnType<typeof createClient>): Promise<string[]> {

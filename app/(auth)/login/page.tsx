@@ -17,43 +17,7 @@ import { Dumbbell, CheckCircle, Mail, Zap } from "lucide-react";
 import { messages } from "@/lib/messages";
 import { showToast } from "@/components/ui/toast";
 import Link from "next/link";
-
-const particleCount = 10;
-
-function generateParticles() {
-  return Array.from({ length: particleCount }, () => ({
-    left: Math.random() * 100,
-    top: Math.random() * 100,
-    delay: Math.random() * 6,
-    duration: 4 + Math.random() * 4,
-    size: 2 + Math.random() * 3,
-    colorIndex: Math.floor(Math.random() * 3),
-  }));
-}
-
-const particles = generateParticles();
-
-function FloatingParticles() {
-  return (
-    <div className="particles-container">
-      {particles.map((p, i) => (
-        <div
-          key={i}
-          className="particle"
-          style={{
-            left: `${p.left}%`,
-            top: `${p.top}%`,
-            animationDelay: `${p.delay}s`,
-            animationDuration: `${p.duration}s`,
-            width: `${p.size}px`,
-            height: `${p.size}px`,
-            background: p.colorIndex === 0 ? "rgba(56, 189, 248, 0.25)" : p.colorIndex === 1 ? "rgba(129, 140, 248, 0.15)" : "rgba(52, 211, 153, 0.15)",
-          }}
-        />
-      ))}
-    </div>
-  );
-}
+import { FloatingParticles } from "@/components/ui/floating-particles";
 
 export default function LoginPage() {
   return (
@@ -403,7 +367,7 @@ function LoginForm() {
   return (
     <div className="min-h-screen flex items-center justify-center p-4 pb-16 relative overflow-hidden">
       <Loader show={loading} message={messages.common.procesando} variant="overlay" />
-      <FloatingParticles />
+      <FloatingParticles id="login" count={10} colors={["rgba(56, 189, 248, 0.25)", "rgba(129, 140, 248, 0.15)", "rgba(52, 211, 153, 0.15)"]} />
       <div className="absolute inset-0 bg-gradient-to-br from-gym-primary/5 via-transparent to-gym-secondary/5" />
       <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-gym-primary/8 rounded-full blur-3xl animate-pulse" />
       <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-gym-secondary/8 rounded-full blur-3xl animate-pulse" style={{ animationDelay: "1s" }} />

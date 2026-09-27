@@ -17,7 +17,7 @@ import { Pagination } from "@/components/ui/pagination";
 import { usePagination } from "@/hooks/usePagination";
 import { showToast } from "@/components/ui/toast";
 import { messages } from "@/lib/messages";
-import type { Profile, Payment, Membership } from "@/lib/types";
+import type { Profile, Membership } from "@/lib/types";
 import { getAdminLevel, isFullAdmin, type AdminLevel } from "@/lib/admin-level";
 import Link from "next/link";
 
@@ -38,7 +38,6 @@ export default function MiembrosPage() {
   const [nuevoPassword, setNuevoPassword] = useState("");
   const [emailError, setEmailError] = useState("");
   const [passwordError, setPasswordError] = useState("");
-  const [pagoInscripcion, setPagoInscripcion] = useState<Payment | null>(null);
   const [isMembresiaLibre, setIsMembresiaLibre] = useState(false);
   const [currentUser, setCurrentUser] = useState<Profile | null>(null);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
@@ -291,39 +290,12 @@ export default function MiembrosPage() {
 
   const verDetalle = async (miembro: Profile) => {
     setSelectedMiembro(miembro);
-    setPagoInscripcion(null);
     setIsMembresiaLibre(false);
     setIsSuperAdmin(miembro.role === "super_admin");
     setIsActivar(miembro.activo !== false);
     setInscripcionAdminNote(miembro.inscription_admin_note || "");
     try {
       const supabase = createClient();
-
-      const { data: inscPago } = await supabase
-        .from("payments")
-        .select("id")
-        .eq("user_id", miembro.id)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      let pagoInsc: Payment | null = null;
-      if (inscPago) {
-        const { data: detInsc } = await supabase
-          .from("payment_detail")
-          .select("payment_id")
-          .eq("payment_id", inscPago.id)
-          .eq("payment_type", "inscripcion")
-          .maybeSingle();
-        if (detInsc) {
-          const { data: pagoFull } = await supabase
-            .from("payments")
-            .select("*")
-            .eq("id", inscPago.id)
-            .single();
-          pagoInsc = pagoFull;
-        }
-      }
 
       const { data: libreData } = await supabase
         .from("memberships")
@@ -334,7 +306,6 @@ export default function MiembrosPage() {
         .limit(1)
         .maybeSingle();
 
-      if (pagoInsc) setPagoInscripcion(pagoInsc);
       setIsMembresiaLibre(!!libreData);
 
       await loadHistorialMembresias(miembro.id);
@@ -747,8 +718,8 @@ export default function MiembrosPage() {
                   <Badge variant={selectedMiembro.activo !== false ? "success" : "danger"}>
                     {selectedMiembro.activo !== false ? "Activo" : "Inactivo"}
                   </Badge>
-                  <Badge variant={pagoInscripcion ? "success" : "warning"}>
-                    Inscripción: {pagoInscripcion ? "Pagada" : "Pendiente"}
+                  <Badge variant={selectedMiembro.inscription_paid ? "success" : "warning"}>
+                    Inscripción: {selectedMiembro.inscription_paid ? "Pagada" : "Pendiente"}
                   </Badge>
                 </div>
               </div>
@@ -768,10 +739,10 @@ export default function MiembrosPage() {
                 <p className="text-gym-muted">Registro</p>
                 <p className="text-gym-text">{formatDate(selectedMiembro.start_date || selectedMiembro.created_at)}</p>
               </div>
-              {pagoInscripcion && (
+              {selectedMiembro.inscription_paid && (
                 <div>
                   <p className="text-gym-muted">Monto Inscripción</p>
-                  <p className="text-gym-text font-bold">{formatCurrency(pagoInscripcion.detail?.reduce((s, d) => s + d.payment_amount, 0) || 0)}</p>
+                  <p className="text-gym-text font-bold">{formatCurrency(selectedMiembro.inscription_amount_paid || 0)}</p>
                 </div>
               )}
             </div>

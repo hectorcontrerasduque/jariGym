@@ -82,9 +82,46 @@ export async function DELETE(request: Request) {
       }
     }
 
+    // Check if payment has inscription detail before deleting
+    const { data: detalles } = await serviceSupabase
+      .from("payment_detail")
+      .select("payment_type")
+      .eq("payment_id", pagoId);
+
+    const tieneInscripcion = detalles?.some(d => d.payment_type === "inscripcion");
+
     // ON DELETE CASCADE elimina payment_detail automáticamente
     const { error } = await serviceSupabase.from("payments").delete().eq("id", pagoId);
     if (error) throw error;
+
+    // If payment had inscription, check if another approved one remains
+    if (tieneInscripcion) {
+      const { data: otroInscripcion } = await serviceSupabase
+        .from("payments")
+        .select("id")
+        .eq("user_id", pagoActual.user_id)
+        .eq("status", "aprobado")
+        .neq("id", pagoId)
+        .limit(1);
+
+      let hayOtraInscripcion = false;
+      if (otroInscripcion && otroInscripcion.length > 0) {
+        const { data: detalleOtro } = await serviceSupabase
+          .from("payment_detail")
+          .select("id")
+          .eq("payment_id", otroInscripcion[0].id)
+          .eq("payment_type", "inscripcion")
+          .limit(1);
+        hayOtraInscripcion = !!detalleOtro && detalleOtro.length > 0;
+      }
+
+      if (!hayOtraInscripcion) {
+        await serviceSupabase
+          .from("profiles")
+          .update({ inscription_paid: false, inscription_date: null })
+          .eq("id", pagoActual.user_id);
+      }
+    }
 
     return NextResponse.json({ success: true });
   } catch (err) {

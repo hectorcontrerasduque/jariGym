@@ -56,6 +56,20 @@ export class PagosService {
     return (this.client ??= createClient());
   }
 
+  private validateDetalles(detalles: CreatePaymentInput["detalles"]): void {
+    const byMonth = new Map<string, Set<string>>();
+    for (const d of detalles) {
+      const key = `${d.month_number}-${d.year_number}`;
+      if (!byMonth.has(key)) byMonth.set(key, new Set());
+      byMonth.get(key)!.add(d.payment_type);
+    }
+    for (const [, tipos] of byMonth) {
+      if (tipos.has("mensualidad") && tipos.has("suspension")) {
+        throw new Error("No se puede registrar mensualidad y suspensión para el mismo mes");
+      }
+    }
+  }
+
   private async getPagosPorAnio(anio: number, supabaseClient?: ReturnType<typeof createClient>): Promise<PagoRPCRow[]> {
     const supabase = supabaseClient || this.supabase;
     const { data, error } = await supabase.rpc("get_pagos_por_anio", { p_anio: anio });
@@ -68,6 +82,8 @@ export class PagosService {
       data: { user },
     } = await this.supabase.auth.getUser();
     if (!user) throw new Error(messages.toast.noAutenticado);
+
+    this.validateDetalles(input.detalles);
 
     const receiptUrl = input.payment_method === "efectivo" ? null : (input.receipt_url || null);
 
@@ -215,6 +231,8 @@ export class PagosService {
     if (profile?.role !== "super_admin") {
       throw new Error(messages.toast.noAutorizado);
     }
+
+    this.validateDetalles(input.detalles);
 
     const receiptUrl = input.payment_method === "efectivo" ? null : (input.receipt_url || null);
 
@@ -417,23 +435,12 @@ export class PagosService {
 
   async tieneInscripcionPendiente(usuarioId: string, supabaseClient?: ReturnType<typeof createClient>): Promise<boolean> {
     const supabase = supabaseClient || this.supabase;
-    const { data: pagos } = await supabase
-      .from("payments")
-      .select("id")
-      .eq("user_id", usuarioId)
-      .in("status", ["pendiente", "aprobado"])
-      .limit(1);
-
-    if (!pagos || pagos.length === 0) return false;
-
-    const { data: detalles } = await supabase
-      .from("payment_detail")
-      .select("id")
-      .eq("payment_id", pagos[0].id)
-      .eq("payment_type", "inscripcion")
-      .limit(1);
-
-    return !!detalles && detalles.length > 0;
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("inscription_paid")
+      .eq("id", usuarioId)
+      .single();
+    return profile?.inscription_paid ?? false;
   }
 
   async pagosRecientesAprobados(anio?: number, supabaseClient?: ReturnType<typeof createClient>): Promise<Pago[]> {

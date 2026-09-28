@@ -25,9 +25,12 @@ const metodoLabels: Record<MetodoPago, string> = {
 function getPagoLabel(pago: Payment): string {
   const detalles = pago.detail || [];
   if (!detalles.length) return "Pago";
-  if (detalles.some(d => d.payment_type === "inscripcion")) return "Inscripción";
-  if (detalles.some(d => d.payment_type === "suspension")) return "Suspensión";
-  return "Mensualidad";
+  const tipos = new Set(detalles.map(d => d.payment_type));
+  const labels: string[] = [];
+  if (tipos.has("inscripcion")) labels.push("Inscripción");
+  if (tipos.has("mensualidad")) labels.push("Mensualidad");
+  if (tipos.has("suspension")) labels.push("Suspensión");
+  return labels.join(" + ") || "Pago";
 }
 
 function isInscripcion(pago: Payment): boolean {
@@ -35,9 +38,7 @@ function isInscripcion(pago: Payment): boolean {
 }
 
 function getTipoLabel(pago: Payment): string {
-  if (isInscripcion(pago)) return "Inscripción";
-  if (pago.detail?.some(d => d.payment_type === "suspension")) return "Suspensión";
-  return "Mensualidad";
+  return getPagoLabel(pago);
 }
 
 function getTotalMonto(pago: Payment): number {

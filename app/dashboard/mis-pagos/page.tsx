@@ -127,12 +127,14 @@ function MisPagosContent() {
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
+    if (requestId !== fetchRequestIdRef.current) return;
 
     const { data: profileData } = await supabase
       .from("profiles")
       .select("*")
       .eq("id", user.id)
       .single();
+    if (requestId !== fetchRequestIdRef.current) return;
     setProfile(profileData);
 
     const targetId = miembroSeleccionado?.id || memberFromUrl || user.id;
@@ -166,6 +168,8 @@ function MisPagosContent() {
       console.error("Error cargando pagos:", err);
       showToast(messages.toast.errorCargaDatos, "error");
     }
+
+    if (requestId !== fetchRequestIdRef.current) return;
 
     // 2. Derivar años de los pagos del miembro + año actual siempre
     const yearsFromPagos = Array.from(

@@ -18,6 +18,9 @@ const transporter = nodemailer.createTransport({
     user: process.env.GMAIL_USER,
     pass: process.env.GMAIL_APP_PASSWORD,
   },
+  pool: true,
+  maxConnections: 5,
+  maxMessages: 100,
   connectionTimeout: 10000,
   greetingTimeout: 5000,
 });
@@ -152,18 +155,29 @@ async function sendEmail({
   const attachments = await qrAttachment();
   const finalHtml = skipQr ? html : injectQrAfterHeader(html);
 
-  const result = await transporter.sendMail({
+  const mailOptions = {
     from: `"${fromName || "GymApp"}" <${process.env.GMAIL_USER}>`,
     to,
     subject,
     html: finalHtml,
     replyTo: process.env.GMAIL_USER,
     attachments,
-  });
+  };
 
-  if (!result.messageId) {
-    throw new Error("Email sent but no messageId returned");
+  let lastError: Error | null = null;
+  for (let attempt = 0; attempt <= 1; attempt++) {
+    try {
+      const result = await transporter.sendMail(mailOptions);
+      if (!result.messageId) {
+        throw new Error("Email sent but no messageId returned");
+      }
+      return;
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+      if (attempt === 0) await sleep(2000);
+    }
   }
+  throw lastError;
 }
 
 // ─── SEND NOTIFICATION (batch/Marketing headers) ─────────────
@@ -184,7 +198,7 @@ async function sendNotificationEmail({
   const attachments = skipQr ? [] : await qrAttachment();
   const finalHtml = skipQr ? html : injectQrAfterHeader(html);
 
-  const result = await transporter.sendMail({
+  const mailOptions = {
     from: `"${fromName || "GymApp"}" <${process.env.GMAIL_USER}>`,
     to,
     subject,
@@ -198,11 +212,22 @@ async function sendNotificationEmail({
       "X-Campaign": campaign,
       "X-Mailer": "GymApp-Notifications",
     },
-  });
+  };
 
-  if (!result.messageId) {
-    throw new Error("Email sent but no messageId returned");
+  let lastError: Error | null = null;
+  for (let attempt = 0; attempt <= 1; attempt++) {
+    try {
+      const result = await transporter.sendMail(mailOptions);
+      if (!result.messageId) {
+        throw new Error("Email sent but no messageId returned");
+      }
+      return;
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+      if (attempt === 0) await sleep(2000);
+    }
   }
+  throw lastError;
 }
 
 // ─── PASSWORD RESET ──────────────────────────────────────────

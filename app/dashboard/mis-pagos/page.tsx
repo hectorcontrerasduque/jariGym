@@ -86,6 +86,7 @@ function MisPagosContent() {
   const [miembroSeleccionado, setMiembroSeleccionado] = useState<Profile | null>(null);
   const [showSearch, setShowSearch] = useState(false);
   const fetchRequestIdRef = useRef(0);
+  const clearedMemberRef = useRef(false);
 
   // Home expand toggles
   const [expandedPendientes, setExpandedPendientes] = useState(true);
@@ -137,7 +138,7 @@ function MisPagosContent() {
     if (requestId !== fetchRequestIdRef.current) return;
     setProfile(profileData);
 
-    const targetId = miembroSeleccionado?.id || memberFromUrl || user.id;
+    const targetId = clearedMemberRef.current ? user.id : (miembroSeleccionado?.id || memberFromUrl || user.id);
     const currentIsAdmin = profileData?.role === "super_admin";
 
     // Individual queries with error handling - avoid Promise.all that fails entire page load
@@ -309,6 +310,7 @@ function MisPagosContent() {
   }, [showForm, miembroSeleccionado, anioSeleccionado, loadMiembroPendientes, loadSelfPendientes]);
 
   const handleSelectMiembro = (m: Profile | null) => {
+    if (m === null) clearedMemberRef.current = true;
     setMiembroSeleccionado(m);
     setShowSearch(false);
     setMiembroSearch("");

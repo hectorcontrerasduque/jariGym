@@ -85,6 +85,7 @@ function MisPagosContent() {
   const [miembroSearch, setMiembroSearch] = useState("");
   const [miembroSeleccionado, setMiembroSeleccionado] = useState<Profile | null>(null);
   const [showSearch, setShowSearch] = useState(false);
+  const fetchRequestIdRef = useRef(0);
 
   // Home expand toggles
   const [expandedPendientes, setExpandedPendientes] = useState(true);
@@ -122,6 +123,7 @@ function MisPagosContent() {
   const [showPagosRealizados, setShowPagosRealizados] = useState(true);
 
   const fetchMisPagosData = useCallback(async () => {
+    const requestId = ++fetchRequestIdRef.current;
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
@@ -191,6 +193,8 @@ function MisPagosContent() {
     } catch {
       config = null;
     }
+
+    if (requestId !== fetchRequestIdRef.current) return;
 
     setPagos(pagosData);
     setAnios(aniosData);

@@ -297,6 +297,13 @@ export default function MiembrosPage() {
     try {
       const supabase = createClient();
 
+      const { data: freshProfile } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", miembro.id)
+        .single();
+      if (freshProfile) setSelectedMiembro(freshProfile);
+
       const { data: libreData } = await supabase
         .from("memberships")
         .select("id, end_date")

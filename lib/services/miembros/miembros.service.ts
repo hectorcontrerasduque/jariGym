@@ -8,14 +8,14 @@ export class MiembrosService {
   async listarMiembros(): Promise<Profile[]> {
     const { data, error } = await this.supabase
       .from("profiles")
-      .select("id, full_name, email, avatar_url, activo, role, start_date, inscription_admin_note, inscription_paid, arrival_time, departure_time")
+      .select("id, full_name, email, avatar_url, activo, role, start_date, phone_number, document_id, inscription_admin_note, inscription_paid, inscription_amount_paid, arrival_time, departure_time")
       .order("start_date", { ascending: false });
 
     if (error) throw error;
     return (data || []) as Profile[];
   }
 
-  private static readonly SELECT_COLUMNS = "id, full_name, email, avatar_url, activo, role, start_date, inscription_admin_note, inscription_paid, arrival_time, departure_time";
+  private static readonly SELECT_COLUMNS = "id, full_name, email, avatar_url, activo, role, start_date, phone_number, document_id, inscription_admin_note, inscription_paid, inscription_amount_paid, arrival_time, departure_time";
 
   async listarPaginated(opts: { from: number; to: number; search?: string }): Promise<{ data: Profile[]; count: number }> {
     const { from, to, search } = opts;

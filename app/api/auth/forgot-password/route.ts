@@ -24,14 +24,10 @@ export async function POST(request: Request) {
 
     const supabase = getAdminClient();
 
-    const { error: cleanupGlobalErr } = await supabase
+    await supabase
       .from("password_reset_tokens")
       .delete()
       .lt("expires_at", new Date().toISOString());
-
-    if (cleanupGlobalErr) {
-      await supabase.from("password_reset_tokens").delete().neq("id", "00000000-0000-0000-0000-000000000000");
-    }
 
     const { data: profile } = await supabase
       .from("profiles")
@@ -44,18 +40,11 @@ export async function POST(request: Request) {
     }
 
     const cutoff = new Date(Date.now() - RATE_LIMIT_WINDOW).toISOString();
-    const { error: cleanupUserErr } = await supabase
+    await supabase
       .from("password_reset_tokens")
       .delete()
       .eq("user_id", profile.id)
       .lt("created_at", cutoff);
-
-    if (cleanupUserErr) {
-      await supabase
-        .from("password_reset_tokens")
-        .delete()
-        .eq("user_id", profile.id);
-    }
 
     const { count } = await supabase
       .from("password_reset_tokens")
@@ -70,13 +59,15 @@ export async function POST(request: Request) {
     const token = crypto.randomBytes(32).toString("hex");
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
-    const { error: insertError } = await supabase
+    const { data: insertedToken, error: insertError } = await supabase
       .from("password_reset_tokens")
       .insert({
         user_id: profile.id,
         token,
         expires_at: expiresAt.toISOString(),
-      });
+      })
+      .select("id")
+      .single();
 
     if (insertError) {
       return NextResponse.json({ error: messages.auth.resetPasswordError }, { status: 500 });
@@ -94,7 +85,14 @@ export async function POST(request: Request) {
     const gymName = gymConfig?.gym_name || "GymApp";
     const gymLogo = gymConfig?.logo_url || null;
 
-    await sendPasswordResetEmail(email, resetLink, gymName, gymLogo);
+    try {
+      await sendPasswordResetEmail(email, resetLink, gymName, gymLogo);
+    } catch {
+      if (insertedToken) {
+        await supabase.from("password_reset_tokens").delete().eq("id", insertedToken.id);
+      }
+      return NextResponse.json({ error: messages.auth.resetPasswordError }, { status: 500 });
+    }
 
     return NextResponse.json({ message: messages.auth.resetPasswordSent });
   } catch {

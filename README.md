@@ -1,10 +1,10 @@
 # GymApp - Gestión de Gimnasio SaaS
 
-Multi-tenant SaaS para gestión de gimnasio con Next.js 14, Supabase y Tailwind CSS.
+Multi-tenant SaaS para gestión de gimnasio con Next.js 16 (App Router), Supabase y Tailwind CSS.
 
 ## Requisitos
 
-- Node.js 18+
+- Node.js 20.9+ (Next 16 no arranca por debajo)
 - npm
 - Cuenta de Supabase
 - Cuenta de Gmail (para envío de emails de reset)
@@ -19,11 +19,13 @@ npm install
 
 ### 2. Configurar variables de entorno
 
-Crea `.env.development` con variables de Supabase dev:
+Copia el ejemplo a `.env.local` — es el archivo que leen `npm run dev` **y** `npm run build`:
 
 ```bash
-cp .env.example .env.development
+cp .env.example .env.local
 ```
+
+> `.env.development` solo lo lee `next dev`. Durante `next build` Next.js usa `NODE_ENV=production` y nunca abre ese archivo, así que si guardas ahí las variables de Supabase el build fallará. Usa `.env.local` (o `.env.production` en producción).
 
 | Variable | Descripción | Ejemplo |
 |----------|-------------|---------|
@@ -56,9 +58,9 @@ En Supabase Dashboard → SQL Editor, ejecuta las migraciones en orden:
 
 ### 5. Variables en Vercel
 
-En Vercel Dashboard → Settings → Environment Variables, agrega:
-- `GMAIL_USER` = tu Gmail
-- `GMAIL_APP_PASSWORD` = tu App Password
+En Vercel Dashboard → Settings → Environment Variables, agrega las 8 variables de la tabla del paso 2 (`NEXT_PUBLIC_*`, `SUPABASE_SERVICE_ROLE_KEY`, `GMAIL_*`, `CRON_SECRET`).
+
+`.env.local` no se sube al repo, así que el build de Vercel no tiene credenciales de Supabase ni de SMTP sin ellas.
 
 ### 6. Google OAuth (Login con Google)
 

@@ -26,9 +26,9 @@ No CI pipelines. No Node.js in WSL — run npm from Windows PowerShell (macOS: H
 Installed automatically by `npm install` / `npm ci` (`prepare` script).
 
 - **pre-commit** (`.husky/pre-commit`, ~4 s): `eslint --max-warnings=0` on staged files, `tsc --noEmit`, `vitest run`.
-- **pre-push** (`.husky/pre-push`): `next build`. Requires `.env.development` with the Supabase variables; without them the build fails while collecting API routes.
+- **pre-push** (`.husky/pre-push`): `next build`. Needs the Supabase variables in `.env.local`: `next build` runs with `NODE_ENV=production`, so it reads `.env.production.local` → `.env.local` → `.env.production` → `.env`, and **never** `.env.development` (that one is dev-only). Without those variables the build fails while collecting API routes.
 - Emergency bypass: `git commit --no-verify` / `git push --no-verify`. Do not use it to skip failing tests.
-- `.gitattributes` forces LF on `.husky/*` so the hooks run under Git for Windows `sh`.
+- `.gitattributes` forces LF repo-wide (`* text=auto eol=lf`, plus `.husky/*`) so the hooks run under Git for Windows `sh` and Windows edits don't produce phantom whole-file diffs.
 
 ### Local database (Supabase local, Docker)
 
@@ -168,11 +168,12 @@ const service = new PagosService(fake.client);
 ## Environment Variables
 
 **Structure (gitignored):**
-- `.env.development` — Supabase dev variables (Next.js reads in dev mode)
-- `.env.prod` — Supabase production variables
-- `.env.local` — Local PostgreSQL credentials (for migrate-db-new.ps1)
+- `.env.local` — what this machine actually uses: Supabase dev variables, GMAIL SMTP, `CRON_SECRET` and the local PostgreSQL credentials (for migrate-db-new.ps1). Read by both `npm run dev` and `npm run build`.
+- `.env.development` — optional dev-only override (`next dev` reads it, `next build` never does). Absent by default.
+- `.env.development.local` — written by `npm run db:local:reset`, beats `.env.local` in dev mode.
+- `.env.prod` — Supabase production variables. Next.js does not read this name: `next build` looks for `.env.production` / `.env.production.local`.
 
-**Supabase variables** (in `.env.development` / `.env.prod`):
+**Supabase variables** (in `.env.local` for dev, production env for deploys):
 - `NEXT_PUBLIC_SUPABASE_URL` — Supabase project URL
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY` — public anon key
 - `SUPABASE_SERVICE_ROLE_KEY` — admin key (server-side only, never expose to client)

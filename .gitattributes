@@ -1,2 +1,7 @@
 # Husky hooks run under sh (also Git for Windows); CRLF breaks them
 .husky/* text eol=lf
+
+# Store LF in the repo and check out LF on every platform. Without this,
+# Windows (core.autocrlf=true) rewrites these files to CRLF on save and the
+# next commit looks like a phantom diff of the whole file.
+* text=auto eol=lf

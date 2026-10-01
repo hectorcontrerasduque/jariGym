@@ -1,4 +1,4 @@
-import nodemailer from "nodemailer";
+import nodemailer, { type SendMailOptions } from "nodemailer";
 import QRCode from "qrcode";
 import { resetPasswordTemplate } from "./templates/reset-password";
 import { welcomeTemplate } from "./templates/welcome";
@@ -57,7 +57,7 @@ async function getQrBuffer(): Promise<Buffer> {
   return cachedQrBuffer;
 }
 
-function qrAttachment(): Promise<NonNullable<nodemailer.SendMailOptions["attachments"]>> {
+function qrAttachment(): Promise<NonNullable<SendMailOptions["attachments"]>> {
   return getQrBuffer().then((buf) => [
     { filename: "qr-login.png", content: buf, cid: "qr-login" },
   ]);

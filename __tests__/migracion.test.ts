@@ -144,6 +144,7 @@ describe("Migración API", () => {
   });
 
   it("exitoso: crea usuario + pagos + inscripcion", async () => {
+    const profileUpdates: Record<string, unknown>[] = [];
     mockSupabase.from.mockImplementation((table: string) => {
       if (table === "gym_config") return chainReturn({ id: "1" });
       if (table === "gym_config_payment_methods") return chainReturn({ amount_monthly: 10, amount_inscription: 5 });
@@ -151,7 +152,16 @@ describe("Migración API", () => {
         { id: "m1", nombre: "HAIDEE", mes_pagar: 1, anio_pagar: 2026, estado: "pagado", migrado: "no" },
         { id: "m2", nombre: "HAIDEE", mes_pagar: 2, anio_pagar: 2026, estado: "pagado", migrado: "no" },
       ]);
-      if (table === "profiles") return chainReturn(null);
+      if (table === "payment_detail") return chainReturn([{ payment_amount: 5 }]);
+      if (table === "profiles") {
+        const chain = chainReturn(null);
+        const originalUpdate = chain.update;
+        chain.update = vi.fn((payload: unknown) => {
+          profileUpdates.push(payload as Record<string, unknown>);
+          return originalUpdate(payload);
+        });
+        return chain;
+      }
       if (table === "password_reset_tokens") return chainReturn(null);
       return chainReturn(null);
     });
@@ -176,6 +186,7 @@ describe("Migración API", () => {
     expect(res.status).toBe(200);
     expect(_body.success).toBe(true);
     expect(_body.pagosCreados).toBeGreaterThanOrEqual(1);
+    expect(profileUpdates).toContainEqual({ inscription_amount_paid: 5 });
   });
 
   it("exitoso con selectedNombre diferente", async () => {

@@ -6,6 +6,7 @@ import { sendWelcomeEmail } from "@/lib/services/email/email.service";
 import { sanitizeOrFilter } from "@/lib/utils/sanitize";
 import { applyRateLimit } from "@/lib/middleware/rate-limit";
 import { createOrUpdateUser } from "@/lib/services/miembros/profile.service";
+import { calcularMontoInscripcionAprobado } from "@/lib/features/pagos/inscription-amount";
 
 export async function POST(request: Request) {
   const rateLimitResponse = await applyRateLimit(request, {
@@ -307,6 +308,17 @@ export async function POST(request: Request) {
     const pagosActualizados = rpcResult?.pagos_actualizados || 0;
 
     const hasMigratedPayments = pagosCreados > 0 || pagosActualizados > 0;
+
+    try {
+      const inscriptionAmount = await calcularMontoInscripcionAprobado(supabase, userId);
+      await supabase
+        .from("profiles")
+        .update({ inscription_amount_paid: inscriptionAmount })
+        .eq("id", userId);
+    } catch {
+      /* best-effort: la migración ya se completó en el RPC */
+    }
+
     let welcomeEmailSent = false;
 
     if (isNewUser || hasMigratedPayments) {

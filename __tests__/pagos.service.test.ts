@@ -595,6 +595,7 @@ describe("crearPagoAprobado", () => {
     fake.setUser(ADMIN);
     fake.on("profiles", "select").reply({ data: { role: "super_admin" } });
     fake.on("payments", "insert").reply({ data: { id: "p1" } });
+    fake.on("payment_detail", "select").reply({ data: [{ payment_amount: 5 }, { payment_amount: 10 }] });
     await service.crearPagoAprobado(input("inscripcion"));
 
     expect(fake.callsTo("payments", "insert")[0].payload).toEqual({
@@ -609,8 +610,16 @@ describe("crearPagoAprobado", () => {
       approved_at: HOY.toISOString(),
     });
     const [upd] = fake.callsTo("profiles", "update");
-    expect(upd.payload).toEqual({ inscription_paid: true, inscription_date: HOY_ISO_DATE });
+    expect(upd.payload).toEqual({
+      inscription_paid: true,
+      inscription_date: HOY_ISO_DATE,
+      inscription_amount_paid: 15,
+    });
     expect(upd.filters).toContainEqual(["eq", "id", "m1"]);
+    const sumSelect = fake.callsTo("payment_detail", "select")[0];
+    expect(sumSelect.filters).toContainEqual(["eq", "payment_type", "inscripcion"]);
+    expect(sumSelect.filters).toContainEqual(["eq", "payments.status", "aprobado"]);
+    expect(sumSelect.filters).toContainEqual(["eq", "payments.user_id", "m1"]);
   });
 
   it("sin línea de inscripción no toca el perfil", async () => {
@@ -640,6 +649,7 @@ describe("aprobarPago", () => {
     fake.on("profiles", "select").reply({ data: { role: "super_admin" } });
     fake.on("payments", "update").reply({ data: { id: "p1", user_id: "m1", status: "aprobado" } });
     fake.on("payment_detail", "select").reply({ data: [{ payment_type: "inscripcion" }] });
+    fake.on("payment_detail", "select").reply({ data: [{ payment_amount: 30 }] });
 
     const r = await service.aprobarPago("p1");
     expect(r).toEqual({ id: "p1", user_id: "m1", status: "aprobado" });
@@ -650,7 +660,11 @@ describe("aprobarPago", () => {
     expect(upd.filters.filter((f) => f[0] === "eq")).toEqual([["eq", "id", "p1"]]);
     expect(fake.callsTo("payment_detail", "select")[0].filters).toContainEqual(["eq", "payment_id", "p1"]);
     const [prof] = fake.callsTo("profiles", "update");
-    expect(prof.payload).toEqual({ inscription_paid: true, inscription_date: HOY_ISO_DATE });
+    expect(prof.payload).toEqual({
+      inscription_paid: true,
+      inscription_date: HOY_ISO_DATE,
+      inscription_amount_paid: 30,
+    });
     expect(prof.filters).toContainEqual(["eq", "id", "m1"]);
   });
 

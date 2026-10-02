@@ -6,6 +6,7 @@ import { calcularMorosos, calcularMiembrosAlDia } from "./domain/morosos";
 import { calcularStats, calcularMonthlyStats } from "./domain/stats";
 import { filtrarElegibles, type ElegiblesInput } from "./domain/elegibles";
 import { calcularMesesPendientes } from "./domain/meses-pendientes";
+import { calcularMontoInscripcionAprobado } from "./inscription-amount";
 
 export type { ElegiblesResult };
 
@@ -165,11 +166,13 @@ export class PagosService {
 
     const tieneInscripcion = detalles?.some((d) => d.payment_type === "inscripcion");
     if (tieneInscripcion) {
+      const inscriptionAmount = await calcularMontoInscripcionAprobado(this.supabase, data.user_id);
       await this.supabase
         .from("profiles")
         .update({
           inscription_paid: true,
           inscription_date: new Date().toISOString().split("T")[0],
+          inscription_amount_paid: inscriptionAmount,
         })
         .eq("id", data.user_id);
     }
@@ -278,11 +281,13 @@ export class PagosService {
 
     const tieneInscripcion = detalles.some((d) => d.payment_type === "inscripcion");
     if (tieneInscripcion) {
+      const inscriptionAmount = await calcularMontoInscripcionAprobado(this.supabase, input.user_id);
       await this.supabase
         .from("profiles")
         .update({
           inscription_paid: true,
           inscription_date: new Date().toISOString().split("T")[0],
+          inscription_amount_paid: inscriptionAmount,
         })
         .eq("id", input.user_id);
     }

@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { createClient as createAuthClient } from "@/lib/supabase/server";
 import { messages } from "@/lib/messages";
+import { calcularMontoInscripcionAprobado } from "@/lib/features/pagos/inscription-amount";
 
 export async function DELETE(request: Request) {
   try {
@@ -118,7 +119,13 @@ export async function DELETE(request: Request) {
       if (!hayOtraInscripcion) {
         await serviceSupabase
           .from("profiles")
-          .update({ inscription_paid: false, inscription_date: null })
+          .update({ inscription_paid: false, inscription_date: null, inscription_amount_paid: 0 })
+          .eq("id", pagoActual.user_id);
+      } else {
+        const inscriptionAmount = await calcularMontoInscripcionAprobado(serviceSupabase, pagoActual.user_id);
+        await serviceSupabase
+          .from("profiles")
+          .update({ inscription_amount_paid: inscriptionAmount })
           .eq("id", pagoActual.user_id);
       }
     }

@@ -84,36 +84,41 @@ El login con Google utiliza **Google Cloud Console** con un proyecto llamado **j
 npm run dev
 ```
 
-### 8. Configurar Cron de Notificaciones (cron-job.org)
+### 8. Cron de Notificaciones (Vercel Cron)
 
 Las notificaciones automáticas se disparan de dos formas:
-1. **Cron externo**: llama al endpoint `/api/notificaciones` diariamente a medianoche
+1. **Vercel Cron**: `vercel.json` invoca `GET /api/notificaciones` diariamente a las 04:00 UTC (medianoche VET)
 2. **Login de admin**: al hacer login, el sidebar dispara en background una verificación
 
-Para configurar el cron externo con [cron-job.org](https://cron-job.org) (gratis):
+No se necesita ningún servicio externo. Solo asegúrate de que exista la env var `CRON_SECRET` en Vercel
+Dashboard → Settings → Environment Variables (entorno **Production**, tipo **Secret** — nunca Config: el tipo
+Config muestra el valor en el dashboard y Vercel avisa "Needs Attention"). Vercel la envía automáticamente como
+`Authorization: Bearer <CRON_SECRET>` al invocar el cron. Si no está definida, el endpoint responde 401.
 
-1. Crea una cuenta en https://cron-job.org
-2. Crea un nuevo cron job con estos settings:
-   - **URL**: `https://TU-DOMINIO.vercel.app/api/notificaciones`
-   - **Method**: `POST`
-   - **Schedule**: `0 0 * * *` (diario a medianoche, 00:00)
-   - **Headers**:
-     ```
-     Authorization: Bearer TU_CRON_SECRET
-     Content-Type: application/json
-     ```
-3. Genera un `CRON_SECRET` aleatorio y agrégalo como env var en Vercel
-4. Activa las notificaciones en **Configuración → Notificaciones** del dashboard
-5. Selecciona la frecuencia deseada por tipo de notificación:
-   - **Diaria**: se ejecuta todos los días (si el cron corre diariamente)
-   - **Semanal**: se ejecuta una vez por semana
-   - **Quincenal**: se ejecuta cada 15 días
-   - **Mensual**: se ejecuta una vez al mes
+> **Desarrollo vs producción**: `vercel.json` es el mismo en ambas ramas, así que el cron se registra en los dos
+> proyectos Vercel (jargym-dev y jargym). Tras probar en dev, **desactívalo en jargym-dev**: Cron Jobs → toggle
+> del job `GET /api/notificaciones` → Disabled (el job queda listado pero no se ejecuta). Alternativa: borrar
+> `CRON_SECRET` de jargym-dev (el cron se seguirá disparando a las 04:00 UTC pero recibirá 401).
+
+Verificaciones:
+
+- Vercel Dashboard → tu proyecto → **Cron Jobs**: el job `GET /api/notificaciones` debe aparecer tras el deploy
+- Puedes dispararlo manualmente desde esa misma vista para probarlo
+- En plan Hobby el mínimo es 1 ejecución/día (este cron es diario) y Vercel puede ejecutarlo en cualquier
+  punto dentro de la hora programada; la lógica de frecuencia del endpoint solo compara fechas, así que no afecta
+- **Nota**: el cron solo corre en deployments de Production (no en previews)
 
 ```bash
 # Generar CRON_SECRET aleatorio (ejecutar una vez)
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
+
+Activa las notificaciones en **Configuración → Notificaciones** del dashboard y selecciona la frecuencia
+deseada por tipo:
+   - **Diaria**: se ejecuta todos los días (si el cron corre diariamente)
+   - **Semanal**: se ejecuta una vez por semana
+   - **Quincenal**: se ejecuta cada 15 días
+   - **Mensual**: se ejecuta una vez al mes
 
 ## Comandos
 
@@ -144,7 +149,7 @@ app/
   api/migracion/             # POST: migrate member data from Excel, search, ping
   api/profile/               # PUT actualizar perfil
   api/notificaciones/        # Cron + manual trigger
-    route.ts                 # POST: cron dispatch (CRON_SECRET or admin token)
+    route.ts                 # GET/POST: cron dispatch (CRON_SECRET or admin token)
     procesar/route.ts        # POST: admin-triggered, forzar bypasses frequency
   api/auth/
     forgot-password/         # POST: genera token + envía email

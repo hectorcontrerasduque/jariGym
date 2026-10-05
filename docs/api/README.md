@@ -37,7 +37,8 @@ También se puede abrir `openapi.yaml` en VS Code (extensión "OpenAPI (Swagger)
 | GET | `/api/migracion/morosos?anio=` | pública ⚠️ | Morosos de migración |
 | GET | `/api/migracion/pending` | pública | ¿Quedan personas por migrar? |
 | GET | `/api/migracion/ping?email=` | pública ⚠️ | ¿Existe el email / ya migró? |
-| POST | `/api/notificaciones` | `CRON_SECRET` o token super_admin ⚠️ | Cron diario de correos |
+| GET | `/api/notificaciones` | `CRON_SECRET` o token super_admin | Vercel Cron diario de correos |
+| POST | `/api/notificaciones` | `CRON_SECRET` o token super_admin | Cron diario de correos |
 | POST | `/api/notificaciones/procesar` | token super_admin | "Ejecutar ahora" |
 | POST | `/api/notificaciones/diagnostico` | token super_admin | Diagnóstico de correo |
 | DELETE | `/api/pagos?id=` | sesión (admin o dueño del pago) | Eliminar pago |

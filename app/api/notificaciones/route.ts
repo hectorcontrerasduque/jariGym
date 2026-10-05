@@ -6,12 +6,21 @@ import { sleep } from "@/lib/services/email/email.service";
 import { getDiaCobro, getDiaNotificacion } from "@/lib/utils";
 import { applyRateLimit } from "@/lib/middleware/rate-limit";
 import type { SupabaseClient } from "@supabase/supabase-js";
-
-const CRON_SECRET = process.env.CRON_SECRET || "gym-notifications-cron-secret";
-
 import type { NextRequest } from "next/server";
 
+const CRON_SECRET = process.env.CRON_SECRET;
+
+export const maxDuration = 300;
+
+export async function GET(request: NextRequest) {
+  return ejecutar(request);
+}
+
 export async function POST(request: NextRequest) {
+  return ejecutar(request);
+}
+
+async function ejecutar(request: NextRequest) {
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -19,7 +28,7 @@ export async function POST(request: NextRequest) {
 
   const authHeader = request.headers.get("authorization");
 
-  const isCronAuth = authHeader === `Bearer ${CRON_SECRET}`;
+  const isCronAuth = !!CRON_SECRET && authHeader === `Bearer ${CRON_SECRET}`;
   let isAdminAuth = false;
   let userId: string | null = null;
 

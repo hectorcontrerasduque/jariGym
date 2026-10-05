@@ -95,7 +95,7 @@ Ordenados por gravedad. Ninguno se tocó.
 
 | # | Gravedad | Dónde | Qué pasa | Verificado |
 |---|---|---|---|---|
-| 1 | 🔴 Alta | `app/api/notificaciones/route.ts:10` | `CRON_SECRET` tiene un valor por defecto en el código (`"gym-notifications-cron-secret"`). Si la variable no está definida en Vercel, cualquiera puede disparar el envío masivo de correos. | Código |
+| 1 | ~~🔴 Alta~~ ✅ | `app/api/notificaciones/route.ts` | ~~`CRON_SECRET` tiene un valor por defecto en el código (`"gym-notifications-cron-secret"`). Si la variable no está definida en Vercel, cualquiera puede disparar el envío masivo de correos.~~ Corregido: sin default; si la env var falta, el cron responde 401 (fail-closed). | Código |
 | 2 | 🔴 Alta | `GET /api/migracion/list`, `GET /api/migracion/morosos` | Públicos, sin límite, con service role: exponen nombres, correos y deudas de los miembros antiguos. El middleware no protege `/api`. | Código |
 | 3 | 🟠 Media | `GET /api/migracion/ping` | Público y sin límite: dice si un email está registrado y devuelve el nombre completo (enumeración de usuarios). | Código |
 | 4 | 🟠 Media | `GET /api/config/public` | Público: devuelve `gym_config` completo (`select *`, con email y teléfono del dueño) y todos los métodos de pago. | Código |

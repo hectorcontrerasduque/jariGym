@@ -75,7 +75,7 @@ app/
   api/migracion/     # POST: migrate member data from Excel, search, ping
   api/profile/       # PUT endpoint for profile updates (uses service role key)
   api/notificaciones/  # Cron: weekly notification dispatch + admin-triggered
-    route.ts          # POST: auth (cron secret OR admin token), frequency check, dispatches types
+    route.ts          # GET/POST: auth (cron secret OR admin token), frequency check, dispatches types
     procesar/route.ts # POST: manual trigger by admin, `forzar` bypasses frequency
   api/auth/
     forgot-password/ # POST: generates token + sends email via Gmail SMTP
@@ -395,7 +395,7 @@ e263c5e refactor: elimina console.* + centraliza strings en messages.ts para i18
 - `id_notificacion_config` (FK), `miembros_notificados`, `sin_problemas`, `error_detalle`, `fecha_hora_envio`
 
 ### Execution flow
-1. **Cron**: `POST /api/notificaciones` with `Authorization: Bearer <CRON_SECRET>` or admin JWT. Recommended schedule: `0 0 * * *` (daily at midnight)
+1. **Vercel Cron** (vercel.json): `GET /api/notificaciones` daily at `0 4 * * *` (UTC) = midnight Venezuela (UTC-4). Vercel sends `Authorization: Bearer <CRON_SECRET>` automatically; if the env var is missing the endpoint fails closed (401). Admin JWT also works. Hobby plan: min 1 run/day, may fire anywhere within the scheduled hour (frequency logic only compares dates).
 2. **Manual**: `POST /api/notificaciones/procesar` with admin JWT + `{ tipo?: string, forzar?: boolean }`
 3. Route queries `notificacion_config WHERE habilitado = true`, loops configs, checks frequency (skipped if `forzar`), calls `ejecutarTipo()`
 4. `ejecutarTipo()` dispatches to `procesarMiembrosDeudores`, `procesarRecordatorioPago`, `procesarResumenDueno`, `procesarEstatusSistema`

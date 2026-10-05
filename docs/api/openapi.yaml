@@ -8,7 +8,7 @@ info:
     **Cómo se autentica cada endpoint** (ver `security` en cada operación):
     - `sesion`: cookies de sesión de Supabase que el navegador envía solo (`@supabase/ssr`). Se usa desde las páginas de la app.
     - `bearerUsuario`: `Authorization: Bearer <access_token de Supabase>` del usuario.
-    - `cronSecret`: `Authorization: Bearer <CRON_SECRET>` para el cron externo.
+    - `cronSecret`: `Authorization: Bearer <CRON_SECRET>` para Vercel Cron (env var `CRON_SECRET`).
     - `security: []`: endpoint **público**, sin autenticación.
 
     "Requiere super_admin" significa que el perfil del usuario (`profiles.role`) debe ser `super_admin`;
@@ -529,6 +529,41 @@ paths:
                   invalid: { type: boolean }
 
   /api/notificaciones:
+    get:
+      tags: [notificaciones]
+      operationId: ejecutarNotificacionesCron
+      summary: Ejecuta las notificaciones habilitadas (Vercel Cron)
+      description: |
+        Invocado por Vercel Cron (`vercel.json`, diario a las 04:00 UTC = medianoche VET) con
+        `Authorization: Bearer <CRON_SECRET>` que Vercel envía automáticamente. Misma lógica que el POST.
+        Si `CRON_SECRET` no está definida en el entorno, el cron responde 401 (fail-closed).
+      security:
+        - cronSecret: []
+        - bearerUsuario: []
+      responses:
+        "200":
+          description: Resultado de la ejecución.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  message: { type: string, description: "Solo cuando no se ejecutó nada (deshabilitadas o sin configuraciones)." }
+                  ejecutadas: { type: integer }
+                  enviados: { type: integer }
+                  errores: { type: integer }
+        "401": { $ref: "#/components/responses/Error" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "500":
+          description: Error inesperado.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean, const: false }
+                  error: { type: string }
     post:
       tags: [notificaciones]
       operationId: ejecutarNotificaciones
@@ -536,11 +571,10 @@ paths:
       description: |
         Recomendado: cron diario a medianoche. Si `gym_config.notifications_enabled` es falso o no hay tipos habilitados,
         no hace nada. Para cada tipo habilitado en `notificacion_config`, respeta su frecuencia y envía los correos
-        (deudores, recordatorio de pago, resumen al dueño, estatus del sistema); registra en `notificacion_log`.
+        (deudores, recordatorio de pago, resumen al dueño, estatus del sistema); registra en `notification_log`.
         Límite de 5 cada 20 min solo cuando llama un usuario (no con `CRON_SECRET`).
 
-        ⚠️ `CRON_SECRET` tiene un valor por defecto en el código (`app/api/notificaciones/route.ts:10`):
-        si la variable no está definida en el entorno, ese valor público permite disparar los envíos.
+        Si `CRON_SECRET` no está definida en el entorno, el cron responde 401 (fail-closed).
       security:
         - cronSecret: []
         - bearerUsuario: []

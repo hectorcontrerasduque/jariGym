@@ -64,17 +64,22 @@ function qrAttachment(): Promise<NonNullable<SendMailOptions["attachments"]>> {
   ]);
 }
 
-// ─── QR SECTION (injected after header in every email) ──────
-function qrSectionHtml(): string {
+// ─── ACCESS SECTION (QR or link-only, injected after header) ──
+function seccionAccesoHtml(conQr: boolean): string {
+  const cuerpo = conQr
+    ? `<p style="color:#64748b;font-size:13px;margin:0 0 12px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Escanea para acceder</p>
+                    <img src="cid:qr-login" alt="QR Acceso" width="160" height="160" style="display:block;margin:0 auto 12px;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,0.1);">
+                    <a href="${APP_URL}" style="color:#38bdf8;font-size:13px;text-decoration:none;font-weight:600;">${APP_URL.replace("https://", "")}</a>`
+    : `<p style="color:#64748b;font-size:13px;margin:0 0 12px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Accede al sistema</p>
+                    <a href="${APP_URL}" style="display:inline-block;background:linear-gradient(135deg,#38bdf8,#0ea5e9);color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:8px;font-size:14px;font-weight:bold;">Ir al sistema</a>`;
+
   return `
           <tr>
             <td style="padding:0 30px 20px;background-color:#ffffff;">
               <table width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;border-radius:12px;border:1px solid #e2e8f0;">
                 <tr>
                   <td style="padding:24px;text-align:center;">
-                    <p style="color:#64748b;font-size:13px;margin:0 0 12px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;">Escanea para acceder</p>
-                    <img src="cid:qr-login" alt="QR Acceso" width="160" height="160" style="display:block;margin:0 auto 12px;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,0.1);">
-                    <a href="${APP_URL}" style="color:#38bdf8;font-size:13px;text-decoration:none;font-weight:600;">${APP_URL.replace("https://", "")}</a>
+                    ${cuerpo}
                   </td>
                 </tr>
               </table>
@@ -82,10 +87,11 @@ function qrSectionHtml(): string {
           </tr>`;
 }
 
-// ─── INJECT QR AFTER HEADER ─────────────────────────────────
-function injectQrAfterHeader(html: string): string {
+// ─── INJECT ACCESS SECTION AFTER HEADER ─────────────────────
+function injectSeccionAcceso(html: string, conQr: boolean): string {
+  const seccion = seccionAccesoHtml(conQr);
   const marker = "</tr>\n          <tr>\n            <td style=\"padding:30px;\">";
-  const replacement = `</tr>\n${qrSectionHtml()}\n          <tr>\n            <td style="padding:30px;">`;
+  const replacement = `</tr>\n${seccion}\n          <tr>\n            <td style="padding:30px;">`;
   if (html.includes(marker)) {
     return html.replace(marker, replacement);
   }
@@ -154,7 +160,7 @@ async function sendEmail({
   await rateLimit();
 
   const attachments = await qrAttachment();
-  const finalHtml = skipQr ? html : injectQrAfterHeader(html);
+  const finalHtml = skipQr ? html : injectSeccionAcceso(html, true);
 
   const mailOptions = {
     from: `"${fromName || "GymApp"}" <${process.env.GMAIL_USER}>`,
@@ -182,6 +188,40 @@ async function sendEmail({
 }
 
 // ─── SEND NOTIFICATION (batch/Marketing headers) ─────────────
+/**
+ * Modo de acceso al sistema por campaña:
+ * - `header`: caja con QR inyectada tras el header (por defecto)
+ * - `embebido`: el template dibuja su propia caja QR (adjunto incluido, sin inyección)
+ * - `enlace`: caja con el enlace pero sin QR (evita el peso de la imagen)
+ * - `ninguno`: el template trae su propio botón de acceso
+ */
+type ModoAcceso = "header" | "embebido" | "enlace" | "ninguno";
+
+const MODO_ACCESO = new Map<string, ModoAcceso>([
+  ["estatus-sistema", "enlace"],
+  ["deudas-pendientes", "embebido"],
+  ["recordatorio-pago", "embebido"],
+  ["resumen-dueno", "ninguno"],
+]);
+
+function modoAcceso(campaign: string): ModoAcceso {
+  return MODO_ACCESO.get(campaign) || "header";
+}
+
+/** El QR adjunto solo se genera para las campañas que lo muestran. */
+export function incluirQrAdjunto(campaign: string): boolean {
+  const modo = modoAcceso(campaign);
+  return modo === "header" || modo === "embebido";
+}
+
+/** Inserta la sección de acceso tras el header (QR o enlace, según la campaña). */
+export function aplicarSeccionAcceso(html: string, campaign: string): string {
+  const modo = modoAcceso(campaign);
+  if (modo === "header") return injectSeccionAcceso(html, true);
+  if (modo === "enlace") return injectSeccionAcceso(html, false);
+  return html;
+}
+
 async function sendNotificationEmail({
   to,
   subject,
@@ -195,9 +235,8 @@ async function sendNotificationEmail({
 
   await rateLimit();
 
-  const skipQr = campaign === "resumen-dueno";
-  const attachments = skipQr ? [] : await qrAttachment();
-  const finalHtml = skipQr ? html : injectQrAfterHeader(html);
+  const attachments = incluirQrAdjunto(campaign) ? await qrAttachment() : [];
+  const finalHtml = aplicarSeccionAcceso(html, campaign);
 
   const mailOptions = {
     from: `"${fromName || "GymApp"}" <${process.env.GMAIL_USER}>`,

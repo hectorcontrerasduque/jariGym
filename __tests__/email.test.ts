@@ -10,6 +10,7 @@ import { recordatorioMiembroTemplate } from "@/lib/services/email/templates/reco
 import { recordatorioAdminTemplate } from "@/lib/services/email/templates/recordatorio-admin";
 import { diagnosticoTemplate } from "@/lib/services/email/templates/diagnostico";
 import { errorReportTemplate } from "@/lib/services/email/templates/error-report";
+import { aplicarSeccionAcceso, incluirQrAdjunto } from "@/lib/services/email/email.service";
 
 describe("resetPasswordTemplate", () => {
   const gymName = "Mi Gym";
@@ -71,6 +72,7 @@ describe("estatusSistemaTemplate", () => {
     ultimoMiembroRegistrado: "Juan Pérez",
     ultimoPagoRegistrado: "2026-08-15",
     migraciones: 10,
+    migracionesTotal: 50,
   };
 
   it("should include gym name", () => {
@@ -101,9 +103,9 @@ describe("estatusSistemaTemplate", () => {
     expect(html).toContain("Juan Pérez");
   });
 
-  it("should include migration count", () => {
+  it("should include migration count as migrated/total", () => {
     const html = estatusSistemaTemplate(gymName, metricas);
-    expect(html).toContain("10");
+    expect(html).toContain("10/50");
   });
 
   it("should render logo when provided", () => {
@@ -139,6 +141,7 @@ describe("resumenDuenoTemplate", () => {
     miembrosAlDia: 12,
     miembrosDeudores: 3,
     migraciones: 8,
+    migracionesTotal: 120,
   };
 
   it("should include gym name", () => {
@@ -177,9 +180,14 @@ describe("resumenDuenoTemplate", () => {
     expect(html).toContain("3");
   });
 
-  it("should include migration count", () => {
+  it("should include migration count as migrated/total", () => {
     const html = resumenDuenoTemplate(gymName, resumen, appUrl);
-    expect(html).toContain("8");
+    expect(html).toContain("8/120");
+  });
+
+  it("should show 0/total when nobody migrated yet", () => {
+    const html = resumenDuenoTemplate(gymName, { ...resumen, migraciones: 0 }, appUrl);
+    expect(html).toContain("0/120");
   });
 
   it("should include app URL", () => {
@@ -367,7 +375,16 @@ describe("deudasPendientesTemplate", () => {
   it("renders fallback when no logo", () => {
     const html = deudasPendientesTemplate("Juan", gymName, deudas, 50, null);
     expect(html).toContain("M");
-    expect(html).not.toContain("<img");
+    // The QR image (cid:qr-login) is always present; only the logo <img> must be absent
+    expect(html).not.toMatch(/<img src="(?!cid:)/);
+  });
+
+  it("uses two columns with the QR in the right column", () => {
+    const html = deudasPendientesTemplate("Juan", gymName, deudas, 50);
+    expect(html).toContain("deudas-columns");
+    expect(html).toContain("deudas-col-left");
+    expect(html).toContain("deudas-col-right");
+    expect(html).toContain('src="cid:qr-login"');
   });
 });
 
@@ -397,6 +414,24 @@ describe("recordatorioMiembroTemplate", () => {
     const logo = "https://example.com/logo.png";
     const html = recordatorioMiembroTemplate("Juan", gymName, 3, "15/09/2026", logo);
     expect(html).toContain(`<img src="${logo}"`);
+  });
+
+  it("warns about becoming a moroso in the title", () => {
+    const html = recordatorioMiembroTemplate("Juan", gymName, 3, "15/09/2026");
+    expect(html).toContain("¡Evita ser expuesto como moroso! Tu membresía está por vencer");
+  });
+
+  it("uses two columns with the QR in the right column", () => {
+    const html = recordatorioMiembroTemplate("Juan", gymName, 3, "15/09/2026");
+    expect(html).toContain("recordatorio-columns");
+    expect(html).toContain("recordatorio-col-left");
+    expect(html).toContain("recordatorio-col-right");
+    expect(html).toContain('src="cid:qr-login"');
+  });
+
+  it("renders fallback when no logo", () => {
+    const html = recordatorioMiembroTemplate("Juan", gymName, 3, "15/09/2026", null);
+    expect(html).not.toMatch(/<img src="(?!cid:)/);
   });
 });
 
@@ -518,5 +553,48 @@ describe("errorReportTemplate", () => {
     const html = errorReportTemplate(errorInfo, gymName, null);
     expect(html).toContain("M");
     expect(html).not.toContain("<img");
+  });
+});
+
+describe("sección de acceso (QR o enlace)", () => {
+  const htmlBase =
+    '<table width="100%">\n' +
+    "          <tr>\n" +
+    '            <td style="padding:0 0 30px;">header</td>\n' +
+    "          </tr>\n" +
+    "          <tr>\n" +
+    '            <td style="padding:30px;">\n' +
+    "              body\n" +
+    "            </td>\n" +
+    "          </tr>\n" +
+    "        </table>";
+
+  it("injects the QR box after the header by default", () => {
+    const html = aplicarSeccionAcceso(htmlBase, "recordatorio-admin");
+    expect(html).toContain("Escanea para acceder");
+    expect(html).toContain('src="cid:qr-login"');
+    expect(html).toContain("body");
+  });
+
+  it("replaces the QR with a link-only box for estatus-sistema", () => {
+    const html = aplicarSeccionAcceso(htmlBase, "estatus-sistema");
+    expect(html).toContain("Accede al sistema");
+    expect(html).toContain("Ir al sistema");
+    expect(html).not.toContain('src="cid:qr-login"');
+    expect(html).toContain("body");
+  });
+
+  it("leaves templates that draw their own QR untouched", () => {
+    for (const campaign of ["deudas-pendientes", "recordatorio-pago", "resumen-dueno"]) {
+      expect(aplicarSeccionAcceso(htmlBase, campaign)).toBe(htmlBase);
+    }
+  });
+
+  it("attaches the QR only when some part of the email shows it", () => {
+    expect(incluirQrAdjunto("recordatorio-admin")).toBe(true);
+    expect(incluirQrAdjunto("deudas-pendientes")).toBe(true);
+    expect(incluirQrAdjunto("recordatorio-pago")).toBe(true);
+    expect(incluirQrAdjunto("estatus-sistema")).toBe(false);
+    expect(incluirQrAdjunto("resumen-dueno")).toBe(false);
   });
 });

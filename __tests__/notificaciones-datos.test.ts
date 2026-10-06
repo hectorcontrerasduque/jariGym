@@ -94,7 +94,16 @@ describe("calcularResumenDueno", () => {
         { id: "p-2", status: "pendiente" },
       ],
     });
-    fake.on("migracion", "select").reply({ count: 6 });
+    fake.on("migracion", "select").reply({
+      data: [
+        { nombre: "Ana Pérez", migrado: "si" },
+        { nombre: "ANA PÉREZ", migrado: "si" },
+        { nombre: "ana pérez", migrado: "no" },
+        { nombre: "Luis Gómez", migrado: "migrado" },
+        { nombre: "luis góMEZ", migrado: "no" },
+        { nombre: "Juan Rojas", migrado: "no" },
+      ],
+    });
 
     const resumen = await calcularResumenDueno(fake.client);
 
@@ -102,7 +111,8 @@ describe("calcularResumenDueno", () => {
     expect(resumen.pagosPendientes).toBe(2);
     expect(resumen.montoCobrado).toBe(30);
     expect(resumen.montoPendiente).toBe(75);
-    expect(resumen.migraciones).toBe(6);
+    expect(resumen.migraciones).toBe(2);
+    expect(resumen.migracionesTotal).toBe(3);
 
     expect(resumen.miembrosDeudores).toBe(1);
     expect(resumen.miembrosAlDia).toBe(1);
@@ -115,7 +125,7 @@ describe("calcularResumenDueno", () => {
     encolarElegibles(fake, [miembro()]);
     fake.onRpc("get_pagos_por_anio").reply({ data: [filaPagoMes("m1")] });
     fake.on("payment_detail", "select").reply({ data: [] });
-    fake.on("migracion", "select").reply({ count: 0 });
+    fake.on("migracion", "select").reply({ data: [] });
 
     const resumen = await calcularResumenDueno(fake.client);
 
@@ -128,6 +138,7 @@ describe("calcularResumenDueno", () => {
       miembrosDeudores: 0,
       miembrosAlDia: 1,
       migraciones: 0,
+      migracionesTotal: 0,
     });
   });
 
@@ -136,7 +147,7 @@ describe("calcularResumenDueno", () => {
     encolarElegibles(fake, [miembro()]);
     fake.onRpc("get_pagos_por_anio").reply({ data: [filaPagoMes("m1")] });
     fake.on("payment_detail", "select").reply({ data: [] });
-    fake.on("migracion", "select").reply({ count: 0 });
+    fake.on("migracion", "select").reply({ data: [] });
 
     await calcularResumenDueno(fake.client);
 
@@ -185,7 +196,15 @@ describe("calcularEstatusSistema", () => {
         },
       ],
     });
-    fake.on("migracion", "select").reply({ count: 3 });
+    fake.on("migracion", "select").reply({
+      data: [
+        { nombre: "Pedro Díaz", migrado: "si" },
+        { nombre: "PEDRO DÍAZ", migrado: "si" },
+        { nombre: "Marta Solís", migrado: "si" },
+        { nombre: "Carla Núñez", migrado: "migrado" },
+        { nombre: "Diego Prado", migrado: "no" },
+      ],
+    });
 
     const { metricas, errores } = await calcularEstatusSistema(fake.client, {
       max_members: 80,
@@ -201,6 +220,7 @@ describe("calcularEstatusSistema", () => {
       capacidad: 4,
       maxMiembros: 80,
       migraciones: 3,
+      migracionesTotal: 4,
     });
 
     expect(metricas.ultimoMiembroRegistrado).toBe("Ana Pérez");
@@ -224,7 +244,7 @@ describe("calcularEstatusSistema", () => {
     fake.on("profiles", "select").reply({ data: null });
     fake.on("payments", "select").reply({ data: null });
     fake.on("notification_log", "select").reply({ data: [] });
-    fake.on("migracion", "select").reply({ count: 0 });
+    fake.on("migracion", "select").reply({ data: [] });
 
     const { metricas } = await calcularEstatusSistema(fake.client, { max_members: 50 });
 

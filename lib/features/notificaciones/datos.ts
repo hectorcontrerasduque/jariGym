@@ -10,6 +10,7 @@ export interface ResumenDueno {
   miembrosAlDia: number;
   miembrosDeudores: number;
   migraciones: number;
+  migracionesTotal: number;
 }
 
 export interface EstatusSistema {
@@ -24,6 +25,7 @@ export interface EstatusSistema {
   ultimoMiembroRegistrado: string;
   ultimoPagoRegistrado: string;
   migraciones: number;
+  migracionesTotal: number;
 }
 
 export interface ErrorNotificacion {
@@ -82,6 +84,29 @@ export async function pagosDelMes(
   };
 }
 
+/**
+ * Personas migradas y total del listado de `migracion`, deduplicados por nombre.
+ * La tabla guarda una fila por mes/persona, así que el conteo debe agrupar por
+ * `nombre`; `migrado` admite 'si' o 'migrado' (nunca 'no' o null).
+ */
+export async function contarMigraciones(
+  supabase: SupabaseClient
+): Promise<{ migradas: number; total: number }> {
+  const { data } = await supabase.from("migracion").select("nombre, migrado");
+
+  const nombres = new Set<string>();
+  const migradas = new Set<string>();
+
+  for (const row of data || []) {
+    const nombre = (row.nombre || "").trim().toUpperCase();
+    if (!nombre) continue;
+    nombres.add(nombre);
+    if (row.migrado === "si" || row.migrado === "migrado") migradas.add(nombre);
+  }
+
+  return { migradas: migradas.size, total: nombres.size };
+}
+
 /** Datos del "Resumen de Pagos" enviado al propietario. */
 export async function calcularResumenDueno(supabase: SupabaseClient): Promise<ResumenDueno> {
   const mesActual = new Date().getMonth() + 1;
@@ -98,10 +123,7 @@ export async function calcularResumenDueno(supabase: SupabaseClient): Promise<Re
 
   const { aprobados, pendientes } = await pagosDelMes(supabase, mesActual, anioActual);
 
-  const { count: migraciones } = await supabase
-    .from("migracion")
-    .select("id", { count: "exact", head: true })
-    .eq("migrado", "migrado");
+  const { migradas, total } = await contarMigraciones(supabase);
 
   return {
     pagosAprobados: aprobados.length,
@@ -111,7 +133,8 @@ export async function calcularResumenDueno(supabase: SupabaseClient): Promise<Re
     montoDeuda,
     miembrosAlDia: miembrosActivos - miembrosDeudores,
     miembrosDeudores,
-    migraciones: migraciones || 0,
+    migraciones: migradas,
+    migracionesTotal: total,
   };
 }
 
@@ -158,10 +181,7 @@ export async function calcularEstatusSistema(
     .order("sent_at", { ascending: false })
     .limit(10);
 
-  const { count: migraciones } = await supabase
-    .from("migracion")
-    .select("id", { count: "exact", head: true })
-    .eq("migrado", "migrado");
+  const { migradas, total } = await contarMigraciones(supabase);
 
   const erroresFormateados = (errores || []).map((e) => ({
     tipo: (e as unknown as { notification_config?: { notification_type?: string } })
@@ -184,7 +204,8 @@ export async function calcularEstatusSistema(
       ultimoPagoRegistrado: ultimoPago
         ? new Date(ultimoPago.created_at).toLocaleDateString("es-ES")
         : "N/A",
-      migraciones: migraciones || 0,
+      migraciones: migradas,
+      migracionesTotal: total,
     },
     errores: erroresFormateados,
   };

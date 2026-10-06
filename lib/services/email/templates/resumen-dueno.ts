@@ -149,12 +149,12 @@ export function resumenDuenoTemplate(
                 </tr>
               </table>
               <!-- Migraciones -->
-              ${resumen.migraciones > 0 ? `
+              ${resumen.migracionesTotal > 0 ? `
               <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 12px;">
                 <tr>
                   <td style="padding:12px 16px;background:#f0f9ff;border-radius:10px;border:1px solid #bae6fd;border-left:3px solid #38bdf8;">
                     <p style="color:#64748b;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin:0 0 4px;">Migraciones</p>
-                    <p style="color:#1e293b;font-size:18px;font-weight:bold;margin:0;">${resumen.migraciones}</p>
+                    <p style="color:#1e293b;font-size:18px;font-weight:bold;margin:0;">${resumen.migraciones}/${resumen.migracionesTotal}</p>
                   </td>
                 </tr>
               </table>` : ""}

@@ -1,3 +1,5 @@
+import type { ResumenDueno } from "@/lib/features/notificaciones/datos";
+
 const MONTH_NAMES = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
@@ -5,15 +7,7 @@ const MONTH_NAMES = [
 
 export function resumenDuenoTemplate(
   gymName: string,
-  resumen: {
-    pagosAprobados: number;
-    pagosPendientes: number;
-    montoCobrado: number;
-    montoDeuda: number;
-    miembrosAlDia: number;
-    miembrosDeudores: number;
-    migraciones: number;
-  },
+  resumen: ResumenDueno,
   appUrl: string,
   gymLogo?: string | null,
   frecuencia?: string
@@ -119,7 +113,7 @@ export function resumenDuenoTemplate(
                         <td style="padding:16px;">
                           <p style="color:#dc2626;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin:0 0 6px;">Pagos Pendientes</p>
                           <p style="color:#b91c1c;font-size:28px;font-weight:bold;margin:0 0 4px;">${resumen.pagosPendientes}</p>
-                          <p style="color:#dc2626;font-size:13px;margin:0;">$${resumen.montoDeuda.toFixed(2)}</p>
+                          <p style="color:#dc2626;font-size:13px;margin:0;">$${resumen.montoPendiente.toFixed(2)}</p>
                         </td>
                       </tr>
                     </table>

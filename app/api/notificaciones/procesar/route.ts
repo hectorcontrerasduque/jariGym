@@ -3,6 +3,11 @@ import { createClient } from "@supabase/supabase-js";
 import { messages } from "@/lib/messages";
 import { getDiaCobro, getDiaNotificacion } from "@/lib/utils";
 import { pagosService } from "@/lib/features/pagos/service";
+import {
+  calcularEstatusSistema,
+  calcularResumenDueno,
+  etiquetaFrecuencia,
+} from "@/lib/features/notificaciones/datos";
 import { applyRateLimit } from "@/lib/middleware/rate-limit";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
@@ -195,65 +200,21 @@ async function ejecutarRecordatorioPago(
   return count;
 }
 
-async function ejecutarResumenDueno(supabase: SupabaseClient, gymConfig: Record<string, unknown>): Promise<number> {
+async function ejecutarResumenDueno(supabase: SupabaseClient, gymConfig: Record<string, unknown>, frecuencia?: string): Promise<number> {
   const duenoEmail = gymConfig.owner_email as string | null;
   if (!duenoEmail) return 0;
 
-  const mesActual = new Date().getMonth() + 1;
-  const anioActual = new Date().getFullYear();
-
-  const elegibles = await pagosService.getMiembrosElegibles(supabase);
-  const ownerEmail = elegibles.ownerEmail;
-
-  const miembrosActivos = elegibles.miembros.filter(
-    (m) => m.email?.toLowerCase() !== ownerEmail
-  ).length;
-
-  const morosos = await pagosService.getMiembrosMorosos(anioActual, supabase, elegibles);
-  const miembrosDeudores = morosos.filter((m) => m.mesesDeuda.length > 0).length;
-  const montoDeuda = morosos.reduce((sum, m) => sum + m.totalDeuda, 0);
-
-  const { data: pagosMesDetalles } = await supabase
-    .from("payment_detail")
-    .select("payment_id, payment_amount")
-    .eq("month_number", mesActual)
-    .eq("year_number", anioActual);
-
-  const pagosMesIds = [...new Set((pagosMesDetalles || []).map((d) => d.payment_id))];
-
-  const { data: pagosMesHeaders } = pagosMesIds.length > 0
-    ? await supabase
-        .from("payments")
-        .select("id, status")
-        .in("id", pagosMesIds)
-    : { data: [] };
-
-  const statusMap = new Map((pagosMesHeaders || []).map((p) => [p.id, p.status]));
-
-  const pagosAprobadosDetalles = (pagosMesDetalles || []).filter((d) => statusMap.get(d.payment_id) === "aprobado");
-  const pagosPendientesDetalles = (pagosMesDetalles || []).filter((d) => statusMap.get(d.payment_id) === "pendiente");
-
-  const { count: migraciones } = await supabase
-    .from("migracion")
-    .select("id", { count: "exact", head: true })
-    .eq("migrado", "migrado");
+  const resumen = await calcularResumenDueno(supabase);
 
   const { sendAdminSummaryEmail } = await import("@/lib/services/email/email.service");
   await sendAdminSummaryEmail(
     duenoEmail,
     (gymConfig.gym_name as string) || "GymApp",
-    {
-      pagosAprobados: pagosAprobadosDetalles.length,
-      pagosPendientes: pagosPendientesDetalles.length,
-      montoCobrado: pagosAprobadosDetalles.reduce((s, d) => s + (d.payment_amount || 0), 0),
-      montoDeuda,
-      miembrosAlDia: miembrosActivos - miembrosDeudores,
-      miembrosDeudores,
-      migraciones: migraciones || 0,
-    },
+    resumen,
     `${process.env.NEXT_PUBLIC_SITE_URL}/login`,
     gymConfig.logo_url as string | null,
-    gymConfig.address as string | null
+    gymConfig.address as string | null,
+    frecuencia
   );
 
   return 1;
@@ -263,79 +224,16 @@ async function ejecutarEstatusSistema(supabase: SupabaseClient, gymConfig: Recor
   const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL;
   if (!adminEmail) return 0;
 
-  const { count: miembrosActivos } = await supabase
-    .from("profiles")
-    .select("id", { count: "exact", head: true })
-    .eq("role", "miembro")
-    .eq("activo", true);
-
-  const { count: miembrosInactivos } = await supabase
-    .from("profiles")
-    .select("id", { count: "exact", head: true })
-    .eq("role", "miembro")
-    .eq("activo", false);
-
-  const { count: pagosAprobadosMes } = await supabase
-    .from("payments")
-    .select("id", { count: "exact", head: true })
-    .eq("status", "aprobado");
-
-  const { count: pagosPendientesMes } = await supabase
-    .from("payments")
-    .select("id", { count: "exact", head: true })
-    .in("status", ["pendiente"]);
-
-  const { data: ultimoPago } = await supabase
-    .from("payments")
-    .select("created_at")
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  const { data: ultimoMiembro } = await supabase
-    .from("profiles")
-    .select("created_at")
-    .eq("role", "miembro")
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  const { data: errores } = await supabase
-    .from("notification_log")
-    .select("error_detail, sent_at")
-    .eq("no_issues", false)
-    .order("sent_at", { ascending: false })
-    .limit(10);
-
-  const { count: migraciones } = await supabase
-    .from("migracion")
-    .select("id", { count: "exact", head: true })
-    .eq("migrado", "migrado");
+  const { metricas, errores } = await calcularEstatusSistema(supabase, gymConfig);
 
   const { sendSystemStatusEmail } = await import("@/lib/services/email/email.service");
   await sendSystemStatusEmail(
     adminEmail,
     (gymConfig.gym_name as string) || "GymApp",
-    {
-      totalMiembrosActivos: miembrosActivos || 0,
-      totalMiembrosInactivos: miembrosInactivos || 0,
-      pagosAprobadosMes: pagosAprobadosMes || 0,
-      pagosPendientesMes: pagosPendientesMes || 0,
-      montoRecaudadoMes: 0,
-      montoPendienteMes: 0,
-      capacidad: 0,
-      maxMiembros: (gymConfig.max_members as number) || 50,
-      ultimoMiembroRegistrado: ultimoMiembro?.created_at || "Nunca",
-      ultimoPagoRegistrado: ultimoPago?.created_at || "Nunca",
-      migraciones: migraciones || 0,
-    },
+    metricas,
     gymConfig.logo_url as string | null,
     gymConfig.address as string | null,
-    (errores || []).map((e) => ({
-      tipo: "notificacion",
-      fecha: e.sent_at,
-      detalle: e.error_detail || "Error desconocido",
-    }))
+    errores
   );
 
   return 1;
@@ -419,7 +317,11 @@ export async function POST(request: Request) {
             count = await ejecutarRecordatorioPago(supabase, config.days_before || 7, gymConfig, forzar);
             break;
           case "resumen_dueno":
-            count = await ejecutarResumenDueno(supabase, gymConfig);
+            count = await ejecutarResumenDueno(
+              supabase,
+              gymConfig,
+              etiquetaFrecuencia(config)
+            );
             break;
           case "estatus_sistema":
             count = await ejecutarEstatusSistema(supabase, gymConfig);

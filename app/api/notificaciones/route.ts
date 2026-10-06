@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { pagosService } from "@/lib/features/pagos/service";
+import {
+  calcularEstatusSistema,
+  calcularResumenDueno,
+  etiquetaFrecuencia,
+} from "@/lib/features/notificaciones/datos";
 import { messages } from "@/lib/messages";
 import { sleep } from "@/lib/services/email/email.service";
 import { getDiaCobro, getDiaNotificacion } from "@/lib/utils";
@@ -197,14 +202,13 @@ async function ejecutarTipo(
           forzar
         );
         break;
-      case "resumen_dueno": {
-        let frecuencia = "Mensual";
-        if (config.daily_frequency) frecuencia = "Diario";
-        else if (config.weekly_frequency) frecuencia = "Semanal";
-        else if (config.biweekly_frequency) frecuencia = "Quincenal";
-        miembrosNotificados = await procesarResumenDueno(supabase, gymConfig, frecuencia);
+      case "resumen_dueno":
+        miembrosNotificados = await procesarResumenDueno(
+          supabase,
+          gymConfig,
+          etiquetaFrecuencia(config)
+        );
         break;
-      }
       case "estatus_sistema":
         miembrosNotificados = await procesarEstatusSistema(supabase, gymConfig);
         break;
@@ -453,44 +457,7 @@ async function procesarRecordatorioPago(
 async function procesarResumenDueno(supabase: SupabaseClient, gymConfig: Record<string, unknown>, frecuencia?: string): Promise<number> {
   if (!gymConfig.owner_email) throw new Error(messages.notificaciones.noDuenoEmail);
 
-  const mesActual = new Date().getMonth() + 1;
-  const anioActual = new Date().getFullYear();
-
-  const elegibles = await pagosService.getMiembrosElegibles(supabase);
-  const ownerEmail = elegibles.ownerEmail;
-
-  const miembrosActivos = elegibles.miembros.filter(
-    (m) => m.email?.toLowerCase() !== ownerEmail
-  ).length;
-
-  const morosos = await pagosService.getMiembrosMorosos(anioActual, supabase, elegibles);
-  const miembrosDeudores = morosos.filter((m) => m.mesesDeuda.length > 0).length;
-  const montoDeuda = morosos.reduce((sum, m) => sum + m.totalDeuda, 0);
-
-  const { data: pagosMesDetalles } = await supabase
-    .from("payment_detail")
-    .select("payment_id, payment_amount")
-    .eq("month_number", mesActual)
-    .eq("year_number", anioActual);
-
-  const pagosMesIds = [...new Set((pagosMesDetalles || []).map((d) => d.payment_id))];
-
-  const { data: pagosMesHeaders } = pagosMesIds.length > 0
-    ? await supabase
-        .from("payments")
-        .select("id, status")
-        .in("id", pagosMesIds)
-    : { data: [] };
-
-  const statusMap = new Map((pagosMesHeaders || []).map((p) => [p.id, p.status]));
-
-  const pagosAprobadosDetalles = (pagosMesDetalles || []).filter((d) => statusMap.get(d.payment_id) === "aprobado");
-  const pagosPendientesDetalles = (pagosMesDetalles || []).filter((d) => statusMap.get(d.payment_id) === "pendiente");
-
-  const { count: migraciones } = await supabase
-    .from("migracion")
-    .select("id", { count: "exact", head: true })
-    .eq("migrado", "migrado");
+  const resumen = await calcularResumenDueno(supabase);
 
   try {
     const { sendAdminSummaryEmail } = await import(
@@ -499,20 +466,10 @@ async function procesarResumenDueno(supabase: SupabaseClient, gymConfig: Record<
     await sendAdminSummaryEmail(
       gymConfig.owner_email as string,
       (gymConfig.gym_name as string) || "GymApp",
-      {
-        pagosAprobados: pagosAprobadosDetalles.length,
-        pagosPendientes: pagosPendientesDetalles.length,
-        montoCobrado: pagosAprobadosDetalles.reduce(
-          (sum, p) => sum + p.payment_amount,
-          0
-        ),
-        montoDeuda,
-        miembrosAlDia: miembrosActivos - miembrosDeudores,
-        miembrosDeudores,
-        migraciones: migraciones || 0,
-      },
+      resumen,
       `${process.env.NEXT_PUBLIC_SITE_URL}/login`,
       gymConfig.logo_url as string | null,
+      gymConfig.address as string | null,
       frecuencia
     );
     return 1;
@@ -525,75 +482,7 @@ async function procesarEstatusSistema(supabase: SupabaseClient, gymConfig: Recor
   const destino = process.env.NEXT_PUBLIC_ADMIN_EMAIL;
   if (!destino) return 0;
 
-  const mesActual = new Date().getMonth() + 1;
-  const anioActual = new Date().getFullYear();
-
-  const { count: totalActivos } = await supabase
-    .from("profiles")
-    .select("id", { count: "exact", head: true })
-    .eq("activo", true);
-
-  const { count: totalInactivos } = await supabase
-    .from("profiles")
-    .select("id", { count: "exact", head: true })
-    .eq("activo", false);
-
-  // Step 1: query payment_detail by month+year (small result set)
-  const { data: pagosMesDetalles } = await supabase
-    .from("payment_detail")
-    .select("payment_id, payment_amount")
-    .eq("month_number", mesActual)
-    .eq("year_number", anioActual);
-
-  const pagosMesIds = [...new Set((pagosMesDetalles || []).map((d) => d.payment_id))];
-
-  // Step 2: fetch only relevant headers
-  const { data: pagosMesHeaders } = pagosMesIds.length > 0
-    ? await supabase
-        .from("payments")
-        .select("id, status")
-        .in("id", pagosMesIds)
-    : { data: [] };
-
-  const statusMap = new Map((pagosMesHeaders || []).map((p) => [p.id, p.status]));
-
-  const pagosAprobadosMesDetalles = (pagosMesDetalles || []).filter((d) => statusMap.get(d.payment_id) === "aprobado");
-  const pagosPendientesMesDetalles = (pagosMesDetalles || []).filter((d) => {
-    const s = statusMap.get(d.payment_id);
-    return s === "pendiente";
-  });
-
-  const { data: ultimoMiembro } = await supabase
-    .from("profiles")
-    .select("full_name, created_at")
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .single();
-
-  const { data: ultimoPago } = await supabase
-    .from("payments")
-    .select("created_at")
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .single();
-
-  const { data: erroresRecientes } = await supabase
-    .from("notification_log")
-    .select("id, sent_at, error_detail, notification_config(notification_type)")
-    .eq("no_issues", false)
-    .order("sent_at", { ascending: false })
-    .limit(10);
-
-  const erroresFormateados = (erroresRecientes || []).map((e) => ({
-    tipo: (e as unknown as { notification_config?: { notification_type?: string } }).notification_config?.notification_type || "desconocido",
-    fecha: new Date(e.sent_at).toLocaleDateString("es-ES"),
-    detalle: e.error_detail || "Sin detalle",
-  }));
-
-  const { count: migraciones } = await supabase
-    .from("migracion")
-    .select("id", { count: "exact", head: true })
-    .eq("migrado", "migrado");
+  const { metricas, errores } = await calcularEstatusSistema(supabase, gymConfig);
 
   try {
     const { sendSystemStatusEmail } = await import(
@@ -602,32 +491,10 @@ async function procesarEstatusSistema(supabase: SupabaseClient, gymConfig: Recor
     await sendSystemStatusEmail(
       destino,
       (gymConfig.gym_name as string) || "GymApp",
-      {
-        totalMiembrosActivos: totalActivos || 0,
-        totalMiembrosInactivos: totalInactivos || 0,
-        pagosAprobadosMes: (pagosAprobadosMesDetalles || []).length,
-        pagosPendientesMes: (pagosPendientesMesDetalles || []).length,
-        montoRecaudadoMes: (pagosAprobadosMesDetalles || []).reduce(
-          (s, p) => s + p.payment_amount,
-          0
-        ),
-        montoPendienteMes: (pagosPendientesMesDetalles || []).reduce(
-          (s, p) => s + p.payment_amount,
-          0
-        ),
-        capacidad: totalActivos || 0,
-        maxMiembros: gymConfig.max_members as number,
-        ultimoMiembroRegistrado: ultimoMiembro
-          ? ultimoMiembro.full_name
-          : "N/A",
-        ultimoPagoRegistrado: ultimoPago
-          ? new Date(ultimoPago.created_at).toLocaleDateString("es-ES")
-          : "N/A",
-        migraciones: migraciones || 0,
-      },
+      metricas,
       gymConfig.logo_url as string | null,
-      undefined,
-      erroresFormateados
+      gymConfig.address as string | null,
+      errores
     );
     return 1;
   } catch {

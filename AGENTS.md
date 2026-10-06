@@ -92,6 +92,8 @@ lib/
       service.ts    # PagosService: Supabase queries + delegates to domain/
     dashboard/
       carga.ts      # consultarDashboard (server-side raw fetch) + mapearMiembros
+    notificaciones/
+      datos.ts      # Shared email data: etiquetaFrecuencia, calcularResumenDueno, calcularEstatusSistema (cron + manual routes)
   services/         # Legacy modules, migrated to features/ phase by phase
     auth/           # signIn, resetPassword, getProfile
     config/         # Config CRUD + dueno email promotion on change
@@ -400,6 +402,7 @@ e263c5e refactor: elimina console.* + centraliza strings en messages.ts para i18
 3. Route queries `notificacion_config WHERE habilitado = true`, loops configs, checks frequency (skipped if `forzar`), calls `ejecutarTipo()`
 4. `ejecutarTipo()` dispatches to `procesarMiembrosDeudores`, `procesarRecordatorioPago`, `procesarResumenDueno`, `procesarEstatusSistema`
 5. Each logs to `notificacion_log` (success or error)
+6. `resumen_dueno` and `estatus_sistema` build their payloads in `lib/features/notificaciones/datos.ts` (`calcularResumenDueno`, `calcularEstatusSistema`, `etiquetaFrecuencia`); both routes call those helpers so they cannot drift. `ResumenDueno.montoPendiente` = sum of the month's pending payment amounts — distinct from `montoDeuda` (general morosos debt).
 
 ### Recordatorio de Pago - Día de Cobro
 - `recordatorio_pago` uses per-member billing day logic

@@ -11,6 +11,7 @@ import { diagnosticoTemplate } from "./templates/diagnostico";
 import { errorReportTemplate } from "./templates/error-report";
 import { pagoAprobadoTemplate } from "./templates/pago-aprobado";
 import { pagoRechazadoTemplate } from "./templates/pago-rechazado";
+import type { EstatusSistema, ResumenDueno } from "@/lib/features/notificaciones/datos";
 
 const transporter = nodemailer.createTransport({
   service: "gmail",
@@ -333,15 +334,7 @@ export async function sendAdminReminderEmail(
 export async function sendAdminSummaryEmail(
   to: string,
   gymName: string,
-  resumen: {
-    pagosAprobados: number;
-    pagosPendientes: number;
-    montoCobrado: number;
-    montoDeuda: number;
-    miembrosAlDia: number;
-    miembrosDeudores: number;
-    migraciones: number;
-  },
+  resumen: ResumenDueno,
   appUrl: string,
   gymLogo?: string | null,
   address?: string | null,
@@ -361,19 +354,7 @@ export async function sendAdminSummaryEmail(
 export async function sendSystemStatusEmail(
   to: string,
   gymName: string,
-  metricas: {
-    totalMiembrosActivos: number;
-    totalMiembrosInactivos: number;
-    pagosAprobadosMes: number;
-    pagosPendientesMes: number;
-    montoRecaudadoMes: number;
-    montoPendienteMes: number;
-    capacidad: number;
-    maxMiembros: number;
-    ultimoMiembroRegistrado: string;
-    ultimoPagoRegistrado: string;
-    migraciones: number;
-  },
+  metricas: EstatusSistema,
   gymLogo?: string | null,
   address?: string | null,
   erroresRecientes?: Array<{ tipo: string; fecha: string; detalle: string }>

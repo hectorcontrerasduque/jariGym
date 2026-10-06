@@ -134,6 +134,7 @@ describe("resumenDuenoTemplate", () => {
     pagosAprobados: 15,
     pagosPendientes: 4,
     montoCobrado: 375,
+    montoPendiente: 60,
     montoDeuda: 100,
     miembrosAlDia: 12,
     miembrosDeudores: 3,
@@ -155,6 +156,19 @@ describe("resumenDuenoTemplate", () => {
     const html = resumenDuenoTemplate(gymName, resumen, appUrl);
     expect(html).toContain("375");
     expect(html).toContain("100");
+  });
+
+  it("shows the pending total in the pending card, not the general debt", () => {
+    const html = resumenDuenoTemplate(gymName, resumen, appUrl);
+
+    const desdePendientes = html.indexOf(">Pagos Pendientes</p>");
+    const pendientes = html.slice(desdePendientes, desdePendientes + 400);
+    expect(pendientes).toContain("$60.00");
+    expect(pendientes).not.toContain("$100.00");
+
+    const desdeDeudores = html.indexOf(">Miembros Deudores</p>");
+    const deudores = html.slice(desdeDeudores, desdeDeudores + 400);
+    expect(deudores).toContain("$100.00");
   });
 
   it("should include member status", () => {

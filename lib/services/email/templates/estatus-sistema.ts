@@ -1,18 +1,8 @@
+import type { EstatusSistema } from "@/lib/features/notificaciones/datos";
+
 export function estatusSistemaTemplate(
   gymName: string,
-  metricas: {
-    totalMiembrosActivos: number;
-    totalMiembrosInactivos: number;
-    pagosAprobadosMes: number;
-    pagosPendientesMes: number;
-    montoRecaudadoMes: number;
-    montoPendienteMes: number;
-    capacidad: number;
-    maxMiembros: number;
-    ultimoMiembroRegistrado: string;
-    ultimoPagoRegistrado: string;
-    migraciones: number;
-  },
+  metricas: EstatusSistema,
   gymLogo?: string | null,
   erroresRecientes?: Array<{ tipo: string; fecha: string; detalle: string }>
 ): string {

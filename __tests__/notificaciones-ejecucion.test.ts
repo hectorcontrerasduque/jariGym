@@ -54,22 +54,23 @@ function moroso(overrides: Partial<Moroso> = {}): Moroso {
 }
 
 describe("fechasRecordatorio", () => {
-  it("dia_uno: con cobro el 1, el aviso cae en el mes anterior", () => {
-    const fechas = fechasRecordatorio("2026-05-10", 3, "dia_uno", new Date(2026, 4, 25));
+  // Con la ventana eliminada el llamador usa lead 0: notificacion === cobro.
+  it("dia_uno: cobro el 1 del próximo mes cuando hoy aún no llegó", () => {
+    const fechas = fechasRecordatorio("2026-05-10", 0, "dia_uno", new Date(2026, 4, 25));
     expect(fechas.cobro).toEqual(new Date(2026, 5, 1));
-    expect(fechas.notificacion).toEqual(new Date(2026, 4, 29));
+    expect(fechas.notificacion).toEqual(new Date(2026, 5, 1));
   });
 
   it("dia_uno: si hoy es el día de cobro, el cobro es hoy", () => {
-    const fechas = fechasRecordatorio("2026-05-10", 3, "dia_uno", new Date(2026, 4, 1));
+    const fechas = fechasRecordatorio("2026-05-10", 0, "dia_uno", new Date(2026, 4, 1));
     expect(fechas.cobro).toEqual(new Date(2026, 4, 1));
-    expect(fechas.notificacion).toEqual(new Date(2026, 3, 28));
+    expect(fechas.notificacion).toEqual(new Date(2026, 4, 1));
   });
 
   it("fecha_inscripcion: usa el día de inscripción cuando aún no venció", () => {
-    const fechas = fechasRecordatorio("2026-01-15", 3, "fecha_inscripcion", new Date(2026, 0, 5));
+    const fechas = fechasRecordatorio("2026-01-15", 0, "fecha_inscripcion", new Date(2026, 0, 5));
     expect(fechas.cobro).toEqual(new Date(2026, 0, 15));
-    expect(fechas.notificacion).toEqual(new Date(2026, 0, 12));
+    expect(fechas.notificacion).toEqual(new Date(2026, 0, 15));
   });
 
   it("fecha_inscripcion: ajusta el día 31 a los meses cortos", () => {
@@ -113,7 +114,7 @@ describe("ejecutarRecordatorioPago", () => {
     iniciarPresupuesto();
   });
 
-  it("envía cuando la ventana está abierta y no había aviso previo", async () => {
+  it("envía a todos los candidatos cuando no había aviso previo", async () => {
     encolar({ data: null });
 
     const resultado = await ejecutarRecordatorioPago(fake.client, config, GYM);
@@ -132,7 +133,7 @@ describe("ejecutarRecordatorioPago", () => {
     );
   });
 
-  it("no repite el aviso dentro del mismo ciclo", async () => {
+  it("no repite el aviso el mismo día (VET)", async () => {
     encolar({ data: { sent_at: new Date().toISOString() } });
 
     const resultado = await ejecutarRecordatorioPago(fake.client, config, GYM);
@@ -140,19 +141,29 @@ describe("ejecutarRecordatorioPago", () => {
     expect(resultado).toMatchObject({ enviados: 0, fallos: 0 });
     expect(sendPaymentReminderEmail).not.toHaveBeenCalled();
     expect(sendAdminReminderEmail).not.toHaveBeenCalled();
+    expect(fake.callsTo("profiles", "select")).toHaveLength(0);
   });
 
-  it("forzar salta la ventana y el dedup", async () => {
-    encolar({ data: { sent_at: new Date().toISOString() } });
-    const configCorta = { ...config, days_before: 0 };
+  it("vuelve a enviar si el último aviso fue ayer (ya no hay ventana por socio)", async () => {
+    encolar({ data: { sent_at: new Date(Date.now() - 24 * 3600 * 1000).toISOString() } });
 
-    const resultado = await ejecutarRecordatorioPago(fake.client, configCorta, GYM, true);
+    const resultado = await ejecutarRecordatorioPago(fake.client, config, GYM);
 
     expect(resultado).toMatchObject({ enviados: 1, fallos: 0 });
     expect(sendPaymentReminderEmail).toHaveBeenCalledTimes(1);
   });
 
-  it("excluye a los socios que ya pagaron el mes", async () => {
+  it("forzar salta el dedup del día y no consulta la bitácora", async () => {
+    encolar({ data: { sent_at: new Date().toISOString() } });
+
+    const resultado = await ejecutarRecordatorioPago(fake.client, config, GYM, true);
+
+    expect(resultado).toMatchObject({ enviados: 1, fallos: 0 });
+    expect(sendPaymentReminderEmail).toHaveBeenCalledTimes(1);
+    expect(fake.callsTo("notification_log", "select")).toHaveLength(0);
+  });
+
+  it("excluye a los que ya pagaron el próximo mes y consulta ese mes", async () => {
     encolar(
       { data: null },
       [{ payment_id: "p1", payment_amount: 30 }],
@@ -163,6 +174,12 @@ describe("ejecutarRecordatorioPago", () => {
 
     expect(resultado).toMatchObject({ enviados: 0, fallos: 0 });
     expect(sendPaymentReminderEmail).not.toHaveBeenCalled();
+
+    const hoy = new Date();
+    const proximo = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 1);
+    const consulta = fake.callsTo("payment_detail", "select")[0];
+    expect(consulta.filters).toContainEqual(["eq", "month_number", proximo.getMonth() + 1]);
+    expect(consulta.filters).toContainEqual(["eq", "year_number", proximo.getFullYear()]);
   });
 });
 
@@ -348,6 +365,33 @@ describe("ejecutarCorrida", () => {
     expect(sendPaymentDebtEmail).not.toHaveBeenCalled();
     expect(fake.callsTo("notification_log", "insert")).toHaveLength(0);
     expect(resumen.reporteTexto).toContain(messages.notificaciones.reporte.saltadaFrecuencia);
+  });
+
+  it("todas saltadas: cero filas en bitácora (aunque ninguna falló)", async () => {
+    const hoy = new Date().toISOString();
+    // orden FIFO: frecuencia cfg1, frecuencia cfg2, purga cfg1, purga cfg2
+    fake.on("notification_log", "select").reply({ data: { sent_at: hoy } });
+    fake.on("notification_log", "select").reply({ data: { sent_at: hoy } });
+    fake.on("notification_log", "select").reply({ data: null });
+    fake.on("notification_log", "select").reply({ data: null });
+    fake.on("profiles", "select").reply({ count: 80 });
+
+    const resumen = await ejecutarCorrida(fake.client, {
+      configs: [
+        configDeuda,
+        { id: "cfg-resumen", notification_type: "resumen_dueno", daily_frequency: true },
+      ],
+      gymConfig: GYM,
+      origen: "cron",
+      respetarFrecuencia: true,
+      userId: "user-1",
+    });
+
+    expect(resumen).toMatchObject({ ejecutadas: 0, enviados: 0, errores: 0, reporteEnviado: true });
+    expect(fake.callsTo("notification_log", "insert")).toHaveLength(0);
+    expect(fake.callsTo("notification_log", "select")).toHaveLength(4);
+    expect(resumen.reporteTexto).toContain("0/2 tipos ejecutados");
+    expect(resumen.reporteTexto).toContain("saltada por frecuencia");
   });
 
   it("purga la bitácora dejando las 10 filas más recientes", async () => {

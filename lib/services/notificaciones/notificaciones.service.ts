@@ -33,10 +33,10 @@ export class NotificacionesService {
   // ─── CONFIG POR TIPO ──────────────────────────
 
   private defaultConfigs = [
-    { notification_type: "miembros_deudores", is_active: true, daily_frequency: false, weekly_frequency: true, biweekly_frequency: false, monthly_frequency: false, days_before: 7, notify_by_email: true, notify_by_whatsapp: false },
-    { notification_type: "recordatorio_pago", is_active: true, daily_frequency: false, weekly_frequency: false, biweekly_frequency: true, monthly_frequency: false, days_before: 7, notify_by_email: true, notify_by_whatsapp: false },
-    { notification_type: "resumen_dueno", is_active: true, daily_frequency: false, weekly_frequency: true, biweekly_frequency: false, monthly_frequency: false, days_before: 7, notify_by_email: true, notify_by_whatsapp: false },
-    { notification_type: "estatus_sistema", is_active: true, daily_frequency: false, weekly_frequency: false, biweekly_frequency: false, monthly_frequency: true, days_before: 7, notify_by_email: true, notify_by_whatsapp: false },
+    { notification_type: "miembros_deudores", is_active: true, daily_frequency: false, weekly_frequency: true, biweekly_frequency: false, monthly_frequency: false, days_before: 0, notify_by_email: true, notify_by_whatsapp: false },
+    { notification_type: "recordatorio_pago", is_active: true, daily_frequency: false, weekly_frequency: false, biweekly_frequency: true, monthly_frequency: false, days_before: 0, notify_by_email: true, notify_by_whatsapp: false },
+    { notification_type: "resumen_dueno", is_active: true, daily_frequency: false, weekly_frequency: true, biweekly_frequency: false, monthly_frequency: false, days_before: 0, notify_by_email: true, notify_by_whatsapp: false },
+    { notification_type: "estatus_sistema", is_active: true, daily_frequency: false, weekly_frequency: false, biweekly_frequency: false, monthly_frequency: true, days_before: 0, notify_by_email: true, notify_by_whatsapp: false },
   ];
 
   async ensureDefaultConfigs(): Promise<void> {

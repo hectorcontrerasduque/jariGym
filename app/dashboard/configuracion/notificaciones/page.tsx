@@ -89,7 +89,7 @@ export default function NotificacionesPage() {
     setConfigs(configs.map((c) => (c.id === id ? { ...c, [field]: value } : c)));
   };
 
-  const handleDiasPrevioChange = (id: string, value: number) => {
+  const handleAnticipacionChange = (id: string, value: number) => {
     setConfigs(configs.map((c) => (c.id === id ? { ...c, days_before: value } : c)));
   };
 
@@ -340,20 +340,18 @@ export default function NotificacionesPage() {
                   </div>
                 </div>
 
-                {config.notification_type === "recordatorio_pago" && (
-                  <div>
-                    <p className="text-sm font-medium text-gym-text mb-1">{messages.notificaciones.diasPrevio}</p>
-                    <p className="text-xs text-gym-muted mb-2">{messages.notificaciones.diasPrevioDesc}</p>
-                    <input
-                      type="number"
-                      min="1"
-                      max="30"
-                      value={config.days_before}
-                      onChange={(e) => handleDiasPrevioChange(config.id, parseInt(e.target.value) || 3)}
-                      className="w-20 px-3 py-2 bg-gym-surface border border-gym-border rounded-xl text-gym-text focus:outline-none focus:ring-2 focus:ring-gym-primary"
-                    />
-                  </div>
-                )}
+                <div>
+                  <p className="text-sm font-medium text-gym-text mb-1">{messages.notificaciones.anticipacion}</p>
+                  <p className="text-xs text-gym-muted mb-2">{messages.notificaciones.anticipacionDesc}</p>
+                  <input
+                    type="number"
+                    min="0"
+                    max="30"
+                    value={config.days_before}
+                    onChange={(e) => handleAnticipacionChange(config.id, parseInt(e.target.value) || 0)}
+                    className="w-20 px-3 py-2 bg-gym-surface border border-gym-border rounded-xl text-gym-text focus:outline-none focus:ring-2 focus:ring-gym-primary"
+                  />
+                </div>
 
                 <div>
                   <p className="text-sm font-medium text-gym-text mb-2">{messages.notificaciones.canales}</p>

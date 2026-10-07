@@ -7,7 +7,7 @@ import {
   etiquetaFrecuencia,
   pagosDelMes,
 } from "./datos";
-import { verificarFrecuencia } from "./frecuencia";
+import { verificarFrecuencia, mismoDiaVet } from "./frecuencia";
 import {
   asuntoReporte,
   contarMiembrosActivos,
@@ -209,12 +209,15 @@ export async function ejecutarRecordatorioPago(
   const duenoEmail = gymConfig.owner_email?.toLowerCase() || null;
   const modoCobro: "dia_uno" | "fecha_inscripcion" =
     gymConfig.billing_mode === "fecha_inscripcion" ? "fecha_inscripcion" : "dia_uno";
-  const diasPrevio = config.days_before ?? 3;
   const hoy = new Date();
+  const res = resultadoVacio();
 
-  // Último envío exitoso de ESTE tipo: evita repetir el aviso dentro del
-  // mismo ciclo (antes el guard por mes calendario lo bloqueaba casi siempre).
+  // CUÁNDO se envía lo decide el gate de frecuencia del cron
+  // (fecha_objetivo − days_before, uniforme para todos los socios). Aquí solo
+  // evitamos repetir dos veces el mismo día cuando la ruta manual corre sin
+  // `forzar` (que sí salta el gate).
   const ultimoEnvio = forzar ? null : await ultimoEnvioExitoso(supabase, config.id);
+  if (ultimoEnvio && mismoDiaVet(ultimoEnvio, hoy)) return res;
 
   const { data: miembros } = await supabase
     .from("profiles")
@@ -222,10 +225,10 @@ export async function ejecutarRecordatorioPago(
     .in("role", ["miembro", "super_admin"])
     .eq("activo", true)
     .not("email", "is", null);
-  if (!miembros || miembros.length === 0) return resultadoVacio();
+  if (!miembros || miembros.length === 0) return res;
 
   let candidatos = miembros.filter((m) => !m.email || m.email.toLowerCase() !== duenoEmail);
-  if (candidatos.length === 0) return resultadoVacio();
+  if (candidatos.length === 0) return res;
 
   const idsCandidatos = candidatos.map((m) => m.id);
   const { data: libreRows } = await supabase
@@ -237,31 +240,28 @@ export async function ejecutarRecordatorioPago(
 
   const idsLibres = new Set((libreRows || []).map((r) => r.user_id));
   candidatos = candidatos.filter((m) => !idsLibres.has(m.id));
-  if (candidatos.length === 0) return resultadoVacio();
+  if (candidatos.length === 0) return res;
 
-  const { usuariosConPago } = await pagosDelMes(supabase, hoy.getMonth() + 1, hoy.getFullYear());
+  // Destinatarios: activos que DEBEN EL PRÓXIMO MES (conserva las
+  // exclusiones de dueño, membresías sin fecha fin y ya pagados).
+  const proximo = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 1);
+  const { usuariosConPago } = await pagosDelMes(
+    supabase,
+    proximo.getMonth() + 1,
+    proximo.getFullYear()
+  );
 
-  const deudores = candidatos.filter((m) => {
-    if (usuariosConPago.has(m.id)) return false;
-    if (!m.start_date) return false;
-    if (forzar) return true;
-
-    const fechas = fechasRecordatorio(m.start_date, diasPrevio, modoCobro, hoy);
-    if (ultimoEnvio && ultimoEnvio >= fechas.notificacion) return false;
-    return hoy >= fechas.notificacion && hoy <= fechas.cobro;
-  });
-  if (deudores.length === 0) return resultadoVacio();
+  const deudores = candidatos.filter((m) => !!m.start_date && !usuariosConPago.has(m.id));
+  if (deudores.length === 0) return res;
 
   const { sendPaymentReminderEmail, sendAdminReminderEmail } = await import(
     "@/lib/services/email/email.service"
   );
 
-  const res = resultadoVacio();
-
   for (const deudor of deudores) {
     if (sinPresupuesto()) break;
 
-    const fechas = fechasRecordatorio(deudor.start_date!, diasPrevio, modoCobro, hoy);
+    const fechas = fechasRecordatorio(deudor.start_date!, 0, modoCobro, hoy);
     try {
       await sendPaymentReminderEmail(
         deudor.email!,
@@ -289,7 +289,7 @@ export async function ejecutarRecordatorioPago(
         gymConfig.owner_email!,
         nombreGym,
         deudores.map((d) => {
-          const fechas = fechasRecordatorio(d.start_date!, diasPrevio, modoCobro, hoy);
+          const fechas = fechasRecordatorio(d.start_date!, 0, modoCobro, hoy);
           return {
             nombre: d.full_name,
             diasRestantes: forzar ? 0 : diasHastaCobro(fechas.cobro, hoy),

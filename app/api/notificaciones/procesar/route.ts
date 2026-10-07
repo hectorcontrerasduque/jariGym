@@ -9,8 +9,8 @@ import {
 
 /**
  * Disparo manual de notificaciones (botones del panel). No consulta frecuencia:
- * la decisión de ejecutar la toma el admin, y `forzar` además salta la ventana
- * de días del recordatorio.
+ * la decisión de ejecutar la toma el admin, y `forzar` además salta el dedup
+ * del día del recordatorio.
  */
 export async function POST(request: Request) {
   const supabase = createClient(

@@ -58,12 +58,18 @@ export function etiquetaFrecuencia(config: FrecuenciaConfig): string {
  * Detalles de pago del mes actual separados por el estado de su cabecera.
  * Un solo paso pequeño (payment_detail por mes+año) seguido de las cabeceras
  * implicadas, en vez de barrer todos los pagos de la tabla.
+ * `usuariosConPago` son los `user_id` con un pago **aprobado** del mes (sirve
+ * para excluir a los ya pagados del recordatorio de vencimiento).
  */
 export async function pagosDelMes(
   supabase: SupabaseClient,
   mes: number,
   anio: number
-): Promise<{ aprobados: DetalleMes[]; pendientes: DetalleMes[] }> {
+): Promise<{
+  aprobados: DetalleMes[];
+  pendientes: DetalleMes[];
+  usuariosConPago: Set<string>;
+}> {
   const { data: detalles } = await supabase
     .from("payment_detail")
     .select("payment_id, payment_amount")
@@ -73,14 +79,20 @@ export async function pagosDelMes(
   const ids = [...new Set((detalles || []).map((d) => d.payment_id))];
 
   const { data: headers } = ids.length > 0
-    ? await supabase.from("payments").select("id, status").in("id", ids)
-    : { data: [] as Array<{ id: string; status: string }> };
+    ? await supabase.from("payments").select("id, user_id, status").in("id", ids)
+    : { data: [] as Array<{ id: string; user_id: string | null; status: string }> };
 
   const statusMap = new Map((headers || []).map((p) => [p.id, p.status]));
+  const usuariosConPago = new Set(
+    (headers || [])
+      .filter((p) => p.status === "aprobado" && p.user_id)
+      .map((p) => p.user_id as string)
+  );
 
   return {
     aprobados: (detalles || []).filter((d) => statusMap.get(d.payment_id) === "aprobado"),
     pendientes: (detalles || []).filter((d) => statusMap.get(d.payment_id) === "pendiente"),
+    usuariosConPago,
   };
 }
 

@@ -436,6 +436,8 @@ export const messages = {
     notificacionesDeshabilitadas: "Notificaciones deshabilitadas",
     noConfiguracionesHabilitadas: "No hay configuraciones habilitadas",
     noDuenoEmail: "No hay correo de propietario configurado. Configure el correo en Configuración del Gym.",
+    sinEmailAdmin: "No hay correo de administrador configurado (NEXT_PUBLIC_ADMIN_EMAIL).",
+    envioParcial: "Fallo parcial en el envío de la notificación",
   },
 } as const;
 

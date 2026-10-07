@@ -74,7 +74,7 @@ app/
   api/miembros/      # POST endpoint for creating members
   api/migracion/     # POST: migrate member data from Excel, search, ping
   api/profile/       # PUT endpoint for profile updates (uses service role key)
-  api/notificaciones/  # Cron: weekly notification dispatch + admin-triggered
+  api/notificaciones/  # Cron: daily notification dispatch + admin-triggered
     route.ts          # GET/POST: auth (cron secret OR admin token), frequency check, dispatches types
     procesar/route.ts # POST: manual trigger by admin, `forzar` bypasses frequency
   api/auth/
@@ -93,7 +93,9 @@ lib/
     dashboard/
       carga.ts      # consultarDashboard (server-side raw fetch) + mapearMiembros
     notificaciones/
-      datos.ts      # Shared email data: etiquetaFrecuencia, calcularResumenDueno, calcularEstatusSistema (cron + manual routes)
+      datos.ts      # Shared email data: etiquetaFrecuencia, calcularResumenDueno, calcularEstatusSistema, contarMigraciones, pagosDelMes
+      frecuencia.ts # verificarFrecuencia() puro (umbrales 1/7/15/30 + piso de 7 días para deudores)
+      ejecucion.ts  # Los 4 procesadores + ejecutarYRegistrar() (log + error-report); usado por cron Y manual
   services/         # Legacy modules, migrated to features/ phase by phase
     auth/           # signIn, resetPassword, getProfile
     config/         # Config CRUD + dueno email promotion on change
@@ -399,32 +401,37 @@ e263c5e refactor: elimina console.* + centraliza strings en messages.ts para i18
 ### Execution flow
 1. **Vercel Cron** (vercel.json): `GET /api/notificaciones` daily at `0 4 * * *` (UTC) = midnight Venezuela (UTC-4). Vercel sends `Authorization: Bearer <CRON_SECRET>` automatically; if the env var is missing the endpoint fails closed (401). Admin JWT also works. Hobby plan: min 1 run/day, may fire anywhere within the scheduled hour (frequency logic only compares dates).
 2. **Manual**: `POST /api/notificaciones/procesar` with admin JWT + `{ tipo?: string, forzar?: boolean }`
-3. Route queries `notificacion_config WHERE habilitado = true`, loops configs, checks frequency (skipped if `forzar`), calls `ejecutarTipo()`
-4. `ejecutarTipo()` dispatches to `procesarMiembrosDeudores`, `procesarRecordatorioPago`, `procesarResumenDueno`, `procesarEstatusSistema`
-5. Each logs to `notificacion_log` (success or error)
-6. `resumen_dueno` and `estatus_sistema` build their payloads in `lib/features/notificaciones/datos.ts` (`calcularResumenDueno`, `calcularEstatusSistema`, `etiquetaFrecuencia`); both routes call those helpers so they cannot drift. `ResumenDueno.montoPendiente` = sum of the month's pending payment amounts — distinct from `montoDeuda` (general morosos debt).
+3. Route queries `notification_config WHERE is_active = true`, loops configs, checks `verificarFrecuencia(config, ultimoIntento)` (manual route skips the frequency check; `forzar` bypasses the reminder window), calls `ejecutarYRegistrar()`
+4. `ejecutarYRegistrar()` → `ejecutarTipoNotificacion()` dispatches to `ejecutarMiembrosDeudores`, `ejecutarRecordatorioPago`, `ejecutarResumenDueno`, `ejecutarEstatusSistema`, all in `lib/features/notificaciones/ejecucion.ts`. Both routes share this module so they cannot diverge.
+5. **Logging rules** (`ejecutarYRegistrar`): success (`enviados > 0`, `fallos = 0`) → log `no_issues: true`; nothing to send (`0/0`) → **no log written** (so an empty run does not consume the frequency window); partial failure or exception → log `no_issues: false` + `error-report` email to `NEXT_PUBLIC_ADMIN_EMAIL`.
+6. `resumen_dueno` and `estatus_sistema` build their payloads in `lib/features/notificaciones/datos.ts` (`calcularResumenDueno`, `calcularEstatusSistema`, `etiquetaFrecuencia`). `ResumenDueno.montoPendiente` = sum of the month's pending payment amounts — distinct from `montoDeuda` (general morosos debt).
+7. **Time budget**: `iniciarPresupuesto()` (240 s of the route's `maxDuration = 300`) + 1 s pause between individual emails (`configurarPausa(0)` in tests). Loops stop early instead of dying mid-list.
 
-### Recordatorio de Pago - Día de Cobro
+### Recordatorio de Pago - Ventana de envío
 - `recordatorio_pago` uses per-member billing day logic
-- Billing day = day of inscription, adjusted for months with fewer days (e.g., Feb 28/29)
-- Notification sent on `diaCobro - dias_previo` (wraps to previous month if < 1)
+- Billing day = day of inscription (or the 1st in `dia_uno` mode), adjusted for months with fewer days (e.g., Feb 28/29)
+- **Window**: sends while `hoy ∈ [cobro - days_before, cobro]` (`fechasRecordatorio()` in `ejecucion.ts`). With `dia_uno` + `days_before = 3` the window is the end of the previous month → the reminder is sent on its first run there.
+- **Dedup**: one send per billing cycle — skipped when the last *successful* log for that config is `>= fechaNotificacion` of the member's current cycle. `forzar` bypasses window + dedup.
+- Excludes members with an approved payment of the month (`pagosDelMes().usuariosConPago`), the owner, and members with an active open-ended membership
 - No grace period: first billing month is inscription month
-- Helper functions in `lib/utils.ts`: `getDiaCobro()`, `getDiaNotificacion()`, `esDiaDeNotificacion()`
+- Helper functions in `lib/utils.ts`: `getDiaCobro()`, `getDiaNotificacion()`, `esDiaDeNotificacion()` (the window math lives in `ejecucion.ts`)
+- **Caveat**: with `monthly_frequency` (30 days) the reminder can land on the billing day itself; use daily/weekly/biweekly for this type.
 
 ### Miembros Morosos - Día de Cobro
 - `getMiembrosMorosos()` uses `getDiaCobro()` to determine debt start
 - First debt month = inscription month (no grace period)
 - Current month only counted as debt if `hoy.getDate() >= diaCobro`
+- **Debt notices are never sent more than once every 7 days** (`MIN_DIAS_AVISO_DEUDA` in `frecuencia.ts`), even if the type is configured as daily — re-mailing the same debtor daily hurts deliverability
 
 ### Dashboard trigger
-- `app/dashboard/page.tsx` fires `procesarTodasLasNotificaciones()` on mount when `notificaciones_enabled` is true (background, no await)
+- There is **no** automatic trigger from `/dashboard`: `procesarTodasLasNotificaciones()` is only called from the Notificaciones config page ("Ejecutar Todo" / "Ejecutar Ahora", both with `forzar: true`). The cron is the only unattended sender.
 
 ### Sidebar
 - Notifications link at top level: `<SidebarItem icon={Bell} label="Notificaciones" href="/dashboard/configuracion/notificaciones" />`
 
 ### Per-type execution
 - "Ejecutar Ahora" on a specific type sends `{ tipo: "miembros_deudores", forzar: true }` → API skips frequency, executes only that type
-- `forzar: true` bypasses `verificarFrecuencia()` — always runs regardless of last execution date
+- The manual route **never** checks `verificarFrecuencia()`; `forzar: true` additionally bypasses the recordatorio window + per-cycle dedup (sends to everyone who has not paid)
 
 ## Migrations Applied
 

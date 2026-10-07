@@ -1,244 +1,17 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { messages } from "@/lib/messages";
-import { getDiaCobro, getDiaNotificacion } from "@/lib/utils";
-import { pagosService } from "@/lib/features/pagos/service";
-import {
-  calcularEstatusSistema,
-  calcularResumenDueno,
-  etiquetaFrecuencia,
-} from "@/lib/features/notificaciones/datos";
 import { applyRateLimit } from "@/lib/middleware/rate-limit";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import {
+  ejecutarYRegistrar,
+  iniciarPresupuesto,
+} from "@/lib/features/notificaciones/ejecucion";
 
-function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-async function ejecutarMiembrosDeudores(supabase: SupabaseClient, gymConfig: Record<string, unknown>): Promise<number> {
-  const morosos = await pagosService.getMiembrosMorosos(undefined, supabase);
-  if (morosos.length === 0) return 0;
-
-  const ownerEmail = gymConfig.owner_email as string | null;
-  const { sendPaymentDebtEmail } = await import("@/lib/services/email/email.service");
-
-  let count = 0;
-  for (const miembro of morosos) {
-    if (ownerEmail && miembro.email?.toLowerCase() === ownerEmail.toLowerCase()) continue;
-
-    try {
-      const deudasParaEmail = miembro.deudas.length > 0
-        ? miembro.deudas
-        : [{ month_number: new Date().getMonth() + 1, year_number: new Date().getFullYear(), payment_amount: miembro.totalDeuda || 0 }];
-
-      await sendPaymentDebtEmail(
-        miembro.email,
-        miembro.full_name,
-        (gymConfig.gym_name as string) || "GymApp",
-        deudasParaEmail,
-        miembro.totalDeuda,
-        gymConfig.logo_url as string | null,
-        gymConfig.address as string | null
-      );
-      count++;
-      await sleep(3000);
-    } catch {
-      // silent
-    }
-  }
-
-  return count;
-}
-
-async function ejecutarRecordatorioPago(
-  supabase: SupabaseClient,
-  diasPrevio: number,
-  gymConfig: Record<string, unknown>,
-  forzar: boolean
-): Promise<number> {
-  const nombreGym = (gymConfig.gym_name as string) || "GymApp";
-  const logoUrl = gymConfig.logo_url as string | null;
-  const duenoEmail = gymConfig.owner_email as string | null;
-  const address = gymConfig.address as string | null;
-  const modoCobro = (gymConfig.billing_mode as "dia_uno" | "fecha_inscripcion") || "dia_uno";
-
-  const mesActual = new Date().getMonth() + 1;
-  const anioActual = new Date().getFullYear();
-  const hoy = new Date();
-
-  if (!forzar) {
-    const { data: configRecordatorio } = await supabase
-      .from("notification_config")
-      .select("id")
-      .eq("notification_type", "recordatorio_pago")
-      .maybeSingle();
-
-    if (configRecordatorio) {
-      const inicioMes = new Date(anioActual, mesActual - 1, 1).toISOString();
-      const finMes = new Date(anioActual, mesActual, 0, 23, 59, 59).toISOString();
-      const { data: logExistente } = await supabase
-        .from("notification_log")
-        .select("id")
-        .eq("notification_config_id", configRecordatorio.id)
-        .gte("sent_at", inicioMes)
-        .lte("sent_at", finMes)
-        .limit(1)
-        .maybeSingle();
-
-      if (logExistente) return 0;
-    }
-  }
-
-  const { data: miembros } = await supabase
-    .from("profiles")
-    .select("id, email, full_name, start_date")
-    .in("role", ["miembro", "super_admin"])
-    .eq("activo", true)
-    .not("email", "is", null);
-
-  if (!miembros || miembros.length === 0) return 0;
-
-  let candidatos = miembros.filter((m) => m.email !== duenoEmail);
-  if (candidatos.length === 0) return 0;
-
-  const idsCandidatos = candidatos.map((m) => m.id);
-  const { data: libreRows } = await supabase
-    .from("memberships")
-    .select("user_id")
-    .in("user_id", idsCandidatos)
-    .eq("status", "activa")
-    .is("end_date", null);
-
-  const idsLibres = new Set((libreRows || []).map((r) => r.user_id));
-  candidatos = candidatos.filter((m) => !idsLibres.has(m.id));
-  if (candidatos.length === 0) return 0;
-
-  // Step 1: query payment_detail by month+year (small result set)
-  const { data: pagosDetalles } = await supabase
-    .from("payment_detail")
-    .select("payment_id, payment_amount")
-    .eq("month_number", mesActual)
-    .eq("year_number", anioActual);
-
-  const pagoIds = [...new Set((pagosDetalles || []).map((d) => d.payment_id))];
-
-  // Step 2: fetch only relevant headers
-  const { data: pagosHeader } = pagoIds.length > 0
-    ? await supabase
-        .from("payments")
-        .select("id, user_id")
-        .in("id", pagoIds)
-        .in("status", ["aprobado"])
-    : { data: [] };
-
-  const pagoUsuarioMap = new Map((pagosHeader || []).map((p) => [p.id, p.user_id]));
-  const usuariosConPago = new Set(
-    (pagosDetalles || []).map((d) => pagoUsuarioMap.get(d.payment_id)).filter(Boolean)
-  );
-
-  const deudores = candidatos.filter((m) => {
-    if (usuariosConPago.has(m.id)) return false;
-    if (!m.start_date) return false;
-    if (forzar) return true;
-
-    const diaCobro = getDiaCobro(m.start_date, mesActual, anioActual, modoCobro);
-    const notif = getDiaNotificacion(diaCobro, diasPrevio, mesActual, anioActual);
-    return hoy.getDate() === notif.dia &&
-      hoy.getMonth() + 1 === notif.mes &&
-      hoy.getFullYear() === notif.anio;
-  });
-
-  if (deudores.length === 0) return 0;
-
-  const { sendPaymentReminderEmail, sendAdminReminderEmail } = await import("@/lib/services/email/email.service");
-
-  let count = 0;
-  for (const deudor of deudores) {
-    try {
-      const diaCobro = getDiaCobro(deudor.start_date!, mesActual, anioActual, modoCobro);
-      const diasRestantesMes = diaCobro - hoy.getDate();
-
-      await sendPaymentReminderEmail(
-        deudor.email!,
-        deudor.full_name,
-        nombreGym,
-        forzar ? 0 : Math.max(0, diasRestantesMes),
-        new Date(anioActual, mesActual, diaCobro).toLocaleDateString("es-ES"),
-        logoUrl,
-        address
-      );
-      count++;
-      await sleep(3000);
-    } catch {
-      // silent
-    }
-  }
-
-  if (duenoEmail && count > 0) {
-    try {
-      await sendAdminReminderEmail(
-        duenoEmail,
-        duenoEmail,
-        nombreGym,
-        deudores.map((d) => {
-          const diaCobro = getDiaCobro(d.start_date!, mesActual, anioActual, modoCobro);
-          return {
-            nombre: d.full_name,
-            diasRestantes: forzar ? 0 : Math.max(0, diaCobro - hoy.getDate()),
-            fechaVencimiento: new Date(anioActual, mesActual, diaCobro).toLocaleDateString("es-ES"),
-          };
-        }),
-        logoUrl,
-        address
-      );
-      count++;
-    } catch {
-      // silent
-    }
-  }
-
-  return count;
-}
-
-async function ejecutarResumenDueno(supabase: SupabaseClient, gymConfig: Record<string, unknown>, frecuencia?: string): Promise<number> {
-  const duenoEmail = gymConfig.owner_email as string | null;
-  if (!duenoEmail) return 0;
-
-  const resumen = await calcularResumenDueno(supabase);
-
-  const { sendAdminSummaryEmail } = await import("@/lib/services/email/email.service");
-  await sendAdminSummaryEmail(
-    duenoEmail,
-    (gymConfig.gym_name as string) || "GymApp",
-    resumen,
-    `${process.env.NEXT_PUBLIC_SITE_URL}/login`,
-    gymConfig.logo_url as string | null,
-    gymConfig.address as string | null,
-    frecuencia
-  );
-
-  return 1;
-}
-
-async function ejecutarEstatusSistema(supabase: SupabaseClient, gymConfig: Record<string, unknown>): Promise<number> {
-  const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL;
-  if (!adminEmail) return 0;
-
-  const { metricas, errores } = await calcularEstatusSistema(supabase, gymConfig);
-
-  const { sendSystemStatusEmail } = await import("@/lib/services/email/email.service");
-  await sendSystemStatusEmail(
-    adminEmail,
-    (gymConfig.gym_name as string) || "GymApp",
-    metricas,
-    gymConfig.logo_url as string | null,
-    gymConfig.address as string | null,
-    errores
-  );
-
-  return 1;
-}
-
+/**
+ * Disparo manual de notificaciones (botones del panel). No consulta frecuencia:
+ * la decisión de ejecutar la toma el admin, y `forzar` además salta la ventana
+ * de días del recordatorio.
+ */
 export async function POST(request: Request) {
   const supabase = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -263,6 +36,7 @@ export async function POST(request: Request) {
       .select("role")
       .eq("id", user.id)
       .single();
+
     if (profile?.role !== "super_admin") {
       return NextResponse.json({ error: messages.toast.noAutorizado }, { status: 403 });
     }
@@ -301,70 +75,22 @@ export async function POST(request: Request) {
       return NextResponse.json({ ejecutadas: 0, enviados: 0, errores: 0 });
     }
 
+    iniciarPresupuesto();
+
     let ejecutadas = 0;
     let enviados = 0;
     let errores = 0;
 
     for (const config of configs) {
-      try {
-        let count = 0;
+      const resultado = await ejecutarYRegistrar(supabase, config, gymConfig, {
+        forzar,
+        userId: user.id,
+        origen: "manual",
+      });
 
-        switch (config.notification_type) {
-          case "miembros_deudores":
-            count = await ejecutarMiembrosDeudores(supabase, gymConfig);
-            break;
-          case "recordatorio_pago":
-            count = await ejecutarRecordatorioPago(supabase, config.days_before || 7, gymConfig, forzar);
-            break;
-          case "resumen_dueno":
-            count = await ejecutarResumenDueno(
-              supabase,
-              gymConfig,
-              etiquetaFrecuencia(config)
-            );
-            break;
-          case "estatus_sistema":
-            count = await ejecutarEstatusSistema(supabase, gymConfig);
-            break;
-        }
-
-        enviados += count;
-        ejecutadas++;
-
-        await supabase.from("notification_log").insert({
-          notification_config_id: config.id,
-          members_notified: count,
-          no_issues: true,
-        });
-      } catch (error) {
-        errores++;
-        const errorMsg = error instanceof Error ? error.message : "Error en ejecución manual";
-        await supabase.from("notification_log").insert({
-          notification_config_id: config.id,
-          members_notified: 0,
-          no_issues: false,
-          error_detail: errorMsg,
-        });
-
-        const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL;
-        if (adminEmail) {
-          try {
-            const { sendErrorReportEmail } = await import("@/lib/services/email/email.service");
-            await sendErrorReportEmail(
-              adminEmail,
-              (gymConfig.gym_name as string) || "GymApp",
-              {
-                paso: `Notificación manual: ${config.notification_type}`,
-                mensaje: errorMsg,
-                timestamp: new Date().toLocaleString("es-ES"),
-                contexto: { tipo: config.notification_type, config_id: config.id },
-              },
-              gymConfig.logo_url as string | null,
-              gymConfig.address as string | null
-            );
-          } catch { /* silent */ }
-        }
-      }
+      ejecutadas++;
+      enviados += resultado.enviados;
+      if (!resultado.sinProblemas) errores++;
     }
 
     return NextResponse.json({ ejecutadas, enviados, errores });

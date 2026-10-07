@@ -7,6 +7,17 @@ import {
   etiquetaFrecuencia,
   pagosDelMes,
 } from "./datos";
+import { verificarFrecuencia } from "./frecuencia";
+import {
+  asuntoReporte,
+  contarMiembrosActivos,
+  construirReporteCorrida,
+  enviarReporteTexto,
+  fechaVet,
+  labelTipo,
+  reporteATexto,
+  type PlantillaEntrada,
+} from "./reporte";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 /**
@@ -20,7 +31,23 @@ export type ResultadoEjecucion = {
   enviados: number;
   /** Destinatarios que fallaron (el resto puede haberse enviado bien). */
   fallos: number;
+  /** Correos que se enviaron bien (para el reporte del cron). */
+  enviadosA: string[];
+  /** Correos que fallaron. */
+  fallidosA: string[];
+  /** El bucle se cortó por `PRESUPUESTO_MS` antes de agotar la lista. */
+  presupuestoAgotado: boolean;
 };
+
+function resultadoVacio(): ResultadoEjecucion {
+  return { enviados: 0, fallos: 0, enviadosA: [], fallidosA: [], presupuestoAgotado: false };
+}
+
+/** Entrada de `fallidosA` con el motivo real del fallo (para el reporte). */
+function falloDestinatario(email: string, error: unknown): string {
+  const motivo = error instanceof Error ? error.message : String(error);
+  return `${email} — ${motivo}`;
+}
 
 export type ConfigNotificacion = {
   id: string;
@@ -132,8 +159,7 @@ export async function ejecutarMiembrosDeudores(
   const ownerEmail = gymConfig.owner_email?.toLowerCase();
   const { sendPaymentDebtEmail } = await import("@/lib/services/email/email.service");
 
-  let enviados = 0;
-  let fallos = 0;
+  const res = resultadoVacio();
 
   for (const miembro of morosos) {
     if (ownerEmail && miembro.email?.toLowerCase() === ownerEmail) continue;
@@ -159,15 +185,18 @@ export async function ejecutarMiembrosDeudores(
         gymConfig.logo_url,
         gymConfig.address
       );
-      enviados++;
-    } catch {
-      fallos++;
+      res.enviados++;
+      if (miembro.email) res.enviadosA.push(miembro.email);
+    } catch (error) {
+      res.fallos++;
+      if (miembro.email) res.fallidosA.push(falloDestinatario(miembro.email, error));
     }
 
     await pausaEntreCorreos();
   }
 
-  return { enviados, fallos };
+  res.presupuestoAgotado = sinPresupuesto();
+  return res;
 }
 
 export async function ejecutarRecordatorioPago(
@@ -193,10 +222,10 @@ export async function ejecutarRecordatorioPago(
     .in("role", ["miembro", "super_admin"])
     .eq("activo", true)
     .not("email", "is", null);
-  if (!miembros || miembros.length === 0) return { enviados: 0, fallos: 0 };
+  if (!miembros || miembros.length === 0) return resultadoVacio();
 
   let candidatos = miembros.filter((m) => !m.email || m.email.toLowerCase() !== duenoEmail);
-  if (candidatos.length === 0) return { enviados: 0, fallos: 0 };
+  if (candidatos.length === 0) return resultadoVacio();
 
   const idsCandidatos = candidatos.map((m) => m.id);
   const { data: libreRows } = await supabase
@@ -208,7 +237,7 @@ export async function ejecutarRecordatorioPago(
 
   const idsLibres = new Set((libreRows || []).map((r) => r.user_id));
   candidatos = candidatos.filter((m) => !idsLibres.has(m.id));
-  if (candidatos.length === 0) return { enviados: 0, fallos: 0 };
+  if (candidatos.length === 0) return resultadoVacio();
 
   const { usuariosConPago } = await pagosDelMes(supabase, hoy.getMonth() + 1, hoy.getFullYear());
 
@@ -221,14 +250,13 @@ export async function ejecutarRecordatorioPago(
     if (ultimoEnvio && ultimoEnvio >= fechas.notificacion) return false;
     return hoy >= fechas.notificacion && hoy <= fechas.cobro;
   });
-  if (deudores.length === 0) return { enviados: 0, fallos: 0 };
+  if (deudores.length === 0) return resultadoVacio();
 
   const { sendPaymentReminderEmail, sendAdminReminderEmail } = await import(
     "@/lib/services/email/email.service"
   );
 
-  let enviados = 0;
-  let fallos = 0;
+  const res = resultadoVacio();
 
   for (const deudor of deudores) {
     if (sinPresupuesto()) break;
@@ -244,15 +272,17 @@ export async function ejecutarRecordatorioPago(
         gymConfig.logo_url,
         gymConfig.address
       );
-      enviados++;
-    } catch {
-      fallos++;
+      res.enviados++;
+      res.enviadosA.push(deudor.email!);
+    } catch (error) {
+      res.fallos++;
+      res.fallidosA.push(falloDestinatario(deudor.email!, error));
     }
 
     await pausaEntreCorreos();
   }
 
-  if (duenoEmail && enviados > 0 && !sinPresupuesto()) {
+  if (duenoEmail && res.enviados > 0 && !sinPresupuesto()) {
     try {
       await sendAdminReminderEmail(
         gymConfig.owner_email!,
@@ -269,13 +299,16 @@ export async function ejecutarRecordatorioPago(
         gymConfig.logo_url,
         gymConfig.address
       );
-      enviados++;
-    } catch {
-      fallos++;
+      res.enviados++;
+      res.enviadosA.push(gymConfig.owner_email!);
+    } catch (error) {
+      res.fallos++;
+      res.fallidosA.push(falloDestinatario(gymConfig.owner_email!, error));
     }
   }
 
-  return { enviados, fallos };
+  res.presupuestoAgotado = sinPresupuesto();
+  return res;
 }
 
 export async function ejecutarResumenDueno(
@@ -298,7 +331,10 @@ export async function ejecutarResumenDueno(
     config ? etiquetaFrecuencia(config) : undefined
   );
 
-  return { enviados: 1, fallos: 0 };
+  const res = resultadoVacio();
+  res.enviados = 1;
+  res.enviadosA.push(gymConfig.owner_email);
+  return res;
 }
 
 export async function ejecutarEstatusSistema(
@@ -320,7 +356,10 @@ export async function ejecutarEstatusSistema(
     errores
   );
 
-  return { enviados: 1, fallos: 0 };
+  const res = resultadoVacio();
+  res.enviados = 1;
+  res.enviadosA.push(destino);
+  return res;
 }
 
 /**
@@ -335,9 +374,9 @@ export async function ultimoEnvioExitoso(
 }
 
 /**
- * Último intento registrado (éxito o error). Lo usa la comprobación de
- * frecuencia: un fallo también consume la ventana para no reintentar a diario
- * (y no inundar al admin con `error-report`).
+ * Último intento registrado (hoy solo se registran corridas sin fallos; el
+ * detalle de los fallos vive en el reporte de texto del cron). Lo usa la
+ * comprobación de frecuencia.
  */
 export async function ultimoIntento(
   supabase: SupabaseClient,
@@ -365,8 +404,8 @@ async function ultimoRegistro(
   return data?.sent_at ? new Date(data.sent_at) : null;
 }
 
-// ─── DESPACHO + REGISTRO ─────────────────────────────────────
-/** Ejecuta el tipo que corresponda. Lanza si algo falló (lo registra `ejecutarYRegistrar`). */
+// ─── DESPACHO + CORRIDA COMPLETA ─────────────────────────────
+/** Ejecuta el tipo que corresponda. Lanza si algo falló (lo captura `ejecutarCorrida`). */
 export async function ejecutarTipoNotificacion(
   supabase: SupabaseClient,
   config: ConfigNotificacion,
@@ -383,115 +422,219 @@ export async function ejecutarTipoNotificacion(
     case "estatus_sistema":
       return ejecutarEstatusSistema(supabase, gymConfig);
     default:
-      return { enviados: 0, fallos: 0 };
+      return resultadoVacio();
   }
 }
+
+/** Filas de `notification_log` que se conservan por tipo (la tabla no crece). */
+export const LIMITE_BITACORA = 10;
 
 /**
- * Ejecuta + escribe `notification_log` + avisa al admin si algo falló.
- *
- * Reglas de registro:
- * - Envío total (fallos = 0, enviados > 0) → log `no_issues: true`.
- * - Sin nada que enviar (0 y 0) → **no se escribe log**, para no consumir la
- *   ventana de frecuencia del tipo.
- * - Fallo parcial o excepción → log `no_issues: false` + `error-report` al admin.
+ * Deja solo las últimas `limite` filas del tipo. Se llama al final de cada
+ * corrida; el dedup de frecuencia siempre consulta la fila más reciente, así
+ * que recortar por `sent_at desc` es seguro.
  */
-export async function ejecutarYRegistrar(
+export async function purgarBitacora(
   supabase: SupabaseClient,
-  config: ConfigNotificacion,
-  gymConfig: GymConfigNotificaciones,
-  opciones: { forzar?: boolean; userId?: string | null; origen: OrigenEjecucion }
-): Promise<{ enviados: number; sinProblemas: boolean }> {
-  try {
-    const resultado = await ejecutarTipoNotificacion(
-      supabase,
-      config,
-      gymConfig,
-      opciones.forzar ?? false
-    );
+  configId: string,
+  limite: number = LIMITE_BITACORA
+): Promise<void> {
+  const { data } = await supabase
+    .from("notification_log")
+    .select("id")
+    .eq("notification_config_id", configId)
+    .order("sent_at", { ascending: false })
+    .limit(limite);
 
-    if (resultado.fallos > 0) {
-      const detalle = `${messages.notificaciones.envioParcial} (enviados: ${resultado.enviados}, fallos: ${resultado.fallos})`;
-      await escribirLog(supabase, {
-        configId: config.id,
-        enviados: resultado.enviados,
-        sinProblemas: false,
-        detalle,
-        userId: opciones.userId,
-      });
-      await avisarErrorAlAdmin(config, gymConfig, detalle, opciones.origen);
-      return { enviados: resultado.enviados, sinProblemas: false };
-    }
+  const ids = (data ?? []).map((r) => String((r as { id: string }).id));
+  if (ids.length < limite) return;
 
-    if (resultado.enviados > 0) {
-      await escribirLog(supabase, {
-        configId: config.id,
-        enviados: resultado.enviados,
-        sinProblemas: true,
-        userId: opciones.userId,
-      });
-    }
+  await supabase
+    .from("notification_log")
+    .delete()
+    .eq("notification_config_id", configId)
+    .not("id", "in", `(${ids.map((id) => `"${id}"`).join(",")})`);
+}
 
-    return { enviados: resultado.enviados, sinProblemas: true };
-  } catch (error) {
-    const errorMsg = error instanceof Error ? error.message : String(error);
-    await escribirLog(supabase, {
+export type OpcionesCorrida = {
+  configs: ConfigNotificacion[];
+  gymConfig: GymConfigNotificaciones;
+  forzar?: boolean;
+  userId?: string | null;
+  origen: OrigenEjecucion;
+  /** El cron chequea la frecuencia de cada tipo; el disparo manual no. */
+  respetarFrecuencia: boolean;
+  /** Expresión de vercel.json, solo para el reporte. */
+  expresionCron?: string | null;
+};
+
+export type ResumenCorrida = {
+  ejecutadas: number;
+  enviados: number;
+  errores: number;
+  /** Texto plano del reporte (solo corridas del cron; null en manuales). */
+  reporteTexto: string | null;
+  /** false = no pudo enviarse; null = no aplica (corrida manual). */
+  reporteEnviado: boolean | null;
+};
+
+/**
+ * Corrida completa de los tipos indicados.
+ *
+ * Reglas:
+ * - **Bitácora**: al final, y solo si ningún tipo falló → 1 insert batch con
+ *   las filas `no_issues: true` de los tipos que enviaron. Si algo falló no se
+ *   escribe ninguna fila (el detalle viaja en el reporte del cron).
+ * - **Retención**: cada tipo queda con `LIMITE_BITACORA` filas como máximo.
+ * - **Reporte**: solo en corridas del cron (`origen: "cron"`), siempre al
+ *   final, en texto plano al super admin técnico. Las manuales no lo envían.
+ */
+export async function ejecutarCorrida(
+  supabase: SupabaseClient,
+  opciones: OpcionesCorrida
+): Promise<ResumenCorrida> {
+  const inicio = Date.now();
+  const advertencias: string[] = [];
+  const entradas: PlantillaEntrada[] = [];
+  let hayFallo = false;
+
+  for (const config of opciones.configs) {
+    const base = {
       configId: config.id,
-      enviados: 0,
-      sinProblemas: false,
-      detalle: errorMsg,
-      userId: opciones.userId,
+      tipo: config.notification_type,
+      label: labelTipo(config.notification_type),
+      frecuencia: etiquetaFrecuencia(config),
+      ultimoIntento: null as string | null,
+      presupuestoAgotado: false,
+    };
+
+    if (opciones.respetarFrecuencia) {
+      const fecha = await ultimoIntento(supabase, config.id);
+      base.ultimoIntento = fecha ? fechaVet(fecha) : null;
+      if (!verificarFrecuencia(config, fecha)) {
+        entradas.push({
+          ...base,
+          estado: "saltada_frecuencia",
+          enviados: 0,
+          fallos: 0,
+          destinatarios: [],
+          fallidos: [],
+          error: null,
+        });
+        continue;
+      }
+    }
+
+    if (sinPresupuesto()) {
+      entradas.push({
+        ...base,
+        estado: "presupuesto",
+        enviados: 0,
+        fallos: 0,
+        destinatarios: [],
+        fallidos: [],
+        error: null,
+      });
+      continue;
+    }
+
+    try {
+      const r = await ejecutarTipoNotificacion(
+        supabase,
+        config,
+        opciones.gymConfig,
+        opciones.forzar ?? false
+      );
+      const error =
+        r.fallos > 0
+          ? `${messages.notificaciones.envioParcial} (enviados: ${r.enviados}, fallos: ${r.fallos})`
+          : null;
+      if (error) hayFallo = true;
+      entradas.push({
+        ...base,
+        estado: "ejecutada",
+        enviados: r.enviados,
+        fallos: r.fallos,
+        destinatarios: r.enviadosA,
+        fallidos: r.fallidosA,
+        error,
+        presupuestoAgotado: r.presupuestoAgotado,
+      });
+    } catch (error) {
+      hayFallo = true;
+      entradas.push({
+        ...base,
+        estado: "ejecutada",
+        enviados: 0,
+        fallos: 1,
+        destinatarios: [],
+        fallidos: [],
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  const ejecutadas = entradas.filter((e) => e.estado === "ejecutada").length;
+  const errores = entradas.filter(
+    (e) => e.estado === "ejecutada" && (e.fallos > 0 || e.error)
+  ).length;
+  const enviados = entradas.reduce((suma, e) => suma + e.enviados, 0);
+
+  // Bitácora: solo al final, y solo si la corrida fue limpia.
+  if (!hayFallo) {
+    const filas = entradas
+      .filter((e) => e.estado === "ejecutada" && e.enviados > 0)
+      .map((e) => ({
+        notification_config_id: e.configId,
+        members_notified: e.enviados,
+        no_issues: true,
+        ...(opciones.userId ? { created_by: opciones.userId } : {}),
+      }));
+    if (filas.length > 0) {
+      await supabase.from("notification_log").insert(filas);
+    }
+  }
+
+  for (const config of opciones.configs) {
+    try {
+      await purgarBitacora(supabase, config.id);
+    } catch (error) {
+      advertencias.push(
+        `${messages.notificaciones.reporte.purga}: ` +
+          (error instanceof Error ? error.message : String(error))
+      );
+    }
+  }
+
+  let reporteTexto: string | null = null;
+  let reporteEnviado: boolean | null = null;
+
+  if (opciones.origen === "cron") {
+    let miembrosActivos = 0;
+    try {
+      miembrosActivos = await contarMiembrosActivos(supabase);
+    } catch (error) {
+      advertencias.push(
+        `${messages.notificaciones.reporte.miembrosActivos}: ` +
+          (error instanceof Error ? error.message : String(error))
+      );
+    }
+
+    const reporte = construirReporteCorrida({
+      fecha: new Date(),
+      origen: opciones.origen,
+      expresionCron: opciones.expresionCron ?? null,
+      duracionMs: Date.now() - inicio,
+      miembrosActivos,
+      plantillas: entradas,
+      advertencias,
     });
-    await avisarErrorAlAdmin(config, gymConfig, errorMsg, opciones.origen);
-    return { enviados: 0, sinProblemas: false };
-  }
-}
-
-async function escribirLog(
-  supabase: SupabaseClient,
-  datos: {
-    configId: string;
-    enviados: number;
-    sinProblemas: boolean;
-    detalle?: string;
-    userId?: string | null;
-  }
-): Promise<void> {
-  await supabase.from("notification_log").insert({
-    notification_config_id: datos.configId,
-    members_notified: datos.enviados,
-    no_issues: datos.sinProblemas,
-    ...(datos.detalle ? { error_detail: datos.detalle } : {}),
-    ...(datos.userId ? { created_by: datos.userId } : {}),
-  });
-}
-
-async function avisarErrorAlAdmin(
-  config: ConfigNotificacion,
-  gymConfig: GymConfigNotificaciones,
-  mensaje: string,
-  origen: OrigenEjecucion
-): Promise<void> {
-  const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL;
-  if (!adminEmail) return;
-
-  try {
-    const { sendErrorReportEmail } = await import("@/lib/services/email/email.service");
-    await sendErrorReportEmail(
-      adminEmail,
-      gymConfig.gym_name || "GymApp",
-      {
-        paso:
-          (origen === "manual" ? "Notificación manual: " : "Notificación: ") +
-          config.notification_type,
-        mensaje,
-        timestamp: new Date().toLocaleString("es-ES"),
-        contexto: { tipo: config.notification_type, config_id: config.id },
-      },
-      gymConfig.logo_url,
-      gymConfig.address
+    reporteTexto = reporteATexto(reporte);
+    reporteEnviado = await enviarReporteTexto(
+      asuntoReporte(reporte, opciones.gymConfig.gym_name || "GymApp"),
+      reporteTexto
     );
-  } catch {
-    // El error original ya quedó en notification_log; no hay nada más que hacer.
   }
+
+  return { ejecutadas, enviados, errores, reporteTexto, reporteEnviado };
 }

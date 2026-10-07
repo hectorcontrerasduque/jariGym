@@ -9,7 +9,6 @@ import { deudasPendientesTemplate } from "@/lib/services/email/templates/deudas-
 import { recordatorioMiembroTemplate } from "@/lib/services/email/templates/recordatorio-miembro";
 import { recordatorioAdminTemplate } from "@/lib/services/email/templates/recordatorio-admin";
 import { diagnosticoTemplate } from "@/lib/services/email/templates/diagnostico";
-import { errorReportTemplate } from "@/lib/services/email/templates/error-report";
 import { aplicarSeccionAcceso, incluirQrAdjunto } from "@/lib/services/email/email.service";
 
 describe("resetPasswordTemplate", () => {
@@ -511,48 +510,6 @@ describe("diagnosticoTemplate", () => {
     const logo = "https://example.com/logo.png";
     const html = diagnosticoTemplate(resultados, gymName, logo);
     expect(html).toContain(`<img src="${logo}"`);
-  });
-});
-
-// ─── errorReportTemplate ─────────────────────────────────────
-
-describe("errorReportTemplate", () => {
-  const gymName = "Mi Gym";
-  const errorInfo = {
-    paso: "Enviar email",
-    mensaje: "SMTP timeout",
-    timestamp: "2026-09-12 10:30:00",
-    contexto: { userId: "user-1", email: "test@test.com" },
-  };
-
-  it("includes error step and message", () => {
-    const html = errorReportTemplate(errorInfo, gymName);
-    expect(html).toContain("Enviar email");
-    expect(html).toContain("SMTP timeout");
-  });
-
-  it("includes timestamp", () => {
-    const html = errorReportTemplate(errorInfo, gymName);
-    expect(html).toContain("2026-09-12 10:30:00");
-  });
-
-  it("includes context keys and values", () => {
-    const html = errorReportTemplate(errorInfo, gymName);
-    expect(html).toContain("userId");
-    expect(html).toContain("user-1");
-    expect(html).toContain("test@test.com");
-  });
-
-  it("renders logo when provided", () => {
-    const logo = "https://example.com/logo.png";
-    const html = errorReportTemplate(errorInfo, gymName, logo);
-    expect(html).toContain(`<img src="${logo}"`);
-  });
-
-  it("renders fallback when no logo", () => {
-    const html = errorReportTemplate(errorInfo, gymName, null);
-    expect(html).toContain("M");
-    expect(html).not.toContain("<img");
   });
 });
 

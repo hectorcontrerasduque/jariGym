@@ -8,7 +8,6 @@ import { recordatorioAdminTemplate } from "./templates/recordatorio-admin";
 import { resumenDuenoTemplate } from "./templates/resumen-dueno";
 import { estatusSistemaTemplate } from "./templates/estatus-sistema";
 import { diagnosticoTemplate } from "./templates/diagnostico";
-import { errorReportTemplate } from "./templates/error-report";
 import { pagoAprobadoTemplate } from "./templates/pago-aprobado";
 import { pagoRechazadoTemplate } from "./templates/pago-rechazado";
 import type { EstatusSistema, ResumenDueno } from "@/lib/features/notificaciones/datos";
@@ -41,6 +40,24 @@ async function rateLimit(): Promise<void> {
     await sleep(EMAIL_DELAY_MS - elapsed);
   }
   lastEmailSentAt = Date.now();
+}
+
+/** Envío con un reintento (2 s) si el transporte falla o no devuelve messageId. */
+async function enviarConReintento(mailOptions: SendMailOptions): Promise<void> {
+  let lastError: Error | null = null;
+  for (let attempt = 0; attempt <= 1; attempt++) {
+    try {
+      const result = await transporter.sendMail(mailOptions);
+      if (!result.messageId) {
+        throw new Error("Email sent but no messageId returned");
+      }
+      return;
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+      if (attempt === 0) await sleep(2000);
+    }
+  }
+  throw lastError;
 }
 
 // ─── QR CODE (cached PNG buffer for CID embedding) ───────────
@@ -171,20 +188,7 @@ async function sendEmail({
     attachments,
   };
 
-  let lastError: Error | null = null;
-  for (let attempt = 0; attempt <= 1; attempt++) {
-    try {
-      const result = await transporter.sendMail(mailOptions);
-      if (!result.messageId) {
-        throw new Error("Email sent but no messageId returned");
-      }
-      return;
-    } catch (err) {
-      lastError = err instanceof Error ? err : new Error(String(err));
-      if (attempt === 0) await sleep(2000);
-    }
-  }
-  throw lastError;
+  await enviarConReintento(mailOptions);
 }
 
 // ─── SEND NOTIFICATION (batch/Marketing headers) ─────────────
@@ -254,20 +258,7 @@ async function sendNotificationEmail({
     },
   };
 
-  let lastError: Error | null = null;
-  for (let attempt = 0; attempt <= 1; attempt++) {
-    try {
-      const result = await transporter.sendMail(mailOptions);
-      if (!result.messageId) {
-        throw new Error("Email sent but no messageId returned");
-      }
-      return;
-    } catch (err) {
-      lastError = err instanceof Error ? err : new Error(String(err));
-      if (attempt === 0) await sleep(2000);
-    }
-  }
-  throw lastError;
+  await enviarConReintento(mailOptions);
 }
 
 // ─── PASSWORD RESET ──────────────────────────────────────────
@@ -426,27 +417,32 @@ export async function sendDiagnosticoEmail(
   });
 }
 
-// ─── ERROR REPORT ────────────────────────────────────────────
-export async function sendErrorReportEmail(
+// ─── RUN REPORT (texto plano) ────────────────────────────────
+/**
+ * Reporte de corrida del cron hacia el super admin técnico: **texto plano**
+ * (sin HTML, sin QR, sin adjuntos, sin cabeceras bulk) — es correo interno,
+ * no una notificación a los miembros.
+ */
+export async function sendRunReportEmail(
   to: string,
-  gymName: string,
-  errorInfo: {
-    paso: string;
-    mensaje: string;
-    timestamp: string;
-    contexto: Record<string, unknown>;
-  },
-  gymLogo?: string | null,
-  address?: string | null
+  subject: string,
+  text: string
 ): Promise<void> {
-  const baseHtml = errorReportTemplate(errorInfo, gymName, gymLogo);
-  await sendNotificationEmail({
+  if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) {
+    throw new Error("GMAIL_USER and GMAIL_APP_PASSWORD must be configured");
+  }
+
+  await rateLimit();
+
+  const mailOptions: SendMailOptions = {
+    from: `"${process.env.GMAIL_USER}" <${process.env.GMAIL_USER}>`,
     to,
-    subject: `${gymName} - Error en notificaciones`,
-    html: baseHtml + unsubscribeFooter(gymName, address),
-    fromName: gymName,
-    campaign: "error-report",
-  });
+    subject,
+    text,
+    replyTo: process.env.GMAIL_USER,
+  };
+
+  await enviarConReintento(mailOptions);
 }
 
 // ─── PAYMENT APPROVED ──────────────────────────────────────

@@ -95,7 +95,9 @@ lib/
     notificaciones/
       datos.ts      # Shared email data: etiquetaFrecuencia, calcularResumenDueno, calcularEstatusSistema, contarMigraciones, pagosDelMes
       frecuencia.ts # verificarFrecuencia() puro (umbrales 1/7/15/30 + piso de 7 días para deudores)
-      ejecucion.ts  # Los 4 procesadores + ejecutarYRegistrar() (log + error-report); usado por cron Y manual
+      ejecucion.ts  # Los 4 procesadores + ejecutarCorrida() (batch log + purge + reporte); usado por cron Y manual
+      reporte.ts    # Reporte de corrida en texto plano (solo cron) + contarMiembrosActivos()
+      horario.ts    # horarioNotificaciones(): lee vercel.json para la franja de horario en la UI
   services/         # Legacy modules, migrated to features/ phase by phase
     auth/           # signIn, resetPassword, getProfile
     config/         # Config CRUD + dueno email promotion on change
@@ -397,15 +399,19 @@ e263c5e refactor: elimina console.* + centraliza strings en messages.ts para i18
 
 ### Log (`notificacion_log` table)
 - `id_notificacion_config` (FK), `miembros_notificados`, `sin_problemas`, `error_detalle`, `fecha_hora_envio`
+- **Batch at the end, only if everything succeeded** + purge to the last 10 rows per type (`LIMITE_BITACORA`) — see Execution flow
 
 ### Execution flow
-1. **Vercel Cron** (vercel.json): `GET /api/notificaciones` daily at `0 4 * * *` (UTC) = midnight Venezuela (UTC-4). Vercel sends `Authorization: Bearer <CRON_SECRET>` automatically; if the env var is missing the endpoint fails closed (401). Admin JWT also works. Hobby plan: min 1 run/day, may fire anywhere within the scheduled hour (frequency logic only compares dates).
+1. **Vercel Cron** (vercel.json): `GET /api/notificaciones` daily at `0 4 * * *` (UTC) = midnight Venezuela (UTC-4). Vercel sends `Authorization: Bearer <CRON_SECRET>` automatically; if the env var is missing the endpoint fails closed (401). Admin JWT also works (but is treated as a manual run → no report). Hobby plan: min 1 run/day, may fire anywhere within the scheduled hour (frequency logic only compares dates).
+   **The schedule lives only in `vercel.json`** — to test, edit `schedule` in UTC (15:00 VET → `0 19 * * *`) and push; `npx vercel crons run /api/notificaciones` or a manual `curl` with `CRON_SECRET` also work. The Notificaciones page only *displays* it (`horarioNotificaciones()` in `horario.ts`, info strip under the master toggle) — there is no DB field and no guard on it.
 2. **Manual**: `POST /api/notificaciones/procesar` with admin JWT + `{ tipo?: string, forzar?: boolean }`
-3. Route queries `notification_config WHERE is_active = true`, loops configs, checks `verificarFrecuencia(config, ultimoIntento)` (manual route skips the frequency check; `forzar` bypasses the reminder window), calls `ejecutarYRegistrar()`
-4. `ejecutarYRegistrar()` → `ejecutarTipoNotificacion()` dispatches to `ejecutarMiembrosDeudores`, `ejecutarRecordatorioPago`, `ejecutarResumenDueno`, `ejecutarEstatusSistema`, all in `lib/features/notificaciones/ejecucion.ts`. Both routes share this module so they cannot diverge.
-5. **Logging rules** (`ejecutarYRegistrar`): success (`enviados > 0`, `fallos = 0`) → log `no_issues: true`; nothing to send (`0/0`) → **no log written** (so an empty run does not consume the frequency window); partial failure or exception → log `no_issues: false` + `error-report` email to `NEXT_PUBLIC_ADMIN_EMAIL`.
-6. `resumen_dueno` and `estatus_sistema` build their payloads in `lib/features/notificaciones/datos.ts` (`calcularResumenDueno`, `calcularEstatusSistema`, `etiquetaFrecuencia`). `ResumenDueno.montoPendiente` = sum of the month's pending payment amounts — distinct from `montoDeuda` (general morosos debt).
-7. **Time budget**: `iniciarPresupuesto()` (240 s of the route's `maxDuration = 300`) + 1 s pause between individual emails (`configurarPausa(0)` in tests). Loops stop early instead of dying mid-list.
+3. Route queries `notification_config WHERE is_active = true`, loops configs, checks `verificarFrecuencia(config, ultimoIntento)` (manual route skips the frequency check; `forzar` bypasses the reminder window), calls `ejecutarCorrida()`
+4. `ejecutarCorrida()` dispatches to `ejecutarMiembrosDeudores`, `ejecutarRecordatorioPago`, `ejecutarResumenDueno`, `ejecutarEstatusSistema`, all in `lib/features/notificaciones/ejecucion.ts`. Both routes share this module so they cannot diverge.
+5. **Logging rules** (`ejecutarCorrida`): the `notification_log` batch is written **at the very end of the run and only when no type failed** — one row per config that executed with `enviados > 0` (`no_issues: true`, `created_by` when there is a user). Nothing is written when `0/0` (an empty run must not consume the frequency window); on any failure or exception **zero rows are written** (detail goes only to the report — accepted trade-off: the frequency windows of the *successful* types do not advance that day). Failures carry the real reason per recipient (`email — mensaje`) in `fallidosA`.
+6. **Purge**: after logging, each config keeps only the **last 10 rows** (`LIMITE_BITACORA = 10`, max 40 rows total): select ids by `sent_at desc`, delete the rest with `.not("id", "in", ...)` when there are more than 10. Purge errors become warnings in the report, not failures.
+7. **Run report (cron only)**: `reporte.ts` builds a plain-text report — schedule + VET window, per-template status/frequency/last attempt, recipients, coverage % (`enviados/activos`, 1 decimal, "—" when there are no active members), failures with reasons, warnings (purge), totals and a pie line — and emails it to `NEXT_PUBLIC_ADMIN_EMAIL` via `sendRunReportEmail` (text/plain, no HTML/QR/bulk headers). Sent on every cron run (even 0/0); **never** for admin-JWT runs (`origen: "manual"`) nor for guard returns (notifications disabled / no configs). A fatal route error still emails a minimal report (`enviarReporteFatal`) when authenticated with `CRON_SECRET`; the 500 body is unchanged. Denominator = profiles with `activo IS NOT FALSE` (all roles).
+8. `resumen_dueno` and `estatus_sistema` build their payloads in `lib/features/notificaciones/datos.ts` (`calcularResumenDueno`, `calcularEstatusSistema`, `etiquetaFrecuencia`). `ResumenDueno.montoPendiente` = sum of the month's pending payment amounts — distinct from `montoDeuda` (general morosos debt).
+9. **Time budget**: `iniciarPresupuesto()` (240 s of the route's `maxDuration = 300`) + 1 s pause between individual emails (`configurarPausa(0)` in tests). Loops stop early instead of dying mid-list.
 
 ### Recordatorio de Pago - Ventana de envío
 - `recordatorio_pago` uses per-member billing day logic

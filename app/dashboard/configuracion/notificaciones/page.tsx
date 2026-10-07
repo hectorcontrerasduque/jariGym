@@ -20,6 +20,7 @@ import {
 import { showToast } from "@/components/ui/toast";
 import { Loader } from "@/components/ui/loader";
 import { messages } from "@/lib/messages";
+import { horarioNotificaciones } from "@/lib/features/notificaciones/horario";
 import type { GymConfig, NotificacionConfig, NotificacionLog } from "@/lib/types";
 
 const tipoLabels: Record<string, { label: string; icon: React.ReactNode; desc: string }> = {
@@ -46,6 +47,8 @@ const tipoLabels: Record<string, { label: string; icon: React.ReactNode; desc: s
 };
 
 const mesesNombres = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+
+const horario = horarioNotificaciones();
 
 export default function NotificacionesPage() {
   const [gymConfig, setGymConfig] = useState<Partial<GymConfig>>({});
@@ -239,6 +242,27 @@ export default function NotificacionesPage() {
           </div>
         </CardContent>
       </Card>
+
+      <div className="flex items-start gap-2 p-3 bg-gym-surface border border-gym-border rounded-xl">
+        <Clock className="w-4 h-4 mt-0.5 text-gym-primary shrink-0" />
+        <div className="text-sm text-gym-muted">
+          <span className="font-medium text-gym-text">
+            {messages.notificaciones.horario.titulo}:
+          </span>{" "}
+          {horario?.ventanaVet ? (
+            <>
+              {messages.notificaciones.horario.diario} {horario.ventanaVet} (
+              {messages.notificaciones.horario.zona}) · {horario.ventanaUtc} UTC ·{" "}
+              {messages.notificaciones.horario.fuente}.
+            </>
+          ) : (
+            horario?.expresion ?? messages.notificaciones.horario.noDisponible
+          )}
+          <span className="block text-xs mt-0.5">
+            {messages.notificaciones.horario.hobby}
+          </span>
+        </div>
+      </div>
 
       {gymConfig.notifications_enabled && (
         <>

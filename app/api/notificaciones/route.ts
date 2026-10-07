@@ -2,12 +2,17 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { messages } from "@/lib/messages";
 import { applyRateLimit } from "@/lib/middleware/rate-limit";
-import { verificarFrecuencia } from "@/lib/features/notificaciones/frecuencia";
 import {
-  ejecutarYRegistrar,
+  ejecutarCorrida,
   iniciarPresupuesto,
-  ultimoIntento,
 } from "@/lib/features/notificaciones/ejecucion";
+import {
+  asuntoReporte,
+  construirReporteCorrida,
+  enviarReporteTexto,
+  reporteATexto,
+} from "@/lib/features/notificaciones/reporte";
+import { horarioNotificaciones } from "@/lib/features/notificaciones/horario";
 import type { NextRequest } from "next/server";
 
 const CRON_SECRET = process.env.CRON_SECRET;
@@ -20,6 +25,24 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   return ejecutar(request);
+}
+
+/** Reporte de fallo fatal (solo cron): el admin se entera aunque la ruta reviente. */
+async function enviarReporteFatal(error: unknown, gymName: string): Promise<void> {
+  try {
+    const reporte = construirReporteCorrida({
+      fecha: new Date(),
+      origen: "cron",
+      expresionCron: horarioNotificaciones()?.expresion ?? null,
+      duracionMs: 0,
+      miembrosActivos: 0,
+      plantillas: [],
+      errorFatal: error instanceof Error ? error.message : String(error),
+    });
+    await enviarReporteTexto(asuntoReporte(reporte, gymName), reporteATexto(reporte));
+  } catch {
+    // El error original se devuelve en la respuesta 500 (logs de Vercel).
+  }
 }
 
 async function ejecutar(request: NextRequest) {
@@ -64,6 +87,8 @@ async function ejecutar(request: NextRequest) {
     if (rateLimitResponse) return rateLimitResponse;
   }
 
+  let gymName = "GymApp";
+
   try {
     const { data: gymConfig } = await supabase
       .from("gym_config")
@@ -78,6 +103,8 @@ async function ejecutar(request: NextRequest) {
         ejecutadas: 0,
       });
     }
+
+    gymName = gymConfig.gym_name || "GymApp";
 
     const { data: configs } = await supabase
       .from("notification_config")
@@ -94,31 +121,29 @@ async function ejecutar(request: NextRequest) {
 
     iniciarPresupuesto();
 
-    let ejecutadas = 0;
-    let enviados = 0;
-    let errores = 0;
-
-    for (const config of configs) {
-      const fechaUltimoIntento = await ultimoIntento(supabase, config.id);
-      if (!verificarFrecuencia(config, fechaUltimoIntento)) continue;
-
-      ejecutadas++;
-      const resultado = await ejecutarYRegistrar(supabase, config, gymConfig, {
-        userId,
-        origen: "cron",
-      });
-
-      enviados += resultado.enviados;
-      if (!resultado.sinProblemas) errores++;
-    }
+    const resumen = await ejecutarCorrida(supabase, {
+      configs,
+      gymConfig,
+      userId,
+      // El reporte de corrida es exclusivo del cron (CRON_SECRET); una llamada
+      // con JWT de super_admin es manual y no genera reporte.
+      origen: isCronAuth ? "cron" : "manual",
+      respetarFrecuencia: true,
+      expresionCron: horarioNotificaciones()?.expresion ?? null,
+    });
 
     return NextResponse.json({
       success: true,
-      ejecutadas,
-      enviados,
-      errores,
+      ejecutadas: resumen.ejecutadas,
+      enviados: resumen.enviados,
+      errores: resumen.errores,
+      reporte_enviado: resumen.reporteEnviado,
+      reporte: resumen.reporteTexto,
     });
   } catch (error) {
+    if (isCronAuth) {
+      await enviarReporteFatal(error, gymName);
+    }
     return NextResponse.json(
       {
         success: false,

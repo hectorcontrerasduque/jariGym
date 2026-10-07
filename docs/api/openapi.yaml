@@ -537,6 +537,8 @@ paths:
         Invocado por Vercel Cron (`vercel.json`, diario a las 04:00 UTC = medianoche VET) con
         `Authorization: Bearer <CRON_SECRET>` que Vercel envía automáticamente. Misma lógica que el POST.
         Si `CRON_SECRET` no está definida en el entorno, el cron responde 401 (fail-closed).
+        Al terminar envía un reporte en texto plano a `NEXT_PUBLIC_ADMIN_EMAIL` (solo esta vía del cron;
+        las ejecuciones manuales no generan reporte).
       security:
         - cronSecret: []
         - bearerUsuario: []
@@ -553,6 +555,8 @@ paths:
                   ejecutadas: { type: integer }
                   enviados: { type: integer }
                   errores: { type: integer }
+                  reporte_enviado: { type: [boolean, "null"], description: "true si el reporte de corrida llegó al correo del super admin (null en guardas y en ejecuciones manuales)." }
+                  reporte: { type: [string, "null"], description: "Texto plano del reporte de corrida." }
         "401": { $ref: "#/components/responses/Error" }
         "429": { $ref: "#/components/responses/RateLimited" }
         "500":
@@ -571,8 +575,12 @@ paths:
       description: |
         Recomendado: cron diario a medianoche. Si `gym_config.notifications_enabled` es falso o no hay tipos habilitados,
         no hace nada. Para cada tipo habilitado en `notificacion_config`, respeta su frecuencia y envía los correos
-        (deudores, recordatorio de pago, resumen al dueño, estatus del sistema); registra en `notification_log`.
+        (deudores, recordatorio de pago, resumen al dueño, estatus del sistema); registra en `notification_log`
+        al final y solo si ningún tipo falló (la bitácora se purga dejando las 10 filas más recientes por tipo).
         Límite de 5 cada 20 min solo cuando llama un usuario (no con `CRON_SECRET`).
+
+        Al terminar envía un reporte en texto plano a `NEXT_PUBLIC_ADMIN_EMAIL` con destinatarios, % de cobertura
+        y errores por plantilla (solo cuando se invoca con `CRON_SECRET`; el POST de usuario no genera reporte).
 
         Si `CRON_SECRET` no está definida en el entorno, el cron responde 401 (fail-closed).
       security:
@@ -591,6 +599,8 @@ paths:
                   ejecutadas: { type: integer }
                   enviados: { type: integer }
                   errores: { type: integer }
+                  reporte_enviado: { type: [boolean, "null"], description: "true si el reporte de corrida llegó al correo del super admin (null en guardas y en ejecuciones manuales)." }
+                  reporte: { type: [string, "null"], description: "Texto plano del reporte de corrida." }
         "401": { $ref: "#/components/responses/Error" }
         "429": { $ref: "#/components/responses/RateLimited" }
         "500":

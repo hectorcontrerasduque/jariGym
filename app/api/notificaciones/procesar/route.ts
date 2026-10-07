@@ -3,7 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { messages } from "@/lib/messages";
 import { applyRateLimit } from "@/lib/middleware/rate-limit";
 import {
-  ejecutarYRegistrar,
+  ejecutarCorrida,
   iniciarPresupuesto,
 } from "@/lib/features/notificaciones/ejecucion";
 
@@ -77,23 +77,20 @@ export async function POST(request: Request) {
 
     iniciarPresupuesto();
 
-    let ejecutadas = 0;
-    let enviados = 0;
-    let errores = 0;
+    const resumen = await ejecutarCorrida(supabase, {
+      configs,
+      gymConfig,
+      forzar,
+      userId: user.id,
+      origen: "manual",
+      respetarFrecuencia: false,
+    });
 
-    for (const config of configs) {
-      const resultado = await ejecutarYRegistrar(supabase, config, gymConfig, {
-        forzar,
-        userId: user.id,
-        origen: "manual",
-      });
-
-      ejecutadas++;
-      enviados += resultado.enviados;
-      if (!resultado.sinProblemas) errores++;
-    }
-
-    return NextResponse.json({ ejecutadas, enviados, errores });
+    return NextResponse.json({
+      ejecutadas: resumen.ejecutadas,
+      enviados: resumen.enviados,
+      errores: resumen.errores,
+    });
   } catch {
     return NextResponse.json({ error: messages.toast.errorGenerico }, { status: 500 });
   }

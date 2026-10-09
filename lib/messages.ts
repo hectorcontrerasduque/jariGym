@@ -436,6 +436,7 @@ export const messages = {
     emailYaRegistradoActivo: "Este correo ya está registrado como miembro activo. Use otro correo.",
     notificacionesDeshabilitadas: "Notificaciones deshabilitadas",
     noConfiguracionesHabilitadas: "No hay configuraciones habilitadas",
+    cronDeshabilitado: "Cron no ejecutado: deshabilitado en este entorno (defina CRON_ENABLED=true para habilitarlo).",
     noDuenoEmail: "No hay correo de propietario configurado. Configure el correo en Configuración del Gym.",
     sinEmailAdmin: "No hay correo de administrador configurado (NEXT_PUBLIC_ADMIN_EMAIL).",
     envioParcial: "Fallo parcial en el envío de la notificación",

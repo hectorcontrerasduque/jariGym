@@ -122,6 +122,20 @@ export function construirReporteCorrida(entrada: EntradaReporte): ReporteCorrida
   };
 }
 
+/**
+ * ¿El reporte merece llegar al correo? Solo si hay información: envíos,
+ * errores, advertencias o fallo fatal. Una corrida donde todo se saltó por
+ * frecuencia (0 envíos, 0 errores, sin avisos) no genera correo.
+ */
+export function debeEnviarReporte(reporte: ReporteCorrida): boolean {
+  return (
+    reporte.totales.enviados > 0 ||
+    reporte.totales.errores > 0 ||
+    reporte.advertencias.length > 0 ||
+    reporte.errorFatal != null
+  );
+}
+
 function estadoTexto(p: PlantillaReporte): string {
   const r = messages.notificaciones.reporte;
   const contexto: string[] = [];

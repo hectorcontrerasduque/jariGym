@@ -78,6 +78,18 @@ async function ejecutar(request: NextRequest) {
     return NextResponse.json({ error: messages.toast.noAutorizado }, { status: 401 });
   }
 
+  // El cron solo corre donde se indique explícitamente (CRON_ENABLED=true).
+  // Por defecto está bloqueado para evitar que el proyecto de dev dispare
+  // correos fuera de tiempo contra datos de depuración. Las llamadas manuales
+  // (JWT de super_admin / /api/notificaciones/procesar) no se ven afectadas.
+  if (isCronAuth && process.env.CRON_ENABLED !== "true") {
+    return NextResponse.json({
+      success: true,
+      message: messages.notificaciones.cronDeshabilitado,
+      ejecutadas: 0,
+    });
+  }
+
   if (userId) {
     const rateLimitResponse = await applyRateLimit(request, {
       max: 5,
@@ -138,6 +150,7 @@ async function ejecutar(request: NextRequest) {
       enviados: resumen.enviados,
       errores: resumen.errores,
       reporte_enviado: resumen.reporteEnviado,
+      reporte_omitido: resumen.reporteOmitido,
       reporte: resumen.reporteTexto,
     });
   } catch (error) {

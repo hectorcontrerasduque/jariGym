@@ -12,6 +12,7 @@ import {
   asuntoReporte,
   contarMiembrosActivos,
   construirReporteCorrida,
+  debeEnviarReporte,
   enviarReporteTexto,
   fechaVet,
   labelTipo,
@@ -476,6 +477,8 @@ export type ResumenCorrida = {
   reporteTexto: string | null;
   /** false = no pudo enviarse; null = no aplica (corrida manual). */
   reporteEnviado: boolean | null;
+  /** `"sin_informacion"` si el reporte se construyó pero no merecía correo. */
+  reporteOmitido: string | null;
 };
 
 /**
@@ -488,6 +491,9 @@ export type ResumenCorrida = {
  * - **Retención**: cada tipo queda con `LIMITE_BITACORA` filas como máximo.
  * - **Reporte**: solo en corridas del cron (`origen: "cron"`), siempre al
  *   final, en texto plano al super admin técnico. Las manuales no lo envían.
+ *   Solo llega al correo si hay información (envíos, errores, advertencias o
+ *   fallo fatal) — `debeEnviarReporte()`; una corrida 100% saltada por
+ *   frecuencia construye el texto (viaja en la respuesta) pero no escribe.
  */
 export async function ejecutarCorrida(
   supabase: SupabaseClient,
@@ -608,6 +614,7 @@ export async function ejecutarCorrida(
 
   let reporteTexto: string | null = null;
   let reporteEnviado: boolean | null = null;
+  let reporteOmitido: string | null = null;
 
   if (opciones.origen === "cron") {
     let miembrosActivos = 0;
@@ -630,11 +637,16 @@ export async function ejecutarCorrida(
       advertencias,
     });
     reporteTexto = reporteATexto(reporte);
-    reporteEnviado = await enviarReporteTexto(
-      asuntoReporte(reporte, opciones.gymConfig.gym_name || "GymApp"),
-      reporteTexto
-    );
+    if (debeEnviarReporte(reporte)) {
+      reporteEnviado = await enviarReporteTexto(
+        asuntoReporte(reporte, opciones.gymConfig.gym_name || "GymApp"),
+        reporteTexto
+      );
+    } else {
+      reporteEnviado = false;
+      reporteOmitido = "sin_informacion";
+    }
   }
 
-  return { ejecutadas, enviados, errores, reporteTexto, reporteEnviado };
+  return { ejecutadas, enviados, errores, reporteTexto, reporteEnviado, reporteOmitido };
 }

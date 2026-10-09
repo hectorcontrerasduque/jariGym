@@ -95,10 +95,19 @@ Dashboard → Settings → Environment Variables (entorno **Production**, tipo *
 Config muestra el valor en el dashboard y Vercel avisa "Needs Attention"). Vercel la envía automáticamente como
 `Authorization: Bearer <CRON_SECRET>` al invocar el cron. Si no está definida, el endpoint responde 401.
 
+Además, la vía del cron solo se ejecuta donde `CRON_ENABLED=true` (por defecto está **bloqueada**: el endpoint
+responde 200 con `ejecutadas: 0` y no envía correos). Define `CRON_ENABLED=true` **solo en el proyecto de
+producción (jargym)**; en dev déjala sin definir.
+
 > **Desarrollo vs producción**: `vercel.json` es el mismo en ambas ramas, así que el cron se registra en los dos
-> proyectos Vercel (jargym-dev y jargym). Tras probar en dev, **desactívalo en jargym-dev**: Cron Jobs → toggle
-> del job `GET /api/notificaciones` → Disabled (el job queda listado pero no se ejecuta). Alternativa: borrar
-> `CRON_SECRET` de jargym-dev (el cron se seguirá disparando a las 04:00 UTC pero recibirá 401).
+> proyectos Vercel (jargym-dev y jargym). El gate `CRON_ENABLED` evita que jargym-dev ejecute nada aunque el
+> job se dispare a las 04:00 UTC. Como capa extra puedes desactivarlo en jargym-dev: Cron Jobs → toggle
+> del job `GET /api/notificaciones` → Disabled, o borrar `CRON_SECRET` de jargym-dev (recibiría 401).
+> Las ejecuciones manuales con JWT de super_admin y `/api/notificaciones/procesar` ignoran el gate.
+
+El reporte de corrida que llega a `NEXT_PUBLIC_ADMIN_EMAIL` **solo se envía cuando hay información**
+(envíos, errores, advertencias o fallo fatal); una corrida donde todos los tipos se saltan por frecuencia
+no genera correo (el texto queda en la respuesta JSON con `reporte_omitido: "sin_informacion"`).
 
 Verificaciones:
 

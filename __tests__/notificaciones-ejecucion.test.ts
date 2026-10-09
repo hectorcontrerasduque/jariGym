@@ -269,20 +269,21 @@ describe("ejecutarCorrida", () => {
     } as const;
   }
 
-  it("sin destinatarios: no escribe bitácora y el reporte sale con cero envíos", async () => {
+  it("corrida sin información: construye el reporte pero no escribe al correo", async () => {
     encolarLogs();
     fake.on("profiles", "select").reply({ count: 80 });
 
     const resumen = await ejecutarCorrida(fake.client, cron());
 
-    expect(resumen).toMatchObject({ ejecutadas: 1, enviados: 0, errores: 0, reporteEnviado: true });
+    expect(resumen).toMatchObject({
+      ejecutadas: 1,
+      enviados: 0,
+      errores: 0,
+      reporteEnviado: false,
+      reporteOmitido: "sin_informacion",
+    });
     expect(fake.callsTo("notification_log", "insert")).toHaveLength(0);
-    expect(sendRunReportEmail).toHaveBeenCalledTimes(1);
-    expect(sendRunReportEmail).toHaveBeenCalledWith(
-      "admin@test.com",
-      expect.stringContaining("Reporte cron"),
-      expect.any(String)
-    );
+    expect(sendRunReportEmail).not.toHaveBeenCalled();
     expect(resumen.reporteTexto).toContain("Miembros activos: 80");
     expect(resumen.reporteTexto).toContain("Enviados 0/80 (0.0%)");
     expect(resumen.reporteTexto).toContain("ERRORES: ninguno");
@@ -296,7 +297,19 @@ describe("ejecutarCorrida", () => {
 
     const resumen = await ejecutarCorrida(fake.client, cron());
 
-    expect(resumen).toMatchObject({ ejecutadas: 1, enviados: 1, errores: 0 });
+    expect(resumen).toMatchObject({
+      ejecutadas: 1,
+      enviados: 1,
+      errores: 0,
+      reporteEnviado: true,
+      reporteOmitido: null,
+    });
+    expect(sendRunReportEmail).toHaveBeenCalledTimes(1);
+    expect(sendRunReportEmail).toHaveBeenCalledWith(
+      "admin@test.com",
+      expect.stringContaining("Reporte cron"),
+      expect.any(String)
+    );
 
     const inserts = fake.callsTo("notification_log", "insert");
     expect(inserts).toHaveLength(1);
@@ -321,7 +334,14 @@ describe("ejecutarCorrida", () => {
 
     const resumen = await ejecutarCorrida(fake.client, cron());
 
-    expect(resumen).toMatchObject({ ejecutadas: 1, enviados: 0, errores: 1 });
+    expect(resumen).toMatchObject({
+      ejecutadas: 1,
+      enviados: 0,
+      errores: 1,
+      reporteEnviado: true,
+      reporteOmitido: null,
+    });
+    expect(sendRunReportEmail).toHaveBeenCalledTimes(1);
     expect(fake.callsTo("notification_log", "insert")).toHaveLength(0);
     expect(resumen.reporteTexto).toContain("ERRORES:");
     expect(resumen.reporteTexto).toContain(messages.notificaciones.envioParcial);
@@ -335,7 +355,13 @@ describe("ejecutarCorrida", () => {
 
     const resumen = await ejecutarCorrida(fake.client, cron());
 
-    expect(resumen).toMatchObject({ ejecutadas: 1, enviados: 0, errores: 1 });
+    expect(resumen).toMatchObject({
+      ejecutadas: 1,
+      enviados: 0,
+      errores: 1,
+      reporteEnviado: true,
+      reporteOmitido: null,
+    });
     expect(fake.callsTo("notification_log", "insert")).toHaveLength(0);
     expect(resumen.reporteTexto).toContain("RPC caído");
   });
@@ -351,7 +377,12 @@ describe("ejecutarCorrida", () => {
       userId: "user-1",
     });
 
-    expect(resumen).toMatchObject({ ejecutadas: 1, reporteTexto: null, reporteEnviado: null });
+    expect(resumen).toMatchObject({
+      ejecutadas: 1,
+      reporteTexto: null,
+      reporteEnviado: null,
+      reporteOmitido: null,
+    });
     expect(sendRunReportEmail).not.toHaveBeenCalled();
   });
 
@@ -361,7 +392,14 @@ describe("ejecutarCorrida", () => {
 
     const resumen = await ejecutarCorrida(fake.client, cron());
 
-    expect(resumen).toMatchObject({ ejecutadas: 0, enviados: 0, errores: 0 });
+    expect(resumen).toMatchObject({
+      ejecutadas: 0,
+      enviados: 0,
+      errores: 0,
+      reporteEnviado: false,
+      reporteOmitido: "sin_informacion",
+    });
+    expect(sendRunReportEmail).not.toHaveBeenCalled();
     expect(sendPaymentDebtEmail).not.toHaveBeenCalled();
     expect(fake.callsTo("notification_log", "insert")).toHaveLength(0);
     expect(resumen.reporteTexto).toContain(messages.notificaciones.reporte.saltadaFrecuencia);
@@ -387,7 +425,14 @@ describe("ejecutarCorrida", () => {
       userId: "user-1",
     });
 
-    expect(resumen).toMatchObject({ ejecutadas: 0, enviados: 0, errores: 0, reporteEnviado: true });
+    expect(resumen).toMatchObject({
+      ejecutadas: 0,
+      enviados: 0,
+      errores: 0,
+      reporteEnviado: false,
+      reporteOmitido: "sin_informacion",
+    });
+    expect(sendRunReportEmail).not.toHaveBeenCalled();
     expect(fake.callsTo("notification_log", "insert")).toHaveLength(0);
     expect(fake.callsTo("notification_log", "select")).toHaveLength(4);
     expect(resumen.reporteTexto).toContain("0/2 tipos ejecutados");

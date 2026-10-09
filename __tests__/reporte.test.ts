@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   asuntoReporte,
   construirReporteCorrida,
+  debeEnviarReporte,
   fechaVet,
   labelTipo,
   porcentajeCobertura,
@@ -195,6 +196,43 @@ describe("reporteATexto", () => {
     expect(texto).toContain("ERRORES:");
     expect(texto).toContain("- Error: DB caída");
     expect(texto).toContain("Totales: 0 envíos · 0 errores · 0/0 tipos ejecutados · 0 no ejecutados");
+  });
+});
+
+describe("debeEnviarReporte", () => {
+  it("todo saltado por frecuencia y sin avisos: no merece correo", () => {
+    const reporte = construirReporteCorrida(
+      entrada({
+        plantillas: [
+          plantilla({ estado: "saltada_frecuencia" }),
+          plantilla({ configId: "b", estado: "saltada_frecuencia" }),
+        ],
+      })
+    );
+    expect(debeEnviarReporte(reporte)).toBe(false);
+  });
+
+  it("ejecutada sin destinatarios y sin errores: no merece correo", () => {
+    const reporte = construirReporteCorrida(entrada({ plantillas: [plantilla()] }));
+    expect(debeEnviarReporte(reporte)).toBe(false);
+  });
+
+  it("con envíos, errores, advertencias o fallo fatal: merece correo", () => {
+    const conEnvios = construirReporteCorrida(
+      entrada({ plantillas: [plantilla({ enviados: 1 })] })
+    );
+    const conErrores = construirReporteCorrida(
+      entrada({ plantillas: [plantilla({ fallos: 1, error: "parcial" })] })
+    );
+    const conAviso = construirReporteCorrida(
+      entrada({ advertencias: ["Purga de bitácora: permiso denegado"] })
+    );
+    const fatal = construirReporteCorrida(entrada({ errorFatal: "DB caída" }));
+
+    expect(debeEnviarReporte(conEnvios)).toBe(true);
+    expect(debeEnviarReporte(conErrores)).toBe(true);
+    expect(debeEnviarReporte(conAviso)).toBe(true);
+    expect(debeEnviarReporte(fatal)).toBe(true);
   });
 });
 

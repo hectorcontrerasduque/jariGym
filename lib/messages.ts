@@ -481,6 +481,26 @@ export const messages = {
       pie: "Este es un reporte automático del cron. No requiere acción.",
     },
   },
+  push: {
+    switch: "Push al Celular",
+    switchDesc:
+      "Notificaciones push al navegador (además del correo). Cada dispositivo debe aceptar el aviso del navegador la primera vez.",
+    switchError: "Error al guardar la configuración de push",
+    activar: "Activar notificaciones",
+    activo: "Notificaciones activas",
+    desactivar: "Desactivar en este dispositivo",
+    bloqueado: "Notificaciones bloqueadas en el navegador",
+    sinSoporte: "Este navegador no soporta notificaciones push",
+    suscrito: "Notificaciones activadas en este dispositivo",
+    desuscrito: "Notificaciones desactivadas en este dispositivo",
+    errorActivar: "No se pudieron activar las notificaciones",
+    errorDesactivar: "No se pudo desactivar este dispositivo",
+    deshabilitado: "Las notificaciones push están deshabilitadas por el administrador",
+    sinConfigurar: "El servidor no tiene push configurado (faltan claves VAPID)",
+    errorServidor: "Error en el servidor de notificaciones push",
+    badRequest: "Suscripción push inválida",
+    errorGuardar: "Error al registrar este dispositivo",
+  },
 } as const;
 
 export type Messages = typeof messages;

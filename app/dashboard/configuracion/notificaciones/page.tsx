@@ -243,6 +243,46 @@ export default function NotificacionesPage() {
         </CardContent>
       </Card>
 
+      {/* Push toggle (canal independiente del correo) */}
+      <Card className="neon-card relative z-10">
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <span className="text-sm font-medium text-gym-text">{messages.push.switch}</span>
+              <p className="text-xs text-gym-muted">{messages.push.switchDesc}</p>
+            </div>
+            <label className="relative inline-flex items-center cursor-pointer shrink-0">
+              <input
+                type="checkbox"
+                className="sr-only peer"
+                checked={gymConfig.push_enabled || false}
+                onChange={async (e) => {
+                  const newValue = e.target.checked;
+                  setGymConfig({ ...gymConfig, push_enabled: newValue });
+                  try {
+                    const res = await fetch("/api/config", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      credentials: "include",
+                      body: JSON.stringify({ config: { push_enabled: newValue } }),
+                    });
+                    if (!res.ok) {
+                      const err = await res.json().catch(() => ({}));
+                      throw new Error(err.error || messages.push.switchError);
+                    }
+                    window.dispatchEvent(new CustomEvent("config:updated"));
+                  } catch {
+                    showToast(messages.push.switchError, "error");
+                    setGymConfig({ ...gymConfig, push_enabled: !newValue });
+                  }
+                }}
+              />
+              <div className="w-11 h-6 bg-gym-surface peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-gym-primary rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-gym-primary"></div>
+            </label>
+          </div>
+        </CardContent>
+      </Card>
+
       <div className="flex items-start gap-2 p-3 bg-gym-surface border border-gym-border rounded-xl">
         <Clock className="w-4 h-4 mt-0.5 text-gym-primary shrink-0" />
         <div className="text-sm text-gym-muted">

@@ -1,0 +1,139 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { Bell, BellOff, BellRing } from "lucide-react";
+import {
+  activarPush,
+  desactivarPush,
+  estadoPermiso,
+  estaSuscrito,
+  pushSoportado,
+} from "@/lib/features/push/dispositivo";
+import { showToast } from "@/components/ui/toast";
+import { messages } from "@/lib/messages";
+
+type Estado = "cargando" | "activo" | "inactivo" | "bloqueado" | "sin-soporte";
+
+const calcularEstado = async (): Promise<Estado> => {
+  if (!pushSoportado()) return "sin-soporte";
+  const permiso = estadoPermiso();
+  if (permiso === "denied") return "bloqueado";
+  if (permiso === "granted" && (await estaSuscrito())) return "activo";
+  return "inactivo";
+};
+
+/**
+ * Botón de suscripción push para administradores (sidebar / barra móvil).
+ * Muestra el estado del permiso del navegador y alterna activar/desactivar.
+ * Si el navegador no soporta push u ocurrió un error, no se rompe nada (fail-open).
+ */
+export function BotonSuscripcion({ variant = "fila" }: { variant?: "fila" | "icono" }) {
+  const [estado, setEstado] = useState<Estado>("cargando");
+
+  const refrescar = () => {
+    void calcularEstado().then((e) => setEstado(e));
+  };
+
+  useEffect(() => {
+    let activo = true;
+    void calcularEstado().then((e) => {
+      if (activo) setEstado(e);
+    });
+    return () => {
+      activo = false;
+    };
+  }, []);
+
+  const handleClick = async () => {
+    if (estado === "activo") {
+      const ok = await desactivarPush();
+      if (ok) {
+        showToast(messages.push.desuscrito, "success");
+        void refrescar();
+      } else {
+        showToast(messages.push.errorDesactivar, "error");
+      }
+      return;
+    }
+    const resultado = await activarPush();
+    void refrescar();
+    switch (resultado) {
+      case "activado":
+      case "ya-activo":
+        showToast(messages.push.suscrito, "success");
+        break;
+      case "denegado":
+        showToast(messages.push.bloqueado, "warning");
+        break;
+      case "deshabilitado":
+        showToast(messages.push.deshabilitado, "warning");
+        break;
+      case "sin-clave":
+        showToast(messages.push.sinConfigurar, "warning");
+        break;
+      case "sin-soporte":
+        showToast(messages.push.sinSoporte, "warning");
+        break;
+      default:
+        showToast(messages.push.errorActivar, "error");
+    }
+  };
+
+  if (estado === "cargando" || estado === "sin-soporte") return null;
+
+  if (variant === "icono") {
+    if (estado === "bloqueado") {
+      return (
+        <span
+          title={messages.push.bloqueado}
+          aria-label={messages.push.bloqueado}
+          className="p-2 text-gym-muted/60"
+        >
+          <BellOff className="w-4 h-4" />
+        </span>
+      );
+    }
+    return (
+      <button
+        onClick={() => void handleClick()}
+        aria-label={estado === "activo" ? messages.push.desactivar : messages.push.activar}
+        title={estado === "activo" ? messages.push.activo : messages.push.activar}
+        className="p-2 text-gym-muted hover:text-gym-text transition-colors"
+      >
+        {estado === "activo" ? (
+          <BellRing className="w-4 h-4 text-gym-success" />
+        ) : (
+          <Bell className="w-4 h-4 text-gym-primary" />
+        )}
+      </button>
+    );
+  }
+
+  if (estado === "bloqueado") {
+    return (
+      <div className="flex items-center gap-2 px-3 py-2 text-xs text-gym-muted/80">
+        <BellOff className="w-4 h-4 shrink-0" />
+        {messages.push.bloqueado}
+      </div>
+    );
+  }
+
+  return (
+    <button
+      onClick={() => void handleClick()}
+      className="flex items-center gap-2 w-full px-3 py-2 rounded-xl text-sm font-medium hover:bg-gym-bg/50 transition-colors text-left"
+    >
+      {estado === "activo" ? (
+        <>
+          <BellRing className="w-4 h-4 shrink-0 text-gym-success" />
+          <span className="text-gym-success">{messages.push.activo}</span>
+        </>
+      ) : (
+        <>
+          <Bell className="w-4 h-4 shrink-0 text-gym-primary" />
+          <span className="text-gym-primary">{messages.push.activar}</span>
+        </>
+      )}
+    </button>
+  );
+}

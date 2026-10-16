@@ -119,6 +119,7 @@ export interface GymConfig {
   owner_phone: string | null;
   billing_mode: ModoCobro;
   notifications_enabled: boolean;
+  push_enabled: boolean;
   created_at: string;
   updated_at: string;
   created_by: string | null;

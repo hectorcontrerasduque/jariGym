@@ -77,6 +77,8 @@ app/
   api/notificaciones/  # Cron: daily notification dispatch + admin-triggered
     route.ts          # GET/POST: auth (cron secret OR admin token), frequency check, dispatches types
     procesar/route.ts # POST: manual trigger by admin, `forzar` bypasses frequency
+  api/push/
+    subscriptions/    # POST/DELETE: alta/baja de suscripción push por dispositivo (sesión)
   api/auth/
     forgot-password/ # POST: generates token + sends email via Gmail SMTP
     reset-password/  # POST: validates token + sets new password
@@ -98,6 +100,10 @@ lib/
       ejecucion.ts  # Los 4 procesadores + ejecutarCorrida() (batch log + purge + reporte); usado por cron Y manual
       reporte.ts    # Reporte de corrida en texto plano (solo cron) + contarMiembrosActivos()
       horario.ts    # horarioNotificaciones(): lee vercel.json para la franja de horario en la UI
+    push/
+      types.ts      # PayloadPush, ResultadoPush, MotivoOmitidoPush (nunca excepciones)
+      service.ts    # Server: enviarPushAUsuarios/enviarPushAAdmins; fail-open, gate push_enabled
+      dispositivo.ts # Client: permisos, Service Worker, alta/baja en /api/push/subscriptions
   services/         # Legacy modules, migrated to features/ phase by phase
     auth/           # signIn, resetPassword, getProfile
     config/         # Config CRUD + dueno email promotion on change
@@ -114,6 +120,9 @@ components/
   ui/loading-overlay.tsx  # LoadingOverlay component
   ui/password-input.tsx   # PasswordInput with eye toggle
   sidebar.tsx       # Desktop sidebar + mobile bottom nav (gold effects for super_admin)
+  push/
+    boton-suscripcion.tsx  # Botón estado push (solo sidebar de admin, variantes fila/icono)
+    auto-suscripcion.tsx   # Auto-suscripción de miembros: 1 intento por dispositivo (localStorage)
   auth-footer.tsx   # Fixed footer for auth pages
   scroll-to-top.tsx # Scroll to top on route change
   providers.tsx     # Client wrapper with ToastContainer
@@ -124,6 +133,7 @@ __tests__/
   helpers/supabase-fake.ts  # Programmable Supabase client double (queue replies, inspect calls)
   pagos.service.test.ts     # Characterization tests of PagosService (pin current behavior)
   pagos.domain.test.ts      # Pure unit tests of lib/features/pagos/domain
+  push.service.test.ts      # Fail-open + gate de lib/features/push/service (doble de Supabase + web-push)
   migracion.test.ts         # Unit tests for migration flow
 ```
 
@@ -449,6 +459,51 @@ e263c5e refactor: elimina console.* + centraliza strings en messages.ts para i18
 - "Ejecutar Ahora" on a specific type sends `{ tipo: "miembros_deudores", forzar: true }` → API skips frequency, executes only that type
 - The manual route **never** checks `verificarFrecuencia()`; `forzar: true` additionally bypasses the recordatorio dedup (sends to everyone who has not paid next month)
 
+## Web Push (push al navegador)
+
+Módulo aislado en `lib/features/push/` — los llamadores solo importan `service.ts` (servidor)
+o `dispositivo.ts` (cliente); nunca al revés (`service.ts` importa `web-push`, que es Node-only).
+
+### Reglas de oro (fail-open)
+- **Nunca lanza excepciones**: siempre devuelve `ResultadoPush { enviados, fallos, omitido }`.
+  Un fallo de push jamás corta correos, cron ni guardados, y **nunca** marca `hayFallo` en
+  `ejecutarCorrida` (solo puede aportar advertencias).
+- Orden de compuertas en cada envío: sin claves VAPID → `omitido: "sin_configurar"` (sin red);
+  luego `gym_config.push_enabled = false` → `omitido: "deshabilitado"`; solo entonces se
+  resuelven destinatarios y se envía.
+- El permiso de notificación es **por dispositivo** (lo otorga el navegador de cada persona);
+  el interruptor `push_enabled` solo habilita el canal en el servidor. iOS ≥16.4 además
+  requiere "Agregar a pantalla de inicio" (fallback: correo).
+
+### Componentes
+- **Tabla `push_subscriptions`** (user_id FK cascade, `UNIQUE (user_id, endpoint)` — 1 fila por
+  dispositivo y sesión; el mismo endpoint con 2 cuentas convive) + **`gym_config.push_enabled`**
+  (default false). Migración `supabase/migrations/058_push_subscriptions.sql`: **aplicar a mano
+  en el SQL Editor** (las migraciones están en `.gitignore`, ver ROADMAP#10). Si falta la
+  migración, `pushHabilitado()` lee error → apagado (fail-closed).
+  RLS: cada usuario solo ve/agrega/borra **sus** suscripciones; service_role bypass RLS por
+  atributo — **nunca** crear policy `USING (true)` (expondría la tabla a anon).
+- **Rutas** `POST/DELETE /api/push/subscriptions` (sesión, rate limit 10/5min en POST):
+  el POST responde `409` con `codigo: "sin_configurar" | "deshabilitado"` cuando el canal
+  está apagado; el DELETE es idempotente. Documentadas en `docs/api/openapi.yaml`.
+- **PWA mínima**: `public/sw.js` (muestra el push y al tocarlo abre/foca la app en `payload.url`;
+  sin caché), `public/manifest.webmanifest` + `public/icons/*.png` (generados desde
+  `public/favicon.svg` con sharp), metadata en `app/layout.tsx` (`manifest`, icono Apple,
+  `viewport.themeColor`).
+- **UI**:
+  - Interruptor "Push al Celular" en Notificaciones (card propia, independiente del toggle de
+    correo; al guardarlo dispara `config:updated` para refrescar el sidebar).
+  - `BotonSuscripcion` en el sidebar **solo para admin** (fila desktop / icono móvil), visible
+    solo si `push_enabled`; estados: activo / activar / bloqueado (permiso denegado).
+  - `AutoSuscripcionMiembro` montado en `app/dashboard/layout.tsx`: miembros hacen **1 intento
+    silencioso por dispositivo** (marca `push_auto_intentado` en localStorage solo después de
+    confirmar `push_enabled`); si el socio bloquea el aviso → solo correo.
+- **VAPID**: `NEXT_PUBLIC_WEB_PUSH_PUBLIC_KEY` (cliente, `NEXT_PUBLIC_*` se inlina en build) +
+  `WEB_PUSH_PRIVATE_KEY` (solo server). Generar con `npx web-push generate-vapid-keys`.
+  Sin ellas la app funciona igual (push omitido silenciosamente).
+- **Tests**: `__tests__/push.service.test.ts` (gate, envíos, limpieza 410, admin band — con
+  `createSupabaseFake` + `vi.mock("web-push")`).
+
 ## Migrations Applied
 
 001–034 applied in Supabase SQL Editor. Key ones:
@@ -467,6 +522,7 @@ e263c5e refactor: elimina console.* + centraliza strings en messages.ts para i18
 - **034**: Admin INSERT RLS for pagos + comprobantes storage
 - **035**: **Payment normalization** — renames old `pagos` → `pagos_historial`, creates new `pagos` (header) + `detalle_pago` (detail per month/inscription). `CreatePagoInput` now takes `detalles[]` instead of flat fields.
 - **056**: **Remove suspendido status** — updates existing `suspendido` → `aprobado`, tightens CHECK to `('pendiente', 'aprobado', 'rechazado')`. Apply manually in Supabase SQL Editor.
+- **058**: **Web Push** — `push_subscriptions` table + RLS (own rows) + `gym_config.push_enabled`. Apply manually in Supabase SQL Editor (not versioned: `.gitignore` hides `supabase/migrations/*.sql`).
 
 <!-- BEGIN:nextjs-agent-rules -->
 

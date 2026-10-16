@@ -12,6 +12,7 @@ import { LogOut, Dumbbell, User, Home, Settings } from "lucide-react";
 import { getAdminLevel, isFullAdmin } from "@/lib/admin-level";
 import { useProfileContext } from "@/components/profile-context";
 import { adminNavItems, miembroNavItems } from "@/lib/nav-items";
+import { BotonSuscripcion } from "@/components/push/boton-suscripcion";
 
 function SidebarNavItem({ item, pathname, variant }: { item: { href: string; label: string; icon: typeof Home }; pathname: string; variant: "desktop" | "mobile" }) {
   const searchParams = useSearchParams();
@@ -55,6 +56,7 @@ export function Sidebar() {
   const [gymLogo, setGymLogo] = useState("");
   const [hasConfig, setHasConfig] = useState<boolean | null>(null);
   const [ownerEmail, setOwnerEmail] = useState<string | null>(null);
+  const [pushEnabled, setPushEnabled] = useState(false);
 
   useEffect(() => {
     if (!profile || profile.role === "super_admin") return;
@@ -74,6 +76,7 @@ export function Sidebar() {
           if (config.gym_name) setGymName(config.gym_name);
           if (config.logo_url) setGymLogo(config.logo_url);
           if (config.owner_email) setOwnerEmail(config.owner_email);
+          setPushEnabled(config.push_enabled === true);
         } else {
           setHasConfig(false);
         }
@@ -124,12 +127,15 @@ export function Sidebar() {
               </p>
             </div>
           </div>
-          <button
-            onClick={handleSignOut}
-            className="p-2 text-gym-muted hover:text-gym-danger transition-colors"
-          >
-            <LogOut className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-1">
+            {pushEnabled && isAdmin && <BotonSuscripcion variant="icono" />}
+            <button
+              onClick={handleSignOut}
+              className="p-2 text-gym-muted hover:text-gym-danger transition-colors"
+            >
+              <LogOut className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -190,6 +196,11 @@ export function Sidebar() {
               </p>
             </div>
           </Link>
+          {pushEnabled && isAdmin && (
+            <div className="mb-3">
+              <BotonSuscripcion />
+            </div>
+          )}
           <button
             onClick={handleSignOut}
             className="flex items-center gap-2 w-full px-4 py-2 text-sm text-gym-muted hover:text-gym-danger transition-colors"

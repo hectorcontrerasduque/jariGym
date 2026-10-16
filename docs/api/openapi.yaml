@@ -38,6 +38,8 @@ tags:
     description: Eliminación de pagos y correos de aprobación/rechazo.
   - name: perfil
     description: Edición de perfil propio o de otros (super_admin).
+  - name: push
+    description: Suscripciones Web Push del navegador (alta/baja por dispositivo).
 
 paths:
   /api/auth/confirm-email:
@@ -810,6 +812,76 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
 
+  /api/push/subscriptions:
+    post:
+      tags: [push]
+      operationId: suscribirPush
+      summary: Registra la suscripción push del dispositivo autenticado
+      description: |
+        Upsert por `(user_id, endpoint)` (renueva claves si el mismo dispositivo vuelve a
+        suscribirse). Responde `409` con `codigo` cuando el canal está apagado: faltan claves
+        VAPID (`sin_configurar`) o `gym_config.push_enabled = false` (`deshabilitado`).
+        Límite: 10 cada 5 min por usuario.
+      security:
+        - sesion: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [endpoint, keys]
+              properties:
+                endpoint: { type: string, format: uri, description: "Endpoint HTTPS del proveedor (FCM/Mozilla)." }
+                keys:
+                  type: object
+                  required: [p256dh, auth]
+                  properties:
+                    p256dh: { type: string }
+                    auth: { type: string }
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+        "400":
+          description: Suscripción inválida o error al guardar.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "409":
+          description: Canal push apagado (sin claves VAPID o `push_enabled=false`).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error: { type: string }
+                  codigo: { type: string, enum: [sin_configurar, deshabilitado] }
+        "429": { $ref: "#/components/responses/RateLimited" }
+        "500": { $ref: "#/components/responses/Error" }
+    delete:
+      tags: [push]
+      operationId: desuscribirPush
+      summary: Da de baja la suscripción push del dispositivo autenticado
+      description: |
+        Limpia la fila de `push_subscriptions` (el navegador ya hizo `unsubscribe`).
+        Idempotente: borrar algo que no existe responde `success`.
+      security:
+        - sesion: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [endpoint]
+              properties:
+                endpoint: { type: string, format: uri }
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+        "400": { $ref: "#/components/responses/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "500": { $ref: "#/components/responses/Error" }
+
 components:
   securitySchemes:
     sesion:
@@ -896,6 +968,7 @@ components:
         owner_phone: { type: [string, "null"] }
         billing_mode: { type: string, enum: [dia_uno, fecha_inscripcion] }
         notifications_enabled: { type: boolean }
+        push_enabled: { type: boolean, description: "Interruptor maestro de Web Push." }
     Profile:
       type: object
       description: Fila de `profiles` (`lib/types.ts`).

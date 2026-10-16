@@ -99,7 +99,7 @@ Ordenados por gravedad. Ninguno se tocó.
 | 2 | 🔴 Alta | `GET /api/migracion/list`, `GET /api/migracion/morosos` | Públicos, sin límite, con service role: exponen nombres, correos y deudas de los miembros antiguos. El middleware no protege `/api`. | Código |
 | 3 | 🟠 Media | `GET /api/migracion/ping` | Público y sin límite: dice si un email está registrado y devuelve el nombre completo (enumeración de usuarios). | Código |
 | 4 | 🟠 Media | `GET /api/config/public` | Público: devuelve `gym_config` completo (`select *`, con email y teléfono del dueño) y todos los métodos de pago. | Código |
-| 5 | 🟠 Media | `POST /api/pagos/notify` | **Bug:** consulta `payments.payment_amount`, columna que no existe → siempre 404 → los correos de pago aprobado/rechazado nunca se envían. | Base local: `ERROR 42703` |
+| 5 | ~~🟠 Media~~ ✅ | `POST /api/pagos/notify` | ~~**Bug:** consulta `payments.payment_amount`, columna que no existe → siempre 404 → los correos de pago aprobado/rechazado nunca se envían.~~ Corregido (rama `webhub`): el monto se suma desde `payment_detail`; la ruta además deriva el evento del estado BD + rol del llamador (aprobado/rechazado → correo + push al miembro; pendiente → push a admins o al miembro) y limita 60/5 min. | Código |
 | 6 | 🟠 Media | `POST /api/miembros/toggle-status` | **Bug:** `ban_duration: "52560000"` no tiene unidad → Auth lo rechaza y el error se ignora. El login de la app bloquea al inactivo (`profiles.activo`), pero una sesión ya abierta sigue válida contra la API. | Auth local: `missing unit in duration` |
 | 7 | 🟡 Baja | `POST /api/auth/forgot-password` | Si falla la limpieza de tokens vencidos, borra **todos** los tokens de recuperación de todos los usuarios. | Código |
 
@@ -107,11 +107,11 @@ Propuesta: un change `seguridad-api` para 1–4 (autenticación en los endpoints
 
 ## Riesgo de proceso detectado
 
-- **`.gitignore` ignora `supabase/migrations/*.sql`**: toda migración nueva queda fuera de Git. Las 051–054 y 056 (incluida la que define `get_pagos_por_anio`) solo existen en la base real. Recomendación: quitar esa regla y versionar las migraciones que faltan, a partir de un `supabase db dump` del esquema real. Requiere decisión del equipo.
+- **`.gitignore` ignora `supabase/migrations/*.sql`**: toda migración nueva queda fuera de Git. Las 051–054, 056 (incluida la que define `get_pagos_por_anio`) y 058 (`push_subscriptions` + `gym_config.push_enabled`) solo existen en la base real o en el disco local. Recomendación: quitar esa regla y versionar las migraciones que faltan, a partir de un `supabase db dump` del esquema real. Requiere decisión del equipo.
 
 ## Hallazgos que **no** se tocan en este refactor porque cambiarían el comportamiento (requieren decisión explícita y su propio change):
 - `aniosConPagos(usuarioId)` filtra por `payments.user_id` sin join.
 - `tieneInscripcionPendiente` solo revisa el primer pago encontrado.
-- `crearPagoSuspendido` devuelve `0` en vez de lanzar error.
+- `crearPagoSuspendido` devuelve `""` (id vacío) en vez de lanzar error (antes devolvía `0`; ahora devuelve el id del pago creado para poder notificarlo).
 - El rate limit deja pasar el request si falla el RPC (`lib/middleware/rate-limit.ts`).
 - Envío de correos de notificación en serie: pasarlo a paralelo cambia el ritmo de envío a Gmail y se evaluará en la fase 3.

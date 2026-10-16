@@ -140,7 +140,7 @@ function PagosContent() {
       fetch("/api/pagos/notify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pagoId, action: "aprobado" }),
+        body: JSON.stringify({ pagoId }),
       }).catch(() => {});
       showToast(messages.toast.pagoAprobado, "success");
       await loadData();
@@ -156,7 +156,7 @@ function PagosContent() {
       fetch("/api/pagos/notify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pagoId, action: "rechazado" }),
+        body: JSON.stringify({ pagoId }),
       }).catch(() => {});
       showToast(messages.toast.pagoRechazado, "success");
       await loadData();

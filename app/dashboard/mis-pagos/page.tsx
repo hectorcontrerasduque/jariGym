@@ -399,7 +399,14 @@ function MisPagosContent() {
         if (formData.meses.length === 0) {
           throw new Error("Selecciona al menos un mes para solicitar suspensión");
         }
-        await pagosService.crearPagoSuspendido(targetId, formData.meses, formData.notas || undefined, isSuperAdmin ? "aprobado" : "pendiente");
+        const pagoSuspension = await pagosService.crearPagoSuspendido(targetId, formData.meses, formData.notas || undefined, isSuperAdmin ? "aprobado" : "pendiente");
+        if (pagoSuspension) {
+          fetch("/api/pagos/notify", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ pagoId: pagoSuspension }),
+          }).catch(() => {});
+        }
         showToast(messages.misPagos.solicitudEnviada, "success");
         setFormData({ meses: [], metodo_pago: "efectivo", codigo_billete: "", notas: "", pagar_inscripcion: false, pagar_mensualidad: false, solicitar_suspension: false, fecha_pago: new Date().toISOString().split("T")[0] });
         await fetchMisPagosData();
@@ -460,11 +467,15 @@ function MisPagosContent() {
         detalles,
       };
 
-      if (useAutoApprove) {
-        await pagosService.crearPagoAprobado(pagoInput);
-      } else {
-        await pagosService.crearPago(pagoInput);
-      }
+      const pago = useAutoApprove
+        ? await pagosService.crearPagoAprobado(pagoInput)
+        : await pagosService.crearPago(pagoInput);
+
+      fetch("/api/pagos/notify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pagoId: pago.id }),
+      }).catch(() => {});
 
       showToast(isSelf ? "Pago registrado y aprobado" : "Pago registrado (pendiente de aprobación)", "success");
       setFormData({ meses: [], metodo_pago: "efectivo", codigo_billete: "", notas: "", pagar_inscripcion: false, pagar_mensualidad: false, solicitar_suspension: false, fecha_pago: new Date().toISOString().split("T")[0] });

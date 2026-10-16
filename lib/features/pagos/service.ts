@@ -295,7 +295,8 @@ export class PagosService {
     return { ...pago, detail: detalles as DetallePago[] };
   }
 
-  async crearPagoSuspendido(usuarioId: string, meses: { month_number: number; year_number: number }[], motivo?: string, status?: "pendiente" | "aprobado"): Promise<number> {
+  /** Crea (o renueva) una suspensión pendiente/aprobada. Devuelve el id del pago creado ("" si falló). */
+  async crearPagoSuspendido(usuarioId: string, meses: { month_number: number; year_number: number }[], motivo?: string, status?: "pendiente" | "aprobado"): Promise<string> {
     const {
       data: { user },
     } = await this.supabase.auth.getUser();
@@ -347,7 +348,7 @@ export class PagosService {
       .select()
       .single();
 
-    if (pagoError || !nuevoPago) return 0;
+    if (pagoError || !nuevoPago) return "";
 
     const detalles = meses.map(({ month_number, year_number }) => ({
       payment_id: nuevoPago.id,
@@ -361,7 +362,7 @@ export class PagosService {
       .from("payment_detail")
       .insert(detalles);
 
-    return detError ? 0 : meses.length;
+    return detError ? "" : nuevoPago.id;
   }
 
   async listarPagos(estado?: string, anio?: number, mes?: number, supabaseClient?: ReturnType<typeof createClient>): Promise<Pago[]> {

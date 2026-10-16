@@ -725,12 +725,22 @@ paths:
     post:
       tags: [pagos]
       operationId: notificarPago
-      summary: Envía al miembro el correo de pago aprobado o rechazado
+      summary: Notifica un alta o cambio de estado de pago (correo y/o push)
       description: |
-        Requiere super_admin.
+        El evento se **deriva del estado real en BD y del rol del llamador**
+        (`derivarEventoPago`), no de lo que pida el cliente:
 
-        ⚠️ Hoy siempre responde `404 "Pago no encontrado"`: consulta `payments.payment_amount`, columna que no existe
-        (el monto está en `payment_detail`). Los correos de aprobación/rechazo no se envían.
+        - `aprobado` / `rechazado` (requiere super_admin) → correo + **push al miembro**.
+          El motivo de rechazo se lee de `payments.payment_note`.
+        - pago `pendiente` de un **miembro dueño** → **push a todos los super_admin**
+          (`reportado`).
+        - pago `pendiente` creado por un **super_admin para un tercero** → **push al
+          miembro** (`registrado`); para sí mismo no notifica (`evento: null`).
+
+        El monto se calcula como suma de `payment_detail.payment_amount`
+        (fix ROADMAP#5: antes consultaba `payments.payment_amount`, inexistente → 404
+        y los correos nunca se enviaban). El push es fail-open: si está apagado o
+        falla, no cambia la respuesta. Límite: 60 cada 5 min por usuario.
       security:
         - sesion: []
       requestBody:
@@ -739,17 +749,26 @@ paths:
           application/json:
             schema:
               type: object
-              required: [pagoId, action]
+              required: [pagoId]
               properties:
                 pagoId: { type: string, format: uuid }
-                action: { type: string, enum: [aprobado, rechazado] }
-                notas: { type: string, description: "Motivo del rechazo." }
       responses:
-        "200": { $ref: "#/components/responses/Success" }
+        "200":
+          description: Notificación procesada (`evento` identifica qué se disparó; `null` si no hubo nada que notificar).
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  evento:
+                    type: [string, "null"]
+                    enum: [aprobado, rechazado, reportado, registrado, null]
         "400": { $ref: "#/components/responses/Error" }
         "401": { $ref: "#/components/responses/Error" }
         "403": { $ref: "#/components/responses/Error" }
         "404": { $ref: "#/components/responses/Error" }
+        "429": { $ref: "#/components/responses/RateLimited" }
         "500": { $ref: "#/components/responses/Error" }
 
   /api/profile:

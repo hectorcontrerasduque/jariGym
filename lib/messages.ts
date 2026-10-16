@@ -501,6 +501,35 @@ export const messages = {
     badRequest: "Suscripción push inválida",
     errorGuardar: "Error al registrar este dispositivo",
   },
+  eventosPago: {
+    reportadoTitulo: "Pago reportado",
+    reportadoCuerpo: "{nombre} reportó un pago por {monto}. Revisa la lista de Pagos.",
+    registradoTitulo: "Pago registrado",
+    registradoCuerpo: "Se registró un pago a tu nombre por {monto}.",
+    aprobadoTitulo: "Pago aprobado",
+    aprobadoCuerpo: "Tu pago por {monto} fue aprobado.",
+    rechazadoTitulo: "Pago rechazado",
+    rechazadoCuerpo: "Tu pago por {monto} fue rechazado: {motivo}",
+    sinMotivo: "sin motivo especificado",
+    metodoNoEspecificado: "No especificado",
+    miembroAnonimo: "Un miembro",
+    gymNameDefault: "GymApp",
+    faltanPagoId: "Falta el identificador del pago",
+    pagoNoEncontrado: "Pago no encontrado",
+    miembroNoEncontrado: "Miembro no encontrado",
+    estadoInvalido: "Estado de pago inválido",
+  },
 } as const;
 
 export type Messages = typeof messages;
+
+/**
+ * Reemplaza los `{placeholders}` de un template de messages con valores
+ * concretos (ej. `mensaje(messages.eventosPago.reportadoCuerpo, { nombre, monto })`).
+ */
+export function mensaje(template: string, vars: Record<string, string | number>): string {
+  return template.replace(/\{(\w+)\}/g, (match, key: string) =>
+    // eslint-disable-next-line security/detect-object-injection -- vars es Record<string, ...> con claves literales del llamador
+    key in vars ? String(vars[key]) : match
+  );
+}

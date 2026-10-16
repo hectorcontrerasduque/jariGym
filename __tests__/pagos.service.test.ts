@@ -745,11 +745,11 @@ describe("crearPagoSuspendido", () => {
     { month_number: 3, year_number: 2026 },
   ];
 
-  it("crea un pago pendiente en efectivo con una línea 'suspension' de 0 por mes y devuelve la cantidad", async () => {
+  it("crea un pago pendiente en efectivo con una línea 'suspension' de 0 por mes y devuelve su id", async () => {
     fake.setUser(ADMIN);
     fake.on("payments", "insert").reply({ data: { id: "s1" } });
 
-    expect(await service.crearPagoSuspendido("m1", meses)).toBe(2);
+    expect(await service.crearPagoSuspendido("m1", meses)).toBe("s1");
     const busquedas = fake.callsTo("payment_detail", "select");
     expect(busquedas).toHaveLength(2);
     expect(busquedas[0].filters).toEqual(
@@ -779,7 +779,7 @@ describe("crearPagoSuspendido", () => {
     fake.on("payment_detail", "select").reply({ data: { payment_id: "old" } }).reply({ data: { payment_id: "old" } });
     fake.on("payments", "insert").reply({ data: { id: "s1" } });
 
-    expect(await service.crearPagoSuspendido("m1", meses, "Viaje", "aprobado")).toBe(2);
+    expect(await service.crearPagoSuspendido("m1", meses, "Viaje", "aprobado")).toBe("s1");
     const upd = fake.callsTo("payments", "update");
     expect(upd).toHaveLength(1);
     expect(upd[0].payload).toEqual({
@@ -794,18 +794,18 @@ describe("crearPagoSuspendido", () => {
     expect(fake.callsTo("payments", "insert")[0].payload).toMatchObject({ status: "aprobado", payment_note: "Viaje" });
   });
 
-  it("falla la inserción del pago → 0 sin lanzar", async () => {
+  it("falla la inserción del pago → '' sin lanzar", async () => {
     fake.setUser(ADMIN);
     fake.on("payments", "insert").reply({ error: { message: "x" } });
-    expect(await service.crearPagoSuspendido("m1", meses)).toBe(0);
+    expect(await service.crearPagoSuspendido("m1", meses)).toBe("");
     expect(fake.callsTo("payment_detail", "insert")).toHaveLength(0);
   });
 
-  it("falla la inserción de líneas → 0 sin lanzar", async () => {
+  it("falla la inserción de líneas → '' sin lanzar", async () => {
     fake.setUser(ADMIN);
     fake.on("payments", "insert").reply({ data: { id: "s1" } });
     fake.on("payment_detail", "insert").reply({ error: { message: "x" } });
-    expect(await service.crearPagoSuspendido("m1", meses)).toBe(0);
+    expect(await service.crearPagoSuspendido("m1", meses)).toBe("");
   });
 
   it("sin sesión → 'no autenticado'", async () => {

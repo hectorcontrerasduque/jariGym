@@ -498,6 +498,27 @@ o `dispositivo.ts` (cliente); nunca al revés (`service.ts` importa `web-push`, 
   - `AutoSuscripcionMiembro` montado en `app/dashboard/layout.tsx`: miembros hacen **1 intento
     silencioso por dispositivo** (marca `push_auto_intentado` en localStorage solo después de
     confirmar `push_enabled`); si el socio bloquea el aviso → solo correo.
+
+### Eventos de pago (`POST /api/pagos/notify`)
+- El cliente solo manda `{ pagoId }` (los 4 call sites: pagos aprobar/rechazar, reportar-pago,
+  mis-pagos). La ruta **deriva el evento** con `derivarEventoPago(status, callerRole, esDueno)`
+  (`lib/features/pagos/domain/notify`, puro + testeado) — nunca confía en un `action` del cliente:
+  - **aprobado/rechazado** (solo super_admin) → correo + **push al miembro**. Motivo de rechazo
+    = `payments.payment_note` (lo escribe `rechazarPago`). Si falla el correo, el push ya se
+    envió y la ruta responde 500 (comportamiento histórico del correo).
+  - **pendiente + miembro dueño** → **push a todos los super_admin** (`reportado`) — incluye
+    solicitudes de suspensión (mis-pagos) y pagos de mensualidad/inscripción auto-reportados.
+  - **pendiente + super_admin de un tercero** → **push al miembro** (`registrado`); si es para
+    él mismo → `evento: null` (sin notificar).
+  - Límite 60/5 min por usuario (`applyRateLimit`, fail-open).
+- **Fix ROADMAP#5**: el monto es `SUM(payment_detail.payment_amount)`; antes se leía
+  `payments.payment_amount` (inexistente) y la ruta respondía siempre 404 → los correos de
+  aprobado/rechazado **nunca** se habían enviado.
+- `crearPagoSuspendido` ahora devuelve el **id del pago** (`""` si falló) — antes devolvía la
+  cantidad de meses; mis-pagos usa ese id para disparar notify.
+- `messages.eventosPago` + helper `mensaje(template, vars)` (placeholders `{nombre}`, `{monto}`…)
+  para los textos de payload y errores de la ruta.
+- Tests: `__tests__/pagos-notify-eventos.test.ts` (derivación completa + `mensaje`).
 - **VAPID**: `NEXT_PUBLIC_WEB_PUSH_PUBLIC_KEY` (cliente, `NEXT_PUBLIC_*` se inlina en build) +
   `WEB_PUSH_PRIVATE_KEY` (solo server). Generar con `npx web-push generate-vapid-keys`.
   Sin ellas la app funciona igual (push omitido silenciosamente).

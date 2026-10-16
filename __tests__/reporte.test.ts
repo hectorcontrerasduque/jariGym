@@ -25,6 +25,7 @@ function plantilla(overrides: Partial<EntradaReporte["plantillas"][number]> = {}
     fallidos: [] as string[],
     error: null,
     presupuestoAgotado: false,
+    sinEnviar: 0,
     ...overrides,
   };
 }
@@ -125,6 +126,7 @@ describe("reporteATexto", () => {
             enviados: 10,
             destinatarios: ["juan@x", "maria@x"],
             presupuestoAgotado: true,
+            sinEnviar: 4,
             ultimoIntento: "01/10/2026",
           }),
           plantilla({
@@ -166,6 +168,7 @@ describe("reporteATexto", () => {
       "Miembros Morosos — ejecutada (frecuencia: Semanal · último intento: 01/10/2026)"
     );
     expect(texto).toContain("Enviados 10/80 (12.5%) · Fallos 0 · detenida por presupuesto de tiempo");
+    expect(texto).toContain("Quedaron sin enviar: 4 (se atenderán en el próximo ciclo)");
     expect(texto).toContain("Destinatarios: juan@x, maria@x");
 
     expect(texto).toContain(
@@ -215,6 +218,13 @@ describe("debeEnviarReporte", () => {
   it("ejecutada sin destinatarios y sin errores: no merece correo", () => {
     const reporte = construirReporteCorrida(entrada({ plantillas: [plantilla()] }));
     expect(debeEnviarReporte(reporte)).toBe(false);
+  });
+
+  it("lote cortado sin envíos ni errores: merece correo por los no enviados", () => {
+    const reporte = construirReporteCorrida(
+      entrada({ plantillas: [plantilla({ sinEnviar: 7, presupuestoAgotado: true })] })
+    );
+    expect(debeEnviarReporte(reporte)).toBe(true);
   });
 
   it("con envíos, errores, advertencias o fallo fatal: merece correo", () => {

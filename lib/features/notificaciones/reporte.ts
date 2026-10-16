@@ -27,6 +27,8 @@ export type PlantillaReporte = {
   fallidos: string[];
   error: string | null;
   presupuestoAgotado: boolean;
+  /** Destinatarios de la lista que no se intentaron (lote cortado). */
+  sinEnviar: number;
 };
 
 export type PlantillaEntrada = Omit<PlantillaReporte, "porcentaje">;
@@ -124,14 +126,16 @@ export function construirReporteCorrida(entrada: EntradaReporte): ReporteCorrida
 
 /**
  * ¿El reporte merece llegar al correo? Solo si hay información: envíos,
- * errores, advertencias o fallo fatal. Una corrida donde todo se saltó por
- * frecuencia (0 envíos, 0 errores, sin avisos) no genera correo.
+ * errores, advertencias, destinatarios sin enviar o fallo fatal. Una corrida
+ * donde todo se saltó por frecuencia (0 envíos, 0 errores, sin avisos) no
+ * genera correo.
  */
 export function debeEnviarReporte(reporte: ReporteCorrida): boolean {
   return (
     reporte.totales.enviados > 0 ||
     reporte.totales.errores > 0 ||
     reporte.advertencias.length > 0 ||
+    reporte.plantillas.some((p) => p.sinEnviar > 0) ||
     reporte.errorFatal != null
   );
 }
@@ -167,6 +171,9 @@ export function reporteATexto(reporte: ReporteCorrida): string {
       lineas.push(
         `  ${r.enviados} ${p.enviados}/${reporte.miembrosActivos} (${p.porcentaje}) · ${r.fallos} ${p.fallos}${extra}`
       );
+      if (p.sinEnviar > 0) {
+        lineas.push(`  ${r.quedaronSinEnviar}: ${p.sinEnviar} (${r.proximoCiclo})`);
+      }
       if (p.destinatarios.length > 0) {
         lineas.push(`  ${r.destinatarios}: ${p.destinatarios.join(", ")}`);
       }

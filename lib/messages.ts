@@ -458,6 +458,8 @@ export const messages = {
       saltadaFrecuencia: "saltada por frecuencia",
       noEjecutadaPresupuesto: "no ejecutada: presupuesto agotado",
       detenidaPresupuesto: "detenida por presupuesto de tiempo",
+      quedaronSinEnviar: "Quedaron sin enviar",
+      proximoCiclo: "se atenderán en el próximo ciclo",
       frecuencia: "frecuencia",
       ultimoIntento: "último intento",
       enviados: "Enviados",

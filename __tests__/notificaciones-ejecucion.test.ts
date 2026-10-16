@@ -1,13 +1,15 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createSupabaseFake, type SupabaseFake } from "./helpers/supabase-fake";
 import {
+  FRACCION_RESERVA_LOTE,
   LIMITE_BITACORA,
-  configurarPausa,
   ejecutarCorrida,
   ejecutarMiembrosDeudores,
   ejecutarRecordatorioPago,
   fechasRecordatorio,
   iniciarPresupuesto,
+  limiteTipoPara,
+  ordenarConfigs,
 } from "@/lib/features/notificaciones/ejecucion";
 import { pagosService } from "@/lib/features/pagos/service";
 import { messages } from "@/lib/messages";
@@ -104,7 +106,6 @@ describe("ejecutarRecordatorioPago", () => {
   }
 
   beforeEach(() => {
-    configurarPausa(0);
     fake = createSupabaseFake();
     vi.mocked(sendPaymentReminderEmail).mockReset();
     vi.mocked(sendAdminReminderEmail).mockReset();
@@ -181,13 +182,40 @@ describe("ejecutarRecordatorioPago", () => {
     expect(consulta.filters).toContainEqual(["eq", "month_number", proximo.getMonth() + 1]);
     expect(consulta.filters).toContainEqual(["eq", "year_number", proximo.getFullYear()]);
   });
+
+  it("ordena por fecha de cobro más próxima primero (fecha_inscripcion)", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date(2026, 4, 10, 12));
+      fake.on("notification_log", "select").reply({ data: null });
+      fake.on("profiles", "select").reply({
+        data: [
+          { id: "u1", email: "tarde@test.com", full_name: "Cobra Tarde", start_date: "2026-05-05" },
+          { id: "u2", email: "pronto@test.com", full_name: "Cobra Pronto", start_date: "2026-05-15" },
+        ],
+      });
+      fake.on("memberships", "select").reply({ data: [] });
+      fake.on("payment_detail", "select").reply({ data: [] });
+      vi.mocked(sendPaymentReminderEmail).mockResolvedValue(undefined);
+      iniciarPresupuesto();
+
+      await ejecutarRecordatorioPago(fake.client, config, { ...GYM, billing_mode: "fecha_inscripcion" });
+
+      // hoy 10/05: cobro 15/05 (5 días) le gana a 05/06 (26 días)
+      const destinos = vi.mocked(sendPaymentReminderEmail).mock.calls.map((c) => c[0]);
+      expect(destinos).toEqual(["pronto@test.com", "tarde@test.com"]);
+      expect(sendPaymentReminderEmail.mock.calls[0][3]).toBe(5);
+      expect(sendPaymentReminderEmail.mock.calls[1][3]).toBe(26);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 describe("ejecutarMiembrosDeudores", () => {
   let fake: SupabaseFake;
 
   beforeEach(() => {
-    configurarPausa(0);
     fake = createSupabaseFake();
     vi.mocked(sendPaymentDebtEmail).mockReset();
     vi.mocked(pagosService.getMiembrosMorosos).mockReset();
@@ -224,8 +252,74 @@ describe("ejecutarMiembrosDeudores", () => {
       enviados: 0,
       fallos: 0,
       presupuestoAgotado: true,
+      sinEnviar: 1,
     });
     expect(sendPaymentDebtEmail).not.toHaveBeenCalled();
+  });
+
+  it("envía primero a los que deben más (urgencia)", async () => {
+    vi.mocked(pagosService.getMiembrosMorosos).mockResolvedValue([
+      moroso({ id: "u1", email: "poco@test.com", full_name: "Poco Deuda", totalDeuda: 10 }),
+      moroso({ id: "u2", email: "mucho@test.com", full_name: "Mucha Deuda", totalDeuda: 99 }),
+      moroso({ id: "u3", email: "medio@test.com", full_name: "Deuda Media", totalDeuda: 50 }),
+    ]);
+    vi.mocked(sendPaymentDebtEmail).mockResolvedValue(undefined);
+
+    await ejecutarMiembrosDeudores(fake.client, GYM);
+
+    const destinos = vi.mocked(sendPaymentDebtEmail).mock.calls.map((c) => c[0]);
+    expect(destinos).toEqual(["mucho@test.com", "medio@test.com", "poco@test.com"]);
+  });
+});
+
+describe("ordenarConfigs", () => {
+  it("individuales primero, luego recordatorio y morosos", () => {
+    const orden = ordenarConfigs([
+      { id: "a", notification_type: "miembros_deudores" },
+      { id: "b", notification_type: "resumen_dueno" },
+      { id: "c", notification_type: "recordatorio_pago" },
+      { id: "d", notification_type: "estatus_sistema" },
+    ]);
+    expect(orden.map((c) => c.notification_type)).toEqual([
+      "resumen_dueno",
+      "estatus_sistema",
+      "recordatorio_pago",
+      "miembros_deudores",
+    ]);
+  });
+
+  it("tipos desconocidos van al final y no muta la entrada", () => {
+    const entrada = [
+      { id: "x", notification_type: "otro" },
+      { id: "b", notification_type: "resumen_dueno" },
+    ];
+    const orden = ordenarConfigs(entrada);
+    expect(orden.map((c) => c.id)).toEqual(["b", "x"]);
+    expect(entrada[0].id).toBe("x");
+  });
+});
+
+describe("limiteTipoPara", () => {
+  afterEach(() => {
+    iniciarPresupuesto();
+  });
+
+  it("reserva la fracción del total por cada lote siguiente", () => {
+    iniciarPresupuesto(240_000);
+    const restante = limiteTipoPara(1);
+    expect(FRACCION_RESERVA_LOTE).toBe(0.25);
+    expect(restante).toBeLessThanOrEqual(240_000 - 0.25 * 240_000);
+    expect(restante).toBeGreaterThan(240_000 - 0.25 * 240_000 - 50);
+  });
+
+  it("sin lotes siguientes usa todo el presupuesto restante", () => {
+    iniciarPresupuesto(240_000);
+    expect(limiteTipoPara(0)).toBe(Infinity);
+  });
+
+  it("nunca devuelve un límite negativo", () => {
+    iniciarPresupuesto(0);
+    expect(limiteTipoPara(3)).toBe(0);
   });
 });
 
@@ -244,7 +338,6 @@ describe("ejecutarCorrida", () => {
   }
 
   beforeEach(() => {
-    configurarPausa(0);
     fake = createSupabaseFake();
     vi.stubEnv("NEXT_PUBLIC_ADMIN_EMAIL", "admin@test.com");
     vi.mocked(sendPaymentDebtEmail).mockReset();
@@ -456,6 +549,42 @@ describe("ejecutarCorrida", () => {
       "in",
       '("l1","l2","l3","l4","l5","l6","l7","l8","l9","l10")',
     ]);
+  });
+
+  it("la reserva por lote deja correr al segundo lote (reloj falso)", async () => {
+    vi.useFakeTimers();
+    try {
+      // 6 s de presupuesto; cada envío "tarda" 2.5 s. Sin reserva el primer
+      // lote consumiría los 6 s (3 envíos) y el segundo no correría nunca.
+      iniciarPresupuesto(6_000);
+      fake.on("notification_log", "select").reply({ data: [] });
+      fake.on("notification_log", "select").reply({ data: [] });
+      vi.mocked(pagosService.getMiembrosMorosos).mockResolvedValue(
+        Array.from({ length: 5 }, (_, i) =>
+          moroso({ id: `u${i + 1}`, email: `socio${i + 1}@test.com` })
+        )
+      );
+      vi.mocked(sendPaymentDebtEmail).mockImplementation(async () => {
+        vi.advanceTimersByTime(2500);
+      });
+
+      const resumen = await ejecutarCorrida(fake.client, {
+        configs: [
+          { id: "cfg-a", notification_type: "miembros_deudores", daily_frequency: true },
+          { id: "cfg-b", notification_type: "miembros_deudores", daily_frequency: true },
+        ],
+        gymConfig: GYM,
+        origen: "manual",
+        respetarFrecuencia: false,
+        userId: "user-1",
+      });
+
+      // lote 1: tope 6 − 25% (4.5 s) → 2 envíos y corte; lote 2: lo que resta → 1 envío
+      expect(resumen).toMatchObject({ ejecutadas: 2, enviados: 3, errores: 0 });
+      expect(sendPaymentDebtEmail).toHaveBeenCalledTimes(3);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("resumen sin correo de dueño falla en vez de pasar en silencio", async () => {

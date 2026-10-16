@@ -36,12 +36,21 @@ export type ResultadoEjecucion = {
   enviadosA: string[];
   /** Correos que fallaron. */
   fallidosA: string[];
-  /** El bucle se cortó por `PRESUPUESTO_MS` antes de agotar la lista. */
+  /** El bucle se cortó antes de agotar la lista (presupuesto global o del tipo). */
   presupuestoAgotado: boolean;
+  /** Destinatarios de la lista que nunca se intentaron (corte por presupuesto). */
+  sinEnviar: number;
 };
 
 function resultadoVacio(): ResultadoEjecucion {
-  return { enviados: 0, fallos: 0, enviadosA: [], fallidosA: [], presupuestoAgotado: false };
+  return {
+    enviados: 0,
+    fallos: 0,
+    enviadosA: [],
+    fallidosA: [],
+    presupuestoAgotado: false,
+    sinEnviar: 0,
+  };
 }
 
 /** Entrada de `fallidosA` con el motivo real del fallo (para el reporte). */
@@ -71,34 +80,48 @@ export type GymConfigNotificaciones = {
 
 export type OrigenEjecucion = "cron" | "manual";
 
-// ─── PRESUPUESTO DE TIEMPO Y PAUSA ENTRE CORREOS ─────────────
+// ─── PRESUPUESTO DE TIEMPO ────────────────────────────────────
 /**
- * `maxDuration` de la ruta es 300 s; el lote se corta antes para no morir a
- * mitad de la lista y dejar envíos sin registrar.
+ * `maxDuration` de la ruta es 300 s; los lotes se cortan antes para no morir
+ * a mitad de la lista y dejar envíos sin registrar. La pausa entre correos ya
+ * no vive aquí: la serializa `email.service` (`EMAIL_DELAY_MS`), que es el
+ * único throttle de salida.
  */
 export const PRESUPUESTO_MS = 240_000;
-const PAUSA_ENTRE_CORREOS_MS = 1000;
 
-let pausaMs = PAUSA_ENTRE_CORREOS_MS;
+/**
+ * Fracción del presupuesto total que cada lote de miembros pendiente posterior
+ * reserva para sí. Así un lote grande no se traga todo y deja al siguiente en
+ * 0: el primer lote puede usar como mucho `restante − fracción × total × lotes
+ * siguientes`. El último lote no reserva nada y usa lo que resta.
+ */
+export const FRACCION_RESERVA_LOTE = 0.25;
+
 let presupuesto: { inicio: number; limiteMs: number } | null = null;
 
 export function iniciarPresupuesto(limiteMs: number = PRESUPUESTO_MS): void {
   presupuesto = { inicio: Date.now(), limiteMs };
 }
 
-/** Pausa entre correos (1 s en producción). Las pruebas la ponen en 0. */
-export function configurarPausa(ms: number): void {
-  pausaMs = Math.max(0, ms);
-}
-
 function sinPresupuesto(): boolean {
   return presupuesto !== null && Date.now() - presupuesto.inicio >= presupuesto.limiteMs;
 }
 
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+/**
+ * Límite en ms que un lote puede consumir: lo que falta del presupuesto global
+ * menos la reserva de los `siguientesLotes` que aún correrán.
+ * `Infinity` (sin presupuesto activo o sin lotes siguientes) = solo rige el
+ * presupuesto global.
+ */
+export function limiteTipoPara(siguientesLotes: number): number {
+  if (presupuesto === null || siguientesLotes <= 0) return Infinity;
+  const restante = presupuesto.inicio + presupuesto.limiteMs - Date.now();
+  const reserva = FRACCION_RESERVA_LOTE * presupuesto.limiteMs * siguientesLotes;
+  return Math.max(0, restante - reserva);
+}
 
-async function pausaEntreCorreos(): Promise<void> {
-  if (pausaMs > 0) await sleep(pausaMs);
+function sinPresupuestoTipo(inicioTipo: number, limiteTipoMs: number): boolean {
+  return Date.now() - inicioTipo >= limiteTipoMs || sinPresupuesto();
 }
 
 // ─── FECHAS DEL RECORDATORIO ─────────────────────────────────
@@ -154,17 +177,28 @@ function diasHastaCobro(cobro: Date, hoy: Date): number {
 // ─── PROCESADORES ────────────────────────────────────────────
 export async function ejecutarMiembrosDeudores(
   supabase: SupabaseClient,
-  gymConfig: GymConfigNotificaciones
+  gymConfig: GymConfigNotificaciones,
+  limiteTipoMs: number = Infinity
 ): Promise<ResultadoEjecucion> {
   const morosos = await pagosService.getMiembrosMorosos(undefined, supabase);
   const ownerEmail = gymConfig.owner_email?.toLowerCase();
   const { sendPaymentDebtEmail } = await import("@/lib/services/email/email.service");
 
-  const res = resultadoVacio();
+  // Urgencia: primero los que deben más — si el presupuesto corta, corta por abajo.
+  const ordenados = [...morosos].sort((a, b) => (b.totalDeuda || 0) - (a.totalDeuda || 0));
+  const lista = ordenados.filter(
+    (m) => !(ownerEmail && m.email?.toLowerCase() === ownerEmail)
+  );
 
-  for (const miembro of morosos) {
-    if (ownerEmail && miembro.email?.toLowerCase() === ownerEmail) continue;
-    if (sinPresupuesto()) break;
+  const res = resultadoVacio();
+  const inicioTipo = Date.now();
+  let cortado = false;
+
+  for (const miembro of lista) {
+    if (sinPresupuestoTipo(inicioTipo, limiteTipoMs)) {
+      cortado = true;
+      break;
+    }
 
     const deudasParaEmail = miembro.deudas.length > 0
       ? miembro.deudas
@@ -192,11 +226,12 @@ export async function ejecutarMiembrosDeudores(
       res.fallos++;
       if (miembro.email) res.fallidosA.push(falloDestinatario(miembro.email, error));
     }
-
-    await pausaEntreCorreos();
   }
 
-  res.presupuestoAgotado = sinPresupuesto();
+  if (cortado) {
+    res.presupuestoAgotado = true;
+    res.sinEnviar = lista.length - res.enviados - res.fallos;
+  }
   return res;
 }
 
@@ -204,7 +239,8 @@ export async function ejecutarRecordatorioPago(
   supabase: SupabaseClient,
   config: ConfigNotificacion,
   gymConfig: GymConfigNotificaciones,
-  forzar = false
+  forzar = false,
+  limiteTipoMs: number = Infinity
 ): Promise<ResultadoEjecucion> {
   const nombreGym = gymConfig.gym_name || "GymApp";
   const duenoEmail = gymConfig.owner_email?.toLowerCase() || null;
@@ -245,6 +281,8 @@ export async function ejecutarRecordatorioPago(
 
   // Destinatarios: activos que DEBEN EL PRÓXIMO MES (conserva las
   // exclusiones de dueño, membresías sin fecha fin y ya pagados).
+  // Urgencia: primero los cuya fecha de cobro llega antes — si el presupuesto
+  // corta, corta por abajo.
   const proximo = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 1);
   const { usuariosConPago } = await pagosDelMes(
     supabase,
@@ -252,15 +290,27 @@ export async function ejecutarRecordatorioPago(
     proximo.getFullYear()
   );
 
-  const deudores = candidatos.filter((m) => !!m.start_date && !usuariosConPago.has(m.id));
+  const deudores = candidatos
+    .filter((m) => !!m.start_date && !usuariosConPago.has(m.id))
+    .sort(
+      (a, b) =>
+        diasHastaCobro(fechasRecordatorio(a.start_date!, 0, modoCobro, hoy).cobro, hoy) -
+        diasHastaCobro(fechasRecordatorio(b.start_date!, 0, modoCobro, hoy).cobro, hoy)
+    );
   if (deudores.length === 0) return res;
 
   const { sendPaymentReminderEmail, sendAdminReminderEmail } = await import(
     "@/lib/services/email/email.service"
   );
 
+  const inicioTipo = Date.now();
+  let cortado = false;
+
   for (const deudor of deudores) {
-    if (sinPresupuesto()) break;
+    if (sinPresupuestoTipo(inicioTipo, limiteTipoMs)) {
+      cortado = true;
+      break;
+    }
 
     const fechas = fechasRecordatorio(deudor.start_date!, 0, modoCobro, hoy);
     try {
@@ -279,10 +329,15 @@ export async function ejecutarRecordatorioPago(
       res.fallos++;
       res.fallidosA.push(falloDestinatario(deudor.email!, error));
     }
-
-    await pausaEntreCorreos();
   }
 
+  if (cortado) {
+    res.presupuestoAgotado = true;
+    res.sinEnviar = deudores.length - res.enviados - res.fallos;
+  }
+
+  // El correo al dueño usa solo presupuesto global: si el lote se cortó por su
+  // límite propio aún cabe aquí, y si no queda presupuesto global se omite.
   if (duenoEmail && res.enviados > 0 && !sinPresupuesto()) {
     try {
       await sendAdminReminderEmail(
@@ -308,7 +363,6 @@ export async function ejecutarRecordatorioPago(
     }
   }
 
-  res.presupuestoAgotado = sinPresupuesto();
   return res;
 }
 
@@ -411,13 +465,14 @@ export async function ejecutarTipoNotificacion(
   supabase: SupabaseClient,
   config: ConfigNotificacion,
   gymConfig: GymConfigNotificaciones,
-  forzar = false
+  forzar = false,
+  limiteTipoMs: number = Infinity
 ): Promise<ResultadoEjecucion> {
   switch (config.notification_type) {
     case "miembros_deudores":
-      return ejecutarMiembrosDeudores(supabase, gymConfig);
+      return ejecutarMiembrosDeudores(supabase, gymConfig, limiteTipoMs);
     case "recordatorio_pago":
-      return ejecutarRecordatorioPago(supabase, config, gymConfig, forzar);
+      return ejecutarRecordatorioPago(supabase, config, gymConfig, forzar, limiteTipoMs);
     case "resumen_dueno":
       return ejecutarResumenDueno(supabase, gymConfig, config);
     case "estatus_sistema":
@@ -425,6 +480,27 @@ export async function ejecutarTipoNotificacion(
     default:
       return resultadoVacio();
   }
+}
+
+/**
+ * Orden de ejecución: primero los tipos de un solo correo (resumen al dueño y
+ * estado del sistema, ~2 envíos) y después los lotes a miembros. Así un lote
+ * grande nunca deja sin ejecutar a los tipos individuales por presupuesto.
+ * Dentro de los lotes va primero el recordatorio (fecha de cobro crítica) y
+ * los morosos cierran con lo que sobre (tienen piso de 7 días).
+ */
+const ORDEN_TIPOS = new Map<string, number>([
+  ["resumen_dueno", 0],
+  ["estatus_sistema", 1],
+  ["recordatorio_pago", 2],
+  ["miembros_deudores", 3],
+]);
+
+export function ordenarConfigs(configs: ConfigNotificacion[]): ConfigNotificacion[] {
+  return [...configs].sort(
+    (a, b) =>
+      (ORDEN_TIPOS.get(a.notification_type) ?? 9) - (ORDEN_TIPOS.get(b.notification_type) ?? 9)
+  );
 }
 
 /** Filas de `notification_log` que se conservan por tipo (la tabla no crece). */
@@ -504,44 +580,63 @@ export async function ejecutarCorrida(
   const entradas: PlantillaEntrada[] = [];
   let hayFallo = false;
 
-  for (const config of opciones.configs) {
-    const base = {
+  // Paso 1 — frecuencia de todos los tipos de una vez, ya en orden de
+  // ejecución (individuales primero): así se sabe qué lotes correrán de verdad
+  // y se puede reservar presupuesto entre ellos.
+  type Fila = {
+    config: ConfigNotificacion;
+    base: PlantillaEntrada;
+    saltada: boolean;
+  };
+  const filas: Fila[] = [];
+
+  for (const config of ordenarConfigs(opciones.configs)) {
+    const base: PlantillaEntrada = {
       configId: config.id,
       tipo: config.notification_type,
       label: labelTipo(config.notification_type),
       frecuencia: etiquetaFrecuencia(config),
-      ultimoIntento: null as string | null,
+      ultimoIntento: null,
       presupuestoAgotado: false,
+      estado: "saltada_frecuencia",
+      enviados: 0,
+      fallos: 0,
+      destinatarios: [],
+      fallidos: [],
+      error: null,
+      sinEnviar: 0,
     };
-
+    let saltada = false;
     if (opciones.respetarFrecuencia) {
       const fecha = await ultimoIntento(supabase, config.id);
       base.ultimoIntento = fecha ? fechaVet(fecha) : null;
-      if (!verificarFrecuencia(config, fecha)) {
-        entradas.push({
-          ...base,
-          estado: "saltada_frecuencia",
-          enviados: 0,
-          fallos: 0,
-          destinatarios: [],
-          fallidos: [],
-          error: null,
-        });
-        continue;
-      }
+      saltada = !verificarFrecuencia(config, fecha);
+    }
+    filas.push({ config, base, saltada });
+  }
+
+  const esLote = (t: string) => t === "miembros_deudores" || t === "recordatorio_pago";
+
+  // Paso 2 — ejecución en ese orden, con presupuesto global y reserva por lote.
+  for (const [i, fila] of filas.entries()) {
+    const { config, base, saltada } = fila;
+
+    if (saltada) {
+      entradas.push({ ...base, estado: "saltada_frecuencia" });
+      continue;
     }
 
     if (sinPresupuesto()) {
-      entradas.push({
-        ...base,
-        estado: "presupuesto",
-        enviados: 0,
-        fallos: 0,
-        destinatarios: [],
-        fallidos: [],
-        error: null,
-      });
+      entradas.push({ ...base, estado: "presupuesto" });
       continue;
+    }
+
+    let limiteTipoMs = Infinity;
+    if (esLote(config.notification_type)) {
+      const siguientes = filas
+        .slice(i + 1)
+        .filter((f) => !f.saltada && esLote(f.config.notification_type)).length;
+      limiteTipoMs = limiteTipoPara(siguientes);
     }
 
     try {
@@ -549,7 +644,8 @@ export async function ejecutarCorrida(
         supabase,
         config,
         opciones.gymConfig,
-        opciones.forzar ?? false
+        opciones.forzar ?? false,
+        limiteTipoMs
       );
       const error =
         r.fallos > 0
@@ -565,6 +661,7 @@ export async function ejecutarCorrida(
         fallidos: r.fallidosA,
         error,
         presupuestoAgotado: r.presupuestoAgotado,
+        sinEnviar: r.sinEnviar,
       });
     } catch (error) {
       hayFallo = true;
@@ -576,6 +673,7 @@ export async function ejecutarCorrida(
         destinatarios: [],
         fallidos: [],
         error: error instanceof Error ? error.message : String(error),
+        sinEnviar: 0,
       });
     }
   }

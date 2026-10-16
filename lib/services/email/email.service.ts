@@ -26,7 +26,12 @@ const transporter = nodemailer.createTransport({
 });
 
 // ─── RATE LIMITING ────────────────────────────────────────────
-const EMAIL_DELAY_MS = 3000;
+/**
+ * Pausa mínima entre correos salientes (global, todos los envíos). 1.5 s ≈ 24
+ * correos/min sostenidos: muy por debajo del límite cómodo de Gmail (~100/min)
+ * y con volumen diario del cron (≤ ~160) muy por debajo del tope de 500/día.
+ */
+const EMAIL_DELAY_MS = 1500;
 let lastEmailSentAt = 0;
 
 function sleep(ms: number): Promise<void> {

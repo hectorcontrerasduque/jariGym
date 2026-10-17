@@ -519,6 +519,24 @@ o `dispositivo.ts` (cliente); nunca al revés (`service.ts` importa `web-push`, 
 - `messages.eventosPago` + helper `mensaje(template, vars)` (placeholders `{nombre}`, `{monto}`…)
   para los textos de payload y errores de la ruta.
 - Tests: `__tests__/pagos-notify-eventos.test.ts` (derivación completa + `mensaje`).
+
+### Push en el cron de notificaciones
+- Los lotes `ejecutarMiembrosDeudores` y `ejecutarRecordatorioPago` (en
+  `lib/features/notificaciones/ejecucion.ts`) añaden un push **complementario** al correo,
+  vía el helper interno `avisarPush(supabase, ids, payload, advertencias)`:
+  import dinámico de `push/service`, mismo alcance que los correos intentados (no los
+  cortados por presupuesto), payload con `url: "/dashboard/mis-pagos"`.
+- **Fail-open reforzado**: `ResultadoEjecucion` ganó `advertencias: string[]`. Un fallo de
+  push (`fallos > 0`, `omitido: "error"` o excepción) solo agrega una línea de advertencia —
+  **nunca** incrementa `fallos`, nunca marca `hayFallo` → la bitácora (`no_issues: true`) se
+  escribe igual y `errores` del reporte queda en 0. `sin_configurar`/`deshabilitado` son
+  estados normales → sin advertencia.
+- `ejecutarCorrida` fusiona `r.advertencias` en las advertencias del reporte del cron (ya
+  existentes, junto a purga/contador), así que `debeEnviarReporte()` también dispara con
+  solo avisos de push.
+- Tests: `__tests__/notificaciones-ejecucion.test.ts` (mock global de push por defecto
+  `sin_configurar`; casos: payload, fallo, excepción, deshabilitado, cortado por presupuesto,
+  y corrida con bitácora intacta pese a push caído).
 - **VAPID**: `NEXT_PUBLIC_WEB_PUSH_PUBLIC_KEY` (cliente, `NEXT_PUBLIC_*` se inlina en build) +
   `WEB_PUSH_PRIVATE_KEY` (solo server). Generar con `npx web-push generate-vapid-keys`.
   Sin ellas la app funciona igual (push omitido silenciosamente).

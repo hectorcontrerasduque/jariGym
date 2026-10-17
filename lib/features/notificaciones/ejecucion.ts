@@ -1,6 +1,6 @@
 import { pagosService } from "@/lib/features/pagos/service";
 import { getDiaCobro } from "@/lib/utils";
-import { messages } from "@/lib/messages";
+import { messages, mensaje } from "@/lib/messages";
 import {
   calcularEstatusSistema,
   calcularResumenDueno,
@@ -20,6 +20,7 @@ import {
   type PlantillaEntrada,
 } from "./reporte";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { PayloadPush } from "@/lib/features/push/types";
 
 /**
  * Ejecución de los 4 tipos de notificación. Un solo módulo para el cron
@@ -40,6 +41,11 @@ export type ResultadoEjecucion = {
   presupuestoAgotado: boolean;
   /** Destinatarios de la lista que nunca se intentaron (corte por presupuesto). */
   sinEnviar: number;
+  /**
+   * Avisos no fatales (p. ej. fallos de web push). Nunca cuentan como `fallos`
+   * ni afectan la bitácora: viajan al reporte como advertencias.
+   */
+  advertencias: string[];
 };
 
 function resultadoVacio(): ResultadoEjecucion {
@@ -50,6 +56,7 @@ function resultadoVacio(): ResultadoEjecucion {
     fallidosA: [],
     presupuestoAgotado: false,
     sinEnviar: 0,
+    advertencias: [],
   };
 }
 
@@ -57,6 +64,37 @@ function resultadoVacio(): ResultadoEjecucion {
 function falloDestinatario(email: string, error: unknown): string {
   const motivo = error instanceof Error ? error.message : String(error);
   return `${email} — ${motivo}`;
+}
+
+// ─── WEB PUSH COMPLEMENTARIO (CRON) ─────────────────────────
+/**
+ * Push en lote para los miembros de un tipo (morosos o recordatorio).
+ * Fail-open total: jamás lanza y jamás cuenta como fallo del tipo — los
+ * fallos parciales y el error feroz de importación solo dejan una
+ * advertencia en el reporte. Sin claves VAPID o `push_enabled = false`
+ * (estado normal, no un problema) → no hace nada.
+ */
+async function avisarPush(
+  supabase: SupabaseClient,
+  userIds: string[],
+  payload: PayloadPush,
+  advertencias: string[]
+): Promise<void> {
+  if (userIds.length === 0) return;
+  try {
+    const { enviarPushAUsuarios } = await import("@/lib/features/push/service");
+    const r = await enviarPushAUsuarios(supabase, userIds, payload);
+    if (r.omitido === "sin_configurar" || r.omitido === "deshabilitado") return;
+    if (r.omitido === "error" || r.fallos > 0) {
+      advertencias.push(
+        mensaje(messages.push.cronAdvertencia, { enviados: r.enviados, fallos: r.fallos })
+      );
+    }
+  } catch (error) {
+    advertencias.push(
+      `${messages.push.cronFallo}: ${error instanceof Error ? error.message : String(error)}`
+    );
+  }
 }
 
 export type ConfigNotificacion = {
@@ -193,6 +231,7 @@ export async function ejecutarMiembrosDeudores(
   const res = resultadoVacio();
   const inicioTipo = Date.now();
   let cortado = false;
+  const idsPush: string[] = [];
 
   for (const miembro of lista) {
     if (sinPresupuestoTipo(inicioTipo, limiteTipoMs)) {
@@ -226,7 +265,23 @@ export async function ejecutarMiembrosDeudores(
       res.fallos++;
       if (miembro.email) res.fallidosA.push(falloDestinatario(miembro.email, error));
     }
+    idsPush.push(miembro.id);
   }
+
+  // Push complementario: mismo alcance que el correo intentado (incluso si el
+  // correo falló, el push puede llegar). Un fallo de push solo deja advertencia.
+  await avisarPush(
+    supabase,
+    idsPush,
+    {
+      title: messages.push.cronDeudoresTitulo,
+      body: mensaje(messages.push.cronDeudoresCuerpo, {
+        gym: gymConfig.gym_name || messages.eventosPago.gymNameDefault,
+      }),
+      url: "/dashboard/mis-pagos",
+    },
+    res.advertencias
+  );
 
   if (cortado) {
     res.presupuestoAgotado = true;
@@ -305,6 +360,7 @@ export async function ejecutarRecordatorioPago(
 
   const inicioTipo = Date.now();
   let cortado = false;
+  const idsPush: string[] = [];
 
   for (const deudor of deudores) {
     if (sinPresupuestoTipo(inicioTipo, limiteTipoMs)) {
@@ -329,7 +385,21 @@ export async function ejecutarRecordatorioPago(
       res.fallos++;
       res.fallidosA.push(falloDestinatario(deudor.email!, error));
     }
+    idsPush.push(deudor.id);
   }
+
+  // Push complementario al recordatorio de cobro (solo a los socios, no al
+  // dueño — su aviso es el correo administrativo de abajo).
+  await avisarPush(
+    supabase,
+    idsPush,
+    {
+      title: messages.push.cronRecordatorioTitulo,
+      body: mensaje(messages.push.cronRecordatorioCuerpo, { gym: nombreGym }),
+      url: "/dashboard/mis-pagos",
+    },
+    res.advertencias
+  );
 
   if (cortado) {
     res.presupuestoAgotado = true;
@@ -652,6 +722,8 @@ export async function ejecutarCorrida(
           ? `${messages.notificaciones.envioParcial} (enviados: ${r.enviados}, fallos: ${r.fallos})`
           : null;
       if (error) hayFallo = true;
+      // Avisos no fatales (p. ej. push fallido) → reporte, sin tocar bitácora.
+      advertencias.push(...r.advertencias);
       entradas.push({
         ...base,
         estado: "ejecutada",

@@ -500,6 +500,12 @@ export const messages = {
     errorServidor: "Error en el servidor de notificaciones push",
     badRequest: "Suscripción push inválida",
     errorGuardar: "Error al registrar este dispositivo",
+    cronDeudoresTitulo: "Pago pendiente",
+    cronDeudoresCuerpo: "Tienes un pago pendiente en {gym}.",
+    cronRecordatorioTitulo: "Próximo cobro",
+    cronRecordatorioCuerpo: "Tu próximo cobro en {gym} está por llegar.",
+    cronAdvertencia: "Web push: {enviados} enviados, {fallos} fallos",
+    cronFallo: "Web push del cron no se pudo ejecutar",
   },
   eventosPago: {
     reportadoTitulo: "Pago reportado",

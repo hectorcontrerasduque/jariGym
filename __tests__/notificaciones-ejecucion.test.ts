@@ -12,6 +12,7 @@ import {
   ordenarConfigs,
 } from "@/lib/features/notificaciones/ejecucion";
 import { pagosService } from "@/lib/features/pagos/service";
+import { enviarPushAUsuarios } from "@/lib/features/push/service";
 import { messages } from "@/lib/messages";
 import {
   sendPaymentDebtEmail,
@@ -31,6 +32,17 @@ vi.mock("@/lib/services/email/email.service", () => ({
 vi.mock("@/lib/features/pagos/service", () => ({
   pagosService: { getMiembrosMorosos: vi.fn().mockResolvedValue([]) },
 }));
+
+vi.mock("@/lib/features/push/service", () => ({
+  enviarPushAUsuarios: vi.fn(),
+}));
+
+// Por defecto el push está "sin configurar" (sin claves VAPID en tests):
+// ningún caso existente depende de un push real.
+beforeEach(() => {
+  vi.mocked(enviarPushAUsuarios).mockReset();
+  vi.mocked(enviarPushAUsuarios).mockResolvedValue({ enviados: 0, fallos: 0, omitido: "sin_configurar" });
+});
 
 const GYM = {
   gym_name: "Mi Gym",
@@ -210,6 +222,46 @@ describe("ejecutarRecordatorioPago", () => {
       vi.useRealTimers();
     }
   });
+
+  it("push: envía a los deudores procesados con payload a mis-pagos", async () => {
+    encolar({ data: null });
+    vi.mocked(sendPaymentReminderEmail).mockResolvedValue(undefined);
+    vi.mocked(enviarPushAUsuarios).mockResolvedValue({ enviados: 1, fallos: 0, omitido: null });
+
+    const resultado = await ejecutarRecordatorioPago(fake.client, config, GYM);
+
+    expect(enviarPushAUsuarios).toHaveBeenCalledTimes(1);
+    expect(enviarPushAUsuarios).toHaveBeenCalledWith(fake.client, ["u1"], {
+      title: messages.push.cronRecordatorioTitulo,
+      body: `Tu próximo cobro en ${GYM.gym_name} está por llegar.`,
+      url: "/dashboard/mis-pagos",
+    });
+    expect(resultado.advertencias).toEqual([]);
+  });
+
+  it("push fallido: advertencia sin afectar el conteo de correos", async () => {
+    encolar({ data: null });
+    vi.mocked(sendPaymentReminderEmail).mockResolvedValue(undefined);
+    vi.mocked(enviarPushAUsuarios).mockResolvedValue({ enviados: 0, fallos: 1, omitido: null });
+
+    const resultado = await ejecutarRecordatorioPago(fake.client, config, GYM);
+
+    expect(resultado).toMatchObject({ enviados: 1, fallos: 0 });
+    expect(resultado.advertencias).toEqual(["Web push: 0 enviados, 1 fallos"]);
+  });
+
+  it("sin deudores: no intenta push", async () => {
+    encolar(
+      { data: null },
+      [{ payment_id: "p1", payment_amount: 30 }],
+      [{ id: "p1", user_id: "u1", status: "aprobado" }]
+    );
+
+    const resultado = await ejecutarRecordatorioPago(fake.client, config, GYM);
+
+    expect(enviarPushAUsuarios).not.toHaveBeenCalled();
+    expect(resultado.advertencias).toEqual([]);
+  });
 });
 
 describe("ejecutarMiembrosDeudores", () => {
@@ -269,6 +321,73 @@ describe("ejecutarMiembrosDeudores", () => {
 
     const destinos = vi.mocked(sendPaymentDebtEmail).mock.calls.map((c) => c[0]);
     expect(destinos).toEqual(["mucho@test.com", "medio@test.com", "poco@test.com"]);
+  });
+
+  it("push: envía a los morosos procesados con payload a mis-pagos", async () => {
+    vi.mocked(pagosService.getMiembrosMorosos).mockResolvedValue([
+      moroso(),
+      moroso({ id: "u2", email: "otro@test.com", full_name: "Socio Dos" }),
+    ]);
+    vi.mocked(sendPaymentDebtEmail).mockResolvedValue(undefined);
+    vi.mocked(enviarPushAUsuarios).mockResolvedValue({ enviados: 3, fallos: 0, omitido: null });
+
+    const resultado = await ejecutarMiembrosDeudores(fake.client, GYM);
+
+    expect(enviarPushAUsuarios).toHaveBeenCalledTimes(1);
+    expect(enviarPushAUsuarios).toHaveBeenCalledWith(
+      fake.client,
+      ["u1", "u2"],
+      {
+        title: messages.push.cronDeudoresTitulo,
+        body: `Tienes un pago pendiente en ${GYM.gym_name}.`,
+        url: "/dashboard/mis-pagos",
+      }
+    );
+    expect(resultado.advertencias).toEqual([]);
+  });
+
+  it("push fallido: solo advertencia, los correos y contadores no cambian", async () => {
+    vi.mocked(pagosService.getMiembrosMorosos).mockResolvedValue([moroso()]);
+    vi.mocked(sendPaymentDebtEmail).mockResolvedValue(undefined);
+    vi.mocked(enviarPushAUsuarios).mockResolvedValue({ enviados: 0, fallos: 2, omitido: null });
+
+    const resultado = await ejecutarMiembrosDeudores(fake.client, GYM);
+
+    expect(resultado).toMatchObject({ enviados: 1, fallos: 0, presupuestoAgotado: false });
+    expect(resultado.advertencias).toEqual(["Web push: 0 enviados, 2 fallos"]);
+  });
+
+  it("push deshabilitado o sin claves: no deja advertencia", async () => {
+    vi.mocked(pagosService.getMiembrosMorosos).mockResolvedValue([moroso()]);
+    vi.mocked(sendPaymentDebtEmail).mockResolvedValue(undefined);
+    vi.mocked(enviarPushAUsuarios).mockResolvedValue({ enviados: 0, fallos: 0, omitido: "deshabilitado" });
+
+    const resultado = await ejecutarMiembrosDeudores(fake.client, GYM);
+
+    expect(resultado.advertencias).toEqual([]);
+  });
+
+  it("push que lanza: capturado como advertencia, nunca rompe el lote", async () => {
+    vi.mocked(pagosService.getMiembrosMorosos).mockResolvedValue([moroso()]);
+    vi.mocked(sendPaymentDebtEmail).mockResolvedValue(undefined);
+    vi.mocked(enviarPushAUsuarios).mockRejectedValue(new Error("red caída"));
+
+    const resultado = await ejecutarMiembrosDeudores(fake.client, GYM);
+
+    expect(resultado).toMatchObject({ enviados: 1, fallos: 0 });
+    expect(resultado.advertencias).toHaveLength(1);
+    expect(resultado.advertencias[0]).toContain(messages.push.cronFallo);
+    expect(resultado.advertencias[0]).toContain("red caída");
+  });
+
+  it("lote cortado por presupuesto: no intenta push a los no procesados", async () => {
+    vi.mocked(pagosService.getMiembrosMorosos).mockResolvedValue([moroso()]);
+    iniciarPresupuesto(0);
+
+    const resultado = await ejecutarMiembrosDeudores(fake.client, GYM);
+
+    expect(enviarPushAUsuarios).not.toHaveBeenCalled();
+    expect(resultado.advertencias).toEqual([]);
   });
 });
 
@@ -439,6 +558,46 @@ describe("ejecutarCorrida", () => {
     expect(resumen.reporteTexto).toContain("ERRORES:");
     expect(resumen.reporteTexto).toContain(messages.notificaciones.envioParcial);
     expect(resumen.reporteTexto).toContain("socio@test.com — SMTP down");
+  });
+
+  it("push fallido: bitácora intacta (solo advertencia en el reporte)", async () => {
+    encolarLogs();
+    fake.on("profiles", "select").reply({ count: 80 });
+    vi.mocked(pagosService.getMiembrosMorosos).mockResolvedValue([moroso()]);
+    vi.mocked(sendPaymentDebtEmail).mockResolvedValue(undefined);
+    vi.mocked(enviarPushAUsuarios).mockResolvedValue({ enviados: 0, fallos: 2, omitido: null });
+
+    const resumen = await ejecutarCorrida(fake.client, cron());
+
+    // El push nunca marca hayFallo: correos OK → corrida limpia → bitácora SÍ.
+    expect(resumen).toMatchObject({
+      ejecutadas: 1,
+      enviados: 1,
+      errores: 0,
+      reporteEnviado: true,
+      reporteOmitido: null,
+    });
+    expect(fake.callsTo("notification_log", "insert")).toHaveLength(1);
+    expect(fake.callsTo("notification_log", "insert")[0].payload).toMatchObject([
+      { notification_config_id: "cfg-deuda", members_notified: 1, no_issues: true },
+    ]);
+    expect(resumen.reporteTexto).toContain(messages.notificaciones.reporte.advertencias);
+    expect(resumen.reporteTexto).toContain("Web push: 0 enviados, 2 fallos");
+    expect(resumen.reporteTexto).toContain("ERRORES: ninguno");
+  });
+
+  it("push que lanza: advertencia en el reporte sin errores ni bitácora rota", async () => {
+    encolarLogs();
+    fake.on("profiles", "select").reply({ count: 80 });
+    vi.mocked(pagosService.getMiembrosMorosos).mockResolvedValue([moroso()]);
+    vi.mocked(sendPaymentDebtEmail).mockResolvedValue(undefined);
+    vi.mocked(enviarPushAUsuarios).mockRejectedValue(new Error("servicio caído"));
+
+    const resumen = await ejecutarCorrida(fake.client, cron());
+
+    expect(resumen).toMatchObject({ ejecutadas: 1, enviados: 1, errores: 0 });
+    expect(fake.callsTo("notification_log", "insert")).toHaveLength(1);
+    expect(resumen.reporteTexto).toContain("Web push del cron no se pudo ejecutar: servicio caído");
   });
 
   it("excepción del procesador queda en el reporte (sin bitácora)", async () => {

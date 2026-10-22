@@ -66,6 +66,21 @@ async function sincronizar(metodo: "POST" | "DELETE", payload: SuscripcionPush):
 }
 
 /**
+ * ¿Debe la auto-suscripción de miembros marcar su intento por dispositivo?
+ * - Terminal: quedó suscrito (activado/ya-activo) o el permiso quedó DENEGADO
+ *   (nada más que reintentar → no volver a molestar con el aviso).
+ * - NO marca si el socio solo cerró el aviso (permiso sigue "default") o si
+ *   falló la sincronización con el servidor → la próxima visita reintenta.
+ */
+export function debeMarcarIntento(
+  resultado: ResultadoActivacionPush,
+  permisoFinal: NotificationPermission | "unsupported"
+): boolean {
+  if (permisoFinal === "denied") return true;
+  return resultado === "activado" || resultado === "ya-activo";
+}
+
+/**
  * Pide permiso, suscribe el navegador y registra la suscripción en el servidor.
  * Si el servidor la rechaza (409/4xx), se da de baja localmente para no dejar
  * una suscripción huérfana.

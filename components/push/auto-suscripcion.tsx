@@ -2,16 +2,28 @@
 
 import { useEffect } from "react";
 import { useProfileContext } from "@/components/profile-context";
-import { activarPush, estadoPermiso, pushSoportado } from "@/lib/features/push/dispositivo";
+import {
+  activarPush,
+  debeMarcarIntento,
+  estadoPermiso,
+  pushSoportado,
+} from "@/lib/features/push/dispositivo";
 
 const CLAVE_INTENTO = "push_auto_intentado";
 
 /**
- * Auto-suscripción de miembros: UN intento silencioso por dispositivo
- * (marcado en localStorage). Si el navegador muestra su aviso y el socio
- * acepta, queda suscrito; si lo bloquea, solo recibirá correo (fail-open).
- * Si `gym_config.push_enabled` está apagado no se marca el intento, así que
- * cuando el administrador lo encienda se intentará sola en la próxima visita.
+ * Auto-suscripción de miembros: UN intento por dispositivo (marcado en
+ * localStorage) para no repetir el aviso del navegador.
+ *
+ * El intento solo se marca cuando el resultado es **terminal**: quedó suscrito
+ * o el permiso quedó bloqueado. Si el socio solo cierra el aviso (el permiso
+ * sigue "default") o falla la sincronización con el servidor, NO se marca y se
+ * reintenta en la próxima visita; si bloquea el permiso, puede darlo de alta
+ * después con la campana del menú. Si `gym_config.push_enabled` está apagado
+ * no se marca nada, así que al encenderlo se intentará sola en la próxima visita.
+ *
+ * Al terminar dispara `push:estado` para que la campana (BotonSuscripcion)
+ * refresque su estado sin recargar.
  */
 export function AutoSuscripcionMiembro() {
   const { profile } = useProfileContext();
@@ -35,18 +47,16 @@ export function AutoSuscripcionMiembro() {
         return; // sin gate confirmado no se intenta (y no se marca el intento)
       }
 
-      try {
-        window.localStorage.setItem(CLAVE_INTENTO, "1");
-      } catch {
-        // almacenamiento no disponible: el permiso del navegador hace de dedup
+      const resultado = await activarPush();
+      if (debeMarcarIntento(resultado, estadoPermiso())) {
+        try {
+          window.localStorage.setItem(CLAVE_INTENTO, "1");
+        } catch {
+          // almacenamiento no disponible: el permiso del navegador hace de dedup
+        }
       }
-
-      const permiso = estadoPermiso();
-      if (permiso === "default") {
-        await activarPush();
-      } else if (permiso === "granted") {
-        await activarPush(); // renueva/sincroniza la suscripción con el servidor
-      }
+      // la campana (BotonSuscripcion) refresca su estado sin recargar
+      window.dispatchEvent(new Event("push:estado"));
     };
 
     void ejecutar();

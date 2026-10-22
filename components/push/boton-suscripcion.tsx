@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Bell, BellOff, BellRing } from "lucide-react";
 import {
   activarPush,
@@ -23,26 +23,23 @@ const calcularEstado = async (): Promise<Estado> => {
 };
 
 /**
- * Botón de suscripción push para administradores (sidebar / barra móvil).
+ * Botón de suscripción push (admin y miembros; barra lateral / barra superior móvil).
  * Muestra el estado del permiso del navegador y alterna activar/desactivar.
  * Si el navegador no soporta push u ocurrió un error, no se rompe nada (fail-open).
  */
 export function BotonSuscripcion({ variant = "fila" }: { variant?: "fila" | "icono" }) {
   const [estado, setEstado] = useState<Estado>("cargando");
 
-  const refrescar = () => {
-    void calcularEstado().then((e) => setEstado(e));
-  };
+  const refrescar = useCallback(() => {
+    void calcularEstado().then(setEstado);
+  }, []);
 
   useEffect(() => {
-    let activo = true;
-    void calcularEstado().then((e) => {
-      if (activo) setEstado(e);
-    });
-    return () => {
-      activo = false;
-    };
-  }, []);
+    void calcularEstado().then(setEstado);
+    // la auto-suscripción (AutoSuscripcionMiembro) avisa al terminar
+    window.addEventListener("push:estado", refrescar);
+    return () => window.removeEventListener("push:estado", refrescar);
+  }, [refrescar]);
 
   const handleClick = async () => {
     if (estado === "activo") {

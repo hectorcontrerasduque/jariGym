@@ -493,11 +493,15 @@ o `dispositivo.ts` (cliente); nunca al revés (`service.ts` importa `web-push`, 
 - **UI**:
   - Interruptor "Push al Celular" en Notificaciones (card propia, independiente del toggle de
     correo; al guardarlo dispara `config:updated` para refrescar el sidebar).
-  - `BotonSuscripcion` en el sidebar **solo para admin** (fila desktop / icono móvil), visible
-    solo si `push_enabled`; estados: activo / activar / bloqueado (permiso denegado).
+  - `BotonSuscripcion` en el sidebar **para admin y miembro** (fila desktop / icono en la barra
+    superior móvil), visible solo si `push_enabled`; estados: activo / activar / bloqueado
+    (permiso denegado). Los miembros lo necesitan porque los eventos de pago son solo push.
   - `AutoSuscripcionMiembro` montado en `app/dashboard/layout.tsx`: miembros hacen **1 intento
-    silencioso por dispositivo** (marca `push_auto_intentado` en localStorage solo después de
-    confirmar `push_enabled`); si el socio bloquea el aviso → solo correo.
+    por dispositivo**; `push_auto_intentado` (localStorage) se marca **solo si el resultado es
+    terminal** (`debeMarcarIntento`: suscrito o permiso bloqueado). Si el socio cierra el aviso
+    (permiso `default`) o falla la sincronización → se reintenta en la próxima visita; si
+    bloquea → lo activa desde la campana. Al terminar dispara el evento `push:estado` para que
+    la campana refresque su estado.
 
 ### Eventos de pago (`POST /api/pagos/notify`)
 - El cliente solo manda `{ pagoId }` (los 4 call sites: pagos aprobar/rechazar, reportar-pago,

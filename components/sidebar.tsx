@@ -128,7 +128,7 @@ export function Sidebar() {
             </div>
           </div>
           <div className="flex items-center gap-1">
-            {pushEnabled && isAdmin && <BotonSuscripcion variant="icono" />}
+            {pushEnabled && <BotonSuscripcion variant="icono" />}
             <button
               onClick={handleSignOut}
               className="p-2 text-gym-muted hover:text-gym-danger transition-colors"
@@ -196,7 +196,7 @@ export function Sidebar() {
               </p>
             </div>
           </Link>
-          {pushEnabled && isAdmin && (
+          {pushEnabled && (
             <div className="mb-3">
               <BotonSuscripcion />
             </div>

@@ -725,12 +725,15 @@ paths:
     post:
       tags: [pagos]
       operationId: notificarPago
-      summary: Notifica un alta o cambio de estado de pago (correo y/o push)
+      summary: Notifica un alta o cambio de estado de pago (solo web push)
       description: |
+        Los eventos de pago notifican **solo por web push** (sin correo; el cron
+        de morosos/recordatorio sí conserva sus correos).
+
         El evento se **deriva del estado real en BD y del rol del llamador**
         (`derivarEventoPago`), no de lo que pida el cliente:
 
-        - `aprobado` / `rechazado` (requiere super_admin) → correo + **push al miembro**.
+        - `aprobado` / `rechazado` (requiere super_admin) → **push al miembro**.
           El motivo de rechazo se lee de `payments.payment_note`.
         - pago `pendiente` de un **miembro dueño** → **push a todos los super_admin**
           (`reportado`).
@@ -739,7 +742,7 @@ paths:
 
         El monto se calcula como suma de `payment_detail.payment_amount`
         (fix ROADMAP#5: antes consultaba `payments.payment_amount`, inexistente → 404
-        y los correos nunca se enviaban). El push es fail-open: si está apagado o
+        y las notificaciones nunca se enviaban). El push es fail-open: si está apagado o
         falla, no cambia la respuesta. Límite: 60 cada 5 min por usuario.
       security:
         - sesion: []

@@ -503,17 +503,20 @@ o `dispositivo.ts` (cliente); nunca al revés (`service.ts` importa `web-push`, 
 - El cliente solo manda `{ pagoId }` (los 4 call sites: pagos aprobar/rechazar, reportar-pago,
   mis-pagos). La ruta **deriva el evento** con `derivarEventoPago(status, callerRole, esDueno)`
   (`lib/features/pagos/domain/notify`, puro + testeado) — nunca confía en un `action` del cliente:
-  - **aprobado/rechazado** (solo super_admin) → correo + **push al miembro**. Motivo de rechazo
-    = `payments.payment_note` (lo escribe `rechazarPago`). Si falla el correo, el push ya se
-    envió y la ruta responde 500 (comportamiento histórico del correo).
+  - **aprobado/rechazado** (solo super_admin) → **push al miembro**. Motivo de rechazo
+    = `payments.payment_note` (lo escribe `rechazarPago`).
   - **pendiente + miembro dueño** → **push a todos los super_admin** (`reportado`) — incluye
     solicitudes de suspensión (mis-pagos) y pagos de mensualidad/inscripción auto-reportados.
   - **pendiente + super_admin de un tercero** → **push al miembro** (`registrado`); si es para
     él mismo → `evento: null` (sin notificar).
   - Límite 60/5 min por usuario (`applyRateLimit`, fail-open).
+- **Solo web push, sin correo**: decisión de producto — los eventos de pago (pendiente /
+  aprobado / rechazado) notifican únicamente por push; el cron de morosos/recordatorio sí
+  conserva sus correos. `sendPaymentApprovedEmail`/`sendPaymentRejectedEmail` quedaron sin
+  call sites.
 - **Fix ROADMAP#5**: el monto es `SUM(payment_detail.payment_amount)`; antes se leía
-  `payments.payment_amount` (inexistente) y la ruta respondía siempre 404 → los correos de
-  aprobado/rechazado **nunca** se habían enviado.
+  `payments.payment_amount` (inexistente) y la ruta respondía siempre 404 → las notificaciones
+  de aprobado/rechazado **nunca** se habían enviado.
 - `crearPagoSuspendido` ahora devuelve el **id del pago** (`""` si falló) — antes devolvía la
   cantidad de meses; mis-pagos usa ese id para disparar notify.
 - `messages.eventosPago` + helper `mensaje(template, vars)` (placeholders `{nombre}`, `{monto}`…)

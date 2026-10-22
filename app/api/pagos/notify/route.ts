@@ -1,7 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { createClient as createAuthClient } from "@/lib/supabase/server";
-import { sendPaymentApprovedEmail, sendPaymentRejectedEmail } from "@/lib/services/email/email.service";
 import { messages, mensaje } from "@/lib/messages";
 import { applyRateLimit } from "@/lib/middleware/rate-limit";
 import { derivarEventoPago } from "@/lib/features/pagos/domain/notify";
@@ -12,13 +11,15 @@ import { formatCurrency } from "@/lib/utils";
  * Notifica un cambio o alta de pago. El evento se DERIVA del estado real en BD
  * y del rol del llamador (`derivarEventoPago`), no de lo que pida el cliente:
  *
- * - aprobado/rechazado → correo + push al MIEMBRO (requiere super_admin)
+ * - aprobado/rechazado → **push al MIEMBRO** (requiere super_admin; sin correo)
  * - pendiente + miembro dueño → push a los ADMINS ("reportado")
  * - pendiente + super_admin de un tercero → push al MIEMBRO ("registrado")
  *
- * El push es fail-open (nunca lanza, nunca decide el resultado); el correo de
- * aprobado/rechazado conserva su comportamiento histórico (error → 500).
- * El monto sale de `payment_detail` (fix ROADMAP#5: `payments.payment_amount` no existe).
+ * Los eventos de pago notifican **solo por web push** (decisión de producto:
+ * los correos de pago quedaron fuera; el cron de morosos/recordatorio sí
+ * conserva sus correos). El push es fail-open (nunca lanza, nunca decide el
+ * resultado). El monto sale de `payment_detail` (fix ROADMAP#5:
+ * `payments.payment_amount` no existe).
  */
 export async function POST(request: Request) {
   try {
@@ -57,7 +58,7 @@ export async function POST(request: Request) {
 
     const { data: pago, error: pagoError } = await serviceSupabase
       .from("payments")
-      .select("user_id, status, payment_method, payment_note")
+      .select("user_id, status, payment_note")
       .eq("id", pagoId)
       .single();
 
@@ -82,12 +83,9 @@ export async function POST(request: Request) {
 
     const { data: detalles } = await serviceSupabase
       .from("payment_detail")
-      .select("payment_type, payment_amount, month_number, year_number")
+      .select("payment_amount")
       .eq("payment_id", pagoId);
     const monto = (detalles ?? []).reduce((suma, d) => suma + (d.payment_amount || 0), 0);
-    const meses = (detalles ?? [])
-      .filter((d) => d.payment_type === "mensualidad" && d.month_number && d.year_number)
-      .map((d) => ({ month_number: d.month_number!, year_number: d.year_number! }));
 
     const { data: memberProfile, error: profileError } = await serviceSupabase
       .from("profiles")
@@ -108,43 +106,6 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: messages.eventosPago.miembroNoEncontrado }, { status: 404 });
       }
 
-      const { data: gymConfig } = await serviceSupabase
-        .from("gym_config")
-        .select("gym_name, logo_url")
-        .limit(1)
-        .single();
-      const gymName = gymConfig?.gym_name || messages.eventosPago.gymNameDefault;
-      const metodoPago = pago.payment_method || messages.eventosPago.metodoNoEspecificado;
-
-      let errorEmail: unknown = null;
-      try {
-        if (evento === "aprobado") {
-          await sendPaymentApprovedEmail(
-            memberProfile.email,
-            nombreMiembro,
-            gymName,
-            monto,
-            meses,
-            metodoPago,
-            gymConfig?.logo_url || null
-          );
-        } else {
-          const motivo = pago.payment_note || messages.eventosPago.sinMotivo;
-          await sendPaymentRejectedEmail(
-            memberProfile.email,
-            nombreMiembro,
-            gymName,
-            monto,
-            meses,
-            metodoPago,
-            motivo,
-            gymConfig?.logo_url || null
-          );
-        }
-      } catch (err) {
-        errorEmail = err;
-      }
-
       const payload =
         evento === "aprobado"
           ? {
@@ -162,7 +123,6 @@ export async function POST(request: Request) {
             };
       await enviarPushAUsuarios(serviceSupabase, [pago.user_id], payload);
 
-      if (errorEmail) throw errorEmail;
       return NextResponse.json({ success: true, evento });
     }
 

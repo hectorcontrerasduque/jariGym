@@ -7,6 +7,9 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    // sw.js y manifest.webmanifest deben servirse SIEMPRE (también sin sesión):
+    // el middleware los redirigía a /login y rompía el registro del Service
+    // Worker y la instalación PWA — sin ellos no hay push en el navegador.
+    "/((?!_next/static|_next/image|favicon.ico|sw\\.js$|manifest\\.webmanifest$|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };

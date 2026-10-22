@@ -3,7 +3,7 @@
  * Puro (sin I/O): el servidor decide la notificación por el ESTADO REAL en BD
  * y el rol del llamador — nunca por lo que el cliente afirme en el body.
  *
- * - `aprobado` / `rechazado` (solo super_admin): notifica al MIEMBRO (correo + push).
+ * - `aprobado` / `rechazado` (solo super_admin): notifica al MIEMBRO (solo push, sin correo).
  * - `reportado` (miembro dueño, pago pendiente): notifica a los ADMINS (push).
  * - `registrado` (super_admin, pago pendiente de un tercero): notifica al MIEMBRO (push).
  * - `sin_evento`: acción válida que no notifica a nadie (ej. admin crea un pago

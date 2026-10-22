@@ -3,11 +3,11 @@ import { derivarEventoPago } from "@/lib/features/pagos/domain/notify";
 import { mensaje, messages } from "@/lib/messages";
 
 describe("derivarEventoPago", () => {
-  it("aprobado + super_admin → aprobado (correo + push al miembro)", () => {
+  it("aprobado + super_admin → aprobado (push al miembro)", () => {
     expect(derivarEventoPago({ status: "aprobado", callerRole: "super_admin", esDueno: false })).toBe("aprobado");
   });
 
-  it("rechazado + super_admin → rechazado (correo + push al miembro)", () => {
+  it("rechazado + super_admin → rechazado (push al miembro)", () => {
     expect(derivarEventoPago({ status: "rechazado", callerRole: "super_admin", esDueno: false })).toBe("rechazado");
   });
 

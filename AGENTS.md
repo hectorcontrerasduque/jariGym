@@ -495,7 +495,9 @@ o `dispositivo.ts` (cliente); nunca al revés (`service.ts` importa `web-push`, 
     correo; al guardarlo dispara `config:updated` para refrescar el sidebar).
   - `BotonSuscripcion` en el sidebar **para admin y miembro** (fila desktop / icono en la barra
     superior móvil), visible solo si `push_enabled`; estados: activo / activar / bloqueado
-    (permiso denegado). Los miembros lo necesitan porque los eventos de pago son solo push.
+    (permiso denegado → **clickeable**, muestra toast con pasos para desbloquear en Chrome, y
+    refresca al volver de los ajustes del navegador vía `visibilitychange`). Los miembros lo
+    necesitan porque los eventos de pago son solo push.
   - `AutoSuscripcionMiembro` montado en `app/dashboard/layout.tsx`: miembros hacen **1 intento
     por dispositivo**; `push_auto_intentado` (localStorage) se marca **solo si el resultado es
     terminal** (`debeMarcarIntento`: suscrito o permiso bloqueado). Si el socio cierra el aviso

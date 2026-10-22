@@ -490,6 +490,8 @@ export const messages = {
     activo: "Notificaciones activas",
     desactivar: "Desactivar en este dispositivo",
     bloqueado: "Notificaciones bloqueadas en el navegador",
+    bloqueadoAyuda:
+      "Permiso bloqueado para este sitio. Actívalo en Chrome: ⋮ → Configuración → Configuración del sitio → Notificaciones → permitir este sitio; vuelve a la app y toca la campana otra vez.",
     sinSoporte: "Este navegador no soporta notificaciones push",
     suscrito: "Notificaciones activadas en este dispositivo",
     desuscrito: "Notificaciones desactivadas en este dispositivo",

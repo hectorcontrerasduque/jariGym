@@ -38,7 +38,15 @@ export function BotonSuscripcion({ variant = "fila" }: { variant?: "fila" | "ico
     void calcularEstado().then(setEstado);
     // la auto-suscripción (AutoSuscripcionMiembro) avisa al terminar
     window.addEventListener("push:estado", refrescar);
-    return () => window.removeEventListener("push:estado", refrescar);
+    // al volver de los ajustes de Chrome (permiso cambiado) refresca el estado
+    const onVisibilidad = () => {
+      if (!document.hidden) refrescar();
+    };
+    document.addEventListener("visibilitychange", onVisibilidad);
+    return () => {
+      window.removeEventListener("push:estado", refrescar);
+      document.removeEventListener("visibilitychange", onVisibilidad);
+    };
   }, [refrescar]);
 
   const handleClick = async () => {
@@ -81,13 +89,14 @@ export function BotonSuscripcion({ variant = "fila" }: { variant?: "fila" | "ico
   if (variant === "icono") {
     if (estado === "bloqueado") {
       return (
-        <span
+        <button
+          onClick={() => showToast(messages.push.bloqueadoAyuda, "warning")}
           title={messages.push.bloqueado}
           aria-label={messages.push.bloqueado}
-          className="p-2 text-gym-muted/60"
+          className="p-2 text-gym-muted/60 hover:text-gym-warning transition-colors"
         >
           <BellOff className="w-4 h-4" />
-        </span>
+        </button>
       );
     }
     return (
@@ -108,10 +117,14 @@ export function BotonSuscripcion({ variant = "fila" }: { variant?: "fila" | "ico
 
   if (estado === "bloqueado") {
     return (
-      <div className="flex items-center gap-2 px-3 py-2 text-xs text-gym-muted/80">
+      <button
+        onClick={() => showToast(messages.push.bloqueadoAyuda, "warning")}
+        title={messages.push.bloqueado}
+        className="flex items-center gap-2 w-full px-3 py-2 rounded-xl text-xs text-gym-muted/80 hover:text-gym-warning transition-colors text-left"
+      >
         <BellOff className="w-4 h-4 shrink-0" />
         {messages.push.bloqueado}
-      </div>
+      </button>
     );
   }
 

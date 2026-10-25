@@ -81,6 +81,27 @@ export function debeMarcarIntento(
 }
 
 /**
+ * Re-sincroniza la suscripción LOCAL con el servidor (POST upsert, idempotente).
+ * Garantiza que, si la campana muestra "activo", exista fila en
+ * `push_subscriptions` para el usuario de la SESIÓN ACTUAL: el permiso y la
+ * suscripción local son por origen (compartidos entre cuentas en un mismo
+ * navegador), mientras que la fila en BD es por usuario — sin este paso la
+ * campana puede decir "activas" y el servidor no tener adónde enviar.
+ * Devuelve el status HTTP o null si no hay suscripción/soporte.
+ */
+export async function sincronizarSuscripcion(): Promise<number | null> {
+  if (!pushSoportado()) return null;
+  try {
+    const reg = await registrarServiceWorker();
+    const sub = await reg?.pushManager.getSubscription();
+    if (!sub) return null;
+    return await sincronizar("POST", aSuscripcion(sub));
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Pide permiso, suscribe el navegador y registra la suscripción en el servidor.
  * Si el servidor la rechaza (409/4xx), se da de baja localmente para no dejar
  * una suscripción huérfana.

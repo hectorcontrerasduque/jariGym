@@ -8,6 +8,7 @@ import {
   estadoPermiso,
   estaSuscrito,
   pushSoportado,
+  sincronizarSuscripcion,
 } from "@/lib/features/push/dispositivo";
 import { showToast } from "@/components/ui/toast";
 import { messages } from "@/lib/messages";
@@ -33,6 +34,24 @@ export function BotonSuscripcion({ variant = "fila" }: { variant?: "fila" | "ico
   const refrescar = useCallback(() => {
     void calcularEstado().then(setEstado);
   }, []);
+
+  // Estado "activo" LOCAL ⇒ asegura la fila del usuario de la sesión actual
+  // en el servidor (permiso/suscripción son por origen, la fila es por usuario).
+  useEffect(() => {
+    if (estado !== "activo") return;
+    let cancelado = false;
+    void sincronizarSuscripcion().then((status) => {
+      if (cancelado || status === null) return;
+      if (status >= 200 && status < 300) return;
+      showToast(
+        status === 409 ? messages.push.deshabilitado : messages.push.errorGuardar,
+        "warning"
+      );
+    });
+    return () => {
+      cancelado = true;
+    };
+  }, [estado]);
 
   useEffect(() => {
     void calcularEstado().then(setEstado);

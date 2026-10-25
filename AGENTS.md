@@ -496,7 +496,12 @@ o `dispositivo.ts` (cliente); nunca al revés (`service.ts` importa `web-push`, 
   - `BotonSuscripcion` en el sidebar **para admin y miembro** (fila desktop / icono en la barra
     superior móvil), visible solo si `push_enabled`; estados: activo / activar / bloqueado
     (permiso denegado → **clickeable**, muestra toast con pasos para desbloquear en Chrome, y
-    refresca al volver de los ajustes del navegador vía `visibilitychange`). Los miembros lo
+    refresca al volver de los ajustes del navegador vía `visibilitychange`). **Cuando el estado
+    local es "activo" re-sincroniza la suscripción con el servidor** (`sincronizarSuscripcion`,
+    POST upsert): el permiso/suscripción local son **por origen** (compartidos entre cuentas del
+    mismo navegador) pero la fila es **por usuario** — sin este paso la campana decía "activas"
+    y `push_subscriptions` no tenía fila del usuario de la sesión actual (push "enviado" a 0
+    destinos). Si el POST falla → toast warning (409 → `deshabilitado`). Los miembros lo
     necesitan porque los eventos de pago son solo push.
   - `AutoSuscripcionMiembro` montado en `app/dashboard/layout.tsx`: miembros hacen **1 intento
     por dispositivo**; `push_auto_intentado` (localStorage) se marca **solo si el resultado es

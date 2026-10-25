@@ -37,6 +37,14 @@ cp .env.example .env.local
 | `GMAIL_USER` | Gmail para enviar emails | `tucorreo@gmail.com` |
 | `GMAIL_APP_PASSWORD` | App Password de Gmail (16 chars) | `abcd efgh ijkl mnop` |
 | `CRON_SECRET` | Secret for cron job auth (generate once) | random hex string |
+| `CRON_ENABLED` | `"true"` solo en producción; bloquea el cron en dev | `true` |
+| `NEXT_PUBLIC_WEB_PUSH_PUBLIC_KEY` | Clave pública VAPID de Web Push (`npx web-push generate-vapid-keys`) | `BI8JSVP4...` |
+| `WEB_PUSH_PRIVATE_KEY` | Clave privada VAPID (solo server; tipo Secret en Vercel) | `w4Rwu825...` |
+
+> Sin las claves VAPID el resto de la app funciona igual: el canal de push se omite
+> silenciosamente (`omitido: "sin_configurar"`). Para activarlo: genera las claves,
+> ponlas en `.env.local` / Vercel, aplica la migración `058_push_subscriptions.sql`
+> en el SQL Editor y enciende **Push al Celular** en Notificaciones.
 
 ### 3. Gmail App Password
 
@@ -58,7 +66,9 @@ En Supabase Dashboard → SQL Editor, ejecuta las migraciones en orden:
 
 ### 5. Variables en Vercel
 
-En Vercel Dashboard → Settings → Environment Variables, agrega las 8 variables de la tabla del paso 2 (`NEXT_PUBLIC_*`, `SUPABASE_SERVICE_ROLE_KEY`, `GMAIL_*`, `CRON_SECRET`).
+En Vercel Dashboard → Settings → Environment Variables, agrega las variables de la tabla del paso 2
+(`NEXT_PUBLIC_*`, `SUPABASE_SERVICE_ROLE_KEY`, `GMAIL_*`) y las del cron (`CRON_SECRET`, `CRON_ENABLED=true`)
+— estas últimas solo en el entorno **Production** del proyecto de producción; ver detalle en el paso 8.
 
 `.env.local` no se sube al repo, así que el build de Vercel no tiene credenciales de Supabase ni de SMTP sin ellas.
 
@@ -86,41 +96,75 @@ npm run dev
 
 ### 8. Cron de Notificaciones (Vercel Cron)
 
-Las notificaciones automáticas se disparan de dos formas:
-1. **Vercel Cron**: `vercel.json` invoca `GET /api/notificaciones` diariamente a las 04:00 UTC (medianoche VET)
-2. **Login de admin**: al hacer login, el sidebar dispara en background una verificación
+Las notificaciones automáticas se envían solo por **Vercel Cron**: `vercel.json` invoca
+`GET /api/notificaciones` diariamente a las 04:00 UTC (medianoche VET). No se necesita ningún servicio
+externo. El único disparo manual es desde **Configuración → Notificaciones** del dashboard
+("Ejecutar Todo" / "Ejecutar Ahora"), que ignora el gate de entorno.
 
-No se necesita ningún servicio externo. Solo asegúrate de que exista la env var `CRON_SECRET` en Vercel
-Dashboard → Settings → Environment Variables (entorno **Production**, tipo **Secret** — nunca Config: el tipo
-Config muestra el valor en el dashboard y Vercel avisa "Needs Attention"). Vercel la envía automáticamente como
-`Authorization: Bearer <CRON_SECRET>` al invocar el cron. Si no está definida, el endpoint responde 401.
+#### Variables obligatorias (Vercel → Settings → Environment Variables, entorno **Production**)
 
-Además, la vía del cron solo se ejecuta donde `CRON_ENABLED=true` (por defecto está **bloqueada**: el endpoint
-responde 200 con `ejecutadas: 0` y no envía correos). Define `CRON_ENABLED=true` **solo en el proyecto de
-producción (jargym)**; en dev déjala sin definir.
+| Variable | Valor | Si falta |
+|----------|-------|----------|
+| `CRON_SECRET` | hex aleatorio (ver abajo), tipo **Secret** — nunca Config: el tipo Config muestra el valor en el dashboard y Vercel avisa "Needs Attention" | cron responde **401**, no corre nada (fail-closed) |
+| `CRON_ENABLED` | `true` (exactamente; cualquier otro valor la bloquea) | responde 200 con `ejecutadas: 0`, no envía nada |
+| `GMAIL_USER` / `GMAIL_APP_PASSWORD` | credenciales SMTP de Gmail | la corrida corre pero **0 envíos** con errores |
+| `NEXT_PUBLIC_ADMIN_EMAIL` | email del dueño | no llega el correo de reporte de corrida |
+
+Vercel envía `CRON_SECRET` automáticamente como `Authorization: Bearer <CRON_SECRET>` al invocar el cron.
+
+```bash
+# Generar CRON_SECRET aleatorio (ejecutar una vez)
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+#### Checklist de configuración (producción, jargym)
+
+1. Genera el `CRON_SECRET` con el comando de arriba.
+2. En Vercel (proyecto **jargym**) → Settings → Environment Variables, crea `CRON_SECRET` (entorno
+   **Production**, tipo **Secret**) y `CRON_ENABLED=true` (entorno **Production**).
+3. **Redeploya la producción** — Vercel solo aplica cambios de env vars en el siguiente deploy; sin
+   redeploy el cron sigue fallando aunque las variables estén bien.
+4. Verifica en **Cron Jobs** que el job `GET /api/notificaciones` aparezca listado tras el deploy.
+
+#### Probar sin esperar al schedule
+
+```bash
+curl -H "Authorization: Bearer <CRON_SECRET>" https://jarigym.vercel.app/api/notificaciones
+```
+
+| Respuesta | Significado |
+|-----------|-------------|
+| `401` | `CRON_SECRET` no coincide (o no existe en el entorno) |
+| `200` + mensaje "Cron no ejecutado: deshabilitado en este entorno" | falta `CRON_ENABLED=true` |
+| `200` + `ejecutadas: 0` + "deshabilitadas/sin configuraciones" | `notifications_enabled` en Config está en off, o no hay tipos activos |
+| `200` + `reporte_omitido: "sin_informacion"` | **Éxito**: corrió, pero todo se saltó por frecuencia (no es día objetivo) |
+| `200` + `enviados > 0` | **Éxito**: envió correos |
+
+Alternativa con Vercel CLI: `npx vercel crons run /api/notificaciones` (desde la raíz del repo, con la
+CLI autenticada y apuntando al proyecto de producción).
+
+#### Diagnosticar si "no dispara"
+
+- **Vercel → Cron Jobs**: historial de invocaciones con status y duración por corrida — es la fuente más
+  directa (un `401` allí = secret faltante/mal copiado; un `200` con `ejecutadas: 0` = gate o config).
+- **Observability → Logs**: filtra por request path `/api/notificaciones`. No confundas con tráfico de
+  páginas: un `GET /dashboard/...` con status `304` es una visita normal de navegador (cache revalidado),
+  no el cron.
+- El cron solo corre en deployments de **Production** (no en previews).
 
 > **Desarrollo vs producción**: `vercel.json` es el mismo en ambas ramas, así que el cron se registra en los dos
-> proyectos Vercel (jargym-dev y jargym). El gate `CRON_ENABLED` evita que jargym-dev ejecute nada aunque el
-> job se dispare a las 04:00 UTC. Como capa extra puedes desactivarlo en jargym-dev: Cron Jobs → toggle
-> del job `GET /api/notificaciones` → Disabled, o borrar `CRON_SECRET` de jargym-dev (recibiría 401).
+> proyectos Vercel (jargym-dev y jargym; el dominio de prod es jarigym.vercel.app). El gate `CRON_ENABLED` evita que jargym-dev ejecute nada aunque el
+> job se dispare a las 04:00 UTC (la ruta responde 200 con `ejecutadas: 0`). Define `CRON_ENABLED=true` **solo
+> en jargym**; en jargym-dev déjala sin definir. Como capa extra puedes desactivarlo en jargym-dev: Cron Jobs →
+> toggle del job `GET /api/notificaciones` → Disabled, o borrar `CRON_SECRET` de jargym-dev (recibiría 401).
 > Las ejecuciones manuales con JWT de super_admin y `/api/notificaciones/procesar` ignoran el gate.
 
 El reporte de corrida que llega a `NEXT_PUBLIC_ADMIN_EMAIL` **solo se envía cuando hay información**
 (envíos, errores, advertencias o fallo fatal); una corrida donde todos los tipos se saltan por frecuencia
 no genera correo (el texto queda en la respuesta JSON con `reporte_omitido: "sin_informacion"`).
 
-Verificaciones:
-
-- Vercel Dashboard → tu proyecto → **Cron Jobs**: el job `GET /api/notificaciones` debe aparecer tras el deploy
-- Puedes dispararlo manualmente desde esa misma vista para probarlo
-- En plan Hobby el mínimo es 1 ejecución/día (este cron es diario) y Vercel puede ejecutarlo en cualquier
-  punto dentro de la hora programada; la lógica de frecuencia del endpoint solo compara fechas, así que no afecta
-- **Nota**: el cron solo corre en deployments de Production (no en previews)
-
-```bash
-# Generar CRON_SECRET aleatorio (ejecutar una vez)
-node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-```
+En plan Hobby el mínimo es 1 ejecución/día (este cron es diario) y Vercel puede ejecutarlo en cualquier
+punto dentro de la hora programada; la lógica de frecuencia del endpoint solo compara fechas, así que no afecta.
 
 Activa las notificaciones en **Configuración → Notificaciones** del dashboard y selecciona la frecuencia
 deseada por tipo:

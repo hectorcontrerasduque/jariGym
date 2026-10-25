@@ -524,13 +524,17 @@ o `dispositivo.ts` (cliente); nunca al revés (`service.ts` importa `web-push`, 
     tras cualquier elección dispara `push:estado` para refrescar la campana.
 
 ### Eventos de pago (`POST /api/pagos/notify`)
-- El cliente solo manda `{ pagoId }` (los 4 call sites: pagos aprobar/rechazar, reportar-pago,
-  mis-pagos). La ruta **deriva el evento** con `derivarEventoPago(status, callerRole, esDueno)`
+- El cliente solo manda `{ pagoId }` (los 5 call sites: pagos aprobar/rechazar, reportar-pago,
+  mis-pagos, botón "Notificar al administrador" de mis-pagos). La ruta **deriva el evento** con
+  `derivarEventoPago(status, callerRole, esDueno)`
   (`lib/features/pagos/domain/notify`, puro + testeado) — nunca confía en un `action` del cliente:
   - **aprobado/rechazado** (solo super_admin) → **push al miembro**. Motivo de rechazo
     = `payments.payment_note` (lo escribe `rechazarPago`).
   - **pendiente + miembro dueño** → **push a todos los super_admin** (`reportado`) — incluye
-    solicitudes de suspensión (mis-pagos) y pagos de mensualidad/inscripción auto-reportados.
+    solicitudes de suspensión (mis-pagos), pagos de mensualidad/inscripción auto-reportados y
+    el **recordatorio manual** del miembro (grid "Pagos realizados" + modal de detalle: botón
+    `BellRing` visible solo con `status === "pendiente"` y rol miembro; al enviar se marca
+    `notificados` en sesión → check verde "Notificación enviada", sin spam).
   - **pendiente + super_admin de un tercero** → **push al miembro** (`registrado`); si es para
     él mismo → `evento: null` (sin notificar).
   - Límite 60/5 min por usuario (`applyRateLimit`, fail-open).

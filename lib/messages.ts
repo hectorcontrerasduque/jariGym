@@ -531,6 +531,10 @@ export const messages = {
     pagoNoEncontrado: "Pago no encontrado",
     miembroNoEncontrado: "Miembro no encontrado",
     estadoInvalido: "Estado de pago inválido",
+    notificarAdmin: "Notificar al administrador",
+    notificado: "Notificación enviada",
+    notificarEnviado: "Se avisó al administrador para que revise tu pago",
+    notificarError: "No se pudo enviar la notificación",
   },
 } as const;
 

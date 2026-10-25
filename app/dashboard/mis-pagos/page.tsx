@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { pagosService } from "@/lib/features/pagos/service";
 import { createClient } from "@/lib/supabase/client";
 import { formatCurrency, formatDate, getMonthName, getDiaCobro } from "@/lib/utils";
-import { CreditCard, CheckCircle, Clock, Calendar, Eye, Trash2, FileText, Plus, Search, Upload, Gift, AlertTriangle, ChevronDown, ChevronRight, X, Save, Phone, Mail, MapPin, XCircle } from "lucide-react";
+import { CreditCard, CheckCircle, Clock, Calendar, Eye, Trash2, FileText, Plus, Search, Upload, Gift, AlertTriangle, ChevronDown, ChevronRight, X, Save, Phone, Mail, MapPin, XCircle, BellRing } from "lucide-react";
 import { showToast } from "@/components/ui/toast";
 import { Modal } from "@/components/ui/modal";
 import { messages } from "@/lib/messages";
@@ -71,6 +71,8 @@ function MisPagosContent() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [notificando, setNotificando] = useState<string | null>(null);
+  const [notificados, setNotificados] = useState<Set<string>>(new Set());
   const [anios, setAnios] = useState<number[]>([]);
   const [anioSeleccionado, setAnioSeleccionado] = useState(new Date().getFullYear());
   const [gymConfig, setGymConfig] = useState<GymConfig | null>(null);
@@ -527,6 +529,30 @@ function MisPagosContent() {
       showToast(msg, "error");
     } finally {
       setDeleting(null);
+    }
+  };
+
+  // Avisa a los super_admins de un pago pendiente (evento "reportado" → push).
+  const notificarAdmin = async (pagoId: string) => {
+    if (notificando) return;
+    setNotificando(pagoId);
+    try {
+      const res = await fetch("/api/pagos/notify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pagoId }),
+      });
+      if (!res.ok) {
+        const data = (await res.json().catch(() => null)) as { error?: string } | null;
+        showToast(data?.error || messages.eventosPago.notificarError, "error");
+        return;
+      }
+      setNotificados(prev => new Set(prev).add(pagoId));
+      showToast(messages.eventosPago.notificarEnviado, "success");
+    } catch {
+      showToast(messages.eventosPago.notificarError, "error");
+    } finally {
+      setNotificando(null);
     }
   };
 
@@ -1580,6 +1606,26 @@ function MisPagosContent() {
                     >
                       <Eye className="w-4 h-4" />
                     </button>
+                    {pago.status === "pendiente" && !isSuperAdmin && (
+                      <button
+                        onClick={() => void notificarAdmin(pago.id)}
+                        disabled={notificando === pago.id || notificados.has(pago.id)}
+                        title={notificados.has(pago.id) ? messages.eventosPago.notificado : messages.eventosPago.notificarAdmin}
+                        className={
+                          notificados.has(pago.id)
+                            ? "p-2 text-gym-success rounded-lg transition-colors disabled:opacity-60 flex-shrink-0"
+                            : "p-2 text-gym-primary hover:bg-gym-primary/10 rounded-lg transition-colors disabled:opacity-60 flex-shrink-0"
+                        }
+                      >
+                        {notificando === pago.id ? (
+                          <div className="w-4 h-4 border-2 border-gym-primary border-t-transparent rounded-full animate-spin" />
+                        ) : notificados.has(pago.id) ? (
+                          <CheckCircle className="w-4 h-4" />
+                        ) : (
+                          <BellRing className="w-4 h-4" />
+                        )}
+                      </button>
+                    )}
                     {(pago.status === "pendiente" ||
                       (isSuperAdmin && pago.status === "aprobado" && isLastApproved(pago))) && (
                       <button
@@ -1703,6 +1749,18 @@ function MisPagosContent() {
               <p className="text-sm text-gym-muted">Notas</p>
               <p className="text-gym-text">{selectedPago.payment_note || "—"}</p>
             </div>
+            {selectedPago.status === "pendiente" && !isSuperAdmin && (
+              <Button
+                onClick={() => void notificarAdmin(selectedPago.id)}
+                loading={notificando === selectedPago.id}
+                disabled={notificados.has(selectedPago.id)}
+                variant={notificados.has(selectedPago.id) ? "secondary" : "primary"}
+                className="w-full"
+              >
+                {!notificando && <BellRing className="w-4 h-4 mr-2" />}
+                {notificados.has(selectedPago.id) ? messages.eventosPago.notificado : messages.eventosPago.notificarAdmin}
+              </Button>
+            )}
             {selectedPago.status === "aprobado" && selectedPago.approved_by_profile && (
               <div>
                 <p className="text-sm text-gym-muted">Aprobado por</p>

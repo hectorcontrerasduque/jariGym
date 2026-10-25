@@ -80,6 +80,27 @@ export function debeMarcarIntento(
   return resultado === "activado" || resultado === "ya-activo";
 }
 
+/** Estados posibles del push en este dispositivo (compartidos: campana + modal). */
+export type EstadoPush = "cargando" | "activo" | "inactivo" | "bloqueado" | "sin-soporte";
+
+/** Calcula el estado actual: soporte → permiso del navegador → suscripción local. */
+export async function calcularEstadoPush(): Promise<EstadoPush> {
+  if (!pushSoportado()) return "sin-soporte";
+  const permiso = estadoPermiso();
+  if (permiso === "denied") return "bloqueado";
+  if (permiso === "granted" && (await estaSuscrito())) return "activo";
+  return "inactivo";
+}
+
+/**
+ * ¿Debe mostrarse el modal de activación de push al enviar un pago?
+ * Solo si el permiso sigue SIN DECIDIR (default). Bloqueado o sin soporte
+ * pasan directo: el pago nunca depende de las notificaciones (fail-open).
+ */
+export function debePedirActivacion(estado: EstadoPush): boolean {
+  return estado === "inactivo";
+}
+
 /**
  * Re-sincroniza la suscripción LOCAL con el servidor (POST upsert, idempotente).
  * Garantiza que, si la campana muestra "activo", exista fila en

@@ -502,6 +502,11 @@ export const messages = {
     errorServidor: "Error en el servidor de notificaciones push",
     badRequest: "Suscripción push inválida",
     errorGuardar: "Error al registrar este dispositivo",
+    modalTitulo: "Activa las notificaciones",
+    modalCuerpo:
+      "Entérate al instante cuando aprueben, rechacen o reporten tus pagos. El navegador solo pedirá permiso una vez.",
+    modalActivar: "Activar ahora",
+    modalContinuar: "Continuar sin notificaciones",
     cronDeudoresTitulo: "Pago pendiente",
     cronDeudoresCuerpo: "Tienes un pago pendiente en {gym}.",
     cronRecordatorioTitulo: "Próximo cobro",

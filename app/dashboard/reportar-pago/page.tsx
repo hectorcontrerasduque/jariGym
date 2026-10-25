@@ -13,6 +13,8 @@ import { getMonthName, formatCurrency } from "@/lib/utils";
 import { Loader } from "@/components/ui/loader";
 import { showToast } from "@/components/ui/toast";
 import { messages } from "@/lib/messages";
+import { calcularEstadoPush, debePedirActivacion } from "@/lib/features/push/dispositivo";
+import { ModalActivarPush } from "@/components/push/modal-activar-push";
 import type { MetodoPago, GymConfig, PaymentMethod, Profile } from "@/lib/types";
 import Link from "next/link";
 
@@ -61,6 +63,7 @@ function ReportarPagoForm() {
     fecha_pago: new Date().toISOString().split("T")[0],
   });
   const [comprobante, setComprobante] = useState<File | null>(null);
+  const [modalPushAbierto, setModalPushAbierto] = useState(false);
 
   const isAdmin = userRole === "super_admin";
 
@@ -219,6 +222,15 @@ function ReportarPagoForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    // Push sin decidir ⇒ ofrece activarlo antes de enviar; el pago nunca se bloquea
+    if (debePedirActivacion(await calcularEstadoPush())) {
+      setModalPushAbierto(true);
+      return;
+    }
+    await procesarPago();
+  };
+
+  const procesarPago = async () => {
     setLoading(true);
     setError("");
 
@@ -718,6 +730,15 @@ function ReportarPagoForm() {
           <Send className="w-6 h-6" />
         )}
       </button>
+
+      <ModalActivarPush
+        isOpen={modalPushAbierto}
+        onCerrar={() => setModalPushAbierto(false)}
+        onContinuar={() => {
+          setModalPushAbierto(false);
+          void procesarPago();
+        }}
+      />
     </>
   );
 }

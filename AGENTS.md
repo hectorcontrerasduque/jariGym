@@ -121,8 +121,10 @@ components/
   ui/password-input.tsx   # PasswordInput with eye toggle
   sidebar.tsx       # Desktop sidebar + mobile bottom nav (gold effects for super_admin)
   push/
-    boton-suscripcion.tsx  # Botón estado push (solo sidebar de admin, variantes fila/icono)
-    auto-suscripcion.tsx   # Auto-suscripción de miembros: 1 intento por dispositivo (localStorage)
+    boton-suscripcion.tsx  # Botón estado push (sidebar admin y miembro, variantes fila/icono)
+    auto-suscripcion.tsx   # Auto-suscripción de miembros (1 intento por dispositivo, localStorage)
+    modal-activar-push.tsx # Interstitial al reportar pago con push sin decidir (nunca bloquea el pago)
+    use-estado-push.ts     # Hook compartido de estado push (campana + modal)
   auth-footer.tsx   # Fixed footer for auth pages
   scroll-to-top.tsx # Scroll to top on route change
   providers.tsx     # Client wrapper with ToastContainer
@@ -502,13 +504,24 @@ o `dispositivo.ts` (cliente); nunca al revés (`service.ts` importa `web-push`, 
     mismo navegador) pero la fila es **por usuario** — sin este paso la campana decía "activas"
     y `push_subscriptions` no tenía fila del usuario de la sesión actual (push "enviado" a 0
     destinos). Si el POST falla → toast warning (409 → `deshabilitado`). Los miembros lo
-    necesitan porque los eventos de pago son solo push.
+    necesitan porque los eventos de pago son solo push. El estado lo calcula el hook
+    **`useEstadoPush`** (compartido con el modal de pagos); en móvil el icono mide **44px**
+    (`p-3` / `w-5 h-5`, `rounded-lg`, `active:scale-95`) y mientras está `inactivo` aplica
+    `animate-pulse-glow` para invitar al toque.
   - `AutoSuscripcionMiembro` montado en `app/dashboard/layout.tsx`: miembros hacen **1 intento
     por dispositivo**; `push_auto_intentado` (localStorage) se marca **solo si el resultado es
     terminal** (`debeMarcarIntento`: suscrito o permiso bloqueado). Si el socio cierra el aviso
     (permiso `default`) o falla la sincronización → se reintenta en la próxima visita; si
     bloquea → lo activa desde la campana. Al terminar dispara el evento `push:estado` para que
     la campana refresque su estado.
+  - **`ModalActivarPush` al reportar pago** (`app/dashboard/reportar-pago`): `handleSubmit`
+    verifica `debePedirActivacion(await calcularEstadoPush())` (puro + testeado en
+    `__tests__/push.dispositivo.test.ts`) y, si el permiso sigue **sin decidir**, retiene el
+    envío y abre el interstitial: *Activar ahora* (el clic es el gesto válido →
+    `requestPermission` → subscribe + sync → envía el pago) o *Continuar sin notificaciones*
+    (envía igual, con toast del resultado). **El pago NUNCA se bloquea** — permiso bloqueado o
+    sin soporte → envío directo sin modal. Escape/X cierra sin enviar (vuelve al formulario);
+    tras cualquier elección dispara `push:estado` para refrescar la campana.
 
 ### Eventos de pago (`POST /api/pagos/notify`)
 - El cliente solo manda `{ pagoId }` (los 4 call sites: pagos aprobar/rechazar, reportar-pago,

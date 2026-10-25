@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { debeMarcarIntento } from "@/lib/features/push/dispositivo";
+import { debeMarcarIntento, debePedirActivacion } from "@/lib/features/push/dispositivo";
 
 describe("debeMarcarIntento (auto-suscripción de miembros)", () => {
   it("marca cuando quedó suscrito y sincronizado", () => {
@@ -27,5 +27,24 @@ describe("debeMarcarIntento (auto-suscripción de miembros)", () => {
 
   it("NO marca si el canal está deshabilitado en el servidor (reintenta)", () => {
     expect(debeMarcarIntento("deshabilitado", "granted")).toBe(false);
+  });
+});
+
+describe("debePedirActivacion (modal al reportar un pago)", () => {
+  it("pide el modal SOLO cuando el permiso sigue sin decidir", () => {
+    expect(debePedirActivacion("inactivo")).toBe(true);
+  });
+
+  it("no pide si las notificaciones ya están activas", () => {
+    expect(debePedirActivacion("activo")).toBe(false);
+  });
+
+  it("no pide si el permiso está bloqueado o no hay soporte (el pago nunca se bloquea)", () => {
+    expect(debePedirActivacion("bloqueado")).toBe(false);
+    expect(debePedirActivacion("sin-soporte")).toBe(false);
+  });
+
+  it("no pide mientras se calcula el estado", () => {
+    expect(debePedirActivacion("cargando")).toBe(false);
   });
 });

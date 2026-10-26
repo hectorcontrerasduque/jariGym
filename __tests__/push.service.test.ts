@@ -212,4 +212,26 @@ describe("enviarPushAAdmins", () => {
     expect(res).toEqual({ enviados: 0, fallos: 0, omitido: null });
     expect(sendMock).not.toHaveBeenCalled();
   });
+
+  it("con excluir → no envía al admin que ejecutó la acción", async () => {
+    const fake = createSupabaseFake();
+    fake.on("gym_config", "select").reply({ data: { push_enabled: true } });
+    fake.on("profiles", "select").reply({ data: [{ id: "admin-1" }, { id: "admin-2" }] });
+    fake.on("push_subscriptions", "select").reply({ data: [FILA_SUB] });
+
+    const res = await enviarPushAAdmins(fake.client, payload, { excluir: "admin-1" });
+    expect(res).toEqual({ enviados: 1, fallos: 0, omitido: null });
+    const subs = fake.callsTo("push_subscriptions", "select")[0];
+    expect(subs.filters).toContainEqual(["in", "user_id", ["admin-2"]]);
+  });
+
+  it("con excluir y sin otros admins → vacío (no resuelve suscripciones)", async () => {
+    const fake = createSupabaseFake();
+    fake.on("gym_config", "select").reply({ data: { push_enabled: true } });
+    fake.on("profiles", "select").reply({ data: [{ id: "admin-1" }] });
+    const res = await enviarPushAAdmins(fake.client, payload, { excluir: "admin-1" });
+    expect(res).toEqual({ enviados: 0, fallos: 0, omitido: null });
+    expect(fake.callsTo("push_subscriptions", "select").length).toBe(0);
+    expect(sendMock).not.toHaveBeenCalled();
+  });
 });

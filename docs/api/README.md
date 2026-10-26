@@ -42,7 +42,7 @@ También se puede abrir `openapi.yaml` en VS Code (extensión "OpenAPI (Swagger)
 | POST | `/api/notificaciones/procesar` | token super_admin | "Ejecutar ahora" |
 | POST | `/api/notificaciones/diagnostico` | token super_admin | Diagnóstico de correo |
 | DELETE | `/api/pagos?id=` | sesión (admin o dueño del pago) | Eliminar pago |
-| POST | `/api/pagos/notify` | sesión super_admin ⚠️ | Correo de pago aprobado/rechazado |
+| POST | `/api/pagos/notify` | sesión (deriva evento por rol) | Web push de eventos de pago |
 | PUT | `/api/profile` | sesión | Editar perfil |
 
 ⚠️ = hallazgo pendiente; detalle en la descripción del endpoint y en `openspec/ROADMAP.md` ("Hallazgos de la fase 8").

@@ -7,6 +7,10 @@ describe("derivarEventoPago", () => {
     expect(derivarEventoPago({ status: "aprobado", callerRole: "super_admin", esDueno: false })).toBe("aprobado");
   });
 
+  it("aprobado + super_admin dueño → propio_aprobado (push a los demás super_admin)", () => {
+    expect(derivarEventoPago({ status: "aprobado", callerRole: "super_admin", esDueno: true })).toBe("propio_aprobado");
+  });
+
   it("rechazado + super_admin → rechazado (push al miembro)", () => {
     expect(derivarEventoPago({ status: "rechazado", callerRole: "super_admin", esDueno: false })).toBe("rechazado");
   });
@@ -52,5 +56,7 @@ describe("mensaje", () => {
   it("los templates de eventos de pago son strings con placeholders", () => {
     expect(messages.eventosPago.reportadoCuerpo).toContain("{nombre}");
     expect(messages.eventosPago.rechazadoCuerpo).toContain("{motivo}");
+    expect(messages.eventosPago.propioAprobadoCuerpo).toContain("{nombre}");
+    expect(messages.eventosPago.propioAprobadoCuerpo).toContain("{monto}");
   });
 });

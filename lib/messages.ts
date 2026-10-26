@@ -523,6 +523,8 @@ export const messages = {
     aprobadoCuerpo: "Tu pago por {monto} fue aprobado.",
     rechazadoTitulo: "Pago rechazado",
     rechazadoCuerpo: "Tu pago por {monto} fue rechazado: {motivo}",
+    propioAprobadoTitulo: "Pago de administrador",
+    propioAprobadoCuerpo: "{nombre} registró un pago propio por {monto}. Revisa la lista de Pagos.",
     sinMotivo: "sin motivo especificado",
     metodoNoEspecificado: "No especificado",
     miembroAnonimo: "Un miembro",

@@ -65,10 +65,12 @@ export async function enviarPushAUsuarios(
 /**
  * Envía un push a todos los perfiles `super_admin` activos (propietario,
  * técnico y restantes; `activo IS NOT FALSE` incluye `null`). Fail-open.
+ * `opciones.excluir` omite un id (ej. no avisar al creador de la acción).
  */
 export async function enviarPushAAdmins(
   supabase: SupabaseClient,
-  payload: PayloadPush
+  payload: PayloadPush,
+  opciones?: { excluir?: string }
 ): Promise<ResultadoPush> {
   return enviar(supabase, payload, async () => {
     const { data, error } = await supabase
@@ -77,7 +79,9 @@ export async function enviarPushAAdmins(
       .eq("role", "super_admin")
       .not("activo", "is", false);
     if (error) throw new Error(error.message);
-    return ((data ?? []) as Array<{ id: string }>).map((a) => a.id);
+    return ((data ?? []) as Array<{ id: string }>)
+      .map((a) => a.id)
+      .filter((id) => id !== opciones?.excluir);
   });
 }
 

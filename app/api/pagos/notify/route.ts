@@ -11,7 +11,9 @@ import { formatCurrency } from "@/lib/utils";
  * Notifica un cambio o alta de pago. El evento se DERIVA del estado real en BD
  * y del rol del llamador (`derivarEventoPago`), no de lo que pida el cliente:
  *
- * - aprobado/rechazado → **push al MIEMBRO** (requiere super_admin; sin correo)
+ * - aprobado/rechazado de un tercero → **push al MIEMBRO** (requiere super_admin; sin correo)
+ * - aprobado + super_admin dueño → **push a los DEMÁS super_admin** (`propio_aprobado`,
+ *   excluyendo al creador; aplica también a auto-suspensiones)
  * - pendiente + miembro dueño → push a los ADMINS ("reportado")
  * - pendiente + super_admin de un tercero → push al MIEMBRO ("registrado")
  *
@@ -123,6 +125,23 @@ export async function POST(request: Request) {
             };
       await enviarPushAUsuarios(serviceSupabase, [pago.user_id], payload);
 
+      return NextResponse.json({ success: true, evento });
+    }
+
+    if (evento === "propio_aprobado") {
+      // Pago propio de un super_admin → avisa a los demás, nunca a él mismo
+      await enviarPushAAdmins(
+        serviceSupabase,
+        {
+          title: messages.eventosPago.propioAprobadoTitulo,
+          body: mensaje(messages.eventosPago.propioAprobadoCuerpo, {
+            nombre: nombreMiembro,
+            monto: montoStr,
+          }),
+          url: "/dashboard/pagos",
+        },
+        { excluir: user.id }
+      );
       return NextResponse.json({ success: true, evento });
     }
 

@@ -530,6 +530,12 @@ o `dispositivo.ts` (cliente); nunca al revés (`service.ts` importa `web-push`, 
   (`lib/features/pagos/domain/notify`, puro + testeado) — nunca confía en un `action` del cliente:
   - **aprobado/rechazado** (solo super_admin) → **push al miembro**. Motivo de rechazo
     = `payments.payment_note` (lo escribe `rechazarPago`).
+  - **aprobado + pago propio de un super_admin** → **push a los DEMÁS super_admin**
+    (`propio_aprobado`, con `enviarPushAAdmins(..., { excluir: user.id })` — el creador
+    **no** recibe su propio push). Aplica también a **auto-suspensiones**
+    (`crearPagoSuspendido(..., "aprobado")`, monto Bs 0): la derivación ignora
+    `payment_type`, solo mira status + rol + propiedad → todas las reglas de
+    notificación aplican por igual a pagos tipo suspensión.
   - **pendiente + miembro dueño** → **push a todos los super_admin** (`reportado`) — incluye
     solicitudes de suspensión (mis-pagos), pagos de mensualidad/inscripción auto-reportados y
     el **recordatorio manual** del miembro (grid "Pagos realizados" + modal de detalle: botón

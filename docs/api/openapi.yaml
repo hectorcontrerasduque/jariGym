@@ -735,6 +735,9 @@ paths:
 
         - `aprobado` / `rechazado` (requiere super_admin) → **push al miembro**.
           El motivo de rechazo se lee de `payments.payment_note`.
+        - pago `aprobado` de un **super_admin para sí mismo** → **push a los demás
+          super_admin** (`propio_aprobado`, excluyendo al creador; aplica también
+          a auto-suspensiones).
         - pago `pendiente` de un **miembro dueño** → **push a todos los super_admin**
           (`reportado`).
         - pago `pendiente` creado por un **super_admin para un tercero** → **push al
@@ -766,7 +769,7 @@ paths:
                   success: { type: boolean }
                   evento:
                     type: [string, "null"]
-                    enum: [aprobado, rechazado, reportado, registrado, null]
+                    enum: [aprobado, rechazado, propio_aprobado, reportado, registrado, null]
         "400": { $ref: "#/components/responses/Error" }
         "401": { $ref: "#/components/responses/Error" }
         "403": { $ref: "#/components/responses/Error" }

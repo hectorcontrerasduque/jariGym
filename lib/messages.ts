@@ -104,6 +104,8 @@ export const messages = {
     aprobar: "Aprobar",
     rechazar: "Rechazar",
     eliminarPagoConfirm: "¿Eliminar este pago pendiente?",
+    soloUltimoRegistro: "Solo se puede eliminar el último registro",
+    soloUltimoRegistroPropio: "Solo puedes eliminar tu último registro pendiente",
   },
   miembros: {
     title: "Miembros",

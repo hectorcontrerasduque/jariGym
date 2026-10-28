@@ -42,44 +42,30 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: "Pago no encontrado" }, { status: 404 });
     }
 
-    const esPendiente = ["pendiente"].includes(pagoActual.status);
-    const esAprobado = pagoActual.status === "aprobado";
+    const esPendiente = pagoActual.status === "pendiente";
+
+    // Último registro del miembro: el más reciente por fecha de creación
+    // (desempate por id). Solo ese pago puede eliminarse.
+    const { data: ultimoPago } = await serviceSupabase
+      .from("payments")
+      .select("id")
+      .eq("user_id", pagoActual.user_id)
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const esUltimoRegistro = ultimoPago?.id === pagoId;
 
     if (isAdmin) {
-      // Super admin: puede borrar pendientes + el último aprobado
-      if (esAprobado) {
-        // Buscar el último aprobado usando year_number/month_number del detail (igual que la UI)
-        const { data: todosAprobados } = await serviceSupabase
-          .from("payments")
-          .select("id, payment_detail(year_number, month_number)")
-          .eq("user_id", pagoActual.user_id)
-          .eq("status", "aprobado");
-
-        if (!todosAprobados || todosAprobados.length === 0) {
-          return NextResponse.json({ error: "No hay pagos aprobados" }, { status: 404 });
-        }
-
-        // Ordenar por year_number * 100 + month_number desc (igual que la UI)
-        const ordenados = todosAprobados
-          .map(p => {
-            const maxKey = (p.payment_detail || []).reduce((max, d) => {
-              const key = ((d.year_number || 0) * 100 + (d.month_number || 0));
-              return key > max ? key : max;
-            }, 0);
-            return { id: p.id, maxKey };
-          })
-          .sort((a, b) => b.maxKey - a.maxKey || (b.id || "").localeCompare(a.id || ""));
-
-        if (ordenados[0].id !== pagoId) {
-          return NextResponse.json({ error: "Solo se puede eliminar el último pago aprobado" }, { status: 403 });
-        }
-      } else if (!esPendiente) {
-        return NextResponse.json({ error: "No se puede eliminar este pago" }, { status: 403 });
+      // Super admin: solo el último registro, sin importar su estatus
+      if (!esUltimoRegistro) {
+        return NextResponse.json({ error: messages.pagos.soloUltimoRegistro }, { status: 403 });
       }
     } else {
-      // Miembro: solo puede borrar sus propios pendientes
-      if (pagoActual.user_id !== user.id || !esPendiente) {
-        return NextResponse.json({ error: "No tienes permiso para eliminar este pago" }, { status: 403 });
+      // Miembro: solo su último registro y solo si está pendiente
+      if (pagoActual.user_id !== user.id || !esPendiente || !esUltimoRegistro) {
+        return NextResponse.json({ error: messages.pagos.soloUltimoRegistroPropio }, { status: 403 });
       }
     }
 

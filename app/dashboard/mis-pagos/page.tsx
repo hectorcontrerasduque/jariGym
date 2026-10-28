@@ -517,7 +517,7 @@ function MisPagosContent() {
     const miembro = isSuperAdmin && miembroSeleccionado
       ? miembroSeleccionado.full_name || miembroSeleccionado.email
       : profile?.full_name || profile?.email;
-    if (!confirm(`¿Eliminar pago de ${miembro}?\n${label} — ${monto}\n${pago.status === "aprobado" ? "Último aprobado" : "Pendiente"}`)) return;
+    if (!confirm(`¿Eliminar pago de ${miembro}?\n${label} — ${monto}\nÚltimo registro (${pago.status})`)) return;
     setDeleting(pago.id);
     try {
       await pagosService.eliminarPago(pago.id);
@@ -558,15 +558,7 @@ function MisPagosContent() {
 
   const pagosOrdenados = useMemo(() => {
     return [...pagos].sort((a, b) => {
-      const aMax = a.detail?.reduce((max, d) => {
-        const key = (d.year_number || 0) * 100 + (d.month_number || 0);
-        return key > max ? key : max;
-      }, 0) || 0;
-      const bMax = b.detail?.reduce((max, d) => {
-        const key = (d.year_number || 0) * 100 + (d.month_number || 0);
-        return key > max ? key : max;
-      }, 0) || 0;
-      return bMax - aMax;
+      return (b.created_at || "").localeCompare(a.created_at || "") || (b.id || "").localeCompare(a.id || "");
     });
   }, [pagos]);
 
@@ -582,23 +574,14 @@ function MisPagosContent() {
     );
   }, [pagosOrdenados, anioPagos]);
 
-  // Último pago aprobado (el más reciente por año/mes del detail, igual que la UI)
-  // Usa pagos (todos, sin filtro de año) para que coincida con la lógica del API
-  const isLastApproved = useCallback((pago: Payment) => {
-    const aprobados = pagos
-      .filter(p => p.status === "aprobado")
-      .sort((a, b) => {
-        const aMax = a.detail?.reduce((max, d) => {
-          const key = (d.year_number || 0) * 100 + (d.month_number || 0);
-          return key > max ? key : max;
-        }, 0) || 0;
-        const bMax = b.detail?.reduce((max, d) => {
-          const key = (d.year_number || 0) * 100 + (d.month_number || 0);
-          return key > max ? key : max;
-        }, 0) || 0;
-        return bMax - aMax || (b.id || "").localeCompare(a.id || "");
-      });
-    return aprobados.length > 0 && aprobados[0].id === pago.id;
+  // Último registro del miembro: el más reciente por fecha de creación
+  // (desempate por id). Usa pagos (todos, sin filtro de año) para que
+  // coincida con la lógica del API: solo ese registro puede tener el trash.
+  const esUltimoRegistro = useCallback((pago: Payment) => {
+    const [ultimo] = [...pagos].sort((a, b) => {
+      return (b.created_at || "").localeCompare(a.created_at || "") || (b.id || "").localeCompare(a.id || "");
+    });
+    return Boolean(ultimo) && ultimo.id === pago.id;
   }, [pagos]);
 
   const aprobados = pagosFiltrados.filter(p => p.status === "aprobado");
@@ -1626,8 +1609,7 @@ function MisPagosContent() {
                         )}
                       </button>
                     )}
-                    {(pago.status === "pendiente" ||
-                      (isSuperAdmin && pago.status === "aprobado" && isLastApproved(pago))) && (
+                    {esUltimoRegistro(pago) && (isSuperAdmin || pago.status === "pendiente") && (
                       <button
                         onClick={() => handleDelete(pago)}
                         disabled={deleting === pago.id}

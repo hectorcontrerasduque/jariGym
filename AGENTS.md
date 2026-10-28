@@ -322,6 +322,14 @@ status: "pendiente" | "aprobado" | "rechazado"
 - Super admin can approve payments (not just regular admin)
 - Suspension flow: member requests → `pendiente` → admin approves → `aprobado` (uses `payment_type: "suspension"` with amount 0)
 
+### Mis Pagos — Delete (trash) rules
+- The "Pagos realizados" grid is ordered by **`created_at` desc** (newest first).
+- **Solo el último registro** del miembro (mayor `created_at`, desempate `id` desc) puede mostrar el trash: máximo 1 bote por miembro. Los registros no-últimos no se pueden eliminar (ni por el admin).
+- **Miembro**: solo su propio último registro, y solo si está `pendiente`.
+- **Super admin**: el último registro de cualquier miembro (incluido él), **sin importar el estatus** (pendiente/aprobado/rechazado).
+- UI: `esUltimoRegistro()` en `app/dashboard/mis-pagos/page.tsx`; autoridad real: `DELETE /api/pagos` (`app/api/pagos/route.ts`). Si el pago incluía inscripción, el endpoint resetea o recalcula `profiles.inscription_amount_paid` (ver `calcularMontoInscripcionAprobado`).
+- Tests: `__tests__/pagos-delete-route.test.ts`.
+
 ### Config Service
 - `updateConfig()` strips read-only fields (`id`, `created_at`, `updated_at`, `created_by`, `updated_by`) before Supabase update
 - When `owner_email` changes, calls `ensure-super-admin` with JWT to create/promote super_admin + sync auth.users (name/email)

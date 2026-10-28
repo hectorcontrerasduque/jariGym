@@ -700,8 +700,13 @@ paths:
       operationId: eliminarPago
       summary: Elimina un pago
       description: |
-        super_admin: puede eliminar pagos pendientes y **solo el último** pago aprobado del miembro (por año/mes del detalle).
-        Miembro: solo sus propios pagos pendientes. Las líneas de `payment_detail` se borran en cascada.
+        Solo se puede eliminar el **último registro** del miembro, definido como el pago con
+        `created_at` más reciente (desempate por `id`). Las líneas de `payment_detail` se borran
+        en cascada.
+
+        super_admin: el último registro del miembro, sin importar su estatus (pendiente,
+        aprobado o rechazado) — permite corregir el pago más reciente.
+        Miembro: solo su propio último registro y únicamente si está `pendiente`.
       security:
         - sesion: []
       parameters:
@@ -714,7 +719,7 @@ paths:
         "400": { $ref: "#/components/responses/Error" }
         "401": { $ref: "#/components/responses/Error" }
         "403":
-          description: Sin permiso, no es el último aprobado, o su estado no permite eliminarlo.
+          description: Sin permiso, no es el último registro del miembro, o (miembro) el registro no está pendiente.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }

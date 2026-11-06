@@ -1,1 +1,3 @@
+npx tsc --noEmit
+npx vitest run
 npx next build

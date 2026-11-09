@@ -16,7 +16,7 @@ function preparar(fake: SupabaseFake, role: "super_admin" | "miembro") {
   fake.on("profiles", "select")
     .reply({ data: [perfilRow("u1"), perfilRow("u2")] }) // elegibles
     .reply({ data: { role, arrival_time: "07:00", departure_time: "08:00", full_name: "U1", email: "u1@t.com" } }); // own profile
-  fake.on("gym_config_payment_methods", "select").reply({ data: { amount_monthly: 25, amount_inscription: 40 } });
+  fake.on("gym_config_payment_methods", "select").reply({ data: [{ amount_monthly: 25, amount_inscription: 40 }] });
   fake.on("memberships", "select").reply({ data: [] });
   fake.on("gym_config", "select")
     .reply({ data: { owner_email: "dueno@t.com", billing_mode: "dia_uno" } }) // elegibles config

@@ -2,6 +2,7 @@ import { Sidebar } from "@/components/sidebar";
 import { Providers } from "@/components/providers";
 import { ScrollToTop } from "@/components/scroll-to-top";
 import { AutoSuscripcionMiembro } from "@/components/push/auto-suscripcion";
+import { AutoActualizarTasa } from "@/components/tasas/auto-actualizar-tasa";
 
 export default function DashboardLayout({
   children,
@@ -11,6 +12,7 @@ export default function DashboardLayout({
   return (
     <Providers>
       <AutoSuscripcionMiembro />
+      <AutoActualizarTasa />
       <ScrollToTop />
       <div className="min-h-screen bg-gym-bg flex flex-col">
         <Sidebar />

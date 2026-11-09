@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse, type NextRequest } from "next/server";
+import { metodoPrincipal } from "@/lib/utils";
 
 export async function GET(request: NextRequest) {
   try {
@@ -12,11 +13,9 @@ export async function GET(request: NextRequest) {
 
     const { data: configResult } = await supabase
       .from("gym_config_payment_methods")
-      .select("amount_monthly")
-      .eq("is_active", true)
-      .limit(1)
-      .maybeSingle();
-    const montoMensual = configResult?.amount_monthly || 0;
+      .select("payment_method, amount_monthly")
+      .eq("is_active", true);
+    const montoMensual = metodoPrincipal(configResult || [])?.amount_monthly || 0;
 
     const { data: rows } = await supabase
       .from("migracion")

@@ -50,7 +50,7 @@ function filaPagoMes(userId: string, overrides: Record<string, unknown> = {}) {
 function encolarElegibles(fake: SupabaseFake, perfiles: unknown[]) {
   fake.on("profiles", "select").reply({ data: perfiles });
   fake.on("gym_config_payment_methods", "select").reply({
-    data: { amount_monthly: 30, amount_inscription: 10 },
+    data: [{ amount_monthly: 30, amount_inscription: 10 }],
   });
   fake.on("memberships", "select").reply({ data: [] });
   fake.on("gym_config", "select").reply({

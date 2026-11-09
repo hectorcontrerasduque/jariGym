@@ -103,6 +103,8 @@ export async function POST(request: Request) {
         .from("gym_config_payment_methods")
         .select("*");
 
+      // Versionado temporal: se desactivan los previos y se inserta una fila
+      // nueva por cada método activo (varios pueden estar activos a la vez).
       for (const m of existingMethods || []) {
         if (m.is_active) {
           await serviceSupabase
@@ -112,12 +114,17 @@ export async function POST(request: Request) {
         }
       }
 
-      const activeMetodo = metodos.find((m: { is_active: boolean }) => m.is_active);
-      if (activeMetodo) {
+      const activos = (metodos as Array<{
+        payment_method: string;
+        amount_monthly: number;
+        amount_inscription: number;
+        is_active: boolean;
+      }>).filter((m) => m.is_active);
+      for (const activo of activos) {
         await serviceSupabase.from("gym_config_payment_methods").insert({
-          payment_method: activeMetodo.payment_method,
-          amount_monthly: activeMetodo.amount_monthly,
-          amount_inscription: activeMetodo.amount_inscription,
+          payment_method: activo.payment_method,
+          amount_monthly: activo.amount_monthly,
+          amount_inscription: activo.amount_inscription,
           is_active: true,
           effective_from: new Date().toISOString().split("T")[0],
         });

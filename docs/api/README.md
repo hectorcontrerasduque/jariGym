@@ -44,5 +44,7 @@ También se puede abrir `openapi.yaml` en VS Code (extensión "OpenAPI (Swagger)
 | DELETE | `/api/pagos?id=` | sesión (admin o dueño del pago) | Eliminar pago |
 | POST | `/api/pagos/notify` | sesión (deriva evento por rol) | Web push de eventos de pago |
 | PUT | `/api/profile` | sesión | Editar perfil |
+| GET | `/api/tasas` | sesión | Últimos 10 registros de tasa BCV + fuente |
+| POST | `/api/tasas/actualizar` | sesión (cualquier rol) | Refrescar tasa BCV (10/hora por usuario) |
 
 ⚠️ = hallazgo pendiente; detalle en la descripción del endpoint y en `openspec/ROADMAP.md` ("Hallazgos de la fase 8").

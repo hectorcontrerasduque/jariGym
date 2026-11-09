@@ -40,6 +40,8 @@ tags:
     description: Edición de perfil propio o de otros (super_admin).
   - name: push
     description: Suscripciones Web Push del navegador (alta/baja por dispositivo).
+  - name: tasas
+    description: "Tasa BCV (Bs por USD) para el método de pago BS: historial y actualización."
 
 paths:
   /api/auth/confirm-email:
@@ -910,6 +912,109 @@ paths:
         "200": { $ref: "#/components/responses/Success" }
         "400": { $ref: "#/components/responses/Error" }
         "401": { $ref: "#/components/responses/Error" }
+        "500": { $ref: "#/components/responses/Error" }
+
+  /api/tasas:
+    get:
+      tags: [tasas]
+      operationId: listarTasas
+      summary: Lista los últimos registros de tasa BCV (máx. 10)
+      description: |
+        Historial ordenado por fecha/hora de vigencia descendente (desempate por
+        `created_at`), máximo 10 filas, más la atribución de la fuente del valor
+        (proveedor + dato oficial del BCV). Cualquier rol autenticado.
+      security:
+        - sesion: []
+      responses:
+        "200":
+          description: Registros de tasa y datos de la fuente.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [tasas, fuente]
+                properties:
+                  tasas:
+                    type: array
+                    maxItems: 10
+                    items:
+                      type: object
+                      properties:
+                        id: { type: integer }
+                        effective_at: { type: string, format: date-time, description: "Fecha y hora de vigencia de la tasa." }
+                        rate_bs: { type: number, description: "Bolívares por 1 USD." }
+                        source: { type: string }
+                        created_at: { type: string, format: date-time }
+                  fuente:
+                    type: object
+                    properties:
+                      nombre: { type: string }
+                      datos: { type: string, description: "Organismo oficial de los datos (BCV)." }
+                      url: { type: string, format: uri }
+                      endpoint: { type: string, format: uri }
+        "401": { $ref: "#/components/responses/Error" }
+        "500": { $ref: "#/components/responses/Error" }
+
+  /api/tasas/actualizar:
+    post:
+      tags: [tasas]
+      operationId: actualizarTasa
+      summary: Refresca la tasa BCV desde el proveedor (cualquier rol)
+      description: |
+        Consulta `ve.dolarapi.com` y guarda la tasa si es nueva. Sin `forzar`
+        solo consulta si la última vigencia tiene más de 6 h (o no hay registro)
+        y si no se escribió nada en los últimos 10 min. Con `forzar: true`
+        (botón «Actualizar» de la modal) consulta siempre.
+
+        Duplicados bloqueados por índice único `(effective_at, rate_bs)`; el
+        historial se poda a 10 filas. Fail-open: si el proveedor falla responde
+        `200` con `actualizado: false` y `error` (el login nunca depende de esto).
+        Límite: 10 cada hora por usuario.
+      security:
+        - sesion: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                forzar: { type: boolean, default: false, description: "Ignora los gates de vigencia/antigüedad." }
+      responses:
+        "200":
+          description: Tasas actuales + resultado del intento de actualización.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [tasas, fuente, actualizado]
+                properties:
+                  tasas:
+                    type: array
+                    maxItems: 10
+                    items:
+                      type: object
+                      properties:
+                        id: { type: integer }
+                        effective_at: { type: string, format: date-time }
+                        rate_bs: { type: number }
+                        source: { type: string }
+                        created_at: { type: string, format: date-time }
+                  fuente:
+                    type: object
+                    properties:
+                      nombre: { type: string }
+                      datos: { type: string }
+                      url: { type: string, format: uri }
+                      endpoint: { type: string, format: uri }
+                  actualizado: { type: boolean, description: "true si se insertó una fila nueva." }
+                  motivo:
+                    type: string
+                    enum: [vigente, reciente, duplicado, error]
+                    description: "Por qué no hubo inserción (solo presente si actualizado=false)."
+                  error: { type: string, description: "Detalle del fallo (solo si motivo=error)." }
+        "401": { $ref: "#/components/responses/Error" }
+        "429": { $ref: "#/components/responses/RateLimited" }
         "500": { $ref: "#/components/responses/Error" }
 
 components:

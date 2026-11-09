@@ -33,7 +33,7 @@ function pago(user_id: string, month_number: number | null, overrides: Record<st
 
 function queueElegibles(fake: ReturnType<typeof createSupabaseFake>, e: Escenario) {
   fake.on("profiles", "select").reply({ data: e.perfiles });
-  fake.on("gym_config_payment_methods", "select").reply({ data: e.metodo });
+  fake.on("gym_config_payment_methods", "select").reply({ data: e.metodo ? [e.metodo] : [] });
   fake.on("memberships", "select").reply({ data: e.membresias });
   fake.on("gym_config", "select").reply({ data: e.config });
 }

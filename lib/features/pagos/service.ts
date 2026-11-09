@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/client";
 import { messages } from "@/lib/messages";
 import type { Pago, MetodoPago, TipoPago, Profile, DetallePago } from "@/lib/types";
+import { metodoPrincipal } from "@/lib/utils";
 import type { ElegiblesResult, Moroso, PagoRPCRow } from "./domain/types";
 import { calcularMorosos, calcularMiembrosAlDia } from "./domain/morosos";
 import { calcularStats, calcularMonthlyStats } from "./domain/stats";
@@ -541,10 +542,8 @@ export class PagosService {
         .not("email", "is", null),
       supabase
         .from("gym_config_payment_methods")
-        .select("amount_monthly, amount_inscription")
-        .eq("is_active", true)
-        .limit(1)
-        .maybeSingle(),
+        .select("payment_method, amount_monthly, amount_inscription")
+        .eq("is_active", true),
       supabase
         .from("memberships")
         .select("user_id, start_date")
@@ -559,7 +558,7 @@ export class PagosService {
 
     return {
       perfiles: miembrosResult.data,
-      metodoPago: configResult.data,
+      metodoPago: metodoPrincipal(configResult.data || []),
       membresias: libresResult.data,
       gymConfig: ownerResult.data,
     };
@@ -597,11 +596,9 @@ export class PagosService {
 
     const { data: configResult } = await supabase
       .from("gym_config_payment_methods")
-      .select("amount_monthly")
-      .eq("is_active", true)
-      .limit(1)
-      .maybeSingle();
-    const montoMensual = configResult?.amount_monthly || 0;
+      .select("payment_method, amount_monthly")
+      .eq("is_active", true);
+    const montoMensual = metodoPrincipal(configResult || [])?.amount_monthly || 0;
 
     const { data: rows } = await supabase
       .from("migracion")

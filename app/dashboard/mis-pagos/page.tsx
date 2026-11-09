@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { pagosService } from "@/lib/features/pagos/service";
 import { createClient } from "@/lib/supabase/client";
-import { formatCurrency, formatDate, getMonthName, getDiaCobro } from "@/lib/utils";
+import { formatCurrency, formatDate, getMonthName, getDiaCobro, metodoPrincipal } from "@/lib/utils";
 import { CreditCard, CheckCircle, Clock, Calendar, Eye, Trash2, FileText, Plus, Search, Upload, Gift, AlertTriangle, ChevronDown, ChevronRight, X, Save, Phone, Mail, MapPin, XCircle, BellRing } from "lucide-react";
 import { showToast } from "@/components/ui/toast";
 import { Modal } from "@/components/ui/modal";
@@ -667,7 +667,7 @@ function MisPagosContent() {
       (p.detail || []).some(d => d.payment_type === "inscripcion")
     );
     const debeInscripcion = !profile.inscription_paid && !tieneInscripcionAprobada;
-    const activeMetodo = metodosPago.find(m => m.is_active);
+    const activeMetodo = metodoPrincipal(metodosPago.filter((m) => m.is_active));
     const montoMensual = activeMetodo?.amount_monthly || 0;
     const montoInscripcion = activeMetodo?.amount_inscription || 0;
     const totalDeuda = mesesDeuda.length * montoMensual + (debeInscripcion ? montoInscripcion : 0);

@@ -6,17 +6,19 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { METODOS_PAGO_DEFAULT } from "@/lib/services/config/config.service";
 import { createClient } from "@/lib/supabase/client";
-import { Save, Building2, User, CreditCard, Upload, Dumbbell, Trash2 } from "lucide-react";
+import { Save, Building2, User, CreditCard, Upload, Dumbbell, Trash2, Landmark } from "lucide-react";
 import { showToast } from "@/components/ui/toast";
 import { Loader } from "@/components/ui/loader";
+import { ModalBcv } from "@/components/tasas/modal-bcv";
 import { messages } from "@/lib/messages";
 import type { GymConfig, MetodoPago, PaymentMethod } from "@/lib/types";
+import type { TasaFila } from "@/lib/features/tasas/domain";
 import { getAdminLevel, isFullAdmin } from "@/lib/admin-level";
 import { useRouter } from "next/navigation";
 
 const metodoLabels: Record<MetodoPago, { label: string; icon: string; locked?: boolean }> = {
   efectivo: { label: messages.configuracion.metodoEfectivo, icon: "💵" },
-  bs: { label: messages.configuracion.metodoBs, icon: "🇻🇪", locked: true },
+  bs: { label: messages.configuracion.metodoBs, icon: "🇻🇪" },
   binance: { label: messages.configuracion.metodoBinance, icon: "🟡", locked: true },
 };
 
@@ -45,6 +47,8 @@ export default function ConfiguracionPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [tasas, setTasas] = useState<TasaFila[]>([]);
+  const [modalBcvAbierta, setModalBcvAbierta] = useState(false);
   const logoInputRef = useRef<HTMLInputElement>(null);
   const metodosRef = useRef<HTMLDivElement>(null);
 
@@ -77,6 +81,17 @@ export default function ConfiguracionPage() {
       showToast(messages.toast.errorCargaDatos, "error");
     } finally {
       setLoading(false);
+    }
+
+    // Tasa BCV para la tarjeta de Bolívares (mejor esfuerzo: no bloquea ni avisa)
+    try {
+      const resTasas = await fetch("/api/tasas");
+      if (resTasas.ok) {
+        const body = (await resTasas.json()) as { tasas?: TasaFila[] };
+        setTasas(body.tasas || []);
+      }
+    } catch {
+      // sin red queda sin tasa; la modal permite reintentar
     }
   };
 
@@ -120,11 +135,11 @@ export default function ConfiguracionPage() {
     // eslint-disable-next-line security/detect-object-injection
     const info = metodoLabels[metodoPago];
     if (info?.locked) return;
+    // Varios métodos pueden quedar activos a la vez (ej. efectivo + BS);
+    // en cada pago el usuario elige uno u otro.
     setMetodos((prev) =>
       prev.map((m) =>
-        m.payment_method === metodoPago
-          ? { ...m, is_active: !m.is_active }
-          : { ...m, is_active: false }
+        m.payment_method === metodoPago ? { ...m, is_active: !m.is_active } : m
       )
     );
   };
@@ -322,16 +337,29 @@ export default function ConfiguracionPage() {
                       {isLocked && <p className="text-xs text-gym-muted">{messages.configuracion.proximamente}</p>}
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    disabled={isDisabled}
-                    onClick={() => handleToggleMetodo(metodo.payment_method)}
-                    className={`w-11 h-6 rounded-full flex items-center px-1 transition-all ${
-                      metodo.is_active ? "bg-gym-primary justify-end" : "bg-gym-border justify-start"
-                    } ${isDisabled ? "cursor-not-allowed opacity-50" : "cursor-pointer hover:opacity-90"}`}
-                  >
-                    <div className={`w-5 h-5 rounded-full transition-all ${metodo.is_active ? "bg-white" : "bg-gym-muted"}`} />
-                  </button>
+                  <div className="flex items-center gap-2">
+                    {metodo.payment_method === "efectivo" && (
+                      <button
+                        type="button"
+                        onClick={() => setModalBcvAbierta(true)}
+                        title={messages.configuracion.bcvAyuda}
+                        className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium border border-gym-border text-gym-muted hover:text-gym-primary hover:border-gym-primary transition-colors"
+                      >
+                        <Landmark className="w-3.5 h-3.5" />
+                        {messages.configuracion.bcvBoton}
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      disabled={isDisabled}
+                      onClick={() => handleToggleMetodo(metodo.payment_method)}
+                      className={`w-11 h-6 rounded-full flex items-center px-1 transition-all ${
+                        metodo.is_active ? "bg-gym-primary justify-end" : "bg-gym-border justify-start"
+                      } ${isDisabled ? "cursor-not-allowed opacity-50" : "cursor-pointer hover:opacity-90"}`}
+                    >
+                      <div className={`w-5 h-5 rounded-full transition-all ${metodo.is_active ? "bg-white" : "bg-gym-muted"}`} />
+                    </button>
+                  </div>
                 </div>
                 {metodo.is_active && (
                   <div className="grid grid-cols-2 gap-3">
@@ -358,6 +386,17 @@ export default function ConfiguracionPage() {
                       step="0.01"
                     />
                   </div>
+                )}
+                {metodo.is_active && metodo.payment_method === "bs" && (
+                  <p className="mt-2 text-xs text-gym-muted">
+                    {messages.configuracion.montosUsd} · {messages.tasas.tasaUsdLabel}:{" "}
+                    {tasas[0]
+                      ? messages.tasas.tasaVigenteFormato.replace(
+                          "{tasa}",
+                          tasas[0].rate_bs.toLocaleString("es-VE", { maximumFractionDigits: 4 })
+                        )
+                      : messages.tasas.tasaSinRegistro}
+                  </p>
                 )}
               </div>
             );
@@ -428,6 +467,8 @@ export default function ConfiguracionPage() {
           <Save className="w-6 h-6" />
         )}
       </button>
+
+      <ModalBcv isOpen={modalBcvAbierta} onClose={() => setModalBcvAbierta(false)} />
     </>
   );
 }

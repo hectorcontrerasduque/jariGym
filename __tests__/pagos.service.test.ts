@@ -88,7 +88,7 @@ afterEach(() => {
 describe("getMiembrosElegibles", () => {
   function queue({
     perfiles = [] as unknown[],
-    metodo = { amount_monthly: 25, amount_inscription: 15 } as unknown,
+    metodo = [{ amount_monthly: 25, amount_inscription: 15 }] as unknown,
     membresias = [] as unknown[],
     config = { owner_email: "Owner@Gym.com", billing_mode: "fecha_inscripcion" } as unknown,
   } = {}) {
@@ -146,7 +146,7 @@ describe("getMiembrosElegibles", () => {
   });
 
   it("sin método de pago activo ni config: montos 0, modo dia_uno, owner vacío", async () => {
-    queue({ metodo: null, config: null });
+    queue({ metodo: [], config: null });
     const r = await service.getMiembrosElegibles();
     expect(r.montoMensual).toBe(0);
     expect(r.montoInscripcion).toBe(0);

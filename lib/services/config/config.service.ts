@@ -135,9 +135,6 @@ export class ConfigService {
       .from("gym_config_payment_methods")
       .select("*");
 
-    const existingMap = new Map((existingRecords || []).map((r) => [r.payment_method, r]));
-    const activeMetodo = metodos.find((m) => m.is_active);
-
     // Desactivar todos los registros existentes primero
     for (const existing of existingRecords || []) {
       if (existing.is_active) {
@@ -148,24 +145,14 @@ export class ConfigService {
       }
     }
 
-    if (!activeMetodo) return;
-
-    const existing = existingMap.get(activeMetodo.payment_method);
-
-    if (existing) {
-      // Siempre INSERT nueva fila (versionado temporal)
+    // Versionado temporal: una fila nueva por cada método activo
+    // (varios pueden estar activos a la vez, p. ej. efectivo + bs).
+    const activos = metodos.filter((m) => m.is_active);
+    for (const activo of activos) {
       await this.supabase.from("gym_config_payment_methods").insert({
-        payment_method: activeMetodo.payment_method,
-        amount_monthly: activeMetodo.amount_monthly,
-        amount_inscription: activeMetodo.amount_inscription,
-        is_active: true,
-        effective_from: new Date().toISOString().split("T")[0],
-      });
-    } else {
-      await this.supabase.from("gym_config_payment_methods").insert({
-        payment_method: activeMetodo.payment_method,
-        amount_monthly: activeMetodo.amount_monthly,
-        amount_inscription: activeMetodo.amount_inscription,
+        payment_method: activo.payment_method,
+        amount_monthly: activo.amount_monthly,
+        amount_inscription: activo.amount_inscription,
         is_active: true,
         effective_from: new Date().toISOString().split("T")[0],
       });

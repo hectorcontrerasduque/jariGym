@@ -1,6 +1,28 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
-import type { ModoCobro } from "./types";
+import type { MetodoPago, ModoCobro } from "./types";
+
+/** Prioridad para elegir el método "principal" cuando hay varios activos. */
+const PRIORIDAD_METODO: MetodoPago[] = ["efectivo", "bs", "binance"];
+
+/**
+ * Elige el método de pago principal entre los activos: efectivo > bs > binance.
+ * Se usa para los cálculos de deuda (montos en USD), de modo que con varios
+ * métodos activos la cifra no cambie respecto de cuando solo estaba efectivo.
+ * Devuelve null si la lista está vacía.
+ */
+export function metodoPrincipal<T extends { payment_method?: MetodoPago }>(metodos: T[]): T | null {
+  if (metodos.length === 0) return null;
+  const prioridad = (m: T) => {
+    const i = PRIORIDAD_METODO.indexOf(m.payment_method as MetodoPago);
+    return i === -1 ? PRIORIDAD_METODO.length : i;
+  };
+  let mejor = metodos[0];
+  for (const m of metodos) {
+    if (prioridad(m) < prioridad(mejor)) mejor = m;
+  }
+  return mejor;
+}
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));

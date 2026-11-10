@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, beforeAll } from "vitest";
 import { createSupabaseFake, type SupabaseFake } from "./helpers/supabase-fake";
 
 let authFake: SupabaseFake;
@@ -48,6 +48,12 @@ beforeEach(() => {
   authFake = createSupabaseFake();
   serviceFake = createSupabaseFake();
 });
+
+// Precarga la ruta fuera del timeout de 5s de los tests (transform frio de
+// next/server en suite paralela). Ver comentario en tasas-route.test.ts.
+beforeAll(async () => {
+  await import("@/app/api/config/route");
+}, 30_000);
 
 describe("POST /api/config — guardado de métodos de pago", () => {
   it("inserta una fila versionada por cada método activo", async () => {

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach, beforeAll } from "vitest";
 import { createSupabaseFake, type SupabaseFake } from "./helpers/supabase-fake";
 
 let authFake: SupabaseFake;
@@ -80,6 +80,15 @@ beforeEach(() => {
 afterEach(() => {
   vi.unstubAllGlobals();
 });
+
+// Precarga las rutas FUERA del timeout de 5s de los tests: en suite paralela
+// el transform frio de next/server + la cadena de la ruta supera 5s; el timeout
+// deja un "zombie" que, al resolverse, consume con el fake nuevo del siguiente
+// test la respuesta encolada (fallo en cascada).
+beforeAll(async () => {
+  await import("@/app/api/tasas/route");
+  await import("@/app/api/tasas/actualizar/route");
+}, 30_000);
 
 describe("GET /api/tasas", () => {
   it("401 sin sesión", async () => {

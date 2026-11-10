@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, beforeAll } from "vitest";
 import { createSupabaseFake, type SupabaseFake } from "./helpers/supabase-fake";
 
 let authFake: SupabaseFake;
@@ -66,6 +66,12 @@ describe("DELETE /api/pagos", () => {
     authFake = createSupabaseFake();
     serviceFake = createSupabaseFake();
   });
+
+  // Precarga la ruta fuera del timeout de 5s de los tests (transform frio de
+  // next/server en suite paralela). Ver comentario en tasas-route.test.ts.
+  beforeAll(async () => {
+    await import("@/app/api/pagos/route");
+  }, 30_000);
 
   it("super_admin borra su último registro pendiente", async () => {
     preparar({

@@ -117,3 +117,61 @@ describe("POST /api/config — guardado de métodos de pago", () => {
     expect(serviceFake.callsTo("gym_config_payment_methods", "insert")).toHaveLength(0);
   });
 });
+
+describe("POST /api/config — personalización de la app", () => {
+  it("persiste colores y fuente en gym_config sin tocar campos de solo lectura", async () => {
+    preparar();
+
+    const { POST } = await import("@/app/api/config/route");
+    const res = await POST(
+      new Request("http://localhost/api/config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          config: {
+            color_primario: "#22D3EE",
+            color_secundario: "#A78BFA",
+            color_fondo: "#082F49",
+            color_fuente: "#F0F9FF",
+            font_family: "Georgia, serif",
+            id: "no-deberia-guardarse",
+            created_at: "2026-01-01T00:00:00Z",
+            updated_by: "admin-1",
+          },
+        }),
+      })
+    );
+
+    expect(res.status).toBe(200);
+
+    const updates = serviceFake.callsTo("gym_config", "update");
+    expect(updates).toHaveLength(1);
+    expect(updates[0].payload).toMatchObject({
+      color_primario: "#22D3EE",
+      color_secundario: "#A78BFA",
+      color_fondo: "#082F49",
+      color_fuente: "#F0F9FF",
+      font_family: "Georgia, serif",
+    });
+    expect(updates[0].payload).not.toHaveProperty("id");
+    expect(updates[0].payload).not.toHaveProperty("created_at");
+    expect(updates[0].payload).not.toHaveProperty("updated_by");
+  });
+
+  it("acepta font_family null (reset a valores hardcodeados)", async () => {
+    preparar();
+
+    const { POST } = await import("@/app/api/config/route");
+    const res = await POST(
+      new Request("http://localhost/api/config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ config: { font_family: null } }),
+      })
+    );
+
+    expect(res.status).toBe(200);
+    const updates = serviceFake.callsTo("gym_config", "update");
+    expect(updates[0].payload).toMatchObject({ font_family: null });
+  });
+});

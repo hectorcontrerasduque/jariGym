@@ -120,6 +120,11 @@ export interface GymConfig {
   billing_mode: ModoCobro;
   notifications_enabled: boolean;
   push_enabled: boolean;
+  color_primario: string | null;
+  color_secundario: string | null;
+  color_fondo: string | null;
+  color_fuente: string | null;
+  font_family: string | null;
   created_at: string;
   updated_at: string;
   created_by: string | null;

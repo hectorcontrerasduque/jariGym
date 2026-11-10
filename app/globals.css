@@ -23,11 +23,12 @@
 
   body {
     @apply bg-gym-bg text-gym-text antialiased;
-    font-family: var(--font-inter), system-ui, sans-serif;
+    /* --font-gym-family lo setea AppTheme desde gym_config.font_family; sin él se usa next/font */
+    font-family: var(--font-gym-family, var(--font-inter)), system-ui, sans-serif;
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-family: var(--font-space-grotesk), system-ui, sans-serif;
+    font-family: var(--font-gym-family, var(--font-space-grotesk)), system-ui, sans-serif;
   }
 }
 

@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, Space_Grotesk } from "next/font/google";
+import AppTheme from "@/components/configuracion/app-theme";
 import "./globals.css";
 
 const inter = Inter({
@@ -45,7 +46,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="es" className={`${inter.variable} ${spaceGrotesk.variable}`}>
-      <body className="min-h-screen bg-gym-bg text-gym-text font-sans antialiased">{children}</body>
+      <body className="min-h-screen bg-gym-bg text-gym-text font-sans antialiased">
+        <AppTheme />
+        {children}
+      </body>
     </html>
   );
 }

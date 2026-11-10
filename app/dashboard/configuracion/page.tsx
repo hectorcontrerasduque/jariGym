@@ -6,10 +6,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { METODOS_PAGO_DEFAULT } from "@/lib/services/config/config.service";
 import { createClient } from "@/lib/supabase/client";
-import { Save, Building2, User, CreditCard, Upload, Dumbbell, Trash2, Landmark } from "lucide-react";
+import { Save, Building2, User, CreditCard, Upload, Dumbbell, Trash2, Landmark, Palette } from "lucide-react";
 import { showToast } from "@/components/ui/toast";
 import { Loader } from "@/components/ui/loader";
 import { ModalBcv } from "@/components/tasas/modal-bcv";
+import { ModalPersonalizacionApp } from "@/components/configuracion/modal-personalizacion-app";
 import { messages } from "@/lib/messages";
 import type { GymConfig, MetodoPago, PaymentMethod } from "@/lib/types";
 import type { TasaFila } from "@/lib/features/tasas/domain";
@@ -49,6 +50,7 @@ export default function ConfiguracionPage() {
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [tasas, setTasas] = useState<TasaFila[]>([]);
   const [modalBcvAbierta, setModalBcvAbierta] = useState(false);
+  const [modalPersonalizacionAbierta, setModalPersonalizacionAbierta] = useState(false);
   const logoInputRef = useRef<HTMLInputElement>(null);
   const metodosRef = useRef<HTMLDivElement>(null);
 
@@ -333,22 +335,24 @@ export default function ConfiguracionPage() {
                   <div className="flex items-center gap-3">
                     <span className="text-xl">{info?.icon}</span>
                     <div>
-                      <p className="font-medium text-gym-text">{info?.label}</p>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-medium text-gym-text">{info?.label}</p>
+                        {metodo.payment_method === "bs" && (
+                          <button
+                            type="button"
+                            onClick={() => setModalBcvAbierta(true)}
+                            title={messages.configuracion.bcvAyuda}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-gym-primary text-white hover:opacity-90 transition-opacity"
+                          >
+                            <Landmark className="w-3.5 h-3.5" />
+                            {messages.configuracion.bcvBoton}
+                          </button>
+                        )}
+                      </div>
                       {isLocked && <p className="text-xs text-gym-muted">{messages.configuracion.proximamente}</p>}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    {metodo.payment_method === "efectivo" && (
-                      <button
-                        type="button"
-                        onClick={() => setModalBcvAbierta(true)}
-                        title={messages.configuracion.bcvAyuda}
-                        className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium border border-gym-border text-gym-muted hover:text-gym-primary hover:border-gym-primary transition-colors"
-                      >
-                        <Landmark className="w-3.5 h-3.5" />
-                        {messages.configuracion.bcvBoton}
-                      </button>
-                    )}
                     <button
                       type="button"
                       disabled={isDisabled}
@@ -438,6 +442,26 @@ export default function ConfiguracionPage() {
         </CardContent>
       </Card>
 
+      {/* Personalización de la App */}
+      <Card className="neon-card relative z-10">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Palette className="w-5 h-5 text-gym-warning" /> {messages.configuracion.personalizacionTitulo}
+          </CardTitle>
+          <p className="text-xs text-gym-muted -mt-2">{messages.configuracion.personalizacionDesc}</p>
+        </CardHeader>
+        <CardContent>
+          <button
+            type="button"
+            onClick={() => setModalPersonalizacionAbierta(true)}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gym-surface border border-gym-border text-sm font-medium text-gym-text hover:border-gym-primary/60 transition-colors"
+          >
+            <Palette className="w-4 h-4 text-gym-primary" />
+            {messages.configuracion.personalizacionBoton}
+          </button>
+        </CardContent>
+      </Card>
+
       {/* Desktop bottom save button */}
       <div className="hidden sm:flex justify-end">
         <button
@@ -469,6 +493,12 @@ export default function ConfiguracionPage() {
       </button>
 
       <ModalBcv isOpen={modalBcvAbierta} onClose={() => setModalBcvAbierta(false)} />
+      <ModalPersonalizacionApp
+        isOpen={modalPersonalizacionAbierta}
+        onClose={() => setModalPersonalizacionAbierta(false)}
+        valores={config}
+        onSaved={(parcial) => setConfig((prev) => ({ ...prev, ...parcial }))}
+      />
     </>
   );
 }

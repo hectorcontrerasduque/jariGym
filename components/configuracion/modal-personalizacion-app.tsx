@@ -19,6 +19,24 @@ type Tema = TemaConfig & { id: string; nombre: string };
 const TEMAS: Tema[] = [
   { id: "cielo", nombre: "Cielo", ...TEMA_DEFAULT },
   {
+    id: "dark",
+    nombre: "Dark",
+    color_primario: "#E2E8F0",
+    color_secundario: "#94A3B8",
+    color_fondo: "#020617",
+    color_fuente: "#F1F5F9",
+    font_family: "",
+  },
+  {
+    id: "neon",
+    nombre: "Neon",
+    color_primario: "#00F5FF",
+    color_secundario: "#FF2BD6",
+    color_fondo: "#000000",
+    color_fuente: "#FFFFFF",
+    font_family: "",
+  },
+  {
     id: "oceano",
     nombre: "Océano",
     color_primario: "#38BDF8",

@@ -280,7 +280,7 @@ Items ya resueltos (historial): `docs/historial-resuelto.md`.
 
 - `docs/notificaciones.md` — frecuencias, cron (`CRON_SECRET`/`CRON_ENABLED`), ejecución, log/purga, reportes, recordatorio y morosos
 - `docs/push.md` — web push: fail-open, componentes, eventos de pago, push en el cron, VAPID, tests
-- `docs/migraciones.md` — 001–058 aplicadas y qué hace cada una
+- `docs/migraciones.md` — 001–060 aplicadas y qué hace cada una
 - `docs/super-admin.md` — detalle visual gold del dueño
 - `docs/historial-resuelto.md` — issues ya corregidos (historial)
 

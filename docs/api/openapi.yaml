@@ -1104,6 +1104,11 @@ components:
         billing_mode: { type: string, enum: [dia_uno, fecha_inscripcion] }
         notifications_enabled: { type: boolean }
         push_enabled: { type: boolean, description: "Interruptor maestro de Web Push." }
+        color_primario: { type: [string, "null"], description: "Color primario de la app (#hex). Default #38BDF8." }
+        color_secundario: { type: [string, "null"], description: "Color secundario de la app (#hex). Default #818CF8." }
+        color_fondo: { type: [string, "null"], description: "Color de fondo de la app (#hex). Default #0B1120." }
+        color_fuente: { type: [string, "null"], description: "Color de fuente/texto (#hex). Default #F8FAFC." }
+        font_family: { type: [string, "null"], description: "Familia tipográfica CSS; null = fuente por defecto (Inter/Space Grotesk)." }
     Profile:
       type: object
       description: Fila de `profiles` (`lib/types.ts`).

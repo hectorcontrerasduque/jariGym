@@ -124,6 +124,8 @@ export interface GymConfig {
   color_secundario: string | null;
   color_fondo: string | null;
   color_fuente: string | null;
+  color_superficie: string | null;
+  color_borde: string | null;
   font_family: string | null;
   created_at: string;
   updated_at: string;

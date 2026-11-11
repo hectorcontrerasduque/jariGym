@@ -139,6 +139,8 @@ describe("POST /api/config — personalización de la app", () => {
             color_secundario: "#A78BFA",
             color_fondo: "#082F49",
             color_fuente: "#F0F9FF",
+            color_superficie: "#0B1E2E",
+            color_borde: "#155E75",
             font_family: "Georgia, serif",
             id: "no-deberia-guardarse",
             created_at: "2026-01-01T00:00:00Z",
@@ -157,6 +159,8 @@ describe("POST /api/config — personalización de la app", () => {
       color_secundario: "#A78BFA",
       color_fondo: "#082F49",
       color_fuente: "#F0F9FF",
+      color_superficie: "#0B1E2E",
+      color_borde: "#155E75",
       font_family: "Georgia, serif",
     });
     expect(updates[0].payload).not.toHaveProperty("id");

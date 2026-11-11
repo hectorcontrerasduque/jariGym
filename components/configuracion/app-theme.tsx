@@ -8,6 +8,8 @@ export const TEMA_DEFAULT = {
   color_secundario: "#818CF8",
   color_fondo: "#0B1120",
   color_fuente: "#F8FAFC",
+  color_superficie: "#111827",
+  color_borde: "#1E293B",
   font_family: "" as string,
 } as const;
 
@@ -16,6 +18,8 @@ export type TemaConfig = {
   color_secundario?: string | null;
   color_fondo?: string | null;
   color_fuente?: string | null;
+  color_superficie?: string | null;
+  color_borde?: string | null;
   font_family?: string | null;
 };
 
@@ -34,6 +38,8 @@ export function aplicarTema(config: TemaConfig | null | undefined) {
   set("--color-gym-secondary", config?.color_secundario);
   set("--color-gym-bg", config?.color_fondo);
   set("--color-gym-text", config?.color_fuente);
+  set("--color-gym-surface", config?.color_superficie);
+  set("--color-gym-border", config?.color_borde);
   set("--font-gym-family", config?.font_family);
 }
 

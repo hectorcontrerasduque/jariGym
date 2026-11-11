@@ -1108,6 +1108,8 @@ components:
         color_secundario: { type: [string, "null"], description: "Color secundario de la app (#hex). Default #818CF8." }
         color_fondo: { type: [string, "null"], description: "Color de fondo de la app (#hex). Default #0B1120." }
         color_fuente: { type: [string, "null"], description: "Color de fuente/texto (#hex). Default #F8FAFC." }
+        color_superficie: { type: [string, "null"], description: "Color de superficie: menú, tarjetas, modal (#hex). Default #111827." }
+        color_borde: { type: [string, "null"], description: "Color de marcos y bordes internos (#hex). Default #1E293B." }
         font_family: { type: [string, "null"], description: "Familia tipográfica CSS; null = fuente por defecto (Inter/Space Grotesk)." }
     Profile:
       type: object

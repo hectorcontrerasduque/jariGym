@@ -209,6 +209,8 @@ export const messages = {
     colorSecundario: "Color secundario",
     colorFondo: "Color de fondo",
     colorFuente: "Color de fuente",
+    colorSuperficie: "Color de superficie / menú",
+    colorBorde: "Color de marcos (bordes)",
     fontFamily: "Fuente de texto",
     fontDefault: "Predeterminada (Inter / Space Grotesk)",
     vistaPrevia: "Vista previa",

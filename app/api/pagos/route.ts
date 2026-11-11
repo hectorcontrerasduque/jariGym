@@ -77,9 +77,30 @@ export async function DELETE(request: Request) {
 
     const tieneInscripcion = detalles?.some(d => d.payment_type === "inscripcion");
 
-    // ON DELETE CASCADE elimina payment_detail automáticamente
+    // Pago BS: recoger las rutas de imagen ANTES del cascade (payment_bolivares
+    // se borra con ON DELETE CASCADE; después ya no existen para leerlas).
+    const { data: bolivares } = await serviceSupabase
+      .from("payment_bolivares")
+      .select("image_url")
+      .eq("payment_id", pagoId);
+    const rutasImagen = (bolivares || [])
+      .map((b) => b.image_url as string | null)
+      .filter((p): p is string => Boolean(p));
+
+    // ON DELETE CASCADE elimina payment_detail y payment_bolivares automáticamente
     const { error } = await serviceSupabase.from("payments").delete().eq("id", pagoId);
     if (error) throw error;
+
+    // Borrar imágenes del bucket comprobantes (best-effort; si falla no bloquea
+    // el DELETE — la limpieza de huérfanos la cubre `limpiarImagenesHuerfanas`).
+    const rutasUnicas = [...new Set(rutasImagen)];
+    if (rutasUnicas.length > 0) {
+      try {
+        await serviceSupabase.storage.from("comprobantes").remove(rutasUnicas);
+      } catch {
+        // best-effort
+      }
+    }
 
     // If payment had inscription, check if another approved one remains
     if (tieneInscripcion) {

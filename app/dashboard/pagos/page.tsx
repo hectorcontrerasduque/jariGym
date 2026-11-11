@@ -6,15 +6,16 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
 import { pagosService } from "@/lib/features/pagos/service";
+import { bolivaresService } from "@/lib/features/pagos/bolivares.service";
 import { miembrosService } from "@/lib/services/miembros/miembros.service";
 import { formatCurrency, getMonthName } from "@/lib/utils";
-import { Check, X, Eye, CreditCard, Clock, CheckCircle, AlertTriangle, Search, Plus } from "lucide-react";
+import { Check, X, Eye, CreditCard, Clock, CheckCircle, AlertTriangle, Search, Plus, Link2 } from "lucide-react";
 import { showToast } from "@/components/ui/toast";
-import { messages } from "@/lib/messages";
+import { messages, mensaje } from "@/lib/messages";
 import { Loader } from "@/components/ui/loader";
 import { Pagination } from "@/components/ui/pagination";
 import { usePagination } from "@/hooks/usePagination";
-import type { Payment, MetodoPago, Profile } from "@/lib/types";
+import type { Payment, MetodoPago, Profile, PaymentBolivar } from "@/lib/types";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
@@ -73,6 +74,12 @@ function PagosContent() {
   const [miembroSeleccionado] = useState<string>(memberFromUrl);
   const [busquedaMiembro, setBusquedaMiembro] = useState("");
   const pagination = usePagination(25);
+
+  // ── Conciliación BS (payment_bolivares) en el modal Detalle ──────────────
+  const [bolivaresSel, setBolivaresSel] = useState<PaymentBolivar[] | null>(null);
+  const [urlImagenSel, setUrlImagenSel] = useState<string | null>(null);
+  const [imagenExpandida, setImagenExpandida] = useState(false);
+  const [conciliando, setConciliando] = useState(false);
 
   const fetchAllData = useCallback(async () => {
     return await Promise.allSettled([
@@ -136,6 +143,35 @@ function PagosContent() {
 
   const handleAprobar = async (pagoId: string) => {
     try {
+      const pago = pagos.find((p) => p.id === pagoId);
+      // ── BS: conciliación propia (marca reconciled + aprueba solo si la suma
+      // de amount_usd reconciliados cubre el monto configurado por mes/tipo).
+      if (pago?.payment_method === "bs") {
+        setConciliando(true);
+        try {
+          const resultado = await bolivaresService.reconciliarPago(pagoId);
+          if (resultado.aprobado) {
+            fetch("/api/pagos/notify", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ pagoId }),
+            }).catch(() => {});
+            showToast(messages.bolivares.conciliado, "success");
+          } else {
+            showToast(
+              mensaje(messages.bolivares.conciliadoParcial, {
+                restante: formatCurrency(resultado.restanteUsd),
+              }),
+              "warning"
+            );
+          }
+          await loadData();
+          setModalOpen(false);
+        } finally {
+          setConciliando(false);
+        }
+        return;
+      }
       await pagosService.aprobarPago(pagoId);
       fetch("/api/pagos/notify", {
         method: "POST",
@@ -146,13 +182,25 @@ function PagosContent() {
       await loadData();
       setModalOpen(false);
     } catch {
-      showToast(messages.toast.pagoAprobadoError, "error");
+      showToast(
+        pagos.find((p) => p.id === pagoId)?.payment_method === "bs"
+          ? messages.bolivares.conciliacionError
+          : messages.toast.pagoAprobadoError,
+        "error"
+      );
+    } finally {
+      setConciliando(false);
     }
   };
 
   const handleRechazar = async (pagoId: string) => {
     try {
+      const pago = pagos.find((p) => p.id === pagoId);
       await pagosService.rechazarPago(pagoId);
+      // BS rechazado: la imagen ya no sirve — borrarla (best-effort).
+      if (pago?.payment_method === "bs") {
+        await bolivaresService.borrarImagenesDePago(pagoId).catch(() => {});
+      }
       fetch("/api/pagos/notify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -165,6 +213,28 @@ function PagosContent() {
       showToast(messages.toast.pagoRechazadoError, "error");
     }
   };
+
+  // Al abrir Detalle de un pago BS: traer payment_bolivares + firmar imagen.
+  // (Reset al abrir el modal en el onClick — regla react-hooks/set-state-in-effect.)
+  useEffect(() => {
+    if (!modalOpen || !selectedPago || selectedPago.payment_method !== "bs") return;
+    let cancelado = false;
+    (async () => {
+      try {
+        const filas = await bolivaresService.obtenerDePago(selectedPago.id);
+        if (cancelado) return;
+        setBolivaresSel(filas);
+        const ruta = filas.find((f) => f.image_url)?.image_url;
+        if (ruta) {
+          const url = await bolivaresService.firmarImagen(ruta);
+          if (!cancelado) setUrlImagenSel(url);
+        }
+      } catch {
+        if (!cancelado) setBolivaresSel([]);
+      }
+    })();
+    return () => { cancelado = true; };
+  }, [modalOpen, selectedPago]);
 
   const pagosFiltrados = useMemo(() => {
     let result = filtro === "todos"
@@ -390,7 +460,7 @@ function PagosContent() {
                         {getTotalMonto(pago) > 0 ? formatCurrency(getTotalMonto(pago)) : "Gratis"}
                       </span>
                       <button
-                        onClick={() => { setSelectedPago(pago); setModalOpen(true); }}
+                        onClick={() => { setSelectedPago(pago); setBolivaresSel(null); setUrlImagenSel(null); setImagenExpandida(false); setModalOpen(true); }}
                         className="p-2 text-gym-muted hover:text-gym-text rounded-lg transition-colors ml-2"
                         title="Ver detalle"
                       >
@@ -457,16 +527,93 @@ function PagosContent() {
                 </a>
               </div>
             )}
+            {/* ── Datos payment_bolivares + imagen expandible + conciliación ── */}
+            {selectedPago.payment_method === "bs" && (
+              <div className="p-3 bg-gym-bg rounded-xl border border-gym-border space-y-3">
+                <p className="text-sm font-medium text-gym-muted">{messages.bolivares.datosBs}</p>
+                {bolivaresSel === null ? (
+                  <p className="text-xs text-gym-muted">Cargando…</p>
+                ) : bolivaresSel.length === 0 ? (
+                  <p className="text-xs text-gym-muted">—</p>
+                ) : (
+                  <>
+                    <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
+                      <span className="text-gym-muted">
+                        {messages.bolivares.montoBs}:{' '}
+                        <span className="text-gym-text font-semibold">
+                          {bolivaresSel.reduce((s, b) => s + Number(b.amount_bs || 0), 0).toLocaleString("es-VE")} Bs
+                        </span>
+                      </span>
+                      <span className="text-gym-muted">
+                        {messages.bolivares.tasaBcvLabel}:{' '}
+                        <span className="text-gym-text">{bolivaresSel[0].rate_bcv} Bs/USD</span>
+                      </span>
+                      <span className="text-gym-muted">
+                        {messages.bolivares.montoUsdEquiv}:{' '}
+                        <span className="text-gym-text">{formatCurrency(bolivaresSel.reduce((s, b) => s + Number(b.amount_usd || 0), 0))}</span>
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
+                      <span className="text-gym-muted">
+                        {messages.bolivares.banco}:{' '}
+                        <span className="text-gym-text">{bolivaresSel[0].bank || messages.bolivares.bancoNoEspecificado}</span>
+                      </span>
+                      <span className="text-gym-muted">
+                        {messages.bolivares.referencia}:{' '}
+                        <span className="text-gym-text font-mono">{bolivaresSel[0].reference_number || messages.bolivares.referenciaNoEspecificada}</span>
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm flex-wrap">
+                      <span className="text-gym-muted">Estado:</span>
+                      <Badge variant={bolivaresSel[0].reconciled ? "success" : "warning"} className="text-[10px]">
+                        {bolivaresSel[0].reconciled ? messages.bolivares.reconciledLabel : messages.bolivares.sinConciliar}
+                      </Badge>
+                    </div>
+                    <p className="text-[11px] text-gym-muted">{messages.bolivares.pagoParcialInfo}</p>
+                    {urlImagenSel ? (
+                      <div>
+                        <p className="text-xs text-gym-muted mb-1">{messages.bolivares.verImagen}</p>
+                        <button
+                          type="button"
+                          onClick={() => setImagenExpandida(true)}
+                          className="block w-full max-w-xs rounded-lg overflow-hidden border border-gym-border hover:border-gym-primary transition-colors"
+                          title={messages.bolivares.verImagen}
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element -- signed URL temporal */}
+                          <img src={urlImagenSel} alt="Comprobante pago Bs" className="w-full h-auto" />
+                        </button>
+                      </div>
+                    ) : bolivaresSel[0].image_url ? (
+                      <p className="text-xs text-gym-muted">{messages.bolivares.imagenNoDisponible}</p>
+                    ) : null}
+                  </>
+                )}
+              </div>
+            )}
             <div>
               <p className="text-sm text-gym-muted">Notas</p>
               <p className="text-gym-text">{selectedPago.payment_note || "—"}</p>
             </div>
             {(selectedPago.status === "pendiente") && (
               <div className="flex gap-2 pt-4">
-                <Button className="flex-1 glow-success" onClick={() => handleAprobar(selectedPago.id)}>
-                  <Check className="w-4 h-4 mr-2" /> Aprobar
+                <Button
+                  className="flex-1 glow-success"
+                  onClick={() => handleAprobar(selectedPago.id)}
+                  loading={conciliando}
+                  disabled={conciliando}
+                >
+                  {selectedPago.payment_method === "bs" ? (
+                    <>
+                      <Link2 className="w-4 h-4 mr-2" />
+                      {conciliando ? messages.bolivares.conciliando : messages.bolivares.conciliar}
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-4 h-4 mr-2" /> Aprobar
+                    </>
+                  )}
                 </Button>
-                <Button variant="danger" className="flex-1 glow-danger" onClick={() => handleRechazar(selectedPago.id)}>
+                <Button variant="danger" className="flex-1 glow-danger" onClick={() => handleRechazar(selectedPago.id)} disabled={conciliando}>
                   <X className="w-4 h-4 mr-2" /> Rechazar
                 </Button>
               </div>
@@ -474,6 +621,33 @@ function PagosContent() {
           </div>
         )}
       </Modal>
+
+      {/* Imagen del comprobante BS a tamaño completa */}
+      {imagenExpandida && urlImagenSel && (
+        <div
+          className="fixed inset-0 z-[80] bg-black/90 flex items-center justify-center p-4 cursor-zoom-out"
+          onClick={() => setImagenExpandida(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-label={messages.bolivares.verImagen}
+        >
+          <button
+            type="button"
+            className="absolute top-4 right-4 p-2 text-white/80 hover:text-white"
+            onClick={() => setImagenExpandida(false)}
+            aria-label={messages.bolivares.cerrarImagen}
+          >
+            <X className="w-6 h-6" />
+          </button>
+          {/* eslint-disable-next-line @next/next/no-img-element -- signed URL temporal */}
+          <img
+            src={urlImagenSel}
+            alt="Comprobante pago Bs"
+            className="max-w-full max-h-[90vh] object-contain"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
     </div>
 
       {/* Mobile floating Generar pagos button */}

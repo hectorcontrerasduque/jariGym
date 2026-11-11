@@ -6,6 +6,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { pagosService } from "@/lib/features/pagos/service";
+import { bolivaresService } from "@/lib/features/pagos/bolivares.service";
+import { comprimirImagen, esImagenComprimible } from "@/lib/features/pagos/comprimir-imagen";
+import { leerComprobante, parseNumero } from "@/lib/features/pagos/ocr";
 import { createClient } from "@/lib/supabase/client";
 import { formatCurrency, formatDate, getMonthName, getDiaCobro, metodoPrincipal } from "@/lib/utils";
 import { CreditCard, CheckCircle, Clock, Calendar, Eye, Trash2, FileText, Plus, Search, Upload, Gift, AlertTriangle, ChevronDown, ChevronRight, X, Save, Phone, Mail, MapPin, XCircle, BellRing } from "lucide-react";
@@ -14,11 +17,29 @@ import { Modal } from "@/components/ui/modal";
 import { messages } from "@/lib/messages";
 import { Avatar } from "@/components/ui/avatar";
 import { Loader } from "@/components/ui/loader";
-import type { Payment, Profile, MetodoPago, PaymentMethod, GymConfig } from "@/lib/types";
+import type { Payment, Profile, MetodoPago, PaymentMethod, GymConfig, PaymentBolivar } from "@/lib/types";
+
+/** Estado vacío del formulario de pago (incluye campos BS). */
+function formDataVacio() {
+  return {
+    meses: [] as { month_number: number; year_number: number }[],
+    metodo_pago: "efectivo" as MetodoPago,
+    codigo_billete: "",
+    notas: "",
+    pagar_inscripcion: false,
+    pagar_mensualidad: false,
+    solicitar_suspension: false,
+    fecha_pago: new Date().toISOString().split("T")[0],
+    /** Monto en bolívares (string editable; se parsea al enviar). */
+    amount_bs: "",
+    bank: "",
+    reference_number: "",
+  };
+}
 
 const metodoLabels: Record<MetodoPago, string> = {
   efectivo: "Efectivo",
-  bs: "Bs",
+  bs: "🇻🇪 Bs",
   binance: "Binance",
 };
 
@@ -112,18 +133,21 @@ function MisPagosContent() {
   const msgConceptoRef = useRef<HTMLDivElement>(null);
   const msgMesesRef = useRef<HTMLDivElement>(null);
 
-  const [formData, setFormData] = useState({
-    meses: [] as { month_number: number; year_number: number }[],
-    metodo_pago: "efectivo" as MetodoPago,
-    codigo_billete: "",
-    notas: "",
-    pagar_inscripcion: false,
-    pagar_mensualidad: false,
-    solicitar_suspension: false,
-    fecha_pago: new Date().toISOString().split("T")[0],
-  });
+  const [formData, setFormData] = useState(formDataVacio);
   const [comprobante, setComprobante] = useState<File | null>(null);
   const [showPagosRealizados, setShowPagosRealizados] = useState(true);
+
+  // ── Pago en bolívares (payment_bolivares) ─────────────────────────────────
+  /** Tasa BCV vigente para mostrar el equivalente USD en el form BS. */
+  const [tasaBcv, setTasaBcv] = useState<number | null>(null);
+  /** true mientras el OCR lee el comprobante (solo método BS). */
+  const [ocrCargando, setOcrCargando] = useState(false);
+  /** payment_bolivares del pago seleccionado en el modal Detalle (si es BS). */
+  const [bolivaresSel, setBolivaresSel] = useState<PaymentBolivar[] | null>(null);
+  /** URL firmada del comprobante BS (bucket privado). */
+  const [urlImagenSel, setUrlImagenSel] = useState<string | null>(null);
+  /** true = imagen del comprobante a tamaño completo sobre el modal. */
+  const [imagenExpandida, setImagenExpandida] = useState(false);
 
   const fetchMisPagosData = useCallback(async () => {
     const requestId = ++fetchRequestIdRef.current;
@@ -316,7 +340,8 @@ function MisPagosContent() {
     setMiembroSeleccionado(m);
     setShowSearch(false);
     setMiembroSearch("");
-    setFormData({ meses: [], metodo_pago: "efectivo", codigo_billete: "", notas: "", pagar_inscripcion: false, pagar_mensualidad: false, solicitar_suspension: false, fecha_pago: new Date().toISOString().split("T")[0] });
+    setFormData(formDataVacio());
+    setComprobante(null);
   };
 
   const toggleMonth = (month_number: number, year_number: number) => {
@@ -352,6 +377,63 @@ function MisPagosContent() {
 
   const needsComprobante = (metodo: MetodoPago) => metodo !== "efectivo";
 
+  // Tasa BCV: se carga al elegir el método BS (para mostrar equivalente USD).
+  useEffect(() => {
+    if (formData.metodo_pago !== "bs" || tasaBcv !== null) return;
+    let cancelado = false;
+    bolivaresService
+      .obtenerTasaVigente()
+      .then((t) => { if (!cancelado) setTasaBcv(t); })
+      .catch(() => { /* sin tasa: el form muestra aviso al enviar */ });
+    return () => { cancelado = true; };
+  }, [formData.metodo_pago, tasaBcv]);
+
+  // Al abrir el modal Detalle de un pago BS: traer payment_bolivares + firmar imagen.
+  // (El reset de estado se hace al abrir el modal en el onClick, no en el effect
+  //  — regla react-hooks/set-state-in-effect.)
+  useEffect(() => {
+    if (!modalOpen || !selectedPago || selectedPago.payment_method !== "bs") return;
+    let cancelado = false;
+    (async () => {
+      try {
+        const filas = await bolivaresService.obtenerDePago(selectedPago.id);
+        if (cancelado) return;
+        setBolivaresSel(filas);
+        const ruta = filas.find((f) => f.image_url)?.image_url;
+        if (ruta) {
+          const url = await bolivaresService.firmarImagen(ruta);
+          if (!cancelado) setUrlImagenSel(url);
+        }
+      } catch {
+        if (!cancelado) setBolivaresSel([]);
+      }
+    })();
+    return () => { cancelado = true; };
+  }, [modalOpen, selectedPago]);
+
+  /**
+   * Al subir comprobante en método BS: comprimir + OCR para PRELLENAR
+   * monto/banco/referencia. El miembro edita y confirma antes de enviar.
+   */
+  const handleComprobanteChange = async (file: File | null) => {
+    setComprobante(file);
+    if (!file || formData.metodo_pago !== "bs" || !esImagenComprimible(file)) return;
+    setOcrCargando(true);
+    try {
+      const datos = await leerComprobante(file);
+      setFormData((prev) => ({
+        ...prev,
+        amount_bs: datos.amount_bs > 0 ? String(datos.amount_bs) : prev.amount_bs,
+        bank: datos.bank || prev.bank,
+        reference_number: datos.reference_number || prev.reference_number,
+      }));
+    } catch {
+      showToast(messages.bolivares.ocrError, "warning");
+    } finally {
+      setOcrCargando(false);
+    }
+  };
+
   const handleSubmitPago = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitted(true);
@@ -382,6 +464,10 @@ function MisPagosContent() {
         const mesesStr = formData.meses.map(m => `${getMonthName(m.month_number)} ${m.year_number}`).join(", ");
         acciones.push(`Mensualidad (${formData.meses.length} mes(es)): ${mesesStr} — Total: ${formatCurrency(montoTotal)}`);
       }
+      if (formData.metodo_pago === "bs") {
+        const montoBs = parseNumero(formData.amount_bs);
+        if (montoBs > 0) acciones.push(`Monto en Bs: ${montoBs.toLocaleString("es-VE")} Bs${tasaBcv ? ` (≈ ${formatCurrency(montoBs / tasaBcv)} a ${tasaBcv} Bs/USD)` : ""}`);
+      }
     }
     const metodoLabel = metodoLabels[formData.metodo_pago] || formData.metodo_pago;
     const confirmMsg = `Confirmar acción para ${nombreMiembro}:\n\n${acciones.join("\n")}\n\nMétodo de pago: ${metodoLabel}\n¿Continuar?`;
@@ -410,7 +496,7 @@ function MisPagosContent() {
           }).catch(() => {});
         }
         showToast(messages.misPagos.solicitudEnviada, "success");
-        setFormData({ meses: [], metodo_pago: "efectivo", codigo_billete: "", notas: "", pagar_inscripcion: false, pagar_mensualidad: false, solicitar_suspension: false, fecha_pago: new Date().toISOString().split("T")[0] });
+        setFormData(formDataVacio());
         await fetchMisPagosData();
         await reloadPendientes();
         return;
@@ -423,21 +509,27 @@ function MisPagosContent() {
         throw new Error("Selecciona al menos un mes");
       }
 
-      let comprobanteUrl = "";
-      if (needsComprobante(formData.metodo_pago) && comprobante) {
-        const fileName = `${targetId}/${crypto.randomUUID()}_${comprobante.name}`;
-        const { error: uploadError } = await supabase.storage.from("comprobantes").upload(fileName, comprobante);
-        if (uploadError) throw uploadError;
-        const { data: urlData } = supabase.storage.from("comprobantes").getPublicUrl(fileName);
-        comprobanteUrl = urlData.publicUrl;
+      const esBs = formData.metodo_pago === "bs";
+
+      // Validaciones específicas del flujo BS (no aplican a efectivo/binance).
+      let montoBsNum = 0;
+      if (esBs) {
+        montoBsNum = parseNumero(formData.amount_bs);
+        if (!(montoBsNum > 0)) {
+          showToast(messages.bolivares.montoBsRequerido, "warning");
+          return;
+        }
+        if (!comprobante) {
+          showToast(messages.bolivares.comprobanteRequerido, "warning");
+          return;
+        }
       }
 
-      const useAutoApprove = isAdmin;
-
-      const detalles: Array<{ month_number: number | null; year_number: number | null; payment_type: "mensualidad" | "inscripcion"; payment_amount: number }> = [];
+      // Detalles con montos esperados (USD de config) — en BS son el peso del reparto.
+      const detallesEsperados: Array<{ month_number: number | null; year_number: number | null; payment_type: "mensualidad" | "inscripcion"; payment_amount: number }> = [];
 
       if (formData.pagar_inscripcion && !inscripcionPagada && getMontoByMetodo(formData.metodo_pago, "inscripcion") > 0) {
-        detalles.push({
+        detallesEsperados.push({
           month_number: new Date().getMonth() + 1,
           year_number: new Date().getFullYear(),
           payment_type: "inscripcion",
@@ -447,7 +539,7 @@ function MisPagosContent() {
 
       if (formData.pagar_mensualidad && formData.meses.length > 0) {
         for (const { month_number, year_number } of formData.meses) {
-          detalles.push({
+          detallesEsperados.push({
             month_number,
             year_number,
             payment_type: "mensualidad",
@@ -456,31 +548,73 @@ function MisPagosContent() {
         }
       }
 
-      if (detalles.length === 0) {
+      if (detallesEsperados.length === 0) {
         throw new Error("Selecciona al menos un concepto de pago");
       }
 
-      const pagoInput = {
-        user_id: targetId,
-        payment_method: formData.metodo_pago,
-        receipt_url: comprobanteUrl || undefined,
-        bill_code: formData.codigo_billete || undefined,
-        payment_note: formData.pagar_inscripcion && !inscripcionPagada ? "Inscripción" : formData.notas || undefined,
-        detalles,
-      };
+      const paymentNote = formData.pagar_inscripcion && !inscripcionPagada ? "Inscripción" : formData.notas || undefined;
+      let pagoCreadoId = "";
 
-      const pago = useAutoApprove
-        ? await pagosService.crearPagoAprobado(pagoInput)
-        : await pagosService.crearPago(pagoInput);
+      if (esBs) {
+        // ── Flujo PROPIO de bolívares: SIEMPRE pendiente (concilia super_admin
+        // en el módulo Pagos). Nunca auto-aprueba, incluso si es super_admin.
+        // La imagen se comprime en el cliente y sube a payments/<id>/comprobante.<ext>.
+        const imagen = await comprimirImagen(comprobante!);
+        const pagoBs = await bolivaresService.crearPago({
+          user_id: targetId,
+          detalles: detallesEsperados,
+          amount_bs: montoBsNum,
+          bank: formData.bank || undefined,
+          reference_number: formData.reference_number || undefined,
+          comprobante: imagen,
+          payment_note: paymentNote,
+          paid_at: formData.fecha_pago,
+        });
+        pagoCreadoId = pagoBs.id;
+      } else {
+        // ── Efectivo / Binance: flujo existente SIN cambios.
+        let comprobanteUrl = "";
+        if (needsComprobante(formData.metodo_pago) && comprobante) {
+          const fileName = `${targetId}/${crypto.randomUUID()}_${comprobante.name}`;
+          const { error: uploadError } = await supabase.storage.from("comprobantes").upload(fileName, comprobante);
+          if (uploadError) throw uploadError;
+          const { data: urlData } = supabase.storage.from("comprobantes").getPublicUrl(fileName);
+          comprobanteUrl = urlData.publicUrl;
+        }
 
-      fetch("/api/pagos/notify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pagoId: pago.id }),
-      }).catch(() => {});
+        const useAutoApprove = isAdmin;
+        const pagoInput = {
+          user_id: targetId,
+          payment_method: formData.metodo_pago,
+          receipt_url: comprobanteUrl || undefined,
+          bill_code: formData.codigo_billete || undefined,
+          payment_note: paymentNote,
+          detalles: detallesEsperados,
+        };
 
-      showToast(isSelf ? "Pago registrado y aprobado" : "Pago registrado (pendiente de aprobación)", "success");
-      setFormData({ meses: [], metodo_pago: "efectivo", codigo_billete: "", notas: "", pagar_inscripcion: false, pagar_mensualidad: false, solicitar_suspension: false, fecha_pago: new Date().toISOString().split("T")[0] });
+        const pago = await (useAutoApprove
+          ? pagosService.crearPagoAprobado(pagoInput)
+          : pagosService.crearPago(pagoInput));
+        pagoCreadoId = pago.id;
+      }
+
+      if (pagoCreadoId) {
+        fetch("/api/pagos/notify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ pagoId: pagoCreadoId }),
+        }).catch(() => {});
+      }
+
+      showToast(
+        esBs
+          ? "Pago en Bs registrado — pendiente de conciliación"
+          : isSelf
+            ? "Pago registrado y aprobado"
+            : "Pago registrado (pendiente de aprobación)",
+        "success"
+      );
+      setFormData(formDataVacio());
       setComprobante(null);
       setSubmitted(false);
       await fetchMisPagosData();
@@ -1202,7 +1336,7 @@ function MisPagosContent() {
                       <button
                         key={p.id}
                         type="button"
-                        onClick={() => { setSelectedPago(p as Payment); setModalOpen(true); }}
+                        onClick={() => { setSelectedPago(p as Payment); setBolivaresSel(null); setUrlImagenSel(null); setImagenExpandida(false); setModalOpen(true); }}
                         className="w-full text-left p-2.5 bg-gym-bg/60 rounded-xl hover:bg-gym-bg transition-colors"
                       >
                         <div className="flex items-center justify-between">
@@ -1413,14 +1547,97 @@ function MisPagosContent() {
                   </div>
                 )}
 
+                {/* Campos BS: monto en bolívares + banco + referencia (OCR prellena) */}
+                {!formData.solicitar_suspension && formData.metodo_pago === "bs" && (
+                  <div className="p-3 bg-gym-bg rounded-xl border border-gym-border space-y-3">
+                    <p className="text-sm font-medium text-gym-muted">{messages.bolivares.datosBs}</p>
+                    <div>
+                      <label htmlFor="amount-bs" className="block text-xs font-medium text-gym-muted mb-1">
+                        {messages.bolivares.montoBs} *
+                      </label>
+                      <input
+                        id="amount-bs"
+                        name="amount_bs"
+                        type="text"
+                        inputMode="decimal"
+                        placeholder="Ej: 1500000"
+                        value={formData.amount_bs}
+                        onChange={(e) => setFormData({ ...formData, amount_bs: e.target.value })}
+                        className="w-full px-4 py-2.5 bg-gym-surface border border-gym-border rounded-xl text-gym-text text-sm focus:outline-none focus:ring-2 focus:ring-gym-primary"
+                      />
+                      {tasaBcv && parseNumero(formData.amount_bs) > 0 && (
+                        <p className="text-xs text-gym-muted mt-1">
+                          {messages.bolivares.montoUsdEquiv}: <span className="text-gym-text font-medium">{formatCurrency(parseNumero(formData.amount_bs) / tasaBcv)}</span>
+                          {" · "}{messages.bolivares.tasaBcvLabel}: 1 USD = {tasaBcv} Bs
+                        </p>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label htmlFor="bank-bs" className="block text-xs font-medium text-gym-muted mb-1">
+                          {messages.bolivares.bancoOpcional}
+                        </label>
+                        <input
+                          id="bank-bs"
+                          name="bank"
+                          type="text"
+                          placeholder="Ej: Mercantil"
+                          value={formData.bank}
+                          onChange={(e) => setFormData({ ...formData, bank: e.target.value })}
+                          className="w-full px-4 py-2.5 bg-gym-surface border border-gym-border rounded-xl text-gym-text text-sm focus:outline-none focus:ring-2 focus:ring-gym-primary"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="ref-bs" className="block text-xs font-medium text-gym-muted mb-1">
+                          {messages.bolivares.referenciaOpcional}
+                        </label>
+                        <input
+                          id="ref-bs"
+                          name="reference_number"
+                          type="text"
+                          placeholder="Ej: 00123456"
+                          value={formData.reference_number}
+                          onChange={(e) => setFormData({ ...formData, reference_number: e.target.value })}
+                          className="w-full px-4 py-2.5 bg-gym-surface border border-gym-border rounded-xl text-gym-text text-sm font-mono focus:outline-none focus:ring-2 focus:ring-gym-primary"
+                        />
+                      </div>
+                    </div>
+                    {ocrCargando && (
+                      <div className="flex items-center gap-2 text-xs text-gym-primary">
+                        <div className="w-3.5 h-3.5 border-2 border-gym-primary border-t-transparent rounded-full animate-spin" />
+                        {messages.bolivares.ocrLeyendo}
+                      </div>
+                    )}
+                    <p className="text-[11px] text-gym-muted">{messages.bolivares.prefillEditable}</p>
+                  </div>
+                )}
+
                 {/* Comprobante for non-cash */}
                 {!formData.solicitar_suspension && needsComprobante(formData.metodo_pago) && (
                   <div>
-                    <label htmlFor="comprobante" className="block text-sm font-medium text-gym-muted mb-2">Comprobante de pago</label>
+                    <label htmlFor="comprobante" className="block text-sm font-medium text-gym-muted mb-2">
+                      Comprobante de pago
+                      {formData.metodo_pago === "bs" && <span className="text-gym-danger"> *</span>}
+                    </label>
                     <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-gym-border rounded-xl cursor-pointer hover:border-gym-primary transition-colors">
                       <Upload className="w-6 h-6 text-gym-muted mb-1" />
-                      <span className="text-xs text-gym-muted">{comprobante ? comprobante.name : "Adjuntar imagen o PDF"}</span>
-                      <input id="comprobante" name="comprobante" type="file" className="hidden" accept="image/*,.pdf" onChange={(e) => setComprobante(e.target.files?.[0] || null)} />
+                      <span className="text-xs text-gym-muted">
+                        {ocrCargando
+                          ? messages.bolivares.procesandoImagen
+                          : comprobante
+                            ? comprobante.name
+                            : formData.metodo_pago === "bs"
+                              ? messages.bolivares.subirComprobante
+                              : "Adjuntar imagen o PDF"}
+                      </span>
+                      <input
+                        id="comprobante"
+                        name="comprobante"
+                        type="file"
+                        className="hidden"
+                        accept="image/*,.pdf"
+                        onChange={(e) => void handleComprobanteChange(e.target.files?.[0] || null)}
+                      />
                     </label>
                   </div>
                 )}
@@ -1473,7 +1690,7 @@ function MisPagosContent() {
 
                 <div className="flex gap-2">
                   <Button type="button" variant="secondary" className="flex-1" onClick={() => {
-                    setFormData({ meses: [], metodo_pago: "efectivo", codigo_billete: "", notas: "", pagar_inscripcion: false, pagar_mensualidad: false, solicitar_suspension: false, fecha_pago: new Date().toISOString().split("T")[0] });
+                    setFormData(formDataVacio());
                     setComprobante(null);
                     setSubmitted(false);
                   }}>
@@ -1583,7 +1800,7 @@ function MisPagosContent() {
                       </div>
                     </div>
                     <button
-                      onClick={() => { setSelectedPago(pago as Payment); setModalOpen(true); }}
+                      onClick={() => { setSelectedPago(pago as Payment); setBolivaresSel(null); setUrlImagenSel(null); setImagenExpandida(false); setModalOpen(true); }}
                       className="p-2 text-gym-primary hover:bg-gym-primary/10 rounded-lg transition-colors flex-shrink-0"
                       title="Ver detalle"
                     >
@@ -1727,6 +1944,68 @@ function MisPagosContent() {
                 </a>
               </div>
             )}
+            {/* Pago en bolívares: datos payment_bolivares + imagen expandible */}
+            {selectedPago.payment_method === "bs" && (
+              <div className="p-3 bg-gym-bg rounded-xl border border-gym-border space-y-2">
+                <p className="text-sm font-medium text-gym-muted">{messages.bolivares.datosBs}</p>
+                {bolivaresSel === null ? (
+                  <p className="text-xs text-gym-muted">Cargando…</p>
+                ) : bolivaresSel.length === 0 ? (
+                  <p className="text-xs text-gym-muted">—</p>
+                ) : (
+                  <>
+                    <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
+                      <span className="text-gym-muted">
+                        {messages.bolivares.montoBs}:{' '}
+                        <span className="text-gym-text font-semibold">
+                          {bolivaresSel.reduce((s, b) => s + Number(b.amount_bs || 0), 0).toLocaleString("es-VE")} Bs
+                        </span>
+                      </span>
+                      <span className="text-gym-muted">
+                        {messages.bolivares.tasaBcvLabel}:{' '}
+                        <span className="text-gym-text">{bolivaresSel[0].rate_bcv} Bs/USD</span>
+                      </span>
+                      <span className="text-gym-muted">
+                        {messages.bolivares.montoUsdEquiv}:{' '}
+                        <span className="text-gym-text">{formatCurrency(bolivaresSel.reduce((s, b) => s + Number(b.amount_usd || 0), 0))}</span>
+                      </span>
+                    </div>
+                    <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
+                      <span className="text-gym-muted">
+                        {messages.bolivares.banco}:{' '}
+                        <span className="text-gym-text">{bolivaresSel[0].bank || messages.bolivares.bancoNoEspecificado}</span>
+                      </span>
+                      <span className="text-gym-muted">
+                        {messages.bolivares.referencia}:{' '}
+                        <span className="text-gym-text font-mono">{bolivaresSel[0].reference_number || messages.bolivares.referenciaNoEspecificada}</span>
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm">
+                      <span className="text-gym-muted">Estado:</span>
+                      <Badge variant={bolivaresSel[0].reconciled ? "success" : "warning"} className="text-[10px]">
+                        {bolivaresSel[0].reconciled ? messages.bolivares.reconciledLabel : messages.bolivares.sinConciliar}
+                      </Badge>
+                    </div>
+                    {urlImagenSel ? (
+                      <div>
+                        <p className="text-xs text-gym-muted mb-1">{messages.bolivares.verImagen}</p>
+                        <button
+                          type="button"
+                          onClick={() => setImagenExpandida(true)}
+                          className="block w-full max-w-xs rounded-lg overflow-hidden border border-gym-border hover:border-gym-primary transition-colors"
+                          title={messages.bolivares.verImagen}
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element -- signed URL temporal */}
+                          <img src={urlImagenSel} alt="Comprobante pago Bs" className="w-full h-auto" />
+                        </button>
+                      </div>
+                    ) : bolivaresSel[0].image_url ? (
+                      <p className="text-xs text-gym-muted">{messages.bolivares.imagenNoDisponible}</p>
+                    ) : null}
+                  </>
+                )}
+              </div>
+            )}
             <div>
               <p className="text-sm text-gym-muted">Notas</p>
               <p className="text-gym-text">{selectedPago.payment_note || "—"}</p>
@@ -1755,6 +2034,33 @@ function MisPagosContent() {
           </div>
         )}
       </Modal>
+
+      {/* Imagen del comprobante BS a tamaño completo */}
+      {imagenExpandida && urlImagenSel && (
+        <div
+          className="fixed inset-0 z-[80] bg-black/90 flex items-center justify-center p-4 cursor-zoom-out"
+          onClick={() => setImagenExpandida(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-label={messages.bolivares.verImagen}
+        >
+          <button
+            type="button"
+            className="absolute top-4 right-4 p-2 text-white/80 hover:text-white"
+            onClick={() => setImagenExpandida(false)}
+            aria-label={messages.bolivares.cerrarImagen}
+          >
+            <X className="w-6 h-6" />
+          </button>
+          {/* eslint-disable-next-line @next/next/no-img-element -- signed URL temporal */}
+          <img
+            src={urlImagenSel}
+            alt="Comprobante pago Bs"
+            className="max-w-full max-h-[90vh] object-contain"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
         </>
       )}
     </div>

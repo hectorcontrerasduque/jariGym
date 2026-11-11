@@ -76,6 +76,34 @@ export interface PaymentWithDetail extends Payment {
   detail: PaymentDetail[];
 }
 
+/**
+ * Fila de public.payment_bolivares — datos del pago en bolívares.
+ * Relación: 1 payment_bolivares ↔ 1 payment_detail (solo pagos BS).
+ * NO repite month_number/year_number/payment_type (viven en payment_detail).
+ * rate_bcv es snapshot de exchange_rates vigente al crear (no FK).
+ */
+export interface PaymentBolivar {
+  id: string;
+  payment_id: string;
+  payment_detail_id: string;
+  /** Monto pagado en bolívares. */
+  amount_bs: number;
+  /** Tasa BCV (Bs por USD) vigente al crear el pago — snapshot. */
+  rate_bcv: number;
+  /** Monto equivalente en USD = amount_bs / rate_bcv (= payment_detail.payment_amount). */
+  amount_usd: number;
+  bank: string | null;
+  reference_number: string | null;
+  /** true = super admin concilió el dato. NO implica payment aprobado. */
+  reconciled: boolean;
+  paid_at: string | null;
+  /** Ruta en bucket comprobantes: payments/<payment_id>/comprobante.<ext>. */
+  image_url: string | null;
+  image_filename: string | null;
+  created_at: string;
+  created_by: string | null;
+}
+
 // Backward compatibility aliases
 export type Pago = Payment;
 export type DetallePago = PaymentDetail;

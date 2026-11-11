@@ -30,9 +30,11 @@ interface Escenario {
   detalles?: { payment_type: string }[];
   otroInscripcion?: { id: string }[] | null;
   detalleOtro?: { id: string }[];
+  /** Rutas image_url de payment_bolivares (pago BS) a borrar del Storage. */
+  imagenesBs?: string[];
 }
 
-function preparar({ rol, pago, ultimoId, detalles, otroInscripcion, detalleOtro }: Escenario) {
+function preparar({ rol, pago, ultimoId, detalles, otroInscripcion, detalleOtro, imagenesBs }: Escenario) {
   authFake.setUser({ id: rol === "miembro" ? MIEMBRO_ID : "admin-1" });
   authFake.on("profiles", "select").reply({ data: { role: rol } });
 
@@ -43,6 +45,15 @@ function preparar({ rol, pago, ultimoId, detalles, otroInscripcion, detalleOtro 
 
   if (detalles !== undefined) {
     serviceFake.on("payment_detail", "select").reply({ data: detalles });
+    // payment_bolivares se consulta ANTES del delete (para recoger image_url).
+    if (imagenesBs !== undefined) {
+      serviceFake.on("payment_bolivares", "select").reply({
+        data: imagenesBs.map((r) => ({ image_url: r })),
+      });
+      if (imagenesBs.length > 0) {
+        serviceFake.onStorage("comprobantes", "remove").reply({ data: [] });
+      }
+    }
     serviceFake.on("payments", "delete").reply({ error: null });
     if (otroInscripcion !== undefined) {
       serviceFake.on("payments", "select").reply({ data: otroInscripcion });
@@ -153,6 +164,39 @@ describe("DELETE /api/pagos", () => {
 
     expect(status).toBe(200);
     expect(serviceFake.callsTo("payments", "delete")).toHaveLength(1);
+  });
+
+  it("borra las imágenes BS hijas del pago del Storage (best-effort)", async () => {
+    preparar({
+      rol: "super_admin",
+      pago: { status: "pendiente", user_id: MIEMBRO_ID },
+      ultimoId: PAGO_ID,
+      detalles: [{ payment_type: "mensualidad" }],
+      imagenesBs: [`payments/${PAGO_ID}/comprobante.jpg`],
+    });
+
+    const { status } = await borrar();
+
+    expect(status).toBe(200);
+    expect(serviceFake.callsTo("payments", "delete")).toHaveLength(1);
+    const removes = serviceFake.callsTo("comprobantes", "remove");
+    expect(removes).toHaveLength(1);
+    expect(removes[0].payload).toEqual([`payments/${PAGO_ID}/comprobante.jpg`]);
+  });
+
+  it("sin imágenes BS no llama a storage remove", async () => {
+    preparar({
+      rol: "super_admin",
+      pago: { status: "pendiente", user_id: MIEMBRO_ID },
+      ultimoId: PAGO_ID,
+      detalles: [{ payment_type: "mensualidad" }],
+      imagenesBs: [],
+    });
+
+    const { status } = await borrar();
+
+    expect(status).toBe(200);
+    expect(serviceFake.callsTo("comprobantes", "remove")).toHaveLength(0);
   });
 
   it("miembro NO borra un pendiente que no es el último", async () => {

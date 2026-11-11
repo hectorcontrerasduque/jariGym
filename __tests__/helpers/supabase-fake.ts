@@ -19,9 +19,9 @@ export interface FakeReply {
 }
 
 export interface FakeCall {
-  kind: "from" | "rpc" | "auth";
+  kind: "from" | "rpc" | "auth" | "storage";
   table: string;
-  op: FakeOp | "rpc" | "auth";
+  op: FakeOp | "rpc" | "auth" | string;
   payload?: unknown;
   /** Filter / modifier calls in order, e.g. ["eq", "status", "pendiente"]. */
   filters: unknown[][];
@@ -112,6 +112,30 @@ export function createSupabaseFake() {
         deleteUser: authCall("admin.deleteUser"),
       },
     },
+    storage: {
+      from: (bucket: string) => ({
+        upload: async (path: string, body: unknown, opts?: unknown) => {
+          calls.push({ kind: "storage", table: bucket, op: "upload", payload: { path, body, opts }, filters: [] });
+          return next(`storage:${bucket}:upload`);
+        },
+        remove: async (paths: string[]) => {
+          calls.push({ kind: "storage", table: bucket, op: "remove", payload: paths, filters: [] });
+          return next(`storage:${bucket}:remove`);
+        },
+        createSignedUrl: async (path: string, expiresIn: number) => {
+          calls.push({ kind: "storage", table: bucket, op: "createSignedUrl", payload: { path, expiresIn }, filters: [] });
+          return next(`storage:${bucket}:createSignedUrl`);
+        },
+        list: async (path: string, opts?: unknown) => {
+          calls.push({ kind: "storage", table: bucket, op: "list", payload: { path, opts }, filters: [] });
+          return next(`storage:${bucket}:list`);
+        },
+        getPublicUrl: (path: string) => {
+          calls.push({ kind: "storage", table: bucket, op: "getPublicUrl", payload: { path }, filters: [] });
+          return { data: { publicUrl: `https://fake/${bucket}/${path}` } };
+        },
+      }),
+    },
   };
 
   return {
@@ -120,12 +144,14 @@ export function createSupabaseFake() {
     on: (table: string, op: FakeOp) => enqueue(`${table}:${op}`),
     onRpc: (name: string) => enqueue(`rpc:${name}`),
     onAuth: (name: string) => enqueue(`auth:${name}`),
+    /** storage.<bucket>.<op> reply queue, e.g. onStorage("comprobantes", "upload"). */
+    onStorage: (bucket: string, op: string) => enqueue(`storage:${bucket}:${op}`),
     setUser: (u: { id: string; email?: string } | null) => {
       user = u;
     },
     /** Calls on a table (optionally a given op), in order. */
-    callsTo: (table: string, op?: FakeOp) =>
-      calls.filter((c) => c.kind === "from" && c.table === table && (!op || c.op === op)),
+    callsTo: (table: string, op?: FakeOp | string) =>
+      calls.filter((c) => c.table === table && (!op || c.op === op)),
   };
 }
 

@@ -19,7 +19,7 @@ import { useRouter } from "next/navigation";
 
 const metodoLabels: Record<MetodoPago, { label: string; icon: string; locked?: boolean }> = {
   efectivo: { label: messages.configuracion.metodoEfectivo, icon: "💵" },
-  bs: { label: messages.configuracion.metodoBs, icon: "🇻🇪" },
+  bs: { label: messages.configuracion.metodoBs, icon: "" },
   binance: { label: messages.configuracion.metodoBinance, icon: "🟡", locked: true },
 };
 

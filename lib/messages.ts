@@ -193,7 +193,7 @@ export const messages = {
     subirLogo: "Subir logo",
     cambiarLogo: "Cambiar",
     metodoEfectivo: "Efectivo",
-    metodoBs: "Bolívares",
+    metodoBs: "🇻🇪",
     metodoBinance: "Binance USDT",
     proximamente: "Próximamente",
     montosUsd: "Montos en USD",

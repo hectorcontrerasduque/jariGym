@@ -1,17 +1,20 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback, Suspense } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { pagosService } from "@/lib/features/pagos/service";
+import { dedupeMetodos, metodosActivos, metodoPorDefecto } from "@/lib/features/pagos/domain/metodos";
+import { datosPagoBs } from "@/lib/features/pagos/domain/banco";
 import { miembrosService } from "@/lib/services/miembros/miembros.service";
 import { createClient } from "@/lib/supabase/client";
 import { Upload, CheckCircle, DollarSign, User, FileText, Gift, Calendar, ArrowLeft, AlertTriangle, Send } from "lucide-react";
 import { getMonthName, formatCurrency } from "@/lib/utils";
 import { Loader } from "@/components/ui/loader";
 import { FlagVe } from "@/components/ui/flag-ve";
+import { DatosPagoBs } from "@/components/pagos/datos-pago-bs";
 import { showToast } from "@/components/ui/toast";
 import { messages } from "@/lib/messages";
 import { calcularEstadoPush, debePedirActivacion } from "@/lib/features/push/dispositivo";
@@ -67,6 +70,23 @@ function ReportarPagoForm() {
   const [modalPushAbierto, setModalPushAbierto] = useState(false);
 
   const isAdmin = userRole === "super_admin";
+
+  /** Métodos habilitados en Config (el estado ya viene deduplicado). */
+  const metodosHabilitados = useMemo(() => metodosActivos(metodosPago), [metodosPago]);
+  /** Método preseleccionado: elección de Config > activado más antiguo. */
+  const metodoPredeterminado = useMemo(
+    () => metodoPorDefecto(metodosPago, gymConfig?.default_payment_method),
+    [metodosPago, gymConfig]
+  );
+  const datosBs = useMemo(() => datosPagoBs(gymConfig?.bs_bank_info), [gymConfig]);
+  const hayDatosBs = datosBs.pagoMovil.length > 0 || datosBs.transferencia.length > 0;
+
+  const metodoDefaultAplicadoRef = useRef(false);
+  useEffect(() => {
+    if (metodoDefaultAplicadoRef.current || !metodoPredeterminado) return;
+    metodoDefaultAplicadoRef.current = true;
+    setFormData((prev) => ({ ...prev, metodo_pago: metodoPredeterminado }));
+  }, [metodoPredeterminado]);
 
    
    useEffect(() => {
@@ -133,7 +153,7 @@ function ReportarPagoForm() {
         const res = await fetch("/api/config/public");
         const { config, metodos } = await res.json();
         if (!cancelled) setGymConfig(config);
-        if (!cancelled) setMetodosPago(metodos);
+        if (!cancelled) setMetodosPago(dedupeMetodos(metodos as PaymentMethod[]));
       } catch {
         if (!cancelled) showToast(messages.toast.errorCargaDatos, "error");
       } finally {
@@ -223,6 +243,10 @@ function ReportarPagoForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (metodosHabilitados.length === 0) {
+      showToast(messages.misPagos.sinMetodosPago, "error");
+      return;
+    }
     // Push sin decidir ⇒ ofrece activarlo antes de enviar; el pago nunca se bloquea
     if (debePedirActivacion(await calcularEstadoPush())) {
       setModalPushAbierto(true);
@@ -575,44 +599,33 @@ function ReportarPagoForm() {
             <div>
               <label className="block text-sm font-medium text-gym-muted mb-3">Método de pago</label>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setFormData({ ...formData, metodo_pago: "efectivo" })}
-                  className={`p-3 rounded-xl text-sm font-medium transition-all ${
-                    formData.metodo_pago === "efectivo"
-                      ? "bg-gym-success text-white glow-success"
-                      : "bg-gym-bg text-gym-muted border border-gym-border hover:border-gym-success hover:shadow-[0_0_10px_rgba(52,211,153,0.2)]"
-                  }`}
-                >
-                  💵 {messages.metodoPago.efectivo}
-                </button>
-                {metodosPago.find(m => m.payment_method === "bs")?.is_active && (
+                {metodosHabilitados.map((m) => (
                   <button
+                    key={m.payment_method}
                     type="button"
-                    onClick={() => setFormData({ ...formData, metodo_pago: "bs" })}
+                    onClick={() => setFormData({ ...formData, metodo_pago: m.payment_method })}
                     className={`p-3 rounded-xl text-sm font-medium transition-all ${
-                      formData.metodo_pago === "bs"
-                        ? "bg-gym-success text-white glow-success"
+                      formData.metodo_pago === m.payment_method
+                        ? m.payment_method === "binance"
+                          ? "bg-gym-warning text-gym-bg glow-warning"
+                          : "bg-gym-success text-white glow-success"
                         : "bg-gym-bg text-gym-muted border border-gym-border hover:border-gym-success"
                     }`}
                   >
-                    <FlagVe className="mr-1 w-4 h-3" /> {messages.metodoPago.bs}
+                    {m.payment_method === "efectivo"
+                      ? `💵 ${messages.metodoPago.efectivo}`
+                      : m.payment_method === "bs"
+                        ? <><FlagVe className="mr-1 w-4 h-3" /> {messages.metodoPago.bs}</>
+                        : `🟡 ${messages.metodoPago.binance}`}
                   </button>
-                )}
-                {metodosPago.find(m => m.payment_method === "binance")?.is_active && (
-                  <button
-                    type="button"
-                    onClick={() => setFormData({ ...formData, metodo_pago: "binance" })}
-                    className={`p-3 rounded-xl text-sm font-medium transition-all ${
-                      formData.metodo_pago === "binance"
-                        ? "bg-gym-warning text-gym-bg glow-warning"
-                        : "bg-gym-bg text-gym-muted border border-gym-border hover:border-gym-warning"
-                    }`}
-                  >
-                    🟡 {messages.metodoPago.binance}
-                  </button>
-                )}
+                ))}
               </div>
+              {metodosHabilitados.length === 0 && (
+                <div className="mt-2 flex items-center gap-2 p-3 bg-gym-warning/10 border border-gym-warning/30 rounded-xl">
+                  <AlertTriangle className="w-4 h-4 text-gym-warning flex-shrink-0" />
+                  <p className="text-sm text-gym-warning">{messages.misPagos.sinMetodosPago}</p>
+                </div>
+              )}
             </div>
 
             {/* Bill code for cash */}
@@ -630,6 +643,13 @@ function ReportarPagoForm() {
                   required
                 />
                 <p className="text-xs text-gym-muted mt-1">Últimos 5 caracteres de cada billete. Si son varios, separar por coma.</p>
+              </div>
+            )}
+
+            {/* Datos para pagar en Bs (pago móvil / transferencia) */}
+            {formData.metodo_pago === "bs" && hayDatosBs && (
+              <div className="p-3 bg-gym-bg rounded-xl border border-gym-border">
+                <DatosPagoBs info={gymConfig?.bs_bank_info} />
               </div>
             )}
 

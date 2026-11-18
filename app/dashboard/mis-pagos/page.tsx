@@ -19,6 +19,7 @@ import { messages } from "@/lib/messages";
 import { Avatar } from "@/components/ui/avatar";
 import { Loader } from "@/components/ui/loader";
 import { FlagVe } from "@/components/ui/flag-ve";
+import { DatosPagoBs } from "@/components/pagos/datos-pago-bs";
 import type { Payment, Profile, MetodoPago, PaymentMethod, GymConfig, PaymentBolivar } from "@/lib/types";
 
 /** Estado vacío del formulario de pago (incluye campos BS). */
@@ -1584,6 +1585,7 @@ function MisPagosContent() {
                 {/* Campos BS: monto en bolívares + banco + referencia (OCR prellena) */}
                 {!formData.solicitar_suspension && formData.metodo_pago === "bs" && (
                   <div className="p-3 bg-gym-bg rounded-xl border border-gym-border space-y-3">
+                    <DatosPagoBs info={gymConfig?.bs_bank_info} />
                     <p className="text-sm font-medium text-gym-muted">{messages.bolivares.datosBs}</p>
                     <div>
                       <label htmlFor="amount-bs" className="block text-xs font-medium text-gym-muted mb-1">

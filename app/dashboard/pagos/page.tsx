@@ -21,9 +21,9 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
 const metodoLabels: Record<MetodoPago, string> = {
-  efectivo: "💵 Efectivo",
-  bs: "Bs",
-  binance: "🟡 Binance",
+  efectivo: `💵 ${messages.metodoPago.efectivo}`,
+  bs: messages.metodoPago.bs,
+  binance: `🟡 ${messages.metodoPago.binance}`,
 };
 
 function isInscripcion(pago: Payment): boolean {

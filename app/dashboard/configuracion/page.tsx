@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import type { ReactNode } from "react";
 import Image from "next/image";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -10,6 +11,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Save, Building2, User, CreditCard, Upload, Dumbbell, Trash2, Landmark, Palette } from "lucide-react";
 import { showToast } from "@/components/ui/toast";
 import { Loader } from "@/components/ui/loader";
+import { FlagVe } from "@/components/ui/flag-ve";
 import { ModalBcv } from "@/components/tasas/modal-bcv";
 import { ModalPersonalizacionApp } from "@/components/configuracion/modal-personalizacion-app";
 import { messages } from "@/lib/messages";
@@ -18,9 +20,9 @@ import type { TasaFila } from "@/lib/features/tasas/domain";
 import { getAdminLevel, isFullAdmin } from "@/lib/admin-level";
 import { useRouter } from "next/navigation";
 
-const metodoLabels: Record<MetodoPago, { label: string; icon: string; locked?: boolean }> = {
-  efectivo: { label: messages.configuracion.metodoEfectivo, icon: "💵" },
-  bs: { label: messages.configuracion.metodoBs, icon: messages.configuracion.metodoBsIcono },
+const metodoLabels: Record<MetodoPago, { label: string; icon: ReactNode; locked?: boolean }> = {
+  efectivo: { label: messages.metodoPago.efectivo, icon: "💵" },
+  bs: { label: messages.metodoPago.bs, icon: <FlagVe className="w-5 h-3.5" /> },
   binance: { label: messages.configuracion.metodoBinance, icon: "🟡", locked: true },
 };
 

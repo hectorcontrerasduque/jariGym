@@ -192,9 +192,6 @@ export const messages = {
     logoDelGym: "Logo del Gym",
     subirLogo: "Subir logo",
     cambiarLogo: "Cambiar",
-    metodoEfectivo: "Efectivo",
-    metodoBs: "Bolívares",
-    metodoBsIcono: "💵",
     metodoBinance: "Binance USDT",
     proximamente: "Próximamente",
     montosUsd: "Montos en USD",
@@ -233,6 +230,11 @@ export const messages = {
     resetCargado: "Valores predeterminados cargados. Guarda para aplicarlos.",
     personalizacionGuardada: "Personalización guardada",
     personalizacionError: "No se pudo guardar la personalización",
+  },
+  metodoPago: {
+    efectivo: "Efectivo",
+    bs: "Bolívares",
+    binance: "Binance",
   },
   reportarPago: {
     title: "Reportar Pago",

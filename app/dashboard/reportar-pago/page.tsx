@@ -584,7 +584,7 @@ function ReportarPagoForm() {
                       : "bg-gym-bg text-gym-muted border border-gym-border hover:border-gym-success hover:shadow-[0_0_10px_rgba(52,211,153,0.2)]"
                   }`}
                 >
-                  💵 Efectivo
+                  💵 {messages.metodoPago.efectivo}
                 </button>
                 {metodosPago.find(m => m.payment_method === "bs")?.is_active && (
                   <button
@@ -596,7 +596,7 @@ function ReportarPagoForm() {
                         : "bg-gym-bg text-gym-muted border border-gym-border hover:border-gym-success"
                     }`}
                   >
-                    <FlagVe className="mr-1 w-4 h-3" /> Bs
+                    <FlagVe className="mr-1 w-4 h-3" /> {messages.metodoPago.bs}
                   </button>
                 )}
                 {metodosPago.find(m => m.payment_method === "binance")?.is_active && (
@@ -609,7 +609,7 @@ function ReportarPagoForm() {
                         : "bg-gym-bg text-gym-muted border border-gym-border hover:border-gym-warning"
                     }`}
                   >
-                    🟡 Binance
+                    🟡 {messages.metodoPago.binance}
                   </button>
                 )}
               </div>

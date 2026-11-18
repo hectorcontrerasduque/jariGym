@@ -39,9 +39,9 @@ function formDataVacio() {
 }
 
 const metodoLabels: Record<MetodoPago, string> = {
-  efectivo: "Efectivo",
-  bs: "Bs",
-  binance: "Binance",
+  efectivo: messages.metodoPago.efectivo,
+  bs: messages.metodoPago.bs,
+  binance: messages.metodoPago.binance,
 };
 
 function getPagoLabel(pago: Payment): string {
@@ -1524,7 +1524,7 @@ function MisPagosContent() {
                               : "bg-gym-bg text-gym-muted border border-gym-border hover:border-gym-primary"
                           }`}
                         >
-                          {m.payment_method === "efectivo" ? "💵 Efectivo" : m.payment_method === "bs" ? <><FlagVe className="mr-1 w-4 h-3" /> Bs</> : "🟡 Binance"}
+                          {m.payment_method === "efectivo" ? `💵 ${messages.metodoPago.efectivo}` : m.payment_method === "bs" ? <><FlagVe className="mr-1 w-4 h-3" /> {messages.metodoPago.bs}</> : `🟡 ${messages.metodoPago.binance}`}
                         </button>
                       ))}
                     </div>

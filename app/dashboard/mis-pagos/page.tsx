@@ -17,6 +17,7 @@ import { Modal } from "@/components/ui/modal";
 import { messages } from "@/lib/messages";
 import { Avatar } from "@/components/ui/avatar";
 import { Loader } from "@/components/ui/loader";
+import { FlagVe } from "@/components/ui/flag-ve";
 import type { Payment, Profile, MetodoPago, PaymentMethod, GymConfig, PaymentBolivar } from "@/lib/types";
 
 /** Estado vacío del formulario de pago (incluye campos BS). */
@@ -39,7 +40,7 @@ function formDataVacio() {
 
 const metodoLabels: Record<MetodoPago, string> = {
   efectivo: "Efectivo",
-  bs: "🇻🇪 Bs",
+  bs: "Bs",
   binance: "Binance",
 };
 
@@ -1523,7 +1524,7 @@ function MisPagosContent() {
                               : "bg-gym-bg text-gym-muted border border-gym-border hover:border-gym-primary"
                           }`}
                         >
-                          {m.payment_method === "efectivo" ? "💵 Efectivo" : m.payment_method === "bs" ? "🇻🇪 Bs" : "🟡 Binance"}
+                          {m.payment_method === "efectivo" ? "💵 Efectivo" : m.payment_method === "bs" ? <><FlagVe className="mr-1 w-4 h-3" /> Bs</> : "🟡 Binance"}
                         </button>
                       ))}
                     </div>
@@ -1912,7 +1913,10 @@ function MisPagosContent() {
             </div>
             <div>
               <p className="text-sm text-gym-muted">Método de pago</p>
-              <p className="text-gym-text">{metodoLabels[selectedPago.payment_method] || selectedPago.payment_method}</p>
+              <p className="text-gym-text">
+                {selectedPago.payment_method === "bs" && <FlagVe className="mr-1 w-4 h-3" />}
+                {metodoLabels[selectedPago.payment_method] || selectedPago.payment_method}
+              </p>
             </div>
             <div>
               <p className="text-sm text-gym-muted">Estado</p>

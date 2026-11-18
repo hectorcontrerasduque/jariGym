@@ -11,6 +11,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Upload, CheckCircle, DollarSign, User, FileText, Gift, Calendar, ArrowLeft, AlertTriangle, Send } from "lucide-react";
 import { getMonthName, formatCurrency } from "@/lib/utils";
 import { Loader } from "@/components/ui/loader";
+import { FlagVe } from "@/components/ui/flag-ve";
 import { showToast } from "@/components/ui/toast";
 import { messages } from "@/lib/messages";
 import { calcularEstadoPush, debePedirActivacion } from "@/lib/features/push/dispositivo";
@@ -595,7 +596,7 @@ function ReportarPagoForm() {
                         : "bg-gym-bg text-gym-muted border border-gym-border hover:border-gym-success"
                     }`}
                   >
-                    🇻🇪 Bs
+                    <FlagVe className="mr-1 w-4 h-3" /> Bs
                   </button>
                 )}
                 {metodosPago.find(m => m.payment_method === "binance")?.is_active && (

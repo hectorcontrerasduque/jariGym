@@ -13,6 +13,7 @@ import { Check, X, Eye, CreditCard, Clock, CheckCircle, AlertTriangle, Search, P
 import { showToast } from "@/components/ui/toast";
 import { messages, mensaje } from "@/lib/messages";
 import { Loader } from "@/components/ui/loader";
+import { FlagVe } from "@/components/ui/flag-ve";
 import { Pagination } from "@/components/ui/pagination";
 import { usePagination } from "@/hooks/usePagination";
 import type { Payment, MetodoPago, Profile, PaymentBolivar } from "@/lib/types";
@@ -21,7 +22,7 @@ import { useSearchParams } from "next/navigation";
 
 const metodoLabels: Record<MetodoPago, string> = {
   efectivo: "💵 Efectivo",
-  bs: "🇻🇪 Bs",
+  bs: "Bs",
   binance: "🟡 Binance",
 };
 
@@ -511,7 +512,10 @@ function PagosContent() {
             </div>
             <div>
               <p className="text-sm text-gym-muted">Método</p>
-              <p className="text-gym-text">{metodoLabels[selectedPago.payment_method]}</p>
+              <p className="text-gym-text">
+                {selectedPago.payment_method === "bs" && <FlagVe className="mr-1 w-4 h-3" />}
+                {metodoLabels[selectedPago.payment_method]}
+              </p>
             </div>
             {selectedPago.bill_code && selectedPago.payment_method === "efectivo" && (
               <div>

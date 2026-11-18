@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { pagosService } from "@/lib/features/pagos/service";
 import { bolivaresService } from "@/lib/features/pagos/bolivares.service";
+import { dedupeMetodos, metodosActivos, metodoPorDefecto } from "@/lib/features/pagos/domain/metodos";
 import { comprimirImagen, esImagenComprimible } from "@/lib/features/pagos/comprimir-imagen";
 import { leerComprobante, parseNumero } from "@/lib/features/pagos/ocr";
 import { createClient } from "@/lib/supabase/client";
@@ -21,10 +22,10 @@ import { FlagVe } from "@/components/ui/flag-ve";
 import type { Payment, Profile, MetodoPago, PaymentMethod, GymConfig, PaymentBolivar } from "@/lib/types";
 
 /** Estado vacío del formulario de pago (incluye campos BS). */
-function formDataVacio() {
+function formDataVacio(metodo: MetodoPago = "efectivo") {
   return {
     meses: [] as { month_number: number; year_number: number }[],
-    metodo_pago: "efectivo" as MetodoPago,
+    metodo_pago: metodo,
     codigo_billete: "",
     notas: "",
     pagar_inscripcion: false,
@@ -138,6 +139,36 @@ function MisPagosContent() {
   const [comprobante, setComprobante] = useState<File | null>(null);
   const [showPagosRealizados, setShowPagosRealizados] = useState(true);
 
+  /** Métodos habilitados en Config (el estado ya viene deduplicado). */
+  const metodosHabilitados = useMemo(() => metodosActivos(metodosPago), [metodosPago]);
+  /** Método preseleccionado: elección de Config > activado más antiguo. */
+  const metodoPredeterminado = useMemo(
+    () => metodoPorDefecto(metodosPago, gymConfig?.default_payment_method),
+    [metodosPago, gymConfig]
+  );
+  const formDataInicial = useCallback(
+    () => formDataVacio(metodoPredeterminado ?? "efectivo"),
+    [metodoPredeterminado]
+  );
+
+  /** Primera carga: preselecciona el método por defecto de Config. */
+  const metodoDefaultAplicadoRef = useRef(false);
+  useEffect(() => {
+    if (metodoDefaultAplicadoRef.current || !metodoPredeterminado) return;
+    metodoDefaultAplicadoRef.current = true;
+    setFormData((prev) => ({ ...prev, metodo_pago: metodoPredeterminado }));
+  }, [metodoPredeterminado]);
+
+  /** Si el método elegido deja de estar habilitado, cae al predeterminado. */
+  useEffect(() => {
+    if (metodosHabilitados.length === 0) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- corregir selección inválida
+    setFormData((prev) => {
+      if (metodosHabilitados.some((m) => m.payment_method === prev.metodo_pago)) return prev;
+      return metodoPredeterminado ? { ...prev, metodo_pago: metodoPredeterminado } : prev;
+    });
+  }, [metodosHabilitados, metodoPredeterminado]);
+
   // ── Pago en bolívares (payment_bolivares) ─────────────────────────────────
   /** Tasa BCV vigente para mostrar el equivalente USD en el form BS. */
   const [tasaBcv, setTasaBcv] = useState<number | null>(null);
@@ -212,16 +243,7 @@ function MisPagosContent() {
       const res = await fetch("/api/config/public");
       const { config: cfg, metodos } = await res.json();
       config = cfg;
-      const deduped = Object.values(
-        (metodos as PaymentMethod[]).reduce((acc, m) => {
-          const existing = acc[m.payment_method];
-          if (!existing || new Date(m.created_at) > new Date(existing.created_at)) {
-            acc[m.payment_method] = m;
-          }
-          return acc;
-        }, {} as Record<string, PaymentMethod>)
-      );
-      setMetodosPago(deduped);
+      setMetodosPago(dedupeMetodos(metodos as PaymentMethod[]));
     } catch {
       config = null;
     }
@@ -341,7 +363,7 @@ function MisPagosContent() {
     setMiembroSeleccionado(m);
     setShowSearch(false);
     setMiembroSearch("");
-    setFormData(formDataVacio());
+    setFormData(formDataInicial());
     setComprobante(null);
   };
 
@@ -439,6 +461,10 @@ function MisPagosContent() {
     e.preventDefault();
     setSubmitted(true);
 
+    if (!formData.solicitar_suspension && metodosHabilitados.length === 0) {
+      showToast(messages.misPagos.sinMetodosPago, "error");
+      return;
+    }
     if (!formData.pagar_inscripcion && !formData.pagar_mensualidad && !formData.solicitar_suspension) {
       showToast("Selecciona un concepto de pago", "warning");
       setTimeout(() => msgConceptoRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 100);
@@ -497,7 +523,7 @@ function MisPagosContent() {
           }).catch(() => {});
         }
         showToast(messages.misPagos.solicitudEnviada, "success");
-        setFormData(formDataVacio());
+        setFormData(formDataInicial());
         await fetchMisPagosData();
         await reloadPendientes();
         return;
@@ -615,7 +641,7 @@ function MisPagosContent() {
             : "Pago registrado (pendiente de aprobación)",
         "success"
       );
-      setFormData(formDataVacio());
+      setFormData(formDataInicial());
       setComprobante(null);
       setSubmitted(false);
       await fetchMisPagosData();
@@ -1509,11 +1535,11 @@ function MisPagosContent() {
                 )}
 
                 {/* Payment method */}
-                {!formData.solicitar_suspension && (
+                {!formData.solicitar_suspension && metodosHabilitados.length > 0 && (
                   <div>
-                    <p className="block text-sm font-medium text-gym-muted mb-2">Método de pago</p>
+                    <p className="block text-sm font-medium text-gym-muted mb-2">{messages.misPagos.metodoPago}</p>
                     <div className="flex gap-2">
-                      {metodosPago.filter(m => m.is_active || m.payment_method === "efectivo").map(m => (
+                      {metodosHabilitados.map(m => (
                         <button
                           key={m.payment_method}
                           type="button"
@@ -1528,6 +1554,13 @@ function MisPagosContent() {
                         </button>
                       ))}
                     </div>
+                  </div>
+                )}
+
+                {!formData.solicitar_suspension && metodosHabilitados.length === 0 && (
+                  <div className="flex items-center gap-2 p-3 bg-gym-warning/10 border border-gym-warning/30 rounded-xl">
+                    <AlertTriangle className="w-4 h-4 text-gym-warning flex-shrink-0" />
+                    <p className="text-sm text-gym-warning">{messages.misPagos.sinMetodosPago}</p>
                   </div>
                 )}
 
@@ -1691,7 +1724,7 @@ function MisPagosContent() {
 
                 <div className="flex gap-2">
                   <Button type="button" variant="secondary" className="flex-1" onClick={() => {
-                    setFormData(formDataVacio());
+                    setFormData(formDataInicial());
                     setComprobante(null);
                     setSubmitted(false);
                   }}>

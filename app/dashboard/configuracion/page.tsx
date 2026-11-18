@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import type { ReactNode } from "react";
 import Image from "next/image";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { METODOS_PAGO_DEFAULT } from "@/lib/services/config/config.service";
+import { dedupeMetodos, metodoPorDefecto } from "@/lib/features/pagos/domain/metodos";
 import { BS_BANK_INFO_DEFAULT, validarBsBankInfo } from "@/lib/services/config/bank-info";
 import { createClient } from "@/lib/supabase/client";
 import { Save, Building2, User, CreditCard, Upload, Dumbbell, Trash2, Landmark, Palette } from "lucide-react";
@@ -27,7 +28,7 @@ const metodoLabels: Record<MetodoPago, { label: string; icon: ReactNode; locked?
 };
 
 function buildMetodosState(dbRecords: PaymentMethod[]): PaymentMethod[] {
-  const dbMap = new Map(dbRecords.map((r) => [r.payment_method, r]));
+  const dbMap = new Map(dedupeMetodos(dbRecords).map((r) => [r.payment_method, r]));
   return METODOS_PAGO_DEFAULT.map((mp) => {
     const existing = dbMap.get(mp);
     return existing || {
@@ -48,6 +49,7 @@ export default function ConfiguracionPage() {
   const router = useRouter();
   const [config, setConfig] = useState<Partial<GymConfig>>({});
   const [metodos, setMetodos] = useState<PaymentMethod[]>([]);
+  const [metodosRaw, setMetodosRaw] = useState<PaymentMethod[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
@@ -56,6 +58,17 @@ export default function ConfiguracionPage() {
   const [modalPersonalizacionAbierta, setModalPersonalizacionAbierta] = useState(false);
   const logoInputRef = useRef<HTMLInputElement>(null);
   const metodosRef = useRef<HTMLDivElement>(null);
+
+  const metodosActivos = useMemo(() => metodos.filter((m) => m.is_active), [metodos]);
+
+  /** Radio de Config: elección guardada > activado más antiguo > primer activo. */
+  const seleccionMetodoDefault = useMemo<MetodoPago | null>(() => {
+    const guardado = config.default_payment_method;
+    if (guardado && metodosActivos.some((m) => m.payment_method === guardado)) return guardado;
+    const derivado = metodoPorDefecto(metodosRaw, null);
+    if (derivado && metodosActivos.some((m) => m.payment_method === derivado)) return derivado;
+    return metodosActivos[0]?.payment_method ?? null;
+  }, [config.default_payment_method, metodosActivos, metodosRaw]);
 
   useEffect(() => {
     const checkAccess = async () => {
@@ -81,6 +94,7 @@ export default function ConfiguracionPage() {
       const res = await fetch("/api/config/public");
       const { config: configData, metodos: metodosData } = await res.json();
       if (configData) setConfig(configData);
+      setMetodosRaw(Array.isArray(metodosData) ? metodosData : []);
       setMetodos(buildMetodosState(metodosData));
     } catch {
       showToast(messages.toast.errorCargaDatos, "error");
@@ -136,12 +150,16 @@ export default function ConfiguracionPage() {
       const res = await fetch("/api/config", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ config, metodos }),
+        body: JSON.stringify({
+          config: { ...config, default_payment_method: seleccionMetodoDefault },
+          metodos,
+        }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.error || "Error guardando");
       }
+      setConfig((prev) => ({ ...prev, default_payment_method: seleccionMetodoDefault }));
       showToast(messages.toast.configuracionGuardada, "success");
       window.dispatchEvent(new Event("config:updated"));
     } catch {
@@ -157,6 +175,10 @@ export default function ConfiguracionPage() {
     if (info?.locked) return;
     // Varios métodos pueden quedar activos a la vez (ej. efectivo + BS);
     // en cada pago el usuario elige uno u otro.
+    const seApaga = metodos.some((m) => m.payment_method === metodoPago && m.is_active);
+    if (seApaga && config.default_payment_method === metodoPago) {
+      setConfig((prev) => ({ ...prev, default_payment_method: null }));
+    }
     setMetodos((prev) =>
       prev.map((m) =>
         m.payment_method === metodoPago ? { ...m, is_active: !m.is_active } : m
@@ -503,6 +525,31 @@ export default function ConfiguracionPage() {
               </div>
             );
           })}
+          {metodosActivos.length > 1 && (
+            <div className="mt-2 p-4 rounded-xl border border-gym-border/40 bg-gym-bg/30">
+              <p className="text-sm font-medium text-gym-text">{messages.configuracion.metodoPorDefecto}</p>
+              <p className="text-xs text-gym-muted mb-3">{messages.configuracion.metodoPorDefectoAyuda}</p>
+              <div className="flex flex-wrap gap-4">
+                {metodosActivos.map((m) => (
+                  <label key={m.payment_method} className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="metodo_pago_default"
+                      value={m.payment_method}
+                      checked={seleccionMetodoDefault === m.payment_method}
+                      onChange={() =>
+                        setConfig((prev) => ({ ...prev, default_payment_method: m.payment_method }))
+                      }
+                      className="w-4 h-4 text-gym-primary focus:ring-gym-primary"
+                    />
+                    <span className="text-sm text-gym-text flex items-center gap-1.5">
+                      {metodoLabels[m.payment_method].icon} {metodoLabels[m.payment_method].label}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 

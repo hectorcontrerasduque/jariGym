@@ -203,12 +203,13 @@ paths:
     post:
       tags: [config]
       operationId: guardarConfig
-      summary: Guarda la configuración del gimnasio y el método de pago activo
+      summary: Guarda la configuración del gimnasio y los métodos de pago activos
       description: |
         Requiere super_admin **y** admin completo. Si cambia `owner_email`: desactiva el perfil del dueño anterior y
         llama a `POST /api/auth/ensure-super-admin` para el nuevo. Ignora los campos de solo lectura
         (`id`, `created_at`, `updated_at`, `created_by`, `updated_by`).
-        Si llega `metodos`: cierra (`is_active=false`, `effective_to=hoy`) los métodos activos e inserta el marcado como activo.
+        Si llega `metodos`: cierra (`is_active=false`, `effective_to=hoy`) los métodos activos e inserta una fila
+        versionada por cada método marcado como activo. Un fallo al guardar los métodos responde 500 (no success silencioso).
       security:
         - sesion: []
       requestBody:
@@ -1111,6 +1112,10 @@ components:
         color_superficie: { type: [string, "null"], description: "Color de superficie: menú, tarjetas, modal (#hex). Default #111827." }
         color_borde: { type: [string, "null"], description: "Color de marcos y bordes internos (#hex). Default #1E293B." }
         font_family: { type: [string, "null"], description: "Familia tipográfica CSS; null = fuente por defecto (Inter/Space Grotesk)." }
+        default_payment_method:
+          type: [string, "null"]
+          enum: [efectivo, bs, binance, null]
+          description: "Método preseleccionado en Mis Pagos. null = el método activo con la primera activación más antigua."
         bs_bank_info:
           type: [object, "null"]
           description: "Datos bancarios para pagos en Bs: pago móvil (banco/cédula/teléfono) y/o transferencia (banco/tipo_cuenta/numero_transferencia/titular)."

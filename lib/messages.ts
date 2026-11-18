@@ -188,6 +188,8 @@ export const messages = {
     mensualidad: "Mensualidad",
     inscripcion: "Inscripción",
     metodoRequiereMonto: "Debes asignar un monto de mensualidad o inscripción al método de pago habilitado. Desplázate hacia abajo para configurarlo.",
+    metodoPorDefecto: "Método por defecto en Mis Pagos",
+    metodoPorDefectoAyuda: "Se preselecciona al registrar un pago. Solo aparece cuando hay más de un método habilitado.",
     ownerRequired: "Nombre y correo del propietario son obligatorios para crear el acceso.",
     logoDelGym: "Logo del Gym",
     subirLogo: "Subir logo",
@@ -286,6 +288,8 @@ export const messages = {
     suspensionRechazada: "Suspensión rechazada",
     aprobarSuspension: "Aprobar Suspensión",
     rechazarSuspension: "Rechazar Suspensión",
+    sinMetodosPago: "No hay métodos de pago habilitados. Contacta al administrador.",
+    metodoPago: "Método de pago",
   },
   common: {
     cargar: "Cargando...",

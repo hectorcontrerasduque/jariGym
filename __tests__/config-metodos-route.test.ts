@@ -101,6 +101,35 @@ describe("POST /api/config — guardado de métodos de pago", () => {
     expect((inserts[0].payload as MetodoBody).payment_method).toBe("bs");
   });
 
+  it("propaga el error del insert de métodos (500, no success silencioso)", async () => {
+    preparar();
+    serviceFake.on("gym_config_payment_methods", "select").reply({ data: [] });
+    serviceFake.on("gym_config_payment_methods", "insert").reply({
+      error: { message: "duplicate key value violates unique constraint" },
+    });
+
+    const { status, body } = await guardar([metodo("efectivo", true)]);
+
+    expect(status).toBe(500);
+    expect(body.error).toContain("duplicate key");
+  });
+
+  it("propaga el error al desactivar métodos previos", async () => {
+    preparar();
+    serviceFake.on("gym_config_payment_methods", "select").reply({
+      data: [{ id: "m1", payment_method: "efectivo", is_active: true }],
+    });
+    serviceFake.on("gym_config_payment_methods", "update").reply({
+      error: { message: "permission denied" },
+    });
+
+    const { status, body } = await guardar([metodo("bs", true)]);
+
+    expect(status).toBe(500);
+    expect(body.error).toContain("permission denied");
+    expect(serviceFake.callsTo("gym_config_payment_methods", "insert")).toHaveLength(0);
+  });
+
   it("sin métodos activos no inserta nada (solo desactiva)", async () => {
     preparar();
     serviceFake.on("gym_config_payment_methods", "select").reply({

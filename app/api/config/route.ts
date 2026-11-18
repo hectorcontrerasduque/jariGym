@@ -99,18 +99,24 @@ export async function POST(request: Request) {
 
     // Save payment methods
     if (Array.isArray(metodos)) {
-      const { data: existingMethods } = await serviceSupabase
+      const { data: existingMethods, error: existingMethodsError } = await serviceSupabase
         .from("gym_config_payment_methods")
         .select("*");
+      if (existingMethodsError) {
+        return NextResponse.json({ error: existingMethodsError.message }, { status: 500 });
+      }
 
       // Versionado temporal: se desactivan los previos y se inserta una fila
       // nueva por cada método activo (varios pueden estar activos a la vez).
       for (const m of existingMethods || []) {
         if (m.is_active) {
-          await serviceSupabase
+          const { error } = await serviceSupabase
             .from("gym_config_payment_methods")
             .update({ is_active: false, effective_to: new Date().toISOString().split("T")[0] })
             .eq("id", m.id);
+          if (error) {
+            return NextResponse.json({ error: error.message }, { status: 500 });
+          }
         }
       }
 
@@ -121,13 +127,16 @@ export async function POST(request: Request) {
         is_active: boolean;
       }>).filter((m) => m.is_active);
       for (const activo of activos) {
-        await serviceSupabase.from("gym_config_payment_methods").insert({
+        const { error } = await serviceSupabase.from("gym_config_payment_methods").insert({
           payment_method: activo.payment_method,
           amount_monthly: activo.amount_monthly,
           amount_inscription: activo.amount_inscription,
           is_active: true,
           effective_from: new Date().toISOString().split("T")[0],
         });
+        if (error) {
+          return NextResponse.json({ error: error.message }, { status: 500 });
+        }
       }
     }
 

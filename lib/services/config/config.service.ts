@@ -131,17 +131,19 @@ export class ConfigService {
   }
 
   async saveMetodosPago(metodos: PaymentMethod[]): Promise<void> {
-    const { data: existingRecords } = await this.supabase
+    const { data: existingRecords, error: existingError } = await this.supabase
       .from("gym_config_payment_methods")
       .select("*");
+    if (existingError) throw existingError;
 
     // Desactivar todos los registros existentes primero
     for (const existing of existingRecords || []) {
       if (existing.is_active) {
-        await this.supabase
+        const { error } = await this.supabase
           .from("gym_config_payment_methods")
           .update({ is_active: false, effective_to: new Date().toISOString().split("T")[0] })
           .eq("id", existing.id);
+        if (error) throw error;
       }
     }
 
@@ -149,13 +151,14 @@ export class ConfigService {
     // (varios pueden estar activos a la vez, p. ej. efectivo + bs).
     const activos = metodos.filter((m) => m.is_active);
     for (const activo of activos) {
-      await this.supabase.from("gym_config_payment_methods").insert({
+      const { error } = await this.supabase.from("gym_config_payment_methods").insert({
         payment_method: activo.payment_method,
         amount_monthly: activo.amount_monthly,
         amount_inscription: activo.amount_inscription,
         is_active: true,
         effective_from: new Date().toISOString().split("T")[0],
       });
+      if (error) throw error;
     }
   }
 

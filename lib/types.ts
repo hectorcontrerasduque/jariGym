@@ -165,6 +165,7 @@ export interface GymConfig {
   color_borde: string | null;
   font_family: string | null;
   bs_bank_info: BsBankInfo | null;
+  default_payment_method: MetodoPago | null;
   created_at: string;
   updated_at: string;
   created_by: string | null;

@@ -1111,6 +1111,16 @@ components:
         color_superficie: { type: [string, "null"], description: "Color de superficie: menú, tarjetas, modal (#hex). Default #111827." }
         color_borde: { type: [string, "null"], description: "Color de marcos y bordes internos (#hex). Default #1E293B." }
         font_family: { type: [string, "null"], description: "Familia tipográfica CSS; null = fuente por defecto (Inter/Space Grotesk)." }
+        bs_bank_info:
+          type: [object, "null"]
+          description: "Datos bancarios para pagos en Bs: pago móvil (banco/cédula/teléfono) y/o transferencia (banco/tipo_cuenta/numero_transferencia/titular)."
+          properties:
+            banco: { type: string }
+            cedula: { type: string }
+            telefono: { type: string }
+            tipo_cuenta: { type: string, enum: [ahorro, corriente, ""] }
+            numero_transferencia: { type: string, pattern: "^\\d{20}$", description: "20 dígitos; se guarda como string para conservar ceros iniciales." }
+            titular: { type: string }
     Profile:
       type: object
       description: Fila de `profiles` (`lib/types.ts`).

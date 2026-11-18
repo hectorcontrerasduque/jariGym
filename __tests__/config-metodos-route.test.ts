@@ -124,6 +124,35 @@ describe("POST /api/config — guardado de métodos de pago", () => {
   });
 });
 
+describe("POST /api/config — datos bancarios BS", () => {
+  it("persiste bs_bank_info en gym_config", async () => {
+    preparar();
+
+    const bs_bank_info = {
+      banco: "Banesco",
+      cedula: "V-12345678",
+      telefono: "04141234567",
+      tipo_cuenta: "ahorro",
+      numero_transferencia: "00123456789012345678",
+      titular: "Ana Pérez",
+    };
+
+    const { POST } = await import("@/app/api/config/route");
+    const res = await POST(
+      new Request("http://localhost/api/config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ config: { bs_bank_info } }),
+      })
+    );
+
+    expect(res.status).toBe(200);
+    const updates = serviceFake.callsTo("gym_config", "update");
+    expect(updates).toHaveLength(1);
+    expect(updates[0].payload).toMatchObject({ bs_bank_info });
+  });
+});
+
 describe("POST /api/config — personalización de la app", () => {
   it("persiste colores y fuente en gym_config sin tocar campos de solo lectura", async () => {
     preparar();

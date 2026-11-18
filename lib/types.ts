@@ -133,6 +133,15 @@ export interface Movimiento {
   profile?: Profile;
 }
 
+export interface BsBankInfo {
+  banco: string;
+  cedula: string;
+  telefono: string;
+  tipo_cuenta: "ahorro" | "corriente" | "";
+  numero_transferencia: string;
+  titular: string;
+}
+
 export interface GymConfig {
   id: string;
   logo_url: string | null;
@@ -155,6 +164,7 @@ export interface GymConfig {
   color_superficie: string | null;
   color_borde: string | null;
   font_family: string | null;
+  bs_bank_info: BsBankInfo | null;
   created_at: string;
   updated_at: string;
   created_by: string | null;

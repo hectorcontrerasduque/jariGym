@@ -5,6 +5,7 @@ import Image from "next/image";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { METODOS_PAGO_DEFAULT } from "@/lib/services/config/config.service";
+import { BS_BANK_INFO_DEFAULT, validarBsBankInfo } from "@/lib/services/config/bank-info";
 import { createClient } from "@/lib/supabase/client";
 import { Save, Building2, User, CreditCard, Upload, Dumbbell, Trash2, Landmark, Palette } from "lucide-react";
 import { showToast } from "@/components/ui/toast";
@@ -12,7 +13,7 @@ import { Loader } from "@/components/ui/loader";
 import { ModalBcv } from "@/components/tasas/modal-bcv";
 import { ModalPersonalizacionApp } from "@/components/configuracion/modal-personalizacion-app";
 import { messages } from "@/lib/messages";
-import type { GymConfig, MetodoPago, PaymentMethod } from "@/lib/types";
+import type { GymConfig, MetodoPago, PaymentMethod, BsBankInfo } from "@/lib/types";
 import type { TasaFila } from "@/lib/features/tasas/domain";
 import { getAdminLevel, isFullAdmin } from "@/lib/admin-level";
 import { useRouter } from "next/navigation";
@@ -113,6 +114,21 @@ export default function ConfiguracionPage() {
       return;
     }
 
+    const bsActivo = metodos.some((m) => m.payment_method === "bs" && m.is_active);
+    if (bsActivo) {
+      const validacion = validarBsBankInfo(config.bs_bank_info);
+      if (!validacion.ok) {
+        showToast(
+          validacion.numeroInvalido
+            ? messages.configuracion.bsNumeroInvalido
+            : messages.configuracion.bsBankInfoRequerido,
+          "error"
+        );
+        metodosRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+        return;
+      }
+    }
+
     setSaving(true);
     try {
       const res = await fetch("/api/config", {
@@ -152,6 +168,13 @@ export default function ConfiguracionPage() {
         m.payment_method === metodoPago ? { ...m, [field]: value } : m
       )
     );
+  };
+
+  const handleUpdateBankInfo = <K extends keyof BsBankInfo>(field: K, value: BsBankInfo[K]) => {
+    setConfig((prev) => ({
+      ...prev,
+      bs_bank_info: { ...BS_BANK_INFO_DEFAULT, ...prev.bs_bank_info, [field]: value },
+    }));
   };
 
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -389,6 +412,79 @@ export default function ConfiguracionPage() {
                       min="0"
                       step="0.01"
                     />
+                  </div>
+                )}
+                {metodo.is_active && metodo.payment_method === "bs" && (
+                  <div className="mt-4 pt-4 border-t border-gym-border/40 space-y-3">
+                    <div>
+                      <p className="text-sm font-medium text-gym-text">{messages.configuracion.datosBancariosBs}</p>
+                      <p className="text-xs text-gym-muted">{messages.configuracion.datosBancariosBsAyuda}</p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <Input
+                        id="bs-banco"
+                        name="bs_banco"
+                        label={`${messages.configuracion.banco} *`}
+                        type="text"
+                        placeholder="Banesco"
+                        value={config.bs_bank_info?.banco || ""}
+                        onChange={(e) => handleUpdateBankInfo("banco", e.target.value)}
+                      />
+                      <Input
+                        id="bs-cedula"
+                        name="bs_cedula"
+                        label={messages.configuracion.cedulaMovil}
+                        type="text"
+                        placeholder="V-12345678"
+                        value={config.bs_bank_info?.cedula || ""}
+                        onChange={(e) => handleUpdateBankInfo("cedula", e.target.value)}
+                      />
+                      <Input
+                        id="bs-telefono"
+                        name="bs_telefono"
+                        label={messages.configuracion.telefonoMovil}
+                        type="text"
+                        placeholder="04141234567"
+                        value={config.bs_bank_info?.telefono || ""}
+                        onChange={(e) => handleUpdateBankInfo("telefono", e.target.value)}
+                      />
+                      <div className="space-y-1">
+                        <label htmlFor="bs-tipo-cuenta" className="block text-sm font-medium text-gym-muted">
+                          {messages.configuracion.tipoCuenta}
+                        </label>
+                        <select
+                          id="bs-tipo-cuenta"
+                          name="bs_tipo_cuenta"
+                          value={config.bs_bank_info?.tipo_cuenta || ""}
+                          onChange={(e) => handleUpdateBankInfo("tipo_cuenta", e.target.value as BsBankInfo["tipo_cuenta"])}
+                          className="w-full px-4 py-2.5 bg-gym-bg border border-gym-border rounded-xl text-gym-text focus:outline-none focus:ring-2 focus:ring-gym-primary focus:border-transparent transition-all duration-200"
+                        >
+                          <option value="">{messages.configuracion.tipoCuentaPlaceholder}</option>
+                          <option value="ahorro">{messages.configuracion.tipoCuentaAhorro}</option>
+                          <option value="corriente">{messages.configuracion.tipoCuentaCorriente}</option>
+                        </select>
+                      </div>
+                      <Input
+                        id="bs-numero"
+                        name="bs_numero_transferencia"
+                        label={`${messages.configuracion.numeroTransferencia} · ${messages.configuracion.numeroTransferenciaAyuda}`}
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={20}
+                        placeholder="01340123456789012345"
+                        value={config.bs_bank_info?.numero_transferencia || ""}
+                        onChange={(e) => handleUpdateBankInfo("numero_transferencia", e.target.value.replace(/\D/g, "").slice(0, 20))}
+                      />
+                      <Input
+                        id="bs-titular"
+                        name="bs_titular"
+                        label={messages.configuracion.titularCuenta}
+                        type="text"
+                        placeholder="Nombre y apellido"
+                        value={config.bs_bank_info?.titular || ""}
+                        onChange={(e) => handleUpdateBankInfo("titular", e.target.value)}
+                      />
+                    </div>
                   </div>
                 )}
                 {metodo.is_active && metodo.payment_method === "bs" && (

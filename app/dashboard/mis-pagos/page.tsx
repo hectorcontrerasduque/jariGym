@@ -154,6 +154,14 @@ function MisPagosContent() {
     () => metodoPorDefecto(metodosPago, gymConfig?.default_payment_method),
     [metodosPago, gymConfig]
   );
+  /** Orden de presentación: primero el método por defecto, luego el resto. */
+  const metodosOrdenados = useMemo(() => {
+    if (!metodoPredeterminado) return metodosHabilitados;
+    return [
+      ...metodosHabilitados.filter((m) => m.payment_method === metodoPredeterminado),
+      ...metodosHabilitados.filter((m) => m.payment_method !== metodoPredeterminado),
+    ];
+  }, [metodosHabilitados, metodoPredeterminado]);
   const formDataInicial = useCallback(
     () => formDataVacio(metodoPredeterminado ?? "efectivo"),
     [metodoPredeterminado]
@@ -1562,7 +1570,7 @@ function MisPagosContent() {
                   <div>
                     <p className="block text-sm font-medium text-gym-muted mb-2">{messages.misPagos.metodoPago}</p>
                     <div className="flex gap-2">
-                      {metodosHabilitados.map(m => (
+                      {metodosOrdenados.map(m => (
                         <button
                           key={m.payment_method}
                           type="button"
@@ -1570,7 +1578,7 @@ function MisPagosContent() {
                           className={`flex-1 p-2 rounded-xl text-sm font-medium transition-all ${
                             formData.metodo_pago === m.payment_method
                               ? "bg-gym-primary text-white"
-                              : "bg-gym-bg text-gym-muted border border-gym-border hover:border-gym-primary"
+                              : "bg-gym-primary/25 text-white/70 border border-gym-primary/25 hover:bg-gym-primary/40"
                           }`}
                         >
                           {m.payment_method === "efectivo" ? `💵 ${messages.metodoPago.efectivo}` : m.payment_method === "bs" ? <><FlagVe className="mr-1 w-4 h-3" /> {messages.metodoPago.bs}</> : `🟡 ${messages.metodoPago.binance}`}

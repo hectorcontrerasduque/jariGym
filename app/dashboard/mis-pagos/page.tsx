@@ -12,7 +12,7 @@ import { comprimirImagen, esImagenComprimible } from "@/lib/features/pagos/compr
 import { leerComprobante, parseNumero } from "@/lib/features/pagos/ocr";
 import { createClient } from "@/lib/supabase/client";
 import { formatCurrency, formatDate, getMonthName, getDiaCobro, metodoPrincipal } from "@/lib/utils";
-import { CreditCard, CheckCircle, Clock, Calendar, Eye, Trash2, FileText, Plus, Search, Gift, AlertTriangle, ChevronDown, ChevronRight, X, Save, Phone, Mail, MapPin, XCircle, BellRing } from "lucide-react";
+import { CreditCard, CheckCircle, Clock, Calendar, Eye, Trash2, FileText, Plus, Search, Gift, AlertTriangle, ChevronDown, ChevronRight, X, Save, Phone, Mail, MapPin, XCircle, BellRing, Landmark } from "lucide-react";
 import { showToast } from "@/components/ui/toast";
 import { Modal } from "@/components/ui/modal";
 import { messages } from "@/lib/messages";
@@ -142,6 +142,7 @@ function MisPagosContent() {
 
   const [formData, setFormData] = useState(formDataVacio);
   const [comprobante, setComprobante] = useState<File | null>(null);
+  const [showDatosBancarios, setShowDatosBancarios] = useState(false);
   /** Token del comprobante actual: invalida resultados OCR de archivos ya reemplazados. */
   const comprobanteVersionRef = useRef(0);
   const [showPagosRealizados, setShowPagosRealizados] = useState(true);
@@ -1606,8 +1607,19 @@ function MisPagosContent() {
                 {/* Campos BS: monto en bolívares + banco + referencia (OCR prellena) */}
                 {!formData.solicitar_suspension && formData.metodo_pago === "bs" && (
                   <div className="p-3 bg-gym-bg rounded-xl border border-gym-border space-y-3">
-                    <DatosPagoBs info={gymConfig?.bs_bank_info} />
-                    <p className="text-sm font-medium text-gym-muted">{messages.bolivares.datosBs}</p>
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-medium text-gym-muted">{messages.bolivares.datosBs}</p>
+                      <button
+                        type="button"
+                        onClick={() => setShowDatosBancarios(true)}
+                        title={messages.bolivares.datosPago.titulo}
+                        aria-label={messages.bolivares.datosPago.titulo}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-gym-primary bg-gym-primary/10 border border-gym-primary/30 rounded-lg hover:bg-gym-primary/20 transition-colors"
+                      >
+                        <Landmark className="w-4 h-4" />
+                        {messages.bolivares.datosPago.titulo}
+                      </button>
+                    </div>
                     <div>
                       <label htmlFor="amount-bs" className="block text-xs font-medium text-gym-muted mb-1">
                         {messages.bolivares.montoBs} *
@@ -1918,6 +1930,17 @@ function MisPagosContent() {
           </CardContent>
         </Card>
       )}
+
+      {/* Datos bancarios para pagar en Bs */}
+      <Modal
+        isOpen={showDatosBancarios}
+        onClose={() => setShowDatosBancarios(false)}
+        title={messages.bolivares.datosPago.titulo}
+      >
+        <div className="p-4">
+          <DatosPagoBs info={gymConfig?.bs_bank_info} />
+        </div>
+      </Modal>
 
       {/* Detail Modal */}
       <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)} title="Detalle del Pago">

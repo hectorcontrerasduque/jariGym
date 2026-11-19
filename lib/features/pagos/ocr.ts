@@ -43,12 +43,62 @@ const BANCOS: string[] = [
   "Venezolano de Crédito",
 ];
 
-/** Etiquetas que preceden a la referencia/operación en recibos. */
-const ETIQUETAS_REFERENCIA =
-  /(?:referencia|nro\.?\s*operaci[oó]n|n[uú]mero\s*de\s*operaci[oó]n|transacci[oó]n|c[oó]digo\s*de\s*operaci[oó]n|receipt|operation)\s*[:#]?\s*([A-Z0-9-]{4,})/i;
+/** Siglas → nombre canónico (los recibos suelen mostrar la sigla del banco). */
+const ALIAS_BANCOS: { nombre: string; alias: string }[] = [
+  { nombre: "Banco de Venezuela", alias: "bdv" },
+];
 
-// NOTA: el regex de arriba es lineal (sin anidamiento ni cuantificadores ambiguos)
-// — detect-unsafe-regex lo acepta. El de montos se construye abajo de forma simple.
+/** Busca un banco conocido (nombre o sigla) en un fragmento de texto. */
+function buscarBancoEn(texto: string): string {
+  const bajo = texto.toLowerCase();
+  for (const { nombre, alias } of ALIAS_BANCOS) {
+    if (bajo.includes(alias)) return nombre;
+  }
+  for (const banco of BANCOS) {
+    if (bajo.includes(banco.toLowerCase())) return banco;
+  }
+  return "";
+}
+
+/** Primer banco conocido según su posición en el texto (no en la lista). */
+function primerBancoEnTexto(texto: string): string {
+  const bajo = texto.toLowerCase();
+  let mejor = "";
+  let mejorIndice = Number.POSITIVE_INFINITY;
+  const candidatos = [
+    ...ALIAS_BANCOS.map(({ nombre, alias }) => ({ nombre, clave: alias })),
+    ...BANCOS.map((nombre) => ({ nombre, clave: nombre.toLowerCase() })),
+  ];
+  for (const { nombre, clave } of candidatos) {
+    const indice = bajo.indexOf(clave);
+    if (indice !== -1 && indice < mejorIndice) {
+      mejorIndice = indice;
+      mejor = nombre;
+    }
+  }
+  return mejor;
+}
+
+/** Líneas con etiquetas que NO contienen un monto (operación, referencia, etc.). */
+const LINEA_NO_MONTO =
+  /operaci[oó]n|referencia|transacci[oó]n|secuencia|confirmaci[oó]n|control|c[eé]dula|rif|tel[eé]fono|cuenta|tarjeta|fecha|hora/i;
+
+/** Líneas donde suele aparecer el importe principal. */
+const LINEA_MONTO = /monto|total|importe|pagad/i;
+
+/** Etiquetas del banco desde el que paga el miembro (el emisor). */
+const ETIQUETA_EMISOR = /emisor|origen/i;
+
+/** Etiquetas que preceden a la referencia/operación en recibos. */
+const ETIQUETAS_OPERACION =
+  /(?:operaci[oó]n|secuencia|confirmaci[oó]n|receipt|operation)[\s:#]*([A-Z0-9][A-Z0-9-]{3,})/i;
+
+const ETIQUETAS_REFERENCIA =
+  /(?:referencia|transacci[oó]n)[\s:#]*([A-Z0-9][A-Z0-9-]{3,})/i;
+
+
+// NOTA: los regex de arriba son lineales (sin anidamiento ni cuantificadores
+// ambiguos) — detect-unsafe-regex los acepta.
 
 /**
  * Ejecuta OCR sobre un archivo de imagen y devuelve los datos detectados.
@@ -87,12 +137,26 @@ export function extraerDatos(texto: string): DatosComprobante {
 }
 
 /**
- * Monto en Bs: el número más grande del texto que parezca un importe.
- * Acepta "1.500.000,00", "1,500,000.00", "Bs 1500000".
+ * Monto en Bs: se prioriza el número marcado como moneda ("1.500.000,00 Bs" /
+ * "Bs 1.500.000,00"), luego el de una línea de monto/total, y por último el
+ * mayor de las líneas que no son de operación/referencia/datos personales.
+ * Así el número de operación (más largo que el monto) nunca gana.
  */
 export function extraerMonto(texto: string): number {
-  // Lineal: dígito seguido de dígitos/puntos/comas (sin cuantificadores anidados).
-  const candidatos = texto.match(/\d[\d.,]*/g);
+  const lineas = texto
+    .split("\n")
+    .map((l) => l.replace(/\s+/g, " ").trim())
+    .filter((l) => l !== "" && !LINEA_NO_MONTO.test(l));
+
+  const conEtiqueta = lineas.filter((l) => LINEA_MONTO.test(l)).join("\n");
+  const preferido = mayorConMoneda(conEtiqueta);
+  if (preferido > 0) return preferido;
+
+  const enMoneda = mayorConMoneda(lineas.join("\n"));
+  if (enMoneda > 0) return enMoneda;
+
+  // Fallback: mayor número de las líneas permitidas (como antes).
+  const candidatos = lineas.join("\n").match(/\d[\d.,]*/g);
   if (!candidatos) return 0;
 
   let mejor = 0;
@@ -100,6 +164,20 @@ export function extraerMonto(texto: string): number {
     const valor = parseNumero(c);
     // Umbral: montos en Bs suelen ser grandes; ignoramos códigos pequeños.
     if (valor > mejor && valor >= 100) mejor = valor;
+  }
+  return mejor;
+}
+
+/** Mayor número marcado como moneda (Bs antes o después) en un texto. */
+function mayorConMoneda(texto: string): number {
+  if (!texto) return 0;
+  const patrones = [/(\d[\d.,]*)\s*bs\b/gi, /\bbs\.?\s*(\d[\d.,]*)/gi];
+  let mejor = 0;
+  for (const patron of patrones) {
+    for (const m of texto.matchAll(patron)) {
+      const valor = parseNumero(m[1] ?? "");
+      if (valor > mejor && valor >= 100) mejor = valor;
+    }
   }
   return mejor;
 }
@@ -148,19 +226,38 @@ function esMiles(texto: string, sep: string): boolean {
   return partes.slice(1).every((p) => p.length === 3);
 }
 
-/** Banco: busca un nombre conocido en el texto (case-insensitive). */
+/**
+ * Banco: el recibo de pago móvil muestra banco destino y banco emisor. El
+ * miembro paga DESDE su banco (emisor), así que se prioriza el banco emisor
+ * (etiqueta "banco emisor/origen"; sigla BDV → Banco de Venezuela). Si no hay
+ * etiqueta de emisor, se usa el primer banco conocido del texto.
+ */
 export function extraerBanco(texto: string): string {
-  const bajo = texto.toLowerCase();
-  for (const banco of BANCOS) {
-    if (bajo.includes(banco.toLowerCase())) return banco;
+  // Etiqueta de emisor/origen: el banco puede estar en la misma línea o en la
+  // siguiente (recibos con etiqueta y valor en líneas separadas).
+  let buscarEnSiguiente = false;
+  for (const linea of texto.split("\n")) {
+    if (buscarEnSiguiente) {
+      const enSiguiente = buscarBancoEn(linea);
+      if (enSiguiente) return enSiguiente;
+      buscarEnSiguiente = false;
+    }
+    if (!ETIQUETA_EMISOR.test(linea)) continue;
+    const enLinea = buscarBancoEn(linea);
+    if (enLinea) return enLinea;
+    buscarEnSiguiente = true;
   }
-  return "";
+
+  // Fallback: el primer banco que aparece en el recibo (suele ser el emisor).
+  return primerBancoEnTexto(texto);
 }
 
-/** Referencia: número junto a una etiqueta típica de recibo. */
+/** Referencia: número de operación (o referencia/transacción) del recibo. */
 export function extraerReferencia(texto: string): string {
-  const m = texto.match(ETIQUETAS_REFERENCIA);
-  if (m?.[1]) return m[1].trim();
-  // Sin etiqueta: si hay un código alfanumérico largo suelto, mejor no adivinar.
+  for (const patron of [ETIQUETAS_OPERACION, ETIQUETAS_REFERENCIA]) {
+    const m = texto.match(patron);
+    const codigo = (m?.[1] ?? "").trim();
+    if (/\d/.test(codigo)) return codigo;
+  }
   return "";
 }

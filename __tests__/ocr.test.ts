@@ -41,6 +41,20 @@ describe("ocr — extraerMonto", () => {
   it("devuelve 0 si no hay candidatos", () => {
     expect(extraerMonto("sin montos aquí")).toBe(0);
   });
+
+  it("prefiere el número con Bs sobre un código más largo", () => {
+    const texto = "Nro. de operación: 2026031512345678\nMonto: 1.500.000,00 Bs";
+    expect(extraerMonto(texto)).toBe(1_500_000);
+  });
+
+  it("nunca toma el número de operación como monto", () => {
+    const texto = "Banco emisor: BDV\nNro. de operación: 0012345678\nImporte: 2.000.000,00 Bs";
+    expect(extraerMonto(texto)).toBe(2_000_000);
+  });
+
+  it("acepta el monto con Bs antepuesto", () => {
+    expect(extraerMonto("Operación: 9999999999\nTotal Bs 1.250.000,50")).toBe(1_250_000.5);
+  });
 });
 
 describe("ocr — extraerBanco", () => {
@@ -53,6 +67,23 @@ describe("ocr — extraerBanco", () => {
   it("devuelve vacío si no reconoce el banco", () => {
     expect(extraerBanco("Transferencia desconocida")).toBe("");
   });
+
+  it("prioriza el banco emisor sobre el destino", () => {
+    const texto = "Banco destino: 0134 Mercantil\nBanco emisor: 0102 Banco de Venezuela";
+    expect(extraerBanco(texto)).toBe("Banco de Venezuela");
+  });
+
+  it("reconoce la sigla BDV como Banco de Venezuela", () => {
+    expect(extraerBanco("Banco destino: Banesco\nBanco emisor: BDV")).toBe("Banco de Venezuela");
+  });
+
+  it("soporta la etiqueta de emisor con el valor en la línea siguiente", () => {
+    expect(extraerBanco("Banco emisor\n0102 Banco de Venezuela")).toBe("Banco de Venezuela");
+  });
+
+  it("sin etiqueta de emisor usa el primer banco del texto", () => {
+    expect(extraerBanco("Banco de Venezuela\nBanco destino: Mercantil")).toBe("Banco de Venezuela");
+  });
 });
 
 describe("ocr — extraerReferencia", () => {
@@ -64,6 +95,13 @@ describe("ocr — extraerReferencia", () => {
 
   it("devuelve vacío sin etiqueta (no adivina)", () => {
     expect(extraerReferencia("solo texto libre 12345")).toBe("");
+  });
+
+  it("reconoce variantes de 'Nro. de operación'", () => {
+    expect(extraerReferencia("Nro. de operación: 0012345678")).toBe("0012345678");
+    expect(extraerReferencia("Nro de operacion 0012345678")).toBe("0012345678");
+    expect(extraerReferencia("N° de operación: 0012345678")).toBe("0012345678");
+    expect(extraerReferencia("Número de la operación: 0012345678")).toBe("0012345678");
   });
 });
 
@@ -86,5 +124,22 @@ describe("ocr — extraerDatos (integración)", () => {
     expect(datos.amount_bs).toBe(0);
     expect(datos.bank).toBe("");
     expect(datos.reference_number).toBe("");
+  });
+
+  it("parsea un comprobante de pago móvil BDV (destino ≠ emisor)", () => {
+    const recibo = `
+      COMPROBANTE DE PAGO MÓVIL
+      Banco destino: 0134 Mercantil
+      Cédula/RIF destino: V-12345678
+      Banco emisor: 0102 Banco de Venezuela
+      Cédula/RIF emisor: V-87654321
+      Monto: 1.500.000,00 Bs
+      Nro. de operación: 0012345678
+      Fecha: 15/03/2026
+    `;
+    const datos = extraerDatos(recibo);
+    expect(datos.amount_bs).toBe(1_500_000);
+    expect(datos.bank).toBe("Banco de Venezuela");
+    expect(datos.reference_number).toBe("0012345678");
   });
 });

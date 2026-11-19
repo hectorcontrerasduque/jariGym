@@ -10,11 +10,12 @@ import { dedupeMetodos, metodosActivos, metodoPorDefecto } from "@/lib/features/
 import { datosPagoBs } from "@/lib/features/pagos/domain/banco";
 import { miembrosService } from "@/lib/services/miembros/miembros.service";
 import { createClient } from "@/lib/supabase/client";
-import { Upload, CheckCircle, DollarSign, User, FileText, Gift, Calendar, ArrowLeft, AlertTriangle, Send } from "lucide-react";
+import { CheckCircle, DollarSign, User, FileText, Gift, Calendar, ArrowLeft, AlertTriangle, Send } from "lucide-react";
 import { getMonthName, formatCurrency } from "@/lib/utils";
 import { Loader } from "@/components/ui/loader";
 import { FlagVe } from "@/components/ui/flag-ve";
 import { DatosPagoBs } from "@/components/pagos/datos-pago-bs";
+import { ComprobanteInput } from "@/components/pagos/comprobante-input";
 import { showToast } from "@/components/ui/toast";
 import { messages } from "@/lib/messages";
 import { calcularEstadoPush, debePedirActivacion } from "@/lib/features/push/dispositivo";
@@ -655,14 +656,12 @@ function ReportarPagoForm() {
 
             {/* Comprobante for non-cash */}
             {needsComprobante(formData.metodo_pago) && (
-              <div>
-                <label className="block text-sm font-medium text-gym-muted mb-2">Comprobante de pago</label>
-                <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gym-border rounded-xl cursor-pointer hover:border-gym-primary transition-colors">
-                  <Upload className="w-8 h-8 text-gym-muted mb-2" />
-                  <span className="text-sm text-gym-muted">{comprobante ? comprobante.name : "Adjuntar imagen o PDF"}</span>
-                  <input type="file" className="hidden" accept="image/*,.pdf" onChange={(e) => setComprobante(e.target.files?.[0] || null)} />
-                </label>
-              </div>
+              <ComprobanteInput
+                file={comprobante}
+                onSelect={setComprobante}
+                label={messages.bolivares.comprobanteLabel}
+                textoVacio={messages.bolivares.adjuntarImagenPdf}
+              />
             )}
 
             {/* Notes */}

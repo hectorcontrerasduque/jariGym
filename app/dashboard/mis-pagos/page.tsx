@@ -12,7 +12,7 @@ import { comprimirImagen, esImagenComprimible } from "@/lib/features/pagos/compr
 import { leerComprobante, parseNumero } from "@/lib/features/pagos/ocr";
 import { createClient } from "@/lib/supabase/client";
 import { formatCurrency, formatDate, getMonthName, getDiaCobro, metodoPrincipal } from "@/lib/utils";
-import { CreditCard, CheckCircle, Clock, Calendar, Eye, Trash2, FileText, Plus, Search, Upload, Gift, AlertTriangle, ChevronDown, ChevronRight, X, Save, Phone, Mail, MapPin, XCircle, BellRing } from "lucide-react";
+import { CreditCard, CheckCircle, Clock, Calendar, Eye, Trash2, FileText, Plus, Search, Gift, AlertTriangle, ChevronDown, ChevronRight, X, Save, Phone, Mail, MapPin, XCircle, BellRing } from "lucide-react";
 import { showToast } from "@/components/ui/toast";
 import { Modal } from "@/components/ui/modal";
 import { messages } from "@/lib/messages";
@@ -20,6 +20,7 @@ import { Avatar } from "@/components/ui/avatar";
 import { Loader } from "@/components/ui/loader";
 import { FlagVe } from "@/components/ui/flag-ve";
 import { DatosPagoBs } from "@/components/pagos/datos-pago-bs";
+import { ComprobanteInput } from "@/components/pagos/comprobante-input";
 import type { Payment, Profile, MetodoPago, PaymentMethod, GymConfig, PaymentBolivar } from "@/lib/types";
 
 /** Estado vacío del formulario de pago (incluye campos BS). */
@@ -138,6 +139,8 @@ function MisPagosContent() {
 
   const [formData, setFormData] = useState(formDataVacio);
   const [comprobante, setComprobante] = useState<File | null>(null);
+  /** Token del comprobante actual: invalida resultados OCR de archivos ya reemplazados. */
+  const comprobanteVersionRef = useRef(0);
   const [showPagosRealizados, setShowPagosRealizados] = useState(true);
 
   /** Métodos habilitados en Config (el estado ya viene deduplicado). */
@@ -365,7 +368,7 @@ function MisPagosContent() {
     setShowSearch(false);
     setMiembroSearch("");
     setFormData(formDataInicial());
-    setComprobante(null);
+    limpiarComprobante();
   };
 
   const toggleMonth = (month_number: number, year_number: number) => {
@@ -440,11 +443,17 @@ function MisPagosContent() {
    * monto/banco/referencia. El miembro edita y confirma antes de enviar.
    */
   const handleComprobanteChange = async (file: File | null) => {
+    if (!file) {
+      limpiarComprobante();
+      return;
+    }
+    const version = ++comprobanteVersionRef.current;
     setComprobante(file);
-    if (!file || formData.metodo_pago !== "bs" || !esImagenComprimible(file)) return;
+    if (formData.metodo_pago !== "bs" || !esImagenComprimible(file)) return;
     setOcrCargando(true);
     try {
       const datos = await leerComprobante(file);
+      if (version !== comprobanteVersionRef.current) return;
       setFormData((prev) => ({
         ...prev,
         amount_bs: datos.amount_bs > 0 ? String(datos.amount_bs) : prev.amount_bs,
@@ -452,10 +461,18 @@ function MisPagosContent() {
         reference_number: datos.reference_number || prev.reference_number,
       }));
     } catch {
+      if (version !== comprobanteVersionRef.current) return;
       showToast(messages.bolivares.ocrError, "warning");
     } finally {
-      setOcrCargando(false);
+      if (version === comprobanteVersionRef.current) setOcrCargando(false);
     }
+  };
+
+  /** Quita el comprobante e invalida cualquier OCR en vuelo. */
+  const limpiarComprobante = () => {
+    comprobanteVersionRef.current++;
+    setComprobante(null);
+    setOcrCargando(false);
   };
 
   const handleSubmitPago = async (e: React.FormEvent) => {
@@ -643,7 +660,7 @@ function MisPagosContent() {
         "success"
       );
       setFormData(formDataInicial());
-      setComprobante(null);
+      limpiarComprobante();
       setSubmitted(false);
       await fetchMisPagosData();
       await reloadPendientes();
@@ -1650,32 +1667,18 @@ function MisPagosContent() {
 
                 {/* Comprobante for non-cash */}
                 {!formData.solicitar_suspension && needsComprobante(formData.metodo_pago) && (
-                  <div>
-                    <label htmlFor="comprobante" className="block text-sm font-medium text-gym-muted mb-2">
-                      Comprobante de pago
-                      {formData.metodo_pago === "bs" && <span className="text-gym-danger"> *</span>}
-                    </label>
-                    <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-gym-border rounded-xl cursor-pointer hover:border-gym-primary transition-colors">
-                      <Upload className="w-6 h-6 text-gym-muted mb-1" />
-                      <span className="text-xs text-gym-muted">
-                        {ocrCargando
-                          ? messages.bolivares.procesandoImagen
-                          : comprobante
-                            ? comprobante.name
-                            : formData.metodo_pago === "bs"
-                              ? messages.bolivares.subirComprobante
-                              : "Adjuntar imagen o PDF"}
-                      </span>
-                      <input
-                        id="comprobante"
-                        name="comprobante"
-                        type="file"
-                        className="hidden"
-                        accept="image/*,.pdf"
-                        onChange={(e) => void handleComprobanteChange(e.target.files?.[0] || null)}
-                      />
-                    </label>
-                  </div>
+                  <ComprobanteInput
+                    file={comprobante}
+                    onSelect={(file) => void handleComprobanteChange(file)}
+                    procesando={ocrCargando}
+                    label={messages.bolivares.comprobanteLabel}
+                    obligatorio={formData.metodo_pago === "bs"}
+                    textoVacio={
+                      formData.metodo_pago === "bs"
+                        ? messages.bolivares.subirComprobante
+                        : messages.bolivares.adjuntarImagenPdf
+                    }
+                  />
                 )}
 
                 {/* Notes */}
@@ -1727,7 +1730,7 @@ function MisPagosContent() {
                 <div className="flex gap-2">
                   <Button type="button" variant="secondary" className="flex-1" onClick={() => {
                     setFormData(formDataInicial());
-                    setComprobante(null);
+                    limpiarComprobante();
                     setSubmitted(false);
                   }}>
                     Cancelar

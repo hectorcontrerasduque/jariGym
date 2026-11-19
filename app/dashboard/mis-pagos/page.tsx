@@ -23,6 +23,9 @@ import { DatosPagoBs } from "@/components/pagos/datos-pago-bs";
 import { ComprobanteInput } from "@/components/pagos/comprobante-input";
 import type { Payment, Profile, MetodoPago, PaymentMethod, GymConfig, PaymentBolivar } from "@/lib/types";
 
+/** Carga de imagen de comprobante oculta por ahora; reactivar con el catálogo. */
+const MOSTRAR_CARGA_COMPROBANTE = false;
+
 /** Estado vacío del formulario de pago (incluye campos BS). */
 function formDataVacio(metodo: MetodoPago = "efectivo") {
   return {
@@ -564,7 +567,7 @@ function MisPagosContent() {
           showToast(messages.bolivares.montoBsRequerido, "warning");
           return;
         }
-        if (!comprobante) {
+        if (MOSTRAR_CARGA_COMPROBANTE && !comprobante) {
           showToast(messages.bolivares.comprobanteRequerido, "warning");
           return;
         }
@@ -603,8 +606,9 @@ function MisPagosContent() {
       if (esBs) {
         // ── Flujo PROPIO de bolívares: SIEMPRE pendiente (concilia super_admin
         // en el módulo Pagos). Nunca auto-aprueba, incluso si es super_admin.
-        // La imagen se comprime en el cliente y sube a payments/<id>/comprobante.<ext>.
-        const imagen = await comprimirImagen(comprobante!);
+        // Si hay imagen (carga oculta por ahora), se comprime y sube a
+        // payments/<id>/comprobante.<ext>.
+        const imagen = comprobante ? await comprimirImagen(comprobante) : null;
         const pagoBs = await bolivaresService.crearPago({
           user_id: targetId,
           detalles: detallesEsperados,
@@ -1666,7 +1670,7 @@ function MisPagosContent() {
                 )}
 
                 {/* Comprobante for non-cash */}
-                {!formData.solicitar_suspension && needsComprobante(formData.metodo_pago) && (
+                {MOSTRAR_CARGA_COMPROBANTE && !formData.solicitar_suspension && needsComprobante(formData.metodo_pago) && (
                   <ComprobanteInput
                     file={comprobante}
                     onSelect={(file) => void handleComprobanteChange(file)}

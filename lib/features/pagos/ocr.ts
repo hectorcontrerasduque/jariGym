@@ -81,10 +81,13 @@ function primerBancoEnTexto(texto: string): string {
 
 /** Líneas con etiquetas que NO contienen un monto (operación, referencia, etc.). */
 const LINEA_NO_MONTO =
-  /operaci[oó]n|referencia|transacci[oó]n|secuencia|confirmaci[oó]n|control|c[eé]dula|rif|tel[eé]fono|cuenta|tarjeta|fecha|hora/i;
+  /operaci[oó]n|referencia|transacci[oó]n|secuencia|confirmaci[oó]n|control|c[eé]dula|rif|tel[eé]fono|cuenta|tarjeta|destino|origen|emisor|fecha|hora/i;
 
 /** Líneas donde suele aparecer el importe principal. */
 const LINEA_MONTO = /monto|total|importe|pagad/i;
+
+/** El importe precedido por la etiqueta "Monto" (admite "Monto total:"). */
+const ETIQUETA_MONTO_NUM = /monto\s*(?:total)?\s*:?\s*(\d[\d.,]*)/i;
 
 /** Etiquetas del banco desde el que paga el miembro (el emisor). */
 const ETIQUETA_EMISOR = /emisor|origen/i;
@@ -137,35 +140,36 @@ export function extraerDatos(texto: string): DatosComprobante {
 }
 
 /**
- * Monto en Bs: se prioriza el número marcado como moneda ("1.500.000,00 Bs" /
- * "Bs 1.500.000,00"), luego el de una línea de monto/total, y por último el
- * mayor de las líneas que no son de operación/referencia/datos personales.
- * Así el número de operación (más largo que el monto) nunca gana.
+ * Monto en Bs. El recibo siempre lo identifica de alguna de estas formas:
+ * 1. Número junto a la etiqueta "Monto" ("Monto: 1.500.000,00").
+ * 2. Número marcado con "Bs" en una línea de monto/total/importe.
+ * 3. Número marcado con "Bs" (al inicio o al final) en cualquier otra línea.
+ * Sin ninguna de esas señales devuelve 0: preferimos dejar el campo vacío a
+ * colar el número de operación, destino o cuenta.
  */
 export function extraerMonto(texto: string): number {
   const lineas = texto
     .split("\n")
     .map((l) => l.replace(/\s+/g, " ").trim())
-    .filter((l) => l !== "" && !LINEA_NO_MONTO.test(l));
+    .filter((l) => l !== "");
 
-  const conEtiqueta = lineas.filter((l) => LINEA_MONTO.test(l)).join("\n");
-  const preferido = mayorConMoneda(conEtiqueta);
-  if (preferido > 0) return preferido;
-
-  const enMoneda = mayorConMoneda(lineas.join("\n"));
-  if (enMoneda > 0) return enMoneda;
-
-  // Fallback: mayor número de las líneas permitidas (como antes).
-  const candidatos = lineas.join("\n").match(/\d[\d.,]*/g);
-  if (!candidatos) return 0;
-
-  let mejor = 0;
-  for (const c of candidatos) {
-    const valor = parseNumero(c);
-    // Umbral: montos en Bs suelen ser grandes; ignoramos códigos pequeños.
-    if (valor > mejor && valor >= 100) mejor = valor;
+  // 1. El número que sigue a la etiqueta "Monto".
+  for (const linea of lineas) {
+    const m = linea.match(ETIQUETA_MONTO_NUM);
+    const valor = parseNumero(m?.[1] ?? "");
+    if (valor >= 100) return valor;
   }
-  return mejor;
+
+  // 2. Número con "Bs" en una línea de monto/total/importe.
+  for (const linea of lineas) {
+    if (!LINEA_MONTO.test(linea)) continue;
+    const valor = mayorConMoneda(linea);
+    if (valor > 0) return valor;
+  }
+
+  // 3. Número con "Bs" en cualquier otra línea (evitando operación/datos/destino).
+  const permitidas = lineas.filter((l) => !LINEA_NO_MONTO.test(l));
+  return mayorConMoneda(permitidas.join("\n"));
 }
 
 /** Mayor número marcado como moneda (Bs antes o después) en un texto. */

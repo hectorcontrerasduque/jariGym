@@ -28,7 +28,7 @@ describe("ocr — parseNumero (separadores latinos/anglos)", () => {
 });
 
 describe("ocr — extraerMonto", () => {
-  it("toma el importe más grande >= 100 del recibo", () => {
+  it("toma el monto de la línea con etiqueta 'Monto'", () => {
     const texto = "Pago recibido\nReferencia: 001234\nMonto: 1.500.000,00 Bs";
     expect(extraerMonto(texto)).toBe(1_500_000);
   });
@@ -38,7 +38,7 @@ describe("ocr — extraerMonto", () => {
     expect(extraerMonto(texto)).toBe(250_000);
   });
 
-  it("devuelve 0 si no hay candidatos", () => {
+  it("devuelve 0 si no hay etiqueta de monto ni Bs", () => {
     expect(extraerMonto("sin montos aquí")).toBe(0);
   });
 
@@ -54,6 +54,26 @@ describe("ocr — extraerMonto", () => {
 
   it("acepta el monto con Bs antepuesto", () => {
     expect(extraerMonto("Operación: 9999999999\nTotal Bs 1.250.000,50")).toBe(1_250_000.5);
+  });
+
+  it("no confunde el número de destino con el monto", () => {
+    const texto = "Destino: 01340123456789012345\nMonto: 1.500.000,00 Bs";
+    expect(extraerMonto(texto)).toBe(1_500_000);
+  });
+
+  it("sin monto identificable devuelve 0 (no adivina con el número más grande)", () => {
+    expect(extraerMonto("Cuenta destino: 01340123456789012345")).toBe(0);
+    expect(extraerMonto("Destino: 01340123456789012345")).toBe(0);
+  });
+
+  it("acepta el monto etiquetado aunque no lleve Bs", () => {
+    expect(extraerMonto("Nro. de operación: 0012345678\nMonto: 1.500.000,00")).toBe(1_500_000);
+    expect(extraerMonto("Monto total: 1.500.000,00 Bs")).toBe(1_500_000);
+  });
+
+  it("la etiqueta 'Monto' gana sobre otro número con Bs", () => {
+    const texto = "Saldo: 5.000.000,00 Bs\nMonto: 1.500.000,00 Bs";
+    expect(extraerMonto(texto)).toBe(1_500_000);
   });
 });
 

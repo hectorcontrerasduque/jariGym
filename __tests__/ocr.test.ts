@@ -81,7 +81,7 @@ describe("ocr — extraerBanco", () => {
   it("detecta bancos venezolanos conocidos", () => {
     expect(extraerBanco("BANCO MERCANTIL\nComprobante")).toBe("Mercantil");
     expect(extraerBanco("Banesco Universal")).toBe("Banesco");
-    expect(extraerBanco("BANCO PROVINCIAL")).toBe("Provincial");
+    expect(extraerBanco("BANCO PROVINCIAL")).toBe("BBVA Provincial");
   });
 
   it("devuelve vacío si no reconoce el banco", () => {

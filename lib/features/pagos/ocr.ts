@@ -13,6 +13,8 @@
  * - referencia: número junto a "referencia", "nro. operación", "transacción".
  */
 
+import { bancosEnTexto } from "./domain/bancos";
+
 /** Resultado del OCR — campos editables por el usuario antes de enviar. */
 export interface DatosComprobante {
   /** Monto en Bs detectado (0 si no se encontró). */
@@ -23,60 +25,14 @@ export interface DatosComprobante {
   reference_number: string;
 }
 
-/** Bancos venezolanos reconocibles en los recibos. */
-const BANCOS: string[] = [
-  "Mercantil",
-  "Banesco",
-  "Provincial",
-  "Banco de Venezuela",
-  "Banco Nacional de Crédito",
-  "BNC",
-  "BBVA Provincial",
-  "Banco del Tesoro",
-  "Bicentenario",
-  "Banco Caroní",
-  "100% Banco",
-  "Banco Plaza",
-  "Bancrecer",
-  "Delsur",
-  "Banco Activo",
-  "Venezolano de Crédito",
-];
-
-/** Siglas → nombre canónico (los recibos suelen mostrar la sigla del banco). */
-const ALIAS_BANCOS: { nombre: string; alias: string }[] = [
-  { nombre: "Banco de Venezuela", alias: "bdv" },
-];
-
-/** Busca un banco conocido (nombre o sigla) en un fragmento de texto. */
+/** Busca un banco conocido (nombre o alias) en un fragmento de texto. */
 function buscarBancoEn(texto: string): string {
-  const bajo = texto.toLowerCase();
-  for (const { nombre, alias } of ALIAS_BANCOS) {
-    if (bajo.includes(alias)) return nombre;
-  }
-  for (const banco of BANCOS) {
-    if (bajo.includes(banco.toLowerCase())) return banco;
-  }
-  return "";
+  return bancosEnTexto(texto)[0]?.nombre ?? "";
 }
 
-/** Primer banco conocido según su posición en el texto (no en la lista). */
+/** Primer banco conocido según su posición en el texto. */
 function primerBancoEnTexto(texto: string): string {
-  const bajo = texto.toLowerCase();
-  let mejor = "";
-  let mejorIndice = Number.POSITIVE_INFINITY;
-  const candidatos = [
-    ...ALIAS_BANCOS.map(({ nombre, alias }) => ({ nombre, clave: alias })),
-    ...BANCOS.map((nombre) => ({ nombre, clave: nombre.toLowerCase() })),
-  ];
-  for (const { nombre, clave } of candidatos) {
-    const indice = bajo.indexOf(clave);
-    if (indice !== -1 && indice < mejorIndice) {
-      mejorIndice = indice;
-      mejor = nombre;
-    }
-  }
-  return mejor;
+  return bancosEnTexto(texto)[0]?.nombre ?? "";
 }
 
 /** Líneas con etiquetas que NO contienen un monto (operación, referencia, etc.). */

@@ -22,6 +22,8 @@ import { Avatar } from "@/components/ui/avatar";
 import { Loader } from "@/components/ui/loader";
 import { FlagVe } from "@/components/ui/flag-ve";
 import { DatosPagoBs } from "@/components/pagos/datos-pago-bs";
+import { BancoInput } from "@/components/pagos/banco-input";
+import { canonicalizarBanco } from "@/lib/features/pagos/domain/bancos";
 import { ComprobanteInput } from "@/components/pagos/comprobante-input";
 import type { Payment, Profile, MetodoPago, PaymentMethod, GymConfig, PaymentBolivar } from "@/lib/types";
 
@@ -561,7 +563,7 @@ function MisPagosContent() {
         ...prev,
         amount_bs: datos.amount_bs > 0 ? String(datos.amount_bs) : prev.amount_bs,
         bank: datos.bank || prev.bank,
-        reference_number: datos.reference_number || prev.reference_number,
+        reference_number: (datos.reference_number || prev.reference_number).replace(/\D/g, ""),
       }));
     } catch {
       if (version !== comprobanteVersionRef.current) return;
@@ -676,10 +678,20 @@ function MisPagosContent() {
 
       // Validaciones específicas del flujo BS (no aplican a efectivo/binance).
       let montoBsNum = 0;
+      let bancoNormalizado: string | undefined;
       if (esBs) {
         montoBsNum = parseNumero(formData.amount_bs);
         if (!(montoBsNum > 0)) {
           showToast(messages.bolivares.montoBsRequerido, "warning");
+          return;
+        }
+        bancoNormalizado = canonicalizarBanco(formData.bank) ?? undefined;
+        if (!bancoNormalizado) {
+          showToast(messages.bolivares.bancoRequerido, "warning");
+          return;
+        }
+        if (!/^\d{6,}$/.test(formData.reference_number.trim())) {
+          showToast(messages.bolivares.referenciaRequerida, "warning");
           return;
         }
         if (MOSTRAR_CARGA_COMPROBANTE && !comprobante) {
@@ -722,7 +734,7 @@ function MisPagosContent() {
           user_id: targetId,
           detalles: detallesEsperados,
           amount_bs: montoBsNum,
-          bank: formData.bank || undefined,
+          bank: bancoNormalizado,
           reference_number: formData.reference_number || undefined,
           comprobante: imagen,
           payment_note: paymentNote,
@@ -1816,29 +1828,27 @@ function MisPagosContent() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
                         <label htmlFor="bank-bs" className="block text-xs font-medium text-gym-muted mb-1">
-                          {messages.bolivares.bancoOpcional}
+                          {messages.bolivares.bancoEmisor} <span className="text-gym-danger">*</span>
                         </label>
-                        <input
+                        <BancoInput
                           id="bank-bs"
-                          name="bank"
-                          type="text"
-                          placeholder="Ej: Mercantil"
                           value={formData.bank}
-                          onChange={(e) => setFormData({ ...formData, bank: e.target.value })}
-                          className="w-full px-4 py-2.5 bg-gym-surface border border-gym-border rounded-xl text-gym-text text-sm focus:outline-none focus:ring-2 focus:ring-gym-primary"
+                          onChange={(banco) => setFormData({ ...formData, bank: banco })}
+                          placeholder="Ej: Banco de Venezuela"
                         />
                       </div>
                       <div>
                         <label htmlFor="ref-bs" className="block text-xs font-medium text-gym-muted mb-1">
-                          {messages.bolivares.referenciaOpcional}
+                          {messages.bolivares.referenciaMinimo} <span className="text-gym-danger">*</span>
                         </label>
                         <input
                           id="ref-bs"
                           name="reference_number"
                           type="text"
-                          placeholder="Ej: 00123456"
+                          inputMode="numeric"
+                          placeholder="Ej: 0012345678"
                           value={formData.reference_number}
-                          onChange={(e) => setFormData({ ...formData, reference_number: e.target.value })}
+                          onChange={(e) => setFormData({ ...formData, reference_number: e.target.value.replace(/\D/g, "") })}
                           className="w-full px-4 py-2.5 bg-gym-surface border border-gym-border rounded-xl text-gym-text text-sm font-mono focus:outline-none focus:ring-2 focus:ring-gym-primary"
                         />
                       </div>

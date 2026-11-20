@@ -1869,19 +1869,6 @@ function MisPagosContent() {
                   />
                 )}
 
-                {/* Notes */}
-                <div>
-                  <label htmlFor="notas" className="block text-sm font-medium text-gym-muted mb-2">Notas (opcional)</label>
-                  <textarea
-                    id="notas"
-                    name="notas"
-                    placeholder="Algún comentario..."
-                    value={formData.notas}
-                    onChange={(e) => setFormData({ ...formData, notas: e.target.value })}
-                    className="w-full px-4 py-2.5 bg-gym-bg border border-gym-border rounded-xl text-gym-text text-sm focus:outline-none focus:ring-2 focus:ring-gym-primary resize-none h-16"
-                  />
-                </div>
-
                 {/* Date */}
                 {!formData.solicitar_suspension && (
                   <div>
@@ -1898,6 +1885,19 @@ function MisPagosContent() {
                     />
                   </div>
                 )}
+
+                {/* Notes */}
+                <div>
+                  <label htmlFor="notas" className="block text-sm font-medium text-gym-muted mb-2">Notas (opcional)</label>
+                  <textarea
+                    id="notas"
+                    name="notas"
+                    placeholder="Algún comentario..."
+                    value={formData.notas}
+                    onChange={(e) => setFormData({ ...formData, notas: e.target.value })}
+                    className="w-full px-4 py-2.5 bg-gym-bg border border-gym-border rounded-xl text-gym-text text-sm focus:outline-none focus:ring-2 focus:ring-gym-primary resize-none h-16"
+                  />
+                </div>
 
                 {/* Total */}
                 {!formData.solicitar_suspension && (

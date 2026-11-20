@@ -62,3 +62,21 @@ export interface MesPendiente {
   month_number: number;
   year_number: number;
 }
+
+/**
+ * Mes con su cobertura por monto (pagos parciales). La fracción pagada se
+ * calcula como Σ (payment_amount / expected_amount_usd) de los pagos aprobados,
+ * usando el precio congelado del método para ese mes (prorated por método).
+ */
+export interface MesConCobertura extends MesPendiente {
+  /** Fracción cubierta (0..N; >= 1 = mes pagado). */
+  fraccionPagada: number;
+  /** Fracción que falta (>= 0). */
+  fraccionPendiente: number;
+  /** Porcentaje visible (0-100). */
+  porcentaje: number;
+  /** USD efectivamente pagados (solo aprobados). */
+  montoPagado: number;
+  /** Precio congelado por método de pago para este mes. */
+  preciosPorMetodo: Record<string, number>;
+}

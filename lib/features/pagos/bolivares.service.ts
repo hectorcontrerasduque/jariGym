@@ -1,14 +1,15 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient as createBrowserClient } from "@/lib/supabase/client";
 import { messages } from "@/lib/messages";
+import { calcularMontoInscripcionAprobado, precioInscripcionActual } from "./inscription-amount";
 import type { Pago, PaymentBolivar, PaymentDetail, TipoPago } from "@/lib/types";
 import {
   convertirBsABsd,
-  repartirUsdEntreDetalles,
   estaCubierto,
   restanteUsd,
   type DetalleInput,
 } from "./domain/bolivares";
+import { distribuirSecuencial } from "./domain/cobertura";
 
 /**
  * BolivaresService — flujo de pago en bolívares (payment_bolivares).
@@ -111,21 +112,66 @@ export class BolivaresService {
     if (!input.detalles.length) throw new Error(messages.bolivares.detalleRequerido);
     if (!(input.amount_bs > 0)) throw new Error(messages.bolivares.montoBsRequerido);
 
+    // Super-admin: el pago nace aprobado (sin conciliación).
+    const { data: profile } = await this.supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .single();
+    const isAdmin = profile?.role === "super_admin";
+
     const rateBcv = await this.obtenerTasaVigente();
     const amountUsdTotal = convertirBsABsd(input.amount_bs, rateBcv);
-    const reparto = repartirUsdEntreDetalles(amountUsdTotal, input.detalles, rateBcv);
 
-    // 1) Cabecera — siempre pendiente; la aprueba el super admin tras conciliar.
+    // Distribución secuencial: cada detalle trae el USD que necesita para
+    // completarse al precio del método (peso). Se llena el mes más viejo primero.
+    const necesidades = input.detalles.map((d) => Math.max(0, Number(d.payment_amount) || 0));
+    const { aplicados, excedente } = distribuirSecuencial(amountUsdTotal, necesidades);
+    if (excedente > 0.009) {
+      throw new Error(
+        messages.bolivares.excedenteMonto.replace("{monto}", excedente.toFixed(2))
+      );
+    }
+    const reparto = input.detalles
+      .map((d, i) => {
+        // eslint-disable-next-line security/detect-object-injection -- índice numérico de array controlado
+        const amountUsd = aplicados[i] ?? 0;
+        return {
+          month_number: d.month_number,
+          year_number: d.year_number,
+          payment_type: d.payment_type,
+          amount_usd: amountUsd,
+          amount_bs: Math.round(amountUsd * rateBcv * 100) / 100,
+        };
+      })
+      .filter((r) => r.amount_usd > 0);
+    if (!reparto.length) throw new Error(messages.bolivares.detalleRequerido);
+
+    // Precio congelado por método (snapshot) para cada detalle.
+    const { data: metodos } = await this.supabase
+      .from("gym_config_payment_methods")
+      .select("payment_method, amount_monthly, amount_inscription")
+      .eq("is_active", true);
+    const cfg =
+      (metodos || []).find((m) => m.payment_method === "bs") ||
+      (metodos || []).find((m) => m.payment_method === "efectivo");
+    const precioMensual = Number(cfg?.amount_monthly ?? 0);
+    const precioInscripcion = Number(cfg?.amount_inscription ?? 0);
+
+    // 1) Cabecera — pendiente para el miembro; aprobada de una vez para el super-admin.
     const { data: pago, error: pagoError } = await this.supabase
       .from("payments")
       .insert({
         user_id: input.user_id,
-        status: "pendiente",
+        status: isAdmin ? "aprobado" : "pendiente",
         payment_method: "bs",
         bill_code: input.reference_number || null,
         receipt_url: null, // la imagen vive en payment_bolivares.image_url
         payment_note: input.payment_note || null,
         created_by: user.id,
+        ...(isAdmin
+          ? { approved_by: user.id, approved_at: new Date().toISOString() }
+          : {}),
       })
       .select()
       .single();
@@ -146,6 +192,8 @@ export class BolivaresService {
         year_number: r.year_number,
         payment_type: r.payment_type,
         payment_amount: r.amount_usd,
+        expected_amount_usd:
+          r.payment_type === "inscripcion" ? precioInscripcion : precioMensual,
       }));
       const { data: detallesCreados, error: detError } = await this.supabase
         .from("payment_detail")
@@ -174,7 +222,7 @@ export class BolivaresService {
           amount_usd: r.amount_usd,
           bank: input.bank || null,
           reference_number: input.reference_number || null,
-          reconciled: false,
+          reconciled: isAdmin,
           paid_at: input.paid_at || new Date().toISOString().split("T")[0],
           image_url: imageUrl,
           image_filename: imageFilename,
@@ -260,8 +308,8 @@ export class BolivaresService {
    *    - borra las imágenes del Storage (ya no sirven)
    *    - además aprueba cualquier OTRO pago pendiente del mismo miembro cuyos
    *      grupos estén ahora todos cubiertos (pagos parciales previos)
-   * 4. Si falta algún grupo: el pago queda pendiente (parcial), imagen se
-   *    conserva; se devuelve el restante para mostrarlo en la UI.
+   * 4. El mes puede quedar parcial: se devuelve el restante para la UI, pero el
+   *    pago queda aprobado (el dinero ya fue confirmado por el super-admin).
    */
   async reconciliarPago(pagoId: string): Promise<ResultadoReconciliacion> {
     const {
@@ -295,21 +343,20 @@ export class BolivaresService {
       .eq("payment_id", pagoId);
     if (recError) throw new Error(recError.message);
 
-    // 2) Evaluar cobertura de todos los grupos de ESTE pago.
+    // 2) Cobertura de los grupos del pago (informativa: el mes puede quedar
+    //    parcial). El super-admin confirma el dinero, así que el pago se
+    //    aprueba SIEMPRE; la cobertura del mes se calcula por fracciones.
     const faltantes = await this.evaluarCoberturaPago(pagoId, pago.user_id);
     const restanteTotal = faltantes.reduce((s, f) => s + f.restante, 0);
-    const listo = faltantes.length === 0;
 
-    if (listo) {
-      await this.aprobarInterno(pagoId, pago.user_id, user.id);
-      // Pagos parciales previos del mismo miembro que ahora quedaron cubiertos.
-      await this.aprobarPendientesCubiertos(pagoId, pago.user_id, user.id);
-      // Borrar imágenes de ESTE pago (ya aprobado).
-      await this.borrarImagenesDePago(pagoId);
-    }
+    await this.aprobarInterno(pagoId, pago.user_id, user.id);
+    // Pagos parciales previos del mismo miembro que ahora quedaron cubiertos.
+    await this.aprobarPendientesCubiertos(pagoId, pago.user_id, user.id);
+    // Borrar imágenes de ESTE pago (ya aprobado).
+    await this.borrarImagenesDePago(pagoId);
 
     return {
-      aprobado: listo,
+      aprobado: true,
       restanteUsd: Math.round(restanteTotal * 100) / 100,
       faltantes,
     };
@@ -415,18 +462,18 @@ export class BolivaresService {
       .eq("payment_id", pagoId);
     const tieneInscripcion = detalles?.some((d) => d.payment_type === "inscripcion");
     if (tieneInscripcion) {
-      const { data: sumaDet } = await this.supabase
-        .from("payment_detail")
-        .select("payment_amount")
-        .eq("payment_id", pagoId)
-        .eq("payment_type", "inscripcion");
-      const montoInsc = (sumaDet || []).reduce((s, d) => s + Number(d.payment_amount || 0), 0);
+      // Solo queda pagada si la suma aprobada cubre el precio configurado.
+      const [montoInsc, precioInsc] = await Promise.all([
+        calcularMontoInscripcionAprobado(this.supabase, userId),
+        precioInscripcionActual(this.supabase, "bs"),
+      ]);
+      const cubierta = precioInsc <= 0 ? true : montoInsc + 1e-9 >= precioInsc;
       await this.supabase
         .from("profiles")
         .update({
-          inscription_paid: true,
-          inscription_date: new Date().toISOString().split("T")[0],
+          inscription_paid: cubierta,
           inscription_amount_paid: montoInsc,
+          ...(cubierta ? { inscription_date: new Date().toISOString().split("T")[0] } : {}),
         })
         .eq("id", userId);
     }

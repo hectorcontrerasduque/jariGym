@@ -8,6 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { pagosService } from "@/lib/features/pagos/service";
 import { bolivaresService } from "@/lib/features/pagos/bolivares.service";
 import { dedupeMetodos, metodosActivos, metodoPorDefecto } from "@/lib/features/pagos/domain/metodos";
+import { distribuirSecuencial, pendienteUsd } from "@/lib/features/pagos/domain/cobertura";
+import type { MesConCobertura } from "@/lib/features/pagos/domain/types";
 import { comprimirImagen, esImagenComprimible } from "@/lib/features/pagos/comprimir-imagen";
 import { leerComprobante, parseNumero } from "@/lib/features/pagos/ocr";
 import { createClient } from "@/lib/supabase/client";
@@ -37,8 +39,12 @@ function formDataVacio(metodo: MetodoPago = "efectivo") {
     pagar_mensualidad: false,
     solicitar_suspension: false,
     fecha_pago: new Date().toISOString().split("T")[0],
-    /** Monto en bolívares (string editable; se parsea al enviar). */
+    /** Monto en bolívares (solo método Bs; string editable). */
     amount_bs: "",
+    /** Monto en USD (efectivo/binance; string editable). */
+    monto_usd: "",
+    /** Efectivo: el excedente se devuelve como vuelto (cambio). */
+    necesita_vuelto: false,
     bank: "",
     reference_number: "",
   };
@@ -129,7 +135,7 @@ function MisPagosContent() {
   const [modalOpen, setModalOpen] = useState(false);
   const [showForm, setShowForm] = useState(true);
   const [metodosPago, setMetodosPago] = useState<PaymentMethod[]>([]);
-  const [mesesPendientes, setMesesPendientes] = useState<{ month_number: number; year_number: number }[]>([]);
+  const [mesesPendientes, setMesesPendientes] = useState<MesConCobertura[]>([]);
   const [inscripcionPagada, setInscripcionPagada] = useState(false);
   const [inscripcionPendiente, setInscripcionPendiente] = useState(false);
   const [membresiaLibre, setMembresiaLibre] = useState(false);
@@ -403,16 +409,77 @@ function MisPagosContent() {
     return tipo === "mensual" ? config.amount_monthly : config.amount_inscription;
   }, [metodosPago]);
 
-  const montoTotal = useMemo(() => {
-    let total = 0;
-    if (formData.pagar_inscripcion && !inscripcionPagada && getMontoByMetodo(formData.metodo_pago, "inscripcion") > 0) {
-      total += getMontoByMetodo(formData.metodo_pago, "inscripcion");
+  /** Meses seleccionados en orden cronológico: el más viejo primero. */
+  const mesesSeleccionados = useMemo(
+    () =>
+      [...formData.meses].sort(
+        (a, b) => a.year_number - b.year_number || a.month_number - b.month_number
+      ),
+    [formData.meses]
+  );
+
+  /** Monto ingresado por el miembro, convertido a USD. */
+  const montoEntradaUsd = useMemo(() => {
+    if (formData.metodo_pago === "bs") {
+      const bs = parseNumero(formData.amount_bs);
+      return tasaBcv && bs > 0 ? bs / tasaBcv : 0;
     }
-    if (formData.pagar_mensualidad && formData.meses.length > 0) {
-      total += formData.meses.length * getMontoByMetodo(formData.metodo_pago, "mensual");
+    return parseNumero(formData.monto_usd);
+  }, [formData.metodo_pago, formData.amount_bs, formData.monto_usd, tasaBcv]);
+
+  /** Necesidad en USD por concepto: inscripción primero, luego meses (viejo→nuevo). */
+  const necesidades = useMemo(() => {
+    const items: Array<{
+      tipo: "inscripcion" | "mensualidad";
+      month_number: number | null;
+      year_number: number | null;
+      necesidad: number;
+    }> = [];
+    if (formData.solicitar_suspension) return items;
+
+    if (formData.pagar_inscripcion && !inscripcionPagada) {
+      const precio = getMontoByMetodo(formData.metodo_pago, "inscripcion");
+      if (precio > 0) {
+        items.push({
+          tipo: "inscripcion",
+          month_number: new Date().getMonth() + 1,
+          year_number: new Date().getFullYear(),
+          necesidad: precio,
+        });
+      }
     }
-    return total;
-  }, [formData, inscripcionPagada, getMontoByMetodo]);
+
+    if (formData.pagar_mensualidad) {
+      const precioActual = getMontoByMetodo(formData.metodo_pago, "mensual");
+      for (const { month_number, year_number } of mesesSeleccionados) {
+        const mes = mesesPendientes.find(
+          (m) => m.month_number === month_number && m.year_number === year_number
+        );
+        const necesidad = mes
+          ? pendienteUsd(mes, formData.metodo_pago, precioActual)
+          : precioActual;
+        items.push({ tipo: "mensualidad", month_number, year_number, necesidad });
+      }
+    }
+    return items;
+  }, [formData, inscripcionPagada, getMontoByMetodo, mesesSeleccionados, mesesPendientes]);
+
+  /** Reparto secuencial del monto entre los conceptos seleccionados. */
+  const reparto = useMemo(
+    () => distribuirSecuencial(montoEntradaUsd, necesidades.map((n) => n.necesidad)),
+    [montoEntradaUsd, necesidades]
+  );
+
+  const deudaSeleccionada = useMemo(
+    () => necesidades.reduce((total, n) => total + n.necesidad, 0),
+    [necesidades]
+  );
+
+  const excedente = reparto.excedente;
+  const hayExcedente = excedente > 0.009;
+  const mostrarVuelto = formData.metodo_pago === "efectivo" && hayExcedente;
+  const excedenteBloquea =
+    hayExcedente && !(formData.metodo_pago === "efectivo" && formData.necesita_vuelto);
 
   const needsComprobante = (metodo: MetodoPago) => metodo !== "efectivo";
 
@@ -426,6 +493,30 @@ function MisPagosContent() {
       .catch(() => { /* sin tasa: el form muestra aviso al enviar */ });
     return () => { cancelado = true; };
   }, [formData.metodo_pago, tasaBcv]);
+
+  // Al entrar al módulo: refrescar la tasa BCV (el server aplica el gate de 6 h).
+  useEffect(() => {
+    let cancelado = false;
+    fetch("/api/tasas/actualizar", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ forzar: false }),
+      keepalive: true,
+    })
+      .then(() => bolivaresService.obtenerTasaVigente())
+      .then((t) => { if (!cancelado && t > 0) setTasaBcv(t); })
+      .catch(() => { /* fail-open: se usa la tasa vigente disponible */ });
+    return () => { cancelado = true; };
+  }, []);
+
+  /** Placeholder del monto con el costo de un mes en el método/tasa actual. */
+  const placeholderMonto = useMemo(() => {
+    const precio = getMontoByMetodo(formData.metodo_pago, "mensual");
+    const valor =
+      formData.metodo_pago === "bs" && tasaBcv ? Math.round(precio * tasaBcv) : precio;
+    if (!(valor > 0)) return "Ej: 0";
+    return messages.bolivares.placeholderMonto.replace("{monto}", valor.toLocaleString("es-VE"));
+  }, [formData.metodo_pago, getMontoByMetodo, tasaBcv]);
 
   // Al abrir el modal Detalle de un pago BS: traer payment_bolivares + firmar imagen.
   // (El reset de estado se hace al abrir el modal en el onClick, no en el effect
@@ -505,8 +596,20 @@ function MisPagosContent() {
       setTimeout(() => msgMesesRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 100);
       return;
     }
-    if (!formData.solicitar_suspension && montoTotal === 0) {
-      showToast("El monto a pagar es 0. Verifica los montos configurados", "warning");
+    if (!formData.solicitar_suspension && montoEntradaUsd <= 0) {
+      showToast(
+        formData.metodo_pago === "bs"
+          ? messages.bolivares.montoRequeridoBs
+          : messages.bolivares.montoRequerido,
+        "warning"
+      );
+      return;
+    }
+    if (!formData.solicitar_suspension && excedenteBloquea) {
+      showToast(
+        messages.bolivares.excedenteMonto.replace("{monto}", excedente.toFixed(2)),
+        "warning"
+      );
       return;
     }
 
@@ -519,11 +622,15 @@ function MisPagosContent() {
       if (formData.pagar_inscripcion) acciones.push(`Inscripción: ${formatCurrency(getMontoByMetodo(formData.metodo_pago, "inscripcion"))}`);
       if (formData.pagar_mensualidad && formData.meses.length > 0) {
         const mesesStr = formData.meses.map(m => `${getMonthName(m.month_number)} ${m.year_number}`).join(", ");
-        acciones.push(`Mensualidad (${formData.meses.length} mes(es)): ${mesesStr} — Total: ${formatCurrency(montoTotal)}`);
+        const aplicadoTotal = reparto.aplicados.reduce((t, a) => t + a, 0);
+        acciones.push(`Mensualidad (${formData.meses.length} mes(es)): ${mesesStr} — Total: ${formatCurrency(aplicadoTotal)}`);
       }
       if (formData.metodo_pago === "bs") {
         const montoBs = parseNumero(formData.amount_bs);
         if (montoBs > 0) acciones.push(`Monto en Bs: ${montoBs.toLocaleString("es-VE")} Bs${tasaBcv ? ` (≈ ${formatCurrency(montoBs / tasaBcv)} a ${tasaBcv} Bs/USD)` : ""}`);
+      }
+      if (formData.necesita_vuelto && hayExcedente) {
+        acciones.push(`${messages.bolivares.vueltoLabel}: ${formatCurrency(excedente)}`);
       }
     }
     const metodoLabel = metodoLabels[formData.metodo_pago] || formData.metodo_pago;
@@ -537,7 +644,6 @@ function MisPagosContent() {
       if (!user) return;
 
       const targetId = miembroSeleccionado?.id || user.id;
-      const isSelf = !miembroSeleccionado || miembroSeleccionado.id === user.id;
 
       // Handle suspension request
       if (formData.solicitar_suspension) {
@@ -582,28 +688,22 @@ function MisPagosContent() {
         }
       }
 
-      // Detalles con montos esperados (USD de config) — en BS son el peso del reparto.
-      const detallesEsperados: Array<{ month_number: number | null; year_number: number | null; payment_type: "mensualidad" | "inscripcion"; payment_amount: number }> = [];
-
-      if (formData.pagar_inscripcion && !inscripcionPagada && getMontoByMetodo(formData.metodo_pago, "inscripcion") > 0) {
-        detallesEsperados.push({
-          month_number: new Date().getMonth() + 1,
-          year_number: new Date().getFullYear(),
-          payment_type: "inscripcion",
-          payment_amount: getMontoByMetodo(formData.metodo_pago, "inscripcion"),
-        });
-      }
-
-      if (formData.pagar_mensualidad && formData.meses.length > 0) {
-        for (const { month_number, year_number } of formData.meses) {
-          detallesEsperados.push({
-            month_number,
-            year_number,
-            payment_type: "mensualidad",
-            payment_amount: getMontoByMetodo(formData.metodo_pago, "mensual"),
-          });
-        }
-      }
+      // Un detalle por concepto con su monto en USD. Para Bs se envía la
+      // necesidad (peso al precio del método) y el servicio la redistribuye con
+      // su propia tasa; para efectivo/binance se envía el monto ya aplicado.
+      const conAplicado = necesidades.map((n, i) => {
+        // eslint-disable-next-line security/detect-object-injection -- índice numérico de array controlado
+        const aplicado = reparto.aplicados[i] ?? 0;
+        return { ...n, aplicado };
+      });
+      const detallesEsperados = conAplicado
+        .filter((n) => (esBs ? n.necesidad > 0 : n.aplicado > 0))
+        .map((n) => ({
+          month_number: n.month_number,
+          year_number: n.year_number,
+          payment_type: n.tipo,
+          payment_amount: esBs ? n.necesidad : n.aplicado,
+        }));
 
       if (detallesEsperados.length === 0) {
         throw new Error("Selecciona al menos un concepto de pago");
@@ -666,8 +766,10 @@ function MisPagosContent() {
 
       showToast(
         esBs
-          ? "Pago en Bs registrado — pendiente de conciliación"
-          : isSelf
+          ? isAdmin
+            ? "Pago en Bs registrado y aprobado"
+            : "Pago en Bs registrado — pendiente de conciliación"
+          : isAdmin
             ? "Pago registrado y aprobado"
             : "Pago registrado (pendiente de aprobación)",
         "success"
@@ -875,20 +977,8 @@ function MisPagosContent() {
 
   const showInscriptionCheckbox = !inscripcionPagada && !inscripcionPendiente && gymConfig && getMontoByMetodo(formData.metodo_pago, "inscripcion") > 0;
 
-  const mesesDisponiblesParaPagar = (() => {
-    const mesesConPago = new Set(
-      pagos
-        .filter(p => {
-          if (isSuperAdmin && miembroSeleccionado) {
-            return p.status === "pendiente" || p.status === "aprobado";
-          }
-          return p.status === "pendiente" || p.status === "aprobado";
-        })
-        .flatMap(p => (p.detail || []).map(d => d.month_number && d.year_number ? `${d.year_number}-${d.month_number}` : null))
-        .filter(Boolean)
-    );
-    return mesesPendientes.filter(m => !mesesConPago.has(`${m.year_number}-${m.month_number}`));
-  })();
+  // El dominio ya excluye meses cubiertos y bloqueados por pagos pendientes.
+  const mesesDisponiblesParaPagar = mesesPendientes;
 
   const mesesParaSuspender = [...mesesDisponiblesParaPagar].sort((a, b) => a.year_number - b.year_number || a.month_number - b.month_number);
 
@@ -1434,7 +1524,7 @@ function MisPagosContent() {
             <CardTitle className="flex items-center gap-2 text-base">
               <Plus className="w-5 h-5 text-gym-primary" />
               {miembroSeleccionado ? `Pago para ${miembroSeleccionado.full_name}` : "Guardar pago"}
-              {!miembroSeleccionado && isAdmin && <Badge variant="success" className="text-[10px] ml-1">Auto-aprobado</Badge>}
+              {isAdmin && <Badge variant="success" className="text-[10px] ml-1">Auto-aprobado</Badge>}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -1533,8 +1623,13 @@ function MisPagosContent() {
                       </div>
                     ) : (
                       <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                        {(formData.solicitar_suspension ? mesesParaSuspender : mesesDisponiblesParaPagar).map(({ month_number, year_number }) => {
+                        {(formData.solicitar_suspension ? mesesParaSuspender : mesesDisponiblesParaPagar).map((mes) => {
+                          const { month_number, year_number } = mes;
                           const seleccionado = formData.meses.some(m => m.month_number === month_number && m.year_number === year_number);
+                          const pct = formData.solicitar_suspension ? 0 : Math.min(100, mes.porcentaje);
+                          const pendienteMes = pct > 0
+                            ? pendienteUsd(mes, formData.metodo_pago, getMontoByMetodo(formData.metodo_pago, "mensual"))
+                            : 0;
                           return (
                             <button
                               key={`${year_number}-${month_number}`}
@@ -1549,6 +1644,21 @@ function MisPagosContent() {
                               <div className="text-center">
                                 <div className="font-semibold">{getMonthName(month_number).slice(0, 3)}</div>
                                 <div className="text-xs opacity-75">{year_number}</div>
+                                {pct > 0 && (
+                                  <div className="mt-1">
+                                    <div className={`h-1.5 w-full rounded-full overflow-hidden ${seleccionado ? "bg-black/20" : "bg-gym-border/50"}`}>
+                                      <div className="h-full bg-gym-success rounded-full" style={{ width: `${pct}%` }} />
+                                    </div>
+                                    <div className="text-[10px] font-semibold text-gym-success">
+                                      {messages.bolivares.pagadoPorcentaje.replace("{porcentaje}", String(pct))}
+                                    </div>
+                                    {pendienteMes > 0 && (
+                                      <div className="text-[10px] opacity-80">
+                                        {messages.bolivares.pendienteMonto.replace("{monto}", formatCurrency(pendienteMes))}
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
                               </div>
                             </button>
                           );
@@ -1595,6 +1705,81 @@ function MisPagosContent() {
                   </div>
                 )}
 
+                {/* Monto a pagar (obligatorio; en Bs se convierte a USD con la tasa) */}
+                {!formData.solicitar_suspension && (
+                  <div className="space-y-2">
+                    <label htmlFor="monto-pago" className="block text-sm font-medium text-gym-muted">
+                      {formData.metodo_pago === "bs"
+                        ? messages.bolivares.montoPagarBs
+                        : messages.bolivares.montoPagarUsd}{" "}
+                      *
+                    </label>
+                    {formData.metodo_pago === "bs" ? (
+                      <div>
+                        <input
+                          id="monto-pago"
+                          name="amount_bs"
+                          type="text"
+                          inputMode="decimal"
+                          placeholder={placeholderMonto}
+                          value={formData.amount_bs}
+                          onChange={(e) => setFormData({ ...formData, amount_bs: e.target.value })}
+                          className="w-full px-4 py-2.5 bg-gym-bg border border-gym-border rounded-xl text-gym-text text-sm focus:outline-none focus:ring-2 focus:ring-gym-primary"
+                        />
+                        {tasaBcv && parseNumero(formData.amount_bs) > 0 && (
+                          <p className="text-xs text-gym-muted mt-1">
+                            {messages.bolivares.montoUsdEquiv}:{" "}
+                            <span className="text-gym-text font-medium">
+                              {formatCurrency(parseNumero(formData.amount_bs) / tasaBcv)}
+                            </span>
+                            {" · "}
+                            {messages.bolivares.tasaBcvLabel}: 1 USD = {tasaBcv} Bs
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <input
+                        id="monto-pago"
+                        name="monto_usd"
+                        type="text"
+                        inputMode="decimal"
+                        placeholder={placeholderMonto}
+                        value={formData.monto_usd}
+                        onChange={(e) => setFormData({ ...formData, monto_usd: e.target.value })}
+                        className="w-full px-4 py-2.5 bg-gym-bg border border-gym-border rounded-xl text-gym-text text-sm focus:outline-none focus:ring-2 focus:ring-gym-primary"
+                      />
+                    )}
+
+                    {deudaSeleccionada > 0 && (
+                      <div className="flex items-center justify-between text-xs text-gym-muted">
+                        <span>{messages.bolivares.deudaSeleccionada}</span>
+                        <span className="font-medium text-gym-text">{formatCurrency(deudaSeleccionada)}</span>
+                      </div>
+                    )}
+
+                    {hayExcedente && (
+                      <div className="flex items-center gap-2 p-2 bg-gym-warning/10 border border-gym-warning/30 rounded-lg">
+                        <AlertTriangle className="w-4 h-4 text-gym-warning flex-shrink-0" />
+                        <p className="text-xs text-gym-warning">
+                          {messages.bolivares.excedenteMonto.replace("{monto}", formatCurrency(excedente))}
+                        </p>
+                      </div>
+                    )}
+
+                    {mostrarVuelto && (
+                      <label className="flex items-center gap-2 text-sm text-gym-muted cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={formData.necesita_vuelto}
+                          onChange={(e) => setFormData({ ...formData, necesita_vuelto: e.target.checked })}
+                          className="w-4 h-4 rounded border-gym-border text-gym-primary focus:ring-gym-primary"
+                        />
+                        {messages.bolivares.necesitaVuelto} ({messages.bolivares.vueltoLabel}: {formatCurrency(excedente)})
+                      </label>
+                    )}
+                  </div>
+                )}
+
                 {/* Bill code for cash */}
                 {!formData.solicitar_suspension && formData.metodo_pago === "efectivo" && (
                   <div>
@@ -1627,27 +1812,6 @@ function MisPagosContent() {
                         <Landmark className="w-4 h-4" />
                         {messages.bolivares.datosPago.titulo}
                       </button>
-                    </div>
-                    <div>
-                      <label htmlFor="amount-bs" className="block text-xs font-medium text-gym-muted mb-1">
-                        {messages.bolivares.montoBs} *
-                      </label>
-                      <input
-                        id="amount-bs"
-                        name="amount_bs"
-                        type="text"
-                        inputMode="decimal"
-                        placeholder="Ej: 1500000"
-                        value={formData.amount_bs}
-                        onChange={(e) => setFormData({ ...formData, amount_bs: e.target.value })}
-                        className="w-full px-4 py-2.5 bg-gym-surface border border-gym-border rounded-xl text-gym-text text-sm focus:outline-none focus:ring-2 focus:ring-gym-primary"
-                      />
-                      {tasaBcv && parseNumero(formData.amount_bs) > 0 && (
-                        <p className="text-xs text-gym-muted mt-1">
-                          {messages.bolivares.montoUsdEquiv}: <span className="text-gym-text font-medium">{formatCurrency(parseNumero(formData.amount_bs) / tasaBcv)}</span>
-                          {" · "}{messages.bolivares.tasaBcvLabel}: 1 USD = {tasaBcv} Bs
-                        </p>
-                      )}
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
@@ -1737,10 +1901,16 @@ function MisPagosContent() {
 
                 {/* Total */}
                 {!formData.solicitar_suspension && (
-                  <div className="p-4 bg-gym-bg rounded-xl neon-border">
+                  <div className="p-4 bg-gym-bg rounded-xl neon-border space-y-1">
                     <div className="flex items-center justify-between">
-                      <span className="text-gym-muted">Total a pagar:</span>
-                      <span className="text-2xl font-bold text-gym-text neon-text">{formatCurrency(montoTotal)}</span>
+                      <span className="text-gym-muted">{messages.bolivares.deudaSeleccionada}:</span>
+                      <span className="text-sm font-medium text-gym-text">{formatCurrency(deudaSeleccionada)}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-gym-muted">{messages.bolivares.montoAplicado}:</span>
+                      <span className="text-2xl font-bold text-gym-text neon-text">
+                        {formatCurrency(reparto.aplicados.reduce((total, aplicado) => total + aplicado, 0))}
+                      </span>
                     </div>
                   </div>
                 )}

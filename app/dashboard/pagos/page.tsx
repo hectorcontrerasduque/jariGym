@@ -151,20 +151,20 @@ function PagosContent() {
         setConciliando(true);
         try {
           const resultado = await bolivaresService.reconciliarPago(pagoId);
-          if (resultado.aprobado) {
-            fetch("/api/pagos/notify", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ pagoId }),
-            }).catch(() => {});
-            showToast(messages.bolivares.conciliado, "success");
-          } else {
+          fetch("/api/pagos/notify", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ pagoId }),
+          }).catch(() => {});
+          if (resultado.restanteUsd > 0) {
             showToast(
               mensaje(messages.bolivares.conciliadoParcial, {
                 restante: formatCurrency(resultado.restanteUsd),
               }),
               "warning"
             );
+          } else {
+            showToast(messages.bolivares.conciliado, "success");
           }
           await loadData();
           setModalOpen(false);

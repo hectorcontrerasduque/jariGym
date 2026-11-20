@@ -223,6 +223,12 @@ status: "pendiente" | "aprobado" | "rechazado"
 // Suspension flow: member requests → pendiente → admin approves → aprobado
 ```
 
+### Pagos parciales (cobertura por monto)
+- `payment_detail.expected_amount_usd` = precio del método congelado al momento del pago (migración 065). La cobertura de un mes es **prorated**: `Σ (payment_amount / expected_amount_usd)` sobre cabeceras `aprobado`; usa el precio de la fila más antigua de cada método (no retroactivo ante cambios de tarifa).
+- Un mes queda cubierto cuando la fracción llega a 1; los pagos `pendiente` lo bloquean (anti doble cobro). `suspension` cubre el mes (monto 0). Agrupación por `payment_type` (inscripción ≠ mensualidad).
+- Dominio puro: `lib/features/pagos/domain/cobertura.ts` (`calcularCoberturaGrupos`, `distribuirSecuencial`, `pendienteUsd`).
+- Pagos BS del super-admin nacen `aprobado` y `reconciled`; los del miembro siguen pendientes hasta conciliar. Al conciliar se aprueba el pago aunque el mes quede parcial.
+
 ### Dashboard Stats Logic
 - Fuente de verdad de cada cifra (inscritos, deudores, al día, stats mensuales, meses pendientes): `openspec/specs/pagos/spec.md` → funciones puras en `lib/features/pagos/domain/`.
 - **Pagos recientes**: solo aprobados, con fallback si falla el join a profiles.

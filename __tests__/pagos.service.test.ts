@@ -460,10 +460,21 @@ describe("monthlyStats", () => {
 
 describe("mesesPendientes", () => {
   const meses = (...pairs: [number, number][]) => pairs.map(([month_number, year_number]) => ({ month_number, year_number }));
+  const soloMeses = (lista: { month_number: number; year_number: number }[]) =>
+    lista.map(({ month_number, year_number }) => ({ month_number, year_number }));
+  const fila = (overrides: Record<string, unknown> = {}) => ({
+    month_number: 11,
+    year_number: 2026,
+    payment_type: "mensualidad",
+    payment_amount: 30,
+    expected_amount_usd: 30,
+    payments: { status: "aprobado", payment_method: "efectivo", created_at: "2026-01-01T00:00:00Z" },
+    ...overrides,
+  });
 
   it("siempre retorna 12 meses, extendiendo al siguiente año", async () => {
     fake.on("payment_detail", "select").reply({ data: [] });
-    expect(await service.mesesPendientes("u1", 2026, undefined, "2026-10-01")).toEqual(
+    expect(soloMeses(await service.mesesPendientes("u1", 2026, undefined, "2026-10-01"))).toEqual(
       meses([10, 2026], [11, 2026], [12, 2026], [1, 2027], [2, 2027], [3, 2027], [4, 2027], [5, 2027], [6, 2027], [7, 2027], [8, 2027], [9, 2027])
     );
     const [call] = fake.callsTo("payment_detail", "select");
@@ -472,16 +483,26 @@ describe("mesesPendientes", () => {
     expect(call.filters).toContainEqual(["not", "month_number", "is", null]);
   });
 
-  it("un detalle aprobado o pendiente bloquea el mes; se extiende al siguiente año", async () => {
-    fake.on("payment_detail", "select").reply({ data: [{ month_number: 11, year_number: 2026 }, { month_number: 12, year_number: 2025 }] });
-    expect(await service.mesesPendientes("u1", 2026, undefined, "2026-10-01")).toEqual(
+  it("un pago aprobado completo bloquea el mes; se extiende al siguiente año", async () => {
+    fake.on("payment_detail", "select").reply({
+      data: [fila(), fila({ month_number: 12, year_number: 2025 })],
+    });
+    expect(soloMeses(await service.mesesPendientes("u1", 2026, undefined, "2026-10-01"))).toEqual(
       meses([10, 2026], [12, 2026], [1, 2027], [2, 2027], [3, 2027], [4, 2027], [5, 2027], [6, 2027], [7, 2027], [8, 2027], [9, 2027], [10, 2027])
     );
   });
 
+  it("un pago parcial aprobado deja el mes pendiente con cobertura", async () => {
+    fake.on("payment_detail", "select").reply({ data: [fila({ payment_amount: 10 })] });
+    const r = await service.mesesPendientes("u1", 2026, undefined, "2026-10-01");
+    const nov = r.find((m) => m.month_number === 11 && m.year_number === 2026);
+    expect(nov?.porcentaje).toBe(33);
+    expect(nov?.fraccionPendiente).toBeCloseTo(0.67, 2);
+  });
+
   it("sin fecha de inicio y año por defecto: enero a diciembre del año actual", async () => {
     fake.on("payment_detail", "select").reply({ data: [] });
-    expect(await service.mesesPendientes("u1")).toEqual(meses([1, 2026], [2, 2026], [3, 2026], [4, 2026], [5, 2026], [6, 2026], [7, 2026], [8, 2026], [9, 2026], [10, 2026], [11, 2026], [12, 2026]));
+    expect(soloMeses(await service.mesesPendientes("u1"))).toEqual(meses([1, 2026], [2, 2026], [3, 2026], [4, 2026], [5, 2026], [6, 2026], [7, 2026], [8, 2026], [9, 2026], [10, 2026], [11, 2026], [12, 2026]));
   });
 
   it("inicio en año posterior → []", async () => {
@@ -496,7 +517,7 @@ describe("mesesPendientes", () => {
 
   it("mesesPendientesAdmin delega con los mismos argumentos", async () => {
     fake.on("payment_detail", "select").reply({ data: [] });
-    expect(await service.mesesPendientesAdmin("u1", 2026, undefined, "2026-11-15")).toEqual(
+    expect(soloMeses(await service.mesesPendientesAdmin("u1", 2026, undefined, "2026-11-15"))).toEqual(
       meses([11, 2026], [12, 2026], [1, 2027], [2, 2027], [3, 2027], [4, 2027], [5, 2027], [6, 2027], [7, 2027], [8, 2027], [9, 2027], [10, 2027])
     );
   });
@@ -532,7 +553,7 @@ describe("crearPago", () => {
       payment_note: null,
       created_by: "admin-1",
     });
-    const detalle = [{ payment_id: "p1", month_number: 9, year_number: 2026, payment_type: "mensualidad", payment_amount: 10 }];
+    const detalle = [{ payment_id: "p1", month_number: 9, year_number: 2026, payment_type: "mensualidad", payment_amount: 10, expected_amount_usd: 0 }];
     expect(fake.callsTo("payment_detail", "insert")[0].payload).toEqual(detalle);
     expect(r).toEqual({ id: "p1", status: "pendiente", detail: detalle });
   });

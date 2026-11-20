@@ -177,7 +177,7 @@ describe("BolivaresService.reconciliarPago", () => {
     expect(pagosUpd.some((c) => (c.payload as { status?: string })?.status === "aprobado")).toBe(true);
   });
 
-  it("NO aprueba si falta por cubrir (pago parcial) y devuelve el restante", async () => {
+  it("aprueba aunque falte por cubrir (pago parcial) y devuelve el restante", async () => {
     prepararAdminYPago();
     fake.on("payment_bolivares", "update").reply({ data: null });
     fake.on("payment_detail", "select").reply({
@@ -199,12 +199,12 @@ describe("BolivaresService.reconciliarPago", () => {
 
     const resultado = await service.reconciliarPago(PAGO_ID);
 
-    expect(resultado.aprobado).toBe(false);
+    expect(resultado.aprobado).toBe(true);
     expect(resultado.restanteUsd).toBe(15);
     expect(resultado.faltantes).toHaveLength(1);
     expect(resultado.faltantes[0].restante).toBe(15);
-    // NO se actualizó payments a aprobado
-    expect(fake.callsTo("payments", "update")).toHaveLength(0);
+    // el pago se aprueba (el dinero fue confirmado aunque el mes quede parcial)
+    expect(fake.callsTo("payments", "update")).toHaveLength(1);
     // sí se marcó reconciled
     expect(fake.callsTo("payment_bolivares", "update")).toHaveLength(1);
   });
@@ -245,5 +245,68 @@ describe("BolivaresService.imágenes", () => {
     expect(fake.callsTo("comprobantes", "remove")[0].payload).toEqual([
       "payments/p1/comprobante.jpg",
     ]);
+  });
+});
+
+describe("BolivaresService.crearPago — super-admin y excedente", () => {
+  beforeEach(() => {
+    fake = createSupabaseFake();
+    service = new BolivaresService(fake.client);
+  });
+
+  const detalles = [
+    { month_number: 1, year_number: 2026, payment_type: "mensualidad" as const, payment_amount: 30 },
+  ];
+
+  function base() {
+    fake.on("exchange_rates", "select").reply({ data: { rate_bs: 100 } });
+    fake.on("gym_config_payment_methods", "select").reply({
+      data: [{ payment_method: "bs", amount_monthly: 35, amount_inscription: 50 }],
+    });
+    fake.on("payments", "insert").reply({ data: { id: PAGO_ID, status: "aprobado" } });
+    fake.on("payment_detail", "insert").reply({
+      data: [{ id: "det-1", month_number: 1, year_number: 2026, payment_type: "mensualidad", payment_amount: 30 }],
+    });
+    fake.on("payment_bolivares", "insert").reply({ data: null });
+  }
+
+  it("super-admin: nace aprobado y reconciliado, con precio congelado", async () => {
+    fake.setUser({ id: ADMIN_ID });
+    fake.on("profiles", "select").reply({ data: { role: "super_admin" } });
+    base();
+
+    await service.crearPago({ user_id: USER_ID, detalles, amount_bs: 3000 });
+
+    expect(fake.callsTo("payments", "insert")[0].payload).toMatchObject({
+      status: "aprobado",
+      approved_by: ADMIN_ID,
+    });
+    const bol = fake.callsTo("payment_bolivares", "insert")[0].payload as Array<Record<string, unknown>>;
+    expect(bol[0].reconciled).toBe(true);
+    const det = fake.callsTo("payment_detail", "insert")[0].payload as Array<Record<string, unknown>>;
+    expect(det[0].expected_amount_usd).toBe(35);
+  });
+
+  it("miembro: nace pendiente y sin conciliar", async () => {
+    fake.setUser({ id: USER_ID });
+    fake.on("profiles", "select").reply({ data: { role: "miembro" } });
+    base();
+
+    await service.crearPago({ user_id: USER_ID, detalles, amount_bs: 3000 });
+
+    expect(fake.callsTo("payments", "insert")[0].payload).toMatchObject({ status: "pendiente" });
+    const bol = fake.callsTo("payment_bolivares", "insert")[0].payload as Array<Record<string, unknown>>;
+    expect(bol[0].reconciled).toBe(false);
+  });
+
+  it("bloquea el pago si el monto supera la necesidad (sin vuelto en Bs)", async () => {
+    fake.setUser({ id: USER_ID });
+    fake.on("profiles", "select").reply({ data: { role: "miembro" } });
+    fake.on("exchange_rates", "select").reply({ data: { rate_bs: 100 } });
+
+    await expect(
+      service.crearPago({ user_id: USER_ID, detalles, amount_bs: 5000 })
+    ).rejects.toThrow("Sobra");
+    expect(fake.callsTo("payments", "insert")).toHaveLength(0);
   });
 });

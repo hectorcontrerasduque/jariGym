@@ -9,6 +9,7 @@ import { calcularMesesPendientes } from "@/lib/features/pagos/domain/meses-pendi
 import { calcularMorosos, calcularMiembrosAlDia, miembrosConInscripcionPagada } from "@/lib/features/pagos/domain/morosos";
 import { calcularStats, calcularMonthlyStats } from "@/lib/features/pagos/domain/stats";
 import type { ElegiblesResult, MiembroElegible, PagoRPCRow } from "@/lib/features/pagos/domain/types";
+import type { FilaCobertura } from "@/lib/features/pagos/domain/cobertura";
 
 const HOY = new Date(2026, 8, 12, 12);
 
@@ -71,22 +72,68 @@ describe("filtrarElegibles", () => {
 
 describe("calcularMesesPendientes", () => {
   const meses = (...pairs: [number, number][]) => pairs.map(([month_number, year_number]) => ({ month_number, year_number }));
+  const soloMeses = (lista: { month_number: number; year_number: number }[]) =>
+    lista.map(({ month_number, year_number }) => ({ month_number, year_number }));
+  const fila = (overrides: Partial<FilaCobertura> = {}): FilaCobertura => ({
+    month_number: 11,
+    year_number: 2026,
+    payment_type: "mensualidad",
+    payment_amount: 30,
+    expected_amount_usd: 30,
+    status: "aprobado",
+    payment_method: "efectivo",
+    created_at: "2026-01-01T00:00:00Z",
+    ...overrides,
+  });
 
   it("siempre retorna 12 meses, extendiendo al siguiente año", () => {
-    expect(calcularMesesPendientes([], 2026, "2026-10-01")).toEqual(
+    expect(soloMeses(calcularMesesPendientes([], 2026, "2026-10-01"))).toEqual(
       meses([10, 2026], [11, 2026], [12, 2026], [1, 2027], [2, 2027], [3, 2027], [4, 2027], [5, 2027], [6, 2027], [7, 2027], [8, 2027], [9, 2027])
     );
   });
 
-  it("un detalle del año bloquea el mes; otros años y meses nulos se ignoran", () => {
+  it("un pago aprobado completo bloquea el mes; otros años y meses nulos se ignoran", () => {
     const detalles = [
-      { month_number: 11, year_number: 2026 },
-      { month_number: 12, year_number: 2025 },
-      { month_number: null, year_number: 2026 },
+      fila({ month_number: 11, year_number: 2026 }),
+      fila({ month_number: 12, year_number: 2025 }),
+      fila({ month_number: null, year_number: 2026 }),
     ];
-    expect(calcularMesesPendientes(detalles, 2026, "2026-10-01")).toEqual(
+    expect(soloMeses(calcularMesesPendientes(detalles, 2026, "2026-10-01"))).toEqual(
       meses([10, 2026], [12, 2026], [1, 2027], [2, 2027], [3, 2027], [4, 2027], [5, 2027], [6, 2027], [7, 2027], [8, 2027], [9, 2027], [10, 2027])
     );
+  });
+
+  it("un pago pendiente bloquea el mes hasta aprobarse", () => {
+    expect(soloMeses(calcularMesesPendientes([fila({ status: "pendiente" })], 2026, "2026-10-01"))).toEqual(
+      meses([10, 2026], [12, 2026], [1, 2027], [2, 2027], [3, 2027], [4, 2027], [5, 2027], [6, 2027], [7, 2027], [8, 2027], [9, 2027], [10, 2027])
+    );
+  });
+
+  it("un pago parcial aprobado deja el mes pendiente con cobertura", () => {
+    const r = calcularMesesPendientes([fila({ payment_amount: 10 })], 2026, "2026-10-01");
+    const nov = r.find((m) => m.month_number === 11 && m.year_number === 2026);
+    expect(nov).toBeDefined();
+    expect(nov?.porcentaje).toBe(33);
+    expect(nov?.montoPagado).toBe(10);
+    expect(nov?.fraccionPendiente).toBeCloseTo(0.67, 2);
+  });
+
+  it("la inscripción no cubre un mes de mensualidad", () => {
+    const r = calcularMesesPendientes(
+      [fila({ payment_type: "inscripcion", payment_amount: 50, expected_amount_usd: 50 })],
+      2026,
+      "2026-10-01"
+    );
+    expect(soloMeses(r)).toContainEqual({ month_number: 11, year_number: 2026 });
+  });
+
+  it("la suspensión cubre el mes", () => {
+    const r = calcularMesesPendientes(
+      [fila({ payment_type: "suspension", payment_amount: 0, expected_amount_usd: 0 })],
+      2026,
+      "2026-10-01"
+    );
+    expect(soloMeses(r)).not.toContainEqual({ month_number: 11, year_number: 2026 });
   });
 
   it("inicio en año anterior o sin fecha: desde enero del año target", () => {
@@ -100,10 +147,10 @@ describe("calcularMesesPendientes", () => {
 
   it("meses pagados en año siguiente se excluyen", () => {
     const detalles = [
-      { month_number: 1, year_number: 2027 },
-      { month_number: 2, year_number: 2027 },
+      fila({ month_number: 1, year_number: 2027 }),
+      fila({ month_number: 2, year_number: 2027 }),
     ];
-    expect(calcularMesesPendientes(detalles, 2026, "2026-11-01")).toEqual(
+    expect(soloMeses(calcularMesesPendientes(detalles, 2026, "2026-11-01"))).toEqual(
       meses([11, 2026], [12, 2026], [3, 2027], [4, 2027], [5, 2027], [6, 2027], [7, 2027], [8, 2027], [9, 2027], [10, 2027], [11, 2027], [12, 2027])
     );
   });

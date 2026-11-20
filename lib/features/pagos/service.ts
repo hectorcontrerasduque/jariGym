@@ -2,12 +2,17 @@ import { createClient } from "@/lib/supabase/client";
 import { messages } from "@/lib/messages";
 import type { Pago, MetodoPago, TipoPago, Profile, DetallePago } from "@/lib/types";
 import { metodoPrincipal } from "@/lib/utils";
-import type { ElegiblesResult, Moroso, PagoRPCRow } from "./domain/types";
+import type { ElegiblesResult, MesConCobertura, Moroso, PagoRPCRow } from "./domain/types";
 import { calcularMorosos, calcularMiembrosAlDia } from "./domain/morosos";
 import { calcularStats, calcularMonthlyStats } from "./domain/stats";
 import { filtrarElegibles, type ElegiblesInput } from "./domain/elegibles";
 import { calcularMesesPendientes } from "./domain/meses-pendientes";
-import { calcularMontoInscripcionAprobado } from "./inscription-amount";
+import {
+  filasCoberturaDesdeQuery,
+  preciosDesdeMetodos,
+  type PreciosPorMetodo,
+} from "./domain/cobertura";
+import { calcularMontoInscripcionAprobado, precioInscripcionActual } from "./inscription-amount";
 
 export type { ElegiblesResult };
 
@@ -56,6 +61,32 @@ export class PagosService {
   /** Injected client, or the browser client created lazily on first use. */
   private get supabase(): SupabaseLike {
     return (this.client ??= createClient());
+  }
+
+  /** Precios actuales (USD) por método, desde la config activa. */
+  private async preciosActuales(): Promise<PreciosPorMetodo> {
+    const { data } = await this.supabase
+      .from("gym_config_payment_methods")
+      .select("payment_method, amount_monthly, amount_inscription")
+      .eq("is_active", true);
+    return preciosDesdeMetodos(data ?? []);
+  }
+
+  /** Recalcula el estado de inscripción: solo queda pagada si se cubre el precio. */
+  private async actualizarInscripcion(userId: string): Promise<void> {
+    const [montoPagado, precio] = await Promise.all([
+      calcularMontoInscripcionAprobado(this.supabase, userId),
+      precioInscripcionActual(this.supabase),
+    ]);
+    const cubierta = precio <= 0 ? true : montoPagado + 1e-9 >= precio;
+    await this.supabase
+      .from("profiles")
+      .update({
+        inscription_paid: cubierta,
+        inscription_amount_paid: montoPagado,
+        ...(cubierta ? { inscription_date: new Date().toISOString().split("T")[0] } : {}),
+      })
+      .eq("id", userId);
   }
 
   private validateDetalles(detalles: CreatePaymentInput["detalles"]): void {
@@ -110,12 +141,18 @@ export class PagosService {
       throw new Error(messages.toast.pagoError);
     }
 
+    const precios = await this.preciosActuales();
+    const esperadoMensual = precios[input.payment_method]?.mensual ?? precios.efectivo?.mensual ?? 0;
+    const esperadoInscripcion =
+      precios[input.payment_method]?.inscripcion ?? precios.efectivo?.inscripcion ?? 0;
     const detalles = input.detalles.map((d) => ({
       payment_id: pago.id,
       month_number: d.month_number,
       year_number: d.year_number,
       payment_type: d.payment_type,
       payment_amount: d.payment_amount,
+      expected_amount_usd:
+        d.payment_type === "inscripcion" ? esperadoInscripcion : esperadoMensual,
     }));
 
     const { error: detalleError } = await this.supabase
@@ -127,7 +164,7 @@ export class PagosService {
       throw new Error(messages.toast.pagoError);
     }
 
-    return { ...pago, detail: detalles as DetallePago[] };
+    return { ...pago, detail: detalles as unknown as DetallePago[] };
   }
 
   async aprobarPago(pagoId: string): Promise<Pago> {
@@ -167,15 +204,7 @@ export class PagosService {
 
     const tieneInscripcion = detalles?.some((d) => d.payment_type === "inscripcion");
     if (tieneInscripcion) {
-      const inscriptionAmount = await calcularMontoInscripcionAprobado(this.supabase, data.user_id);
-      await this.supabase
-        .from("profiles")
-        .update({
-          inscription_paid: true,
-          inscription_date: new Date().toISOString().split("T")[0],
-          inscription_amount_paid: inscriptionAmount,
-        })
-        .eq("id", data.user_id);
+      await this.actualizarInscripcion(data.user_id);
     }
 
     return data as Pago;
@@ -263,12 +292,18 @@ export class PagosService {
       throw new Error(messages.toast.pagoError);
     }
 
+    const precios = await this.preciosActuales();
+    const esperadoMensual = precios[input.payment_method]?.mensual ?? precios.efectivo?.mensual ?? 0;
+    const esperadoInscripcion =
+      precios[input.payment_method]?.inscripcion ?? precios.efectivo?.inscripcion ?? 0;
     const detalles = input.detalles.map((d) => ({
       payment_id: pago.id,
       month_number: d.month_number,
       year_number: d.year_number,
       payment_type: d.payment_type,
       payment_amount: d.payment_amount,
+      expected_amount_usd:
+        d.payment_type === "inscripcion" ? esperadoInscripcion : esperadoMensual,
     }));
 
     const { error: detalleError } = await this.supabase
@@ -282,18 +317,10 @@ export class PagosService {
 
     const tieneInscripcion = detalles.some((d) => d.payment_type === "inscripcion");
     if (tieneInscripcion) {
-      const inscriptionAmount = await calcularMontoInscripcionAprobado(this.supabase, input.user_id);
-      await this.supabase
-        .from("profiles")
-        .update({
-          inscription_paid: true,
-          inscription_date: new Date().toISOString().split("T")[0],
-          inscription_amount_paid: inscriptionAmount,
-        })
-        .eq("id", input.user_id);
+      await this.actualizarInscripcion(input.user_id);
     }
 
-    return { ...pago, detail: detalles as DetallePago[] };
+    return { ...pago, detail: detalles as unknown as DetallePago[] };
   }
 
   /** Crea (o renueva) una suspensión pendiente/aprobada. Devuelve el id del pago creado ("" si falló). */
@@ -419,25 +446,43 @@ export class PagosService {
     return this.listarPagos("pendiente", undefined, undefined, supabaseClient);
   }
 
-  async mesesPendientes(usuarioId: string, anio?: number, supabaseClient?: ReturnType<typeof createClient>, startDate?: string): Promise<{ month_number: number; year_number: number }[]> {
+  async mesesPendientes(
+    usuarioId: string,
+    anio?: number,
+    supabaseClient?: ReturnType<typeof createClient>,
+    startDate?: string,
+    precios?: PreciosPorMetodo
+  ): Promise<MesConCobertura[]> {
     const supabase = supabaseClient || this.supabase;
     const anioFiltro = anio || new Date().getFullYear();
 
-    // Single query: join payment_detail → payments, filter by user+status+year
+    // Una consulta: payment_detail → payments (con monto, tipo y precio congelado).
     const { data: detalles, error } = await supabase
       .from("payment_detail")
-      .select("month_number, year_number, payments!inner(id, status, user_id)")
+      .select(
+        "month_number, year_number, payment_type, payment_amount, expected_amount_usd, payments!inner(status, user_id, payment_method, created_at)"
+      )
       .eq("payments.user_id", usuarioId)
       .in("payments.status", ["aprobado", "pendiente"])
       .not("month_number", "is", null);
 
     if (error || !detalles) return [];
 
-    return calcularMesesPendientes(detalles, anioFiltro, startDate);
+    const preciosFinales = precios ?? (await this.preciosActuales());
+    const filas = filasCoberturaDesdeQuery(
+      detalles as unknown as Parameters<typeof filasCoberturaDesdeQuery>[0]
+    );
+    return calcularMesesPendientes(filas, anioFiltro, startDate, preciosFinales);
   }
 
-  async mesesPendientesAdmin(usuarioId: string, anio?: number, supabaseClient?: ReturnType<typeof createClient>, startDate?: string): Promise<{ month_number: number; year_number: number }[]> {
-    return this.mesesPendientes(usuarioId, anio, supabaseClient, startDate);
+  async mesesPendientesAdmin(
+    usuarioId: string,
+    anio?: number,
+    supabaseClient?: ReturnType<typeof createClient>,
+    startDate?: string,
+    precios?: PreciosPorMetodo
+  ): Promise<MesConCobertura[]> {
+    return this.mesesPendientes(usuarioId, anio, supabaseClient, startDate, precios);
   }
 
   async tieneInscripcionPendiente(usuarioId: string, supabaseClient?: ReturnType<typeof createClient>): Promise<boolean> {

@@ -40,6 +40,8 @@ export interface CoberturaGrupo {
   montoPagado: number;
   tienePendiente: boolean;
   preciosPorMetodo: Record<string, number>;
+  /** Método del primer pago del grupo (con el que se "contrató" el mes). */
+  metodoPago: string | null;
 }
 
 function tiempo(iso: string | null | undefined): number {
@@ -112,6 +114,9 @@ export function calcularCoberturaGrupos(
     const primera = filas[0];
     const tipo = primera.payment_type;
     const preciosPorMetodo = precioCongelado(filas, tipo, precios);
+    // Método "contratado": el del pago más antiguo del grupo.
+    const ordenadas = [...filas].sort((a, b) => tiempo(a.created_at) - tiempo(b.created_at));
+    const metodoPago = ordenadas[0]?.payment_method || "efectivo";
 
     let fraccion = 0;
     let montoPagado = 0;
@@ -144,6 +149,7 @@ export function calcularCoberturaGrupos(
       montoPagado: redondear2(montoPagado),
       tienePendiente,
       preciosPorMetodo,
+      metodoPago,
     });
   }
 

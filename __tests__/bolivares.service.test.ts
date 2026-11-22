@@ -9,6 +9,8 @@ let service: BolivaresService;
 const USER_ID = "miembro-1";
 const ADMIN_ID = "admin-1";
 const PAGO_ID = "pago-1";
+const BANCO = "Banco de Venezuela";
+const REFERENCIA = "0001234567";
 
 function fakeFile(): File {
   return new File(["fake"], "comprobante.jpg", { type: "image/jpeg" });
@@ -45,8 +47,8 @@ describe("BolivaresService.crearPago", () => {
         { month_number: 2, year_number: 2026, payment_type: "mensualidad", payment_amount: 15 },
       ],
       amount_bs: 3000, // 3000/100 = 30 USD → 15 + 15
-      bank: "Mercantil",
-      reference_number: "001",
+      bank: BANCO,
+      reference_number: REFERENCIA,
       comprobante: fakeFile(),
     });
 
@@ -75,6 +77,8 @@ describe("BolivaresService.crearPago", () => {
         user_id: USER_ID,
         detalles: [{ month_number: 1, year_number: 2026, payment_type: "mensualidad", payment_amount: 25 }],
         amount_bs: 1000,
+        bank: BANCO,
+        reference_number: REFERENCIA,
       })
     ).rejects.toThrow(messages.bolivares.sinTasa);
   });
@@ -101,6 +105,8 @@ describe("BolivaresService.crearPago", () => {
       user_id: USER_ID,
       detalles: [{ month_number: 1, year_number: 2026, payment_type: "mensualidad", payment_amount: 25 }],
       amount_bs: 1000,
+      bank: BANCO,
+      reference_number: REFERENCIA,
     });
 
     expect(fake.callsTo("comprobantes", "upload")).toHaveLength(0);
@@ -275,7 +281,7 @@ describe("BolivaresService.crearPago — super-admin y excedente", () => {
     fake.on("profiles", "select").reply({ data: { role: "super_admin" } });
     base();
 
-    await service.crearPago({ user_id: USER_ID, detalles, amount_bs: 3000 });
+    await service.crearPago({ user_id: USER_ID, detalles, amount_bs: 3000, bank: BANCO, reference_number: REFERENCIA });
 
     expect(fake.callsTo("payments", "insert")[0].payload).toMatchObject({
       status: "aprobado",
@@ -292,7 +298,7 @@ describe("BolivaresService.crearPago — super-admin y excedente", () => {
     fake.on("profiles", "select").reply({ data: { role: "miembro" } });
     base();
 
-    await service.crearPago({ user_id: USER_ID, detalles, amount_bs: 3000 });
+    await service.crearPago({ user_id: USER_ID, detalles, amount_bs: 3000, bank: BANCO, reference_number: REFERENCIA });
 
     expect(fake.callsTo("payments", "insert")[0].payload).toMatchObject({ status: "pendiente" });
     const bol = fake.callsTo("payment_bolivares", "insert")[0].payload as Array<Record<string, unknown>>;
@@ -305,8 +311,112 @@ describe("BolivaresService.crearPago — super-admin y excedente", () => {
     fake.on("exchange_rates", "select").reply({ data: { rate_bs: 100 } });
 
     await expect(
-      service.crearPago({ user_id: USER_ID, detalles, amount_bs: 5000 })
+      service.crearPago({ user_id: USER_ID, detalles, amount_bs: 5000, bank: BANCO, reference_number: "0009999999" })
     ).rejects.toThrow("Sobra");
     expect(fake.callsTo("payments", "insert")).toHaveLength(0);
+  });
+});
+
+describe("BolivaresService.crearPago — montos exactos y validaciones", () => {
+  const detalles = [
+    { month_number: 1, year_number: 2026, payment_type: "mensualidad" as const, payment_amount: 20 },
+  ];
+
+  function prepararReparto() {
+    fake.on("payments", "insert").reply({ data: { id: PAGO_ID, status: "pendiente" } });
+    fake.on("payment_detail", "insert").reply({
+      data: [{ id: "det-1", month_number: 1, year_number: 2026, payment_type: "mensualidad", payment_amount: 13.08 }],
+    });
+    fake.on("payment_bolivares", "insert").reply({ data: null });
+    fake.on("gym_config_payment_methods", "select").reply({
+      data: [{ payment_method: "bs", amount_monthly: 20, amount_inscription: 50 }],
+    });
+  }
+
+  beforeEach(() => {
+    fake = createSupabaseFake();
+    service = new BolivaresService(fake.client);
+    fake.setUser({ id: USER_ID });
+    fake.on("profiles", "select").reply({ data: { role: "miembro" } });
+  });
+
+  it("guarda exactamente el monto en Bs ingresado (sin pérdida por redondeo)", async () => {
+    fake.on("exchange_rates", "select").reply({ data: { rate_bs: 764.235 } });
+    prepararReparto();
+
+    await service.crearPago({
+      user_id: USER_ID,
+      detalles,
+      amount_bs: 10000,
+      bank: "bdv",
+      reference_number: "0012345678",
+    });
+
+    const bol = fake.callsTo("payment_bolivares", "insert")[0].payload as Array<Record<string, unknown>>;
+    expect(bol[0].amount_bs).toBe(10000);
+    // el banco se normaliza a nombre canónico
+    expect(bol[0].bank).toBe("Banco de Venezuela");
+  });
+
+  it("rechaza una referencia bancaria duplicada", async () => {
+    fake.on("payments", "select").reply({ data: [{ id: "otro-pago" }] });
+
+    await expect(
+      service.crearPago({ user_id: USER_ID, detalles, amount_bs: 1000, bank: BANCO, reference_number: "0012345678" })
+    ).rejects.toThrow(messages.bolivares.referenciaDuplicada);
+    expect(fake.callsTo("payments", "insert")).toHaveLength(0);
+  });
+
+  it("rechaza banco inválido en backend", async () => {
+    await expect(
+      service.crearPago({ user_id: USER_ID, detalles, amount_bs: 1000, bank: "bco inventado", reference_number: REFERENCIA })
+    ).rejects.toThrow(messages.bolivares.bancoRequerido);
+  });
+
+  it("rechaza referencia inválida en backend", async () => {
+    await expect(
+      service.crearPago({ user_id: USER_ID, detalles, amount_bs: 1000, bank: BANCO, reference_number: "123" })
+    ).rejects.toThrow(messages.bolivares.referenciaRequerida);
+  });
+
+  it("rechaza continuar un mes que se paga con otro método", async () => {
+    fake.on("payment_detail", "select").reply({
+      data: [
+        {
+          month_number: 1,
+          year_number: 2026,
+          payment_type: "mensualidad",
+          payments: { user_id: USER_ID, payment_method: "efectivo" },
+        },
+      ],
+    });
+
+    await expect(
+      service.crearPago({ user_id: USER_ID, detalles, amount_bs: 1000, bank: BANCO, reference_number: REFERENCIA })
+    ).rejects.toThrow(/ya se está pagando con/);
+  });
+
+  it("permite continuar un mes que ya se paga con el mismo método", async () => {
+    fake.on("exchange_rates", "select").reply({ data: { rate_bs: 100 } });
+    fake.on("payment_detail", "select").reply({
+      data: [
+        {
+          month_number: 1,
+          year_number: 2026,
+          payment_type: "mensualidad",
+          payments: { user_id: USER_ID, payment_method: "bs" },
+        },
+      ],
+    });
+    prepararReparto();
+
+    await service.crearPago({
+      user_id: USER_ID,
+      detalles,
+      amount_bs: 1000,
+      bank: BANCO,
+      reference_number: "0076543210",
+    });
+    expect(fake.callsTo("payments", "insert")).toHaveLength(1);
   });
 });

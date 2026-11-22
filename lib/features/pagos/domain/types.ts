@@ -79,4 +79,6 @@ export interface MesConCobertura extends MesPendiente {
   montoPagado: number;
   /** Precio congelado por método de pago para este mes. */
   preciosPorMetodo: Record<string, number>;
+  /** Método con el que arrancó el pago del mes (null si no tiene pagos). */
+  metodoPago: string | null;
 }

@@ -228,6 +228,9 @@ status: "pendiente" | "aprobado" | "rechazado"
 - Un mes queda cubierto cuando la fracción llega a 1; los pagos `pendiente` lo bloquean (anti doble cobro). `suspension` cubre el mes (monto 0). Agrupación por `payment_type` (inscripción ≠ mensualidad).
 - Dominio puro: `lib/features/pagos/domain/cobertura.ts` (`calcularCoberturaGrupos`, `distribuirSecuencial`, `pendienteUsd`).
 - Pagos BS del super-admin nacen `aprobado` y `reconciled`; los del miembro siguen pendientes hasta conciliar. Al conciliar se aprueba el pago aunque el mes quede parcial.
+- Monto Bs: la distribución es secuencial **en Bs** (fuente de verdad = lo transferido); `amount_usd` se deriva. Así el monto guardado es exacto (sin pérdida por redondeo USD↔Bs).
+- Un mes se completa con **un solo método** (`lib/features/pagos/metodo-mes.ts`): si el mes ya tiene pagos con otro método, se rechaza (front en Mis Pagos + backend en los servicios). `MesConCobertura.metodoPago` indica con cuál empezó.
+- Referencia bancaria única: `payments(bill_code)` único parcial para Bs (migración 066) + chequeo en `bolivaresService.crearPago`. Banco y referencia son obligatorios en el flujo Bs (validación en front y backend; banco canónico vía `domain/bancos.ts`).
 
 ### Dashboard Stats Logic
 - Fuente de verdad de cada cifra (inscritos, deudores, al día, stats mensuales, meses pendientes): `openspec/specs/pagos/spec.md` → funciones puras en `lib/features/pagos/domain/`.

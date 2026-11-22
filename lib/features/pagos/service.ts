@@ -13,6 +13,7 @@ import {
   type PreciosPorMetodo,
 } from "./domain/cobertura";
 import { calcularMontoInscripcionAprobado, precioInscripcionActual } from "./inscription-amount";
+import { validarMetodoUnicoPorMes } from "./metodo-mes";
 
 export type { ElegiblesResult };
 
@@ -117,6 +118,7 @@ export class PagosService {
     if (!user) throw new Error(messages.toast.noAutenticado);
 
     this.validateDetalles(input.detalles);
+    await validarMetodoUnicoPorMes(this.supabase, input.user_id, input.payment_method, input.detalles);
 
     const receiptUrl = input.payment_method === "efectivo" ? null : (input.receipt_url || null);
 
@@ -266,6 +268,7 @@ export class PagosService {
     }
 
     this.validateDetalles(input.detalles);
+    await validarMetodoUnicoPorMes(this.supabase, input.user_id, input.payment_method, input.detalles);
 
     const receiptUrl = input.payment_method === "efectivo" ? null : (input.receipt_url || null);
 

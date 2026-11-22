@@ -558,6 +558,22 @@ describe("crearPago", () => {
     expect(r).toEqual({ id: "p1", status: "pendiente", detail: detalle });
   });
 
+  it("rechaza si el mes ya se está pagando con otro método", async () => {
+    fake.setUser(ADMIN);
+    fake.on("payment_detail", "select").reply({
+      data: [
+        {
+          month_number: 9,
+          year_number: 2026,
+          payment_type: "mensualidad",
+          payments: { user_id: "m1", payment_method: "bs" },
+        },
+      ],
+    });
+    await expect(service.crearPago(input())).rejects.toThrow(/ya se está pagando con/);
+    expect(fake.callsTo("payments", "insert")).toHaveLength(0);
+  });
+
   it("métodos distintos a efectivo conservan el comprobante", async () => {
     fake.setUser(ADMIN);
     fake.on("payments", "insert").reply({ data: { id: "p1" } });
@@ -579,7 +595,7 @@ describe("crearPago", () => {
     fake.setUser(ADMIN);
     fake.on("payments", "insert").reply({ error: { message: "timeout" } });
     await expect(service.crearPago(input())).rejects.toThrow(messages.toast.pagoError);
-    expect(fake.callsTo("payment_detail")).toHaveLength(0);
+    expect(fake.callsTo("payment_detail", "insert")).toHaveLength(0);
   });
 
   it("falla el detalle → borra la cabecera y falla", async () => {

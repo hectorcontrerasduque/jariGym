@@ -75,6 +75,14 @@ describe("cobertura — prorated por método", () => {
     expect(g.fraccionPagada).toBeCloseTo(0.5, 2);
   });
 
+  it("expone el método del pago más antiguo del mes", () => {
+    const g = grupo([
+      fila({ payment_amount: 10, expected_amount_usd: 35, payment_method: "bs", created_at: "2026-02-01T00:00:00Z" }),
+      fila({ payment_amount: 5, expected_amount_usd: 30, payment_method: "efectivo", created_at: "2026-01-01T00:00:00Z" }),
+    ]);
+    expect(g.metodoPago).toBe("efectivo");
+  });
+
   it("solo los pagos aprobados cuentan; un pendiente bloquea", () => {
     const g = grupo([
       fila({ payment_amount: 35, expected_amount_usd: 35, status: "aprobado" }),

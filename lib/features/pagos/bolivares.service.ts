@@ -3,13 +3,10 @@ import { createClient as createBrowserClient } from "@/lib/supabase/client";
 import { messages } from "@/lib/messages";
 import { calcularMontoInscripcionAprobado, precioInscripcionActual } from "./inscription-amount";
 import type { Pago, PaymentBolivar, PaymentDetail, TipoPago } from "@/lib/types";
-import {
-  convertirBsABsd,
-  estaCubierto,
-  restanteUsd,
-  type DetalleInput,
-} from "./domain/bolivares";
+import { estaCubierto, restanteUsd, type DetalleInput } from "./domain/bolivares";
 import { distribuirSecuencial } from "./domain/cobertura";
+import { canonicalizarBanco } from "./domain/bancos";
+import { validarMetodoUnicoPorMes } from "./metodo-mes";
 
 /**
  * BolivaresService — flujo de pago en bolívares (payment_bolivares).
@@ -120,31 +117,59 @@ export class BolivaresService {
       .single();
     const isAdmin = profile?.role === "super_admin";
 
-    const rateBcv = await this.obtenerTasaVigente();
-    const amountUsdTotal = convertirBsABsd(input.amount_bs, rateBcv);
+    // Validación de datos bancarios (defensa en backend, no solo UI).
+    const banco = canonicalizarBanco(input.bank ?? "");
+    if (!banco) throw new Error(messages.bolivares.bancoRequerido);
+    const referencia = String(input.reference_number ?? "").trim();
+    if (!/^\d{6,}$/.test(referencia)) {
+      throw new Error(messages.bolivares.referenciaRequerida);
+    }
 
-    // Distribución secuencial: cada detalle trae el USD que necesita para
-    // completarse al precio del método (peso). Se llena el mes más viejo primero.
-    const necesidades = input.detalles.map((d) => Math.max(0, Number(d.payment_amount) || 0));
-    const { aplicados, excedente } = distribuirSecuencial(amountUsdTotal, necesidades);
-    if (excedente > 0.009) {
+    // Referencia bancaria única: no se puede registrar dos veces el mismo pago.
+    const { data: duplicado } = await this.supabase
+      .from("payments")
+      .select("id")
+      .eq("payment_method", "bs")
+      .eq("bill_code", referencia)
+      .limit(1);
+    if (duplicado && duplicado.length > 0) {
+      throw new Error(messages.bolivares.referenciaDuplicada);
+    }
+
+    // Un mes se completa con un solo método (el del primer pago del mes).
+    await validarMetodoUnicoPorMes(this.supabase, input.user_id, "bs", input.detalles);
+
+    const rateBcv = await this.obtenerTasaVigente();
+
+    // Distribución secuencial EN BS (fuente de verdad: lo que transfirió el
+    // miembro). Cada detalle trae su necesidad en USD; se convierte a Bs al
+    // precio del método y se llena el mes más viejo primero. Así el monto en Bs
+    // guardado es exactamente el ingresado (sin pérdida por redondeo USD↔Bs).
+    const necesidadesBs = input.detalles.map(
+      (d) => Math.round(Math.max(0, Number(d.payment_amount) || 0) * rateBcv * 100) / 100
+    );
+    const { aplicados: aplicadosBs, excedente } = distribuirSecuencial(
+      input.amount_bs,
+      necesidadesBs
+    );
+    if (excedente > 0.05) {
       throw new Error(
-        messages.bolivares.excedenteMonto.replace("{monto}", excedente.toFixed(2))
+        messages.bolivares.excedenteMontoBs.replace("{monto}", excedente.toFixed(2))
       );
     }
     const reparto = input.detalles
       .map((d, i) => {
         // eslint-disable-next-line security/detect-object-injection -- índice numérico de array controlado
-        const amountUsd = aplicados[i] ?? 0;
+        const amountBs = aplicadosBs[i] ?? 0;
         return {
           month_number: d.month_number,
           year_number: d.year_number,
           payment_type: d.payment_type,
-          amount_usd: amountUsd,
-          amount_bs: Math.round(amountUsd * rateBcv * 100) / 100,
+          amount_bs: amountBs,
+          amount_usd: Math.round((amountBs / rateBcv) * 100) / 100,
         };
       })
-      .filter((r) => r.amount_usd > 0);
+      .filter((r) => r.amount_bs > 0);
     if (!reparto.length) throw new Error(messages.bolivares.detalleRequerido);
 
     // Precio congelado por método (snapshot) para cada detalle.
@@ -165,7 +190,7 @@ export class BolivaresService {
         user_id: input.user_id,
         status: isAdmin ? "aprobado" : "pendiente",
         payment_method: "bs",
-        bill_code: input.reference_number || null,
+        bill_code: referencia,
         receipt_url: null, // la imagen vive en payment_bolivares.image_url
         payment_note: input.payment_note || null,
         created_by: user.id,
@@ -220,8 +245,8 @@ export class BolivaresService {
           amount_bs: r.amount_bs,
           rate_bcv: rateBcv,
           amount_usd: r.amount_usd,
-          bank: input.bank || null,
-          reference_number: input.reference_number || null,
+          bank: banco,
+          reference_number: referencia,
           reconciled: isAdmin,
           paid_at: input.paid_at || new Date().toISOString().split("T")[0],
           image_url: imageUrl,

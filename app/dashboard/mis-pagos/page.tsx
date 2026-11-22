@@ -615,6 +615,52 @@ function MisPagosContent() {
       return;
     }
 
+    // Validaciones de los 3 campos (monto ya validado arriba) ANTES de confirmar.
+    const esBs = formData.metodo_pago === "bs";
+    let montoBsNum = 0;
+    let bancoNormalizado: string | undefined;
+    if (!formData.solicitar_suspension) {
+      // Un mes se completa con un solo método de pago.
+      if (formData.pagar_mensualidad) {
+        for (const sel of formData.meses) {
+          const mes = mesesPendientes.find(
+            (m) => m.month_number === sel.month_number && m.year_number === sel.year_number
+          );
+          const metodoMes = mes?.metodoPago;
+          if (metodoMes && metodoMes !== formData.metodo_pago) {
+            showToast(
+              messages.bolivares.mesOtroMetodo.replace(
+                "{metodo}",
+                metodoLabels[metodoMes as MetodoPago] ?? metodoMes
+              ),
+              "warning"
+            );
+            return;
+          }
+        }
+      }
+      if (esBs) {
+        montoBsNum = parseNumero(formData.amount_bs);
+        if (!(montoBsNum > 0)) {
+          showToast(messages.bolivares.montoRequeridoBs, "warning");
+          return;
+        }
+        bancoNormalizado = canonicalizarBanco(formData.bank) ?? undefined;
+        if (!bancoNormalizado) {
+          showToast(messages.bolivares.bancoRequerido, "warning");
+          return;
+        }
+        if (!/^\d{6,}$/.test(formData.reference_number.trim())) {
+          showToast(messages.bolivares.referenciaRequerida, "warning");
+          return;
+        }
+        if (MOSTRAR_CARGA_COMPROBANTE && !comprobante) {
+          showToast(messages.bolivares.comprobanteRequerido, "warning");
+          return;
+        }
+      }
+    }
+
     const nombreMiembro = miembroSeleccionado?.full_name || profile?.full_name || "tu cuenta";
     const acciones: string[] = [];
     if (formData.solicitar_suspension) {
@@ -672,32 +718,6 @@ function MisPagosContent() {
       }
       if (formData.pagar_mensualidad && formData.meses.length === 0) {
         throw new Error("Selecciona al menos un mes");
-      }
-
-      const esBs = formData.metodo_pago === "bs";
-
-      // Validaciones específicas del flujo BS (no aplican a efectivo/binance).
-      let montoBsNum = 0;
-      let bancoNormalizado: string | undefined;
-      if (esBs) {
-        montoBsNum = parseNumero(formData.amount_bs);
-        if (!(montoBsNum > 0)) {
-          showToast(messages.bolivares.montoBsRequerido, "warning");
-          return;
-        }
-        bancoNormalizado = canonicalizarBanco(formData.bank) ?? undefined;
-        if (!bancoNormalizado) {
-          showToast(messages.bolivares.bancoRequerido, "warning");
-          return;
-        }
-        if (!/^\d{6,}$/.test(formData.reference_number.trim())) {
-          showToast(messages.bolivares.referenciaRequerida, "warning");
-          return;
-        }
-        if (MOSTRAR_CARGA_COMPROBANTE && !comprobante) {
-          showToast(messages.bolivares.comprobanteRequerido, "warning");
-          return;
-        }
       }
 
       // Un detalle por concepto con su monto en USD. Para Bs se envía la
@@ -1656,6 +1676,18 @@ function MisPagosContent() {
                               <div className="text-center">
                                 <div className="font-semibold">{getMonthName(month_number).slice(0, 3)}</div>
                                 <div className="text-xs opacity-75">{year_number}</div>
+                                {mes.metodoPago && (
+                                  <div
+                                    className="text-[10px] font-semibold leading-none"
+                                    title={metodoLabels[mes.metodoPago as MetodoPago] ?? mes.metodoPago}
+                                  >
+                                    {mes.metodoPago === "efectivo"
+                                      ? "💵"
+                                      : mes.metodoPago === "bs"
+                                        ? <FlagVe className="inline-block w-3 h-2" />
+                                        : "🟡"}
+                                  </div>
+                                )}
                                 {pct > 0 && (
                                   <div className="mt-1">
                                     <div className={`h-1.5 w-full rounded-full overflow-hidden ${seleccionado ? "bg-black/20" : "bg-gym-border/50"}`}>

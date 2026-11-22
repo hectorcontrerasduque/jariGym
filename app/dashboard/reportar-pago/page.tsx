@@ -6,6 +6,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { pagosService } from "@/lib/features/pagos/service";
+import { bolivaresService } from "@/lib/features/pagos/bolivares.service";
+import { parseNumero } from "@/lib/features/pagos/ocr";
 import { dedupeMetodos, metodosActivos, metodoPorDefecto } from "@/lib/features/pagos/domain/metodos";
 import { datosPagoBs } from "@/lib/features/pagos/domain/banco";
 import { miembrosService } from "@/lib/services/miembros/miembros.service";
@@ -16,6 +18,8 @@ import { Loader } from "@/components/ui/loader";
 import { FlagVe } from "@/components/ui/flag-ve";
 import { DatosPagoBs } from "@/components/pagos/datos-pago-bs";
 import { ComprobanteInput } from "@/components/pagos/comprobante-input";
+import { BancoInput } from "@/components/pagos/banco-input";
+import { canonicalizarBanco } from "@/lib/features/pagos/domain/bancos";
 import { showToast } from "@/components/ui/toast";
 import { messages } from "@/lib/messages";
 import { calcularEstadoPush, debePedirActivacion } from "@/lib/features/push/dispositivo";
@@ -66,6 +70,9 @@ function ReportarPagoForm() {
     pagar_mensualidad: false,
     estado_pago: "aprobado" as "pendiente" | "aprobado",
     fecha_pago: new Date().toISOString().split("T")[0],
+    bank: "",
+    reference_number: "",
+    amount_bs: "",
   });
   const [comprobante, setComprobante] = useState<File | null>(null);
   const [modalPushAbierto, setModalPushAbierto] = useState(false);
@@ -248,6 +255,21 @@ function ReportarPagoForm() {
       showToast(messages.misPagos.sinMetodosPago, "error");
       return;
     }
+    // Validación de los 3 campos bancarios ANTES de enviar (pago en Bs).
+    if (formData.metodo_pago === "bs") {
+      if (!(parseNumero(formData.amount_bs) > 0)) {
+        showToast(messages.bolivares.montoRequeridoBs, "warning");
+        return;
+      }
+      if (!canonicalizarBanco(formData.bank)) {
+        showToast(messages.bolivares.bancoRequerido, "warning");
+        return;
+      }
+      if (!/^\d{6,}$/.test(formData.reference_number.trim())) {
+        showToast(messages.bolivares.referenciaRequerida, "warning");
+        return;
+      }
+    }
     // Push sin decidir ⇒ ofrece activarlo antes de enviar; el pago nunca se bloquea
     if (debePedirActivacion(await calcularEstadoPush())) {
       setModalPushAbierto(true);
@@ -265,19 +287,6 @@ function ReportarPagoForm() {
 
       if (!isAdmin && formData.pagar_inscripcion && inscripcionPagada) {
         throw new Error("La inscripción ya está pagada");
-      }
-
-      let comprobanteUrl = "";
-
-      if (needsComprobante(formData.metodo_pago) && comprobante) {
-        const supabase = createClient();
-        const fileName = `${targetUserId}/${Date.now()}_${comprobante.name}`;
-        const { error: uploadError } = await supabase.storage
-          .from("comprobantes")
-          .upload(fileName, comprobante);
-        if (uploadError) throw uploadError;
-        const { data: urlData } = supabase.storage.from("comprobantes").getPublicUrl(fileName);
-        comprobanteUrl = urlData.publicUrl;
       }
 
       const detalles: Array<{ month_number: number | null; year_number: number | null; payment_type: "mensualidad" | "inscripcion"; payment_amount: number }> = [];
@@ -310,23 +319,54 @@ function ReportarPagoForm() {
         ? `Inscripción - ${formData.payment_note || ""}`
         : formData.payment_note || undefined;
 
-      const pago = await pagosService.crearPago({
-        user_id: targetUserId,
-        payment_method: formData.metodo_pago,
-        receipt_url: comprobanteUrl || undefined,
-        bill_code: formData.metodo_pago === "efectivo" ? formData.codigo_billete : undefined,
-        payment_note: notasPago,
-        detalles,
-      });
+      let pagoId = "";
 
-      if (isAdmin && formData.estado_pago === "aprobado") {
-        await pagosService.aprobarPago(pago.id);
+      if (formData.metodo_pago === "bs") {
+        // Pago en Bs: flujo propio (valida banco/referencia, congela tasa y
+        // guarda payment_bolivares). El super-admin lo registra aprobado.
+        const pagoBs = await bolivaresService.crearPago({
+          user_id: targetUserId,
+          detalles,
+          amount_bs: parseNumero(formData.amount_bs),
+          bank: canonicalizarBanco(formData.bank) ?? undefined,
+          reference_number: formData.reference_number.trim(),
+          comprobante,
+          payment_note: notasPago,
+          paid_at: formData.fecha_pago,
+        });
+        pagoId = pagoBs.id;
+      } else {
+        let comprobanteUrl = "";
+        if (needsComprobante(formData.metodo_pago) && comprobante) {
+          const supabase = createClient();
+          const fileName = `${targetUserId}/${Date.now()}_${comprobante.name}`;
+          const { error: uploadError } = await supabase.storage
+            .from("comprobantes")
+            .upload(fileName, comprobante);
+          if (uploadError) throw uploadError;
+          const { data: urlData } = supabase.storage.from("comprobantes").getPublicUrl(fileName);
+          comprobanteUrl = urlData.publicUrl;
+        }
+
+        const pago = await pagosService.crearPago({
+          user_id: targetUserId,
+          payment_method: formData.metodo_pago,
+          receipt_url: comprobanteUrl || undefined,
+          bill_code: formData.metodo_pago === "efectivo" ? formData.codigo_billete : undefined,
+          payment_note: notasPago,
+          detalles,
+        });
+
+        if (isAdmin && formData.estado_pago === "aprobado") {
+          await pagosService.aprobarPago(pago.id);
+        }
+        pagoId = pago.id;
       }
 
       fetch("/api/pagos/notify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pagoId: pago.id }),
+        body: JSON.stringify({ pagoId }),
       }).catch(() => {});
 
       setSuccess(true);
@@ -345,7 +385,7 @@ function ReportarPagoForm() {
           <CardContent className="py-12 text-center">
             <CheckCircle className="w-16 h-16 text-gym-success mx-auto mb-4 animate-pulse-glow" />
             <h2 className="text-xl font-semibold text-gym-text mb-2 neon-text-success">Pago Reportado</h2>
-            <p className="text-gym-muted">{isAdmin && formData.estado_pago === "aprobado" ? "Pago registrado y aprobado" : "Tu pago está pendiente de aprobación"}</p>
+            <p className="text-gym-muted">{isAdmin && (formData.estado_pago === "aprobado" || formData.metodo_pago === "bs") ? "Pago registrado y aprobado" : "Tu pago está pendiente de aprobación"}</p>
           </CardContent>
         </Card>
       </div>
@@ -529,7 +569,8 @@ function ReportarPagoForm() {
                   </div>
                 ) : (
                   <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-                    {mesesPendientes.map(({ month_number, year_number }) => {
+                    {mesesPendientes.map((mes) => {
+                      const { month_number, year_number } = mes;
                       const seleccionado = formData.meses.some((m) => m.month_number === month_number && m.year_number === year_number);
                       return (
                         <button
@@ -566,7 +607,7 @@ function ReportarPagoForm() {
             )}
 
             {/* Admin: Status selector */}
-            {isAdmin && (formData.pagar_inscripcion || (formData.pagar_mensualidad && formData.meses.length > 0)) && (
+            {isAdmin && formData.metodo_pago !== "bs" && (formData.pagar_inscripcion || (formData.pagar_mensualidad && formData.meses.length > 0)) && (
               <div>
                 <label className="text-sm font-medium text-gym-muted mb-3 block">Estado del pago</label>
                 <div className="grid grid-cols-2 gap-2">
@@ -644,6 +685,53 @@ function ReportarPagoForm() {
                   required
                 />
                 <p className="text-xs text-gym-muted mt-1">Últimos 5 caracteres de cada billete. Si son varios, separar por coma.</p>
+              </div>
+            )}
+
+            {/* Datos del pago en Bs (obligatorios) */}
+            {formData.metodo_pago === "bs" && (
+              <div className="p-3 bg-gym-bg rounded-xl border border-gym-border space-y-3">
+                <div>
+                  <label htmlFor="amount-bs-rp" className="block text-xs font-medium text-gym-muted mb-1">
+                    {messages.bolivares.montoPagarBs} <span className="text-gym-danger">*</span>
+                  </label>
+                  <input
+                    id="amount-bs-rp"
+                    type="text"
+                    inputMode="decimal"
+                    placeholder="Ej: 1500000"
+                    value={formData.amount_bs}
+                    onChange={(e) => setFormData({ ...formData, amount_bs: e.target.value })}
+                    className="w-full px-4 py-2.5 bg-gym-surface border border-gym-border rounded-xl text-gym-text text-sm focus:outline-none focus:ring-2 focus:ring-gym-primary"
+                  />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label htmlFor="bank-bs-rp" className="block text-xs font-medium text-gym-muted mb-1">
+                      {messages.bolivares.bancoEmisor} <span className="text-gym-danger">*</span>
+                    </label>
+                    <BancoInput
+                      id="bank-bs-rp"
+                      value={formData.bank}
+                      onChange={(banco) => setFormData({ ...formData, bank: banco })}
+                      placeholder="Ej: Banco de Venezuela"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="ref-bs-rp" className="block text-xs font-medium text-gym-muted mb-1">
+                      {messages.bolivares.referenciaMinimo} <span className="text-gym-danger">*</span>
+                    </label>
+                    <input
+                      id="ref-bs-rp"
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="Ej: 0012345678"
+                      value={formData.reference_number}
+                      onChange={(e) => setFormData({ ...formData, reference_number: e.target.value.replace(/\D/g, "") })}
+                      className="w-full px-4 py-2.5 bg-gym-surface border border-gym-border rounded-xl text-gym-text text-sm font-mono focus:outline-none focus:ring-2 focus:ring-gym-primary"
+                    />
+                  </div>
+                </div>
               </div>
             )}
 

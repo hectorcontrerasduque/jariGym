@@ -68,6 +68,7 @@ export function calcularMesesPendientes(
         porcentaje: Math.min(100, Math.round(fraccion * 100)),
         montoPagado: grupo?.montoPagado ?? 0,
         preciosPorMetodo: grupo?.preciosPorMetodo ?? {},
+        metodoPago: grupo?.metodoPago ?? null,
       });
     }
 

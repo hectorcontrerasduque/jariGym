@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  BANCOS_CANONICOS,
   bancosEnTexto,
   buscarBancos,
   canonicalizarBanco,
@@ -41,8 +42,18 @@ describe("buscarBancos", () => {
     expect(buscarBancos("bbva")).toEqual(["BBVA Provincial"]);
   });
 
-  it("sin consulta devuelve el catálogo completo", () => {
-    expect(buscarBancos("").length).toBeGreaterThan(10);
+  it("el catálogo tiene los 27 bancos nacionales", () => {
+    expect(BANCOS_CANONICOS).toHaveLength(27);
+    expect(new Set(BANCOS_CANONICOS).size).toBe(27);
+    expect(buscarBancos("")).toHaveLength(27);
+  });
+
+  it("encuentra por siglas y nombres antiguos", () => {
+    expect(buscarBancos("banfanb")).toEqual(["Banco de la Fuerza Armada Nacional Bolivariana"]);
+    expect(buscarBancos("mi banco")).toEqual(["R4"]);
+    expect(buscarBancos("bicentenario")).toEqual(["Banco Digital de los Trabajadores"]);
+    expect(buscarBancos("bfc")).toEqual(["Banco Fondo Común"]);
+    expect(buscarBancos("0134")).toEqual([]);
   });
 
   it("sin coincidencias devuelve []", () => {

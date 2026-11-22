@@ -11,34 +11,82 @@ export interface BancoAlias {
   alias: string[];
 }
 
-/** Lista canónica (nombre a mostrar/guardar). */
+/**
+ * Lista canónica (nombre comercial a mostrar/guardar).
+ * Basada en el listado del BCV (27 instituciones en la cámara de compensación).
+ */
 export const BANCOS_CANONICOS: string[] = [
+  "100% Banco",
   "Banco Activo",
+  "Banco Agrícola de Venezuela",
   "Banco Caroní",
+  "Banco de la Fuerza Armada Nacional Bolivariana",
   "Banco de Venezuela",
   "Banco del Tesoro",
+  "Banco Digital de los Trabajadores",
+  "Banco Exterior",
+  "Banco Fondo Común",
+  "Banco Internacional de Desarrollo",
   "Banco Nacional de Crédito",
   "Banco Plaza",
+  "Banco Sofitasa",
+  "Bancamiga",
+  "Bancaribe",
   "Bancrecer",
   "Banesco",
+  "Bangente",
+  "Banplus",
   "BBVA Provincial",
-  "Bicentenario",
-  "100% Banco",
   "Delsur",
+  "Instituto Municipal de Crédito Popular",
   "Mercantil",
+  "N58 Banco Digital",
+  "R4",
   "Venezolano de Crédito",
 ];
 
-/** Alias/variantes → nombre canónico. */
+/**
+ * Alias/variantes → nombre canónico. Solo sirven para encontrar/normalizar;
+ * el combobox siempre muestra el nombre comercial.
+ */
 export const ALIAS_BANCOS: BancoAlias[] = [
-  { nombre: "Banco de Venezuela", alias: ["bdv", "banco venezuela", "bco venezuela", "venezuela"] },
-  { nombre: "BBVA Provincial", alias: ["provincial", "banco provincial", "bbva"] },
-  { nombre: "Banco Nacional de Crédito", alias: ["bnc", "nacional de credito"] },
-  { nombre: "Banco del Tesoro", alias: ["bdt"] },
-  { nombre: "Banco Caroní", alias: ["caroni", "banco caroni"] },
-  { nombre: "Delsur", alias: ["banco del sur", "banco delsur"] },
-  { nombre: "Venezolano de Crédito", alias: ["venezolano de credito", "banco venezolano de credito"] },
   { nombre: "100% Banco", alias: ["100 banco", "cien por ciento banco"] },
+  { nombre: "Banco Agrícola de Venezuela", alias: ["banco agricola"] },
+  { nombre: "Banco Caroní", alias: ["caroni", "banco caroni"] },
+  {
+    nombre: "Banco de la Fuerza Armada Nacional Bolivariana",
+    alias: ["banfanb", "fuerza armada", "banco de la fuerza armada"],
+  },
+  { nombre: "Banco de Venezuela", alias: ["bdv", "banco venezuela", "bco venezuela"] },
+  { nombre: "Banco del Tesoro", alias: ["bdt"] },
+  {
+    nombre: "Banco Digital de los Trabajadores",
+    alias: ["bicentenario", "banco bicentenario", "digital de los trabajadores"],
+  },
+  { nombre: "Banco Fondo Común", alias: ["bfc", "fondo comun", "banco fondo comun"] },
+  {
+    nombre: "Banco Internacional de Desarrollo",
+    alias: ["bid", "internacional de desarrollo"],
+  },
+  { nombre: "Banco Nacional de Crédito", alias: ["bnc", "nacional de credito"] },
+  { nombre: "Banco Sofitasa", alias: ["sofitasa"] },
+  { nombre: "Bancamiga", alias: ["banco amiga"] },
+  { nombre: "Bancaribe", alias: ["banco del caribe"] },
+  { nombre: "Bangente", alias: ["banco de la gente emprendedora"] },
+  { nombre: "Banplus", alias: ["banco plus"] },
+  { nombre: "BBVA Provincial", alias: ["provincial", "banco provincial", "bbva"] },
+  { nombre: "Delsur", alias: ["banco del sur", "banco delsur"] },
+  {
+    nombre: "Instituto Municipal de Crédito Popular",
+    alias: ["imcp", "credito popular"],
+  },
+  { nombre: "Mercantil", alias: ["banco mercantil"] },
+  { nombre: "N58 Banco Digital", alias: ["n58"] },
+  { nombre: "R4", alias: ["r4", "mi banco", "r4 banco microfinanciero"] },
+  {
+    nombre: "Venezolano de Crédito",
+    alias: ["venezolano de credito", "banco venezolano de credito"],
+  },
 ];
 
 /** Normaliza para comparar: minúsculas, sin acentos, espacios simples. */

@@ -635,6 +635,7 @@ export const messages = {
     necesitaVuelto: "Necesita vuelto",
     vueltoLabel: "Vuelto",
     deudaSeleccionada: "Total seleccionado",
+    equivBs: "≈ {monto}",
     montoAplicado: "Monto aplicado",
     pagadoPorcentaje: "Pag {porcentaje}%",
     pendienteMonto: "Pend: {monto}",

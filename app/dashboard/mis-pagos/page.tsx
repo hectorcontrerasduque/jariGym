@@ -502,6 +502,12 @@ function MisPagosContent() {
     [necesidades]
   );
 
+  /** Equivalente en Bs del total seleccionado (solo método Bs con tasa). */
+  const deudaSeleccionadaBs = useMemo(() => {
+    if (formData.metodo_pago !== "bs" || !tasaBcv || tasaBcv <= 0) return null;
+    return Math.round(deudaSeleccionada * tasaBcv).toLocaleString("es-VE");
+  }, [formData.metodo_pago, tasaBcv, deudaSeleccionada]);
+
   const excedente = reparto.excedente;
   const hayExcedente = excedente > 0.009;
   const mostrarVuelto = formData.metodo_pago === "efectivo" && hayExcedente;
@@ -1991,7 +1997,14 @@ function MisPagosContent() {
                     {deudaSeleccionada > 0 && (
                       <div className="flex items-center justify-between text-xs text-gym-muted">
                         <span>{messages.bolivares.deudaSeleccionada}</span>
-                        <span className="font-medium text-gym-text">{formatCurrency(deudaSeleccionada)}</span>
+                        <span className="font-medium text-gym-text">
+                          {formatCurrency(deudaSeleccionada)}
+                          {deudaSeleccionadaBs && (
+                            <span className="text-gym-muted font-normal">
+                              {" "}({messages.bolivares.equivBs.replace("{monto}", `${deudaSeleccionadaBs} Bs`)})
+                            </span>
+                          )}
+                        </span>
                       </div>
                     )}
 
@@ -2140,7 +2153,14 @@ function MisPagosContent() {
                   <div className="p-4 bg-gym-bg rounded-xl neon-border space-y-1">
                     <div className="flex items-center justify-between">
                       <span className="text-gym-muted">{messages.bolivares.deudaSeleccionada}:</span>
-                      <span className="text-sm font-medium text-gym-text">{formatCurrency(deudaSeleccionada)}</span>
+                      <span className="text-sm font-medium text-gym-text text-right">
+                        {formatCurrency(deudaSeleccionada)}
+                        {deudaSeleccionadaBs && (
+                          <span className="text-gym-muted font-normal">
+                            {" "}({messages.bolivares.equivBs.replace("{monto}", `${deudaSeleccionadaBs} Bs`)})
+                          </span>
+                        )}
+                      </span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-gym-muted">{messages.bolivares.montoAplicado}:</span>

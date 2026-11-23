@@ -241,6 +241,47 @@ paths:
         "403": { $ref: "#/components/responses/Error" }
         "500": { $ref: "#/components/responses/Error" }
 
+  /api/config/notify:
+    post:
+      tags: [config]
+      operationId: notificarCambioPropietario
+      summary: Avisa al propietario (correo + push) al crear o cambiar sus datos
+      description: |
+        Requiere super_admin. Se llama después de guardar la config (fire-and-forget). Envía un correo al
+        `owner_email` vigente y un web push al usuario propietario (solo si el push está habilitado en
+        `gym_config.push_enabled`; fail-open). Sin cambios ni creación → no notifica.
+      security:
+        - sesion: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                creado:
+                  type: boolean
+                  description: true si los datos del propietario se crean por primera vez.
+                cambios:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      campo: { type: string }
+                      anterior: { type: string }
+                      nuevo: { type: string }
+      responses:
+        "200": { $ref: "#/components/responses/Success" }
+        "400":
+          description: No hay `owner_email` configurado.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "429": { $ref: "#/components/responses/Error" }
+        "500": { $ref: "#/components/responses/Error" }
+
   /api/miembros:
     post:
       tags: [miembros]

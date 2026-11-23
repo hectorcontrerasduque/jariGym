@@ -41,7 +41,7 @@ export async function POST(request: Request) {
     // Read existing config
     const { data: existing } = await serviceSupabase
       .from("gym_config")
-      .select("id, owner_email")
+      .select("id, owner_name, owner_email, owner_phone")
       .limit(1)
       .single();
 
@@ -140,7 +140,31 @@ export async function POST(request: Request) {
       }
     }
 
-    return NextResponse.json({ success: true });
+    // Cambios en los datos del propietario (para avisarle por correo/push).
+    const ownerChanges: Array<{ campo: string; anterior: string; nuevo: string }> = [];
+    const agregarCambio = (campo: string, anterior: string, nuevo: string) => {
+      if (anterior !== nuevo) ownerChanges.push({ campo, anterior, nuevo });
+    };
+
+    const anteriorOwnerName = String(existing?.owner_name ?? "").trim();
+    const anteriorOwnerEmail = String(existing?.owner_email ?? "").trim();
+    const anteriorOwnerPhone = String(existing?.owner_phone ?? "").trim();
+    const nuevoOwnerName = String(safeUpdates?.owner_name ?? "").trim();
+    const nuevoOwnerEmail = String(safeUpdates?.owner_email ?? "").trim();
+    const nuevoOwnerPhone = String(safeUpdates?.owner_phone ?? "").trim();
+
+    if (safeUpdates && "owner_name" in safeUpdates) {
+      agregarCambio("owner_name", anteriorOwnerName, nuevoOwnerName);
+    }
+    if (safeUpdates && "owner_email" in safeUpdates) {
+      agregarCambio("owner_email", anteriorOwnerEmail, nuevoOwnerEmail);
+    }
+    if (safeUpdates && "owner_phone" in safeUpdates) {
+      agregarCambio("owner_phone", anteriorOwnerPhone, nuevoOwnerPhone);
+    }
+    const ownerCreated = anteriorOwnerEmail === "" && nuevoOwnerEmail !== "";
+
+    return NextResponse.json({ success: true, ownerChanges, ownerCreated });
   } catch (err) {
     const msg = err instanceof Error ? err.message : messages.toast.errorGenerico;
     return NextResponse.json({ error: msg }, { status: 500 });

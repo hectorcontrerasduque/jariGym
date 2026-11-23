@@ -265,6 +265,7 @@ status: "pendiente" | "aprobado" | "rechazado"
 
 ### Config Service
 - `updateConfig()` limpia read-only (`id`, `created_at`, `updated_at`, `created_by`, `updated_by`) antes del update; si cambia `owner_email` → `ensure-super-admin` (crea/promueve + sync auth.users y desactiva el anterior).
+- `POST /api/config` devuelve `ownerChanges`/`ownerCreated`; el cliente dispara `POST /api/config/notify` (fire-and-forget) → correo al `owner_email` vigente (bienvenida si se crea / cambios si se modifica) + push al propietario (solo con `gym_config.push_enabled`; fail-open).
 - `saveMetodosPago()` = radio (1 solo activo global, índice único `idx_one_active_per_method`); versionado temporal por tipo (efectivo/bs/binance): filas viejas `effective_to`, nuevas `effective_to=null`; lanza errores (no los traga). `getMetodosPago()` solo `is_active=true`.
 - Si `gym_config` estaba vacío (primer save), recarga la página para sync del sidebar.
 

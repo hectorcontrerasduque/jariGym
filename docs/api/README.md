@@ -28,6 +28,7 @@ También se puede abrir `openapi.yaml` en VS Code (extensión "OpenAPI (Swagger)
 | POST | `/api/auth/reset-password` | pública (token del email) | Cambiar contraseña |
 | GET | `/api/config/public` | pública ⚠️ | Config del gym y métodos de pago |
 | POST | `/api/config` | sesión, admin completo | Guardar config y método de pago |
+| POST | `/api/config/notify` | sesión, super_admin | Avisar al propietario (correo + push) al crear/cambiar sus datos |
 | POST | `/api/miembros` | sesión super_admin | Crear miembro |
 | DELETE | `/api/miembros?id=` | sesión super_admin | Eliminar miembro sin pagos |
 | POST | `/api/miembros/toggle-status` | sesión super_admin | Activar/desactivar miembro ⚠️ |

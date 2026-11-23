@@ -10,6 +10,7 @@ import { estatusSistemaTemplate } from "./templates/estatus-sistema";
 import { diagnosticoTemplate } from "./templates/diagnostico";
 import { pagoAprobadoTemplate } from "./templates/pago-aprobado";
 import { pagoRechazadoTemplate } from "./templates/pago-rechazado";
+import { configuracionDuenoTemplate, type CambioDueno } from "./templates/configuracion-dueno";
 import type { EstatusSistema, ResumenDueno } from "@/lib/features/notificaciones/datos";
 
 const transporter = nodemailer.createTransport({
@@ -466,6 +467,25 @@ export async function sendPaymentApprovedEmail(
     subject: `Pago aprobado - ${gymName}`,
     html: html + sharedFooter(gymName),
     fromName: gymName,
+  });
+}
+
+// ─── OWNER CONFIG (welcome / updated) ──────────────────────
+export async function sendConfiguracionDuenoEmail(
+  to: string,
+  ownerName: string,
+  gymName: string,
+  tipo: "bienvenida" | "actualizacion",
+  cambios: CambioDueno[],
+  gymLogo?: string | null
+): Promise<void> {
+  const html = configuracionDuenoTemplate(ownerName, gymName, tipo, cambios, gymLogo);
+  await sendEmail({
+    to,
+    subject: tipo === "bienvenida" ? `Bienvenido a ${gymName}` : `Datos actualizados - ${gymName}`,
+    html: html + sharedFooter(gymName),
+    fromName: gymName,
+    skipQr: true,
   });
 }
 

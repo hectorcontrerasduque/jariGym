@@ -159,6 +159,21 @@ export default function ConfiguracionPage() {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.error || "Error guardando");
       }
+      // Aviso al propietario si sus datos se crearon o cambiaron (fire-and-forget).
+      const guardado = await res.json().catch(() => ({}));
+      if (
+        guardado.ownerCreated === true ||
+        (Array.isArray(guardado.ownerChanges) && guardado.ownerChanges.length > 0)
+      ) {
+        fetch("/api/config/notify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            creado: guardado.ownerCreated === true,
+            cambios: guardado.ownerChanges ?? [],
+          }),
+        }).catch(() => {});
+      }
       setConfig((prev) => ({ ...prev, default_payment_method: seleccionMetodoDefault }));
       showToast(messages.toast.configuracionGuardada, "success");
       window.dispatchEvent(new Event("config:updated"));

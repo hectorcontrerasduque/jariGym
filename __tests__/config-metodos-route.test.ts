@@ -226,6 +226,33 @@ describe("POST /api/config — personalización de la app", () => {
     expect(updates[0].payload).not.toHaveProperty("updated_by");
   });
 
+  it("devuelve ownerChanges al modificar datos del propietario", async () => {
+    authFake.setUser({ id: "admin-1", email: "owner@gym.com" });
+    authFake.on("profiles", "select").reply({ data: { role: "super_admin" } });
+    serviceFake.on("gym_config", "select").reply({ data: { owner_email: "owner@gym.com" } });
+    serviceFake.on("gym_config", "select").reply({
+      data: { id: "cfg1", owner_name: "Viejo", owner_email: "owner@gym.com", owner_phone: "0414" },
+    });
+
+    const { POST } = await import("@/app/api/config/route");
+    const res = await POST(
+      new Request("http://localhost/api/config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          config: { gym_name: "CrossGym", owner_name: "Nuevo", owner_email: "owner@gym.com", owner_phone: "0414" },
+        }),
+      })
+    );
+
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.ownerCreated).toBe(false);
+    expect(body.ownerChanges).toEqual([
+      { campo: "owner_name", anterior: "Viejo", nuevo: "Nuevo" },
+    ]);
+  });
+
   it("acepta font_family null (reset a valores hardcodeados)", async () => {
     preparar();
 

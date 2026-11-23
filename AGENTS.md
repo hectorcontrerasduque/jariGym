@@ -243,6 +243,7 @@ status: "pendiente" | "aprobado" | "rechazado"
 - Dominio puro: `lib/features/pagos/domain/cobertura.ts` (`calcularCoberturaGrupos`, `distribuirSecuencial`, `pendienteUsd`).
 - Pagos BS del super-admin nacen `aprobado` y `reconciled`; los del miembro siguen pendientes hasta conciliar. Al conciliar se aprueba el pago aunque el mes quede parcial.
 - Monto Bs: la distribución es secuencial **en Bs** (fuente de verdad = lo transferido); `amount_usd` se deriva. Así el monto guardado es exacto (sin pérdida por redondeo USD↔Bs).
+- Inscripción: `profiles.inscription_paid` es la **única** condición que muestra/oculta el checkbox. Se recalcula con `recalcularInscripcion` (`lib/features/pagos/inscripcion.ts`, cobertura prorated con precio congelado) al crear un pago Bs aprobado (super-admin), al aprobar/conciliar, al rechazar y al eliminar. Los pagos `pendiente` no cuentan (el flag se pone al aprobar).
 - Un mes se completa con **un solo método** (`lib/features/pagos/metodo-mes.ts`): si el mes ya tiene pagos con otro método, se rechaza (front en Mis Pagos + backend en los servicios). `MesConCobertura.metodoPago` indica con cuál empezó.
 - Referencia bancaria única: `payments(bill_code)` único parcial para Bs (migración 066) + chequeo en `bolivaresService.crearPago`. Banco y referencia son obligatorios en el flujo Bs (validación en front y backend; banco canónico vía `domain/bancos.ts`).
 

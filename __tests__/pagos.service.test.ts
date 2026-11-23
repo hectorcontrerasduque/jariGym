@@ -666,7 +666,20 @@ describe("crearPagoAprobado", () => {
     fake.setUser(ADMIN);
     fake.on("profiles", "select").reply({ data: { role: "super_admin" } });
     fake.on("payments", "insert").reply({ data: { id: "p1" } });
-    fake.on("payment_detail", "select").reply({ data: [{ payment_amount: 5 }, { payment_amount: 10 }] });
+    // preciosActuales (crearPagoAprobado) y precios del helper
+    const config = [{ payment_method: "efectivo", amount_monthly: 30, amount_inscription: 15 }];
+    fake.on("gym_config_payment_methods", "select").reply({ data: config });
+    fake.on("gym_config_payment_methods", "select").reply({ data: config });
+    // cobertura de inscripción: 5 + 10 de 15
+    const inscripcion = (amount: number) => ({
+      month_number: 1,
+      year_number: 2026,
+      payment_type: "inscripcion",
+      payment_amount: amount,
+      expected_amount_usd: 15,
+      payments: { status: "aprobado", payment_method: "efectivo", created_at: "2026-01-01T00:00:00Z" },
+    });
+    fake.on("payment_detail", "select").reply({ data: [inscripcion(5), inscripcion(10)] });
     await service.crearPagoAprobado(input("inscripcion"));
 
     expect(fake.callsTo("payments", "insert")[0].payload).toEqual({
@@ -683,14 +696,14 @@ describe("crearPagoAprobado", () => {
     const [upd] = fake.callsTo("profiles", "update");
     expect(upd.payload).toEqual({
       inscription_paid: true,
-      inscription_date: HOY_ISO_DATE,
       inscription_amount_paid: 15,
+      inscription_date: HOY_ISO_DATE,
     });
     expect(upd.filters).toContainEqual(["eq", "id", "m1"]);
-    const sumSelect = fake.callsTo("payment_detail", "select")[0];
-    expect(sumSelect.filters).toContainEqual(["eq", "payment_type", "inscripcion"]);
-    expect(sumSelect.filters).toContainEqual(["eq", "payments.status", "aprobado"]);
-    expect(sumSelect.filters).toContainEqual(["eq", "payments.user_id", "m1"]);
+    const cubiertaSelect = fake.callsTo("payment_detail", "select")[0];
+    expect(cubiertaSelect.filters).toContainEqual(["eq", "payment_type", "inscripcion"]);
+    expect(cubiertaSelect.filters).toContainEqual(["eq", "payments.user_id", "m1"]);
+    expect(cubiertaSelect.filters).toContainEqual(["in", "payments.status", ["aprobado", "pendiente"]]);
   });
 
   it("sin línea de inscripción no toca el perfil", async () => {
@@ -720,7 +733,21 @@ describe("aprobarPago", () => {
     fake.on("profiles", "select").reply({ data: { role: "super_admin" } });
     fake.on("payments", "update").reply({ data: { id: "p1", user_id: "m1", status: "aprobado" } });
     fake.on("payment_detail", "select").reply({ data: [{ payment_type: "inscripcion" }] });
-    fake.on("payment_detail", "select").reply({ data: [{ payment_amount: 30 }] });
+    fake.on("gym_config_payment_methods", "select").reply({
+      data: [{ payment_method: "efectivo", amount_monthly: 30, amount_inscription: 30 }],
+    });
+    fake.on("payment_detail", "select").reply({
+      data: [
+        {
+          month_number: 1,
+          year_number: 2026,
+          payment_type: "inscripcion",
+          payment_amount: 30,
+          expected_amount_usd: 30,
+          payments: { status: "aprobado", payment_method: "efectivo", created_at: "2026-01-01T00:00:00Z" },
+        },
+      ],
+    });
 
     const r = await service.aprobarPago("p1");
     expect(r).toEqual({ id: "p1", user_id: "m1", status: "aprobado" });
@@ -733,8 +760,8 @@ describe("aprobarPago", () => {
     const [prof] = fake.callsTo("profiles", "update");
     expect(prof.payload).toEqual({
       inscription_paid: true,
-      inscription_date: HOY_ISO_DATE,
       inscription_amount_paid: 30,
+      inscription_date: HOY_ISO_DATE,
     });
     expect(prof.filters).toContainEqual(["eq", "id", "m1"]);
   });

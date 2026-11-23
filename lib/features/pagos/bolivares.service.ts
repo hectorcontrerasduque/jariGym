@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient as createBrowserClient } from "@/lib/supabase/client";
 import { messages } from "@/lib/messages";
-import { calcularMontoInscripcionAprobado, precioInscripcionActual } from "./inscription-amount";
+import { recalcularInscripcion } from "./inscripcion";
 import type { Pago, PaymentBolivar, PaymentDetail, TipoPago } from "@/lib/types";
 import { estaCubierto, restanteUsd, type DetalleInput } from "./domain/bolivares";
 import { distribuirSecuencial } from "./domain/cobertura";
@@ -272,6 +272,12 @@ export class BolivaresService {
         .insert(bolivaresInsert);
       if (bolError) throw new Error(bolError.message);
 
+      // El pago del super-admin nace aprobado: si incluye inscripción, el flag
+      // `profiles.inscription_paid` debe reflejarse de inmediato.
+      if (isAdmin && input.detalles.some((d) => d.payment_type === "inscripcion")) {
+        await recalcularInscripcion(this.supabase, input.user_id);
+      }
+
       return {
         ...pago,
         detail: detallesCreados as PaymentDetail[],
@@ -500,20 +506,7 @@ export class BolivaresService {
       .eq("payment_id", pagoId);
     const tieneInscripcion = detalles?.some((d) => d.payment_type === "inscripcion");
     if (tieneInscripcion) {
-      // Solo queda pagada si la suma aprobada cubre el precio configurado.
-      const [montoInsc, precioInsc] = await Promise.all([
-        calcularMontoInscripcionAprobado(this.supabase, userId),
-        precioInscripcionActual(this.supabase, "bs"),
-      ]);
-      const cubierta = precioInsc <= 0 ? true : montoInsc + 1e-9 >= precioInsc;
-      await this.supabase
-        .from("profiles")
-        .update({
-          inscription_paid: cubierta,
-          inscription_amount_paid: montoInsc,
-          ...(cubierta ? { inscription_date: new Date().toISOString().split("T")[0] } : {}),
-        })
-        .eq("id", userId);
+      await recalcularInscripcion(this.supabase, userId);
     }
   }
 

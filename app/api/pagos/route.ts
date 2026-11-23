@@ -2,7 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 import { createClient as createAuthClient } from "@/lib/supabase/server";
 import { messages } from "@/lib/messages";
-import { calcularMontoInscripcionAprobado } from "@/lib/features/pagos/inscription-amount";
+import { recalcularInscripcion } from "@/lib/features/pagos/inscripcion";
 
 export async function DELETE(request: Request) {
   try {
@@ -102,39 +102,10 @@ export async function DELETE(request: Request) {
       }
     }
 
-    // If payment had inscription, check if another approved one remains
+    // Si el pago tenía inscripción, recalcular el flag según la cobertura real
+    // (puede haber otros abonos parciales que la mantengan cubierta).
     if (tieneInscripcion) {
-      const { data: otroInscripcion } = await serviceSupabase
-        .from("payments")
-        .select("id")
-        .eq("user_id", pagoActual.user_id)
-        .eq("status", "aprobado")
-        .neq("id", pagoId)
-        .limit(1);
-
-      let hayOtraInscripcion = false;
-      if (otroInscripcion && otroInscripcion.length > 0) {
-        const { data: detalleOtro } = await serviceSupabase
-          .from("payment_detail")
-          .select("id")
-          .eq("payment_id", otroInscripcion[0].id)
-          .eq("payment_type", "inscripcion")
-          .limit(1);
-        hayOtraInscripcion = !!detalleOtro && detalleOtro.length > 0;
-      }
-
-      if (!hayOtraInscripcion) {
-        await serviceSupabase
-          .from("profiles")
-          .update({ inscription_paid: false, inscription_date: null, inscription_amount_paid: 0 })
-          .eq("id", pagoActual.user_id);
-      } else {
-        const inscriptionAmount = await calcularMontoInscripcionAprobado(serviceSupabase, pagoActual.user_id);
-        await serviceSupabase
-          .from("profiles")
-          .update({ inscription_amount_paid: inscriptionAmount })
-          .eq("id", pagoActual.user_id);
-      }
+      await recalcularInscripcion(serviceSupabase, pagoActual.user_id);
     }
 
     return NextResponse.json({ success: true });

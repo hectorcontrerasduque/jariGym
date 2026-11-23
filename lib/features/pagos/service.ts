@@ -14,7 +14,7 @@ import {
   type CoberturaGrupo,
   type PreciosPorMetodo,
 } from "./domain/cobertura";
-import { calcularMontoInscripcionAprobado, precioInscripcionActual } from "./inscription-amount";
+import { recalcularInscripcion } from "./inscripcion";
 import { validarMetodoUnicoPorMes } from "./metodo-mes";
 
 export type { ElegiblesResult };
@@ -73,23 +73,6 @@ export class PagosService {
       .select("payment_method, amount_monthly, amount_inscription")
       .eq("is_active", true);
     return preciosDesdeMetodos(data ?? []);
-  }
-
-  /** Recalcula el estado de inscripción: solo queda pagada si se cubre el precio. */
-  private async actualizarInscripcion(userId: string): Promise<void> {
-    const [montoPagado, precio] = await Promise.all([
-      calcularMontoInscripcionAprobado(this.supabase, userId),
-      precioInscripcionActual(this.supabase),
-    ]);
-    const cubierta = precio <= 0 ? true : montoPagado + 1e-9 >= precio;
-    await this.supabase
-      .from("profiles")
-      .update({
-        inscription_paid: cubierta,
-        inscription_amount_paid: montoPagado,
-        ...(cubierta ? { inscription_date: new Date().toISOString().split("T")[0] } : {}),
-      })
-      .eq("id", userId);
   }
 
   private validateDetalles(detalles: CreatePaymentInput["detalles"]): void {
@@ -208,7 +191,7 @@ export class PagosService {
 
     const tieneInscripcion = detalles?.some((d) => d.payment_type === "inscripcion");
     if (tieneInscripcion) {
-      await this.actualizarInscripcion(data.user_id);
+      await recalcularInscripcion(this.supabase, data.user_id);
     }
 
     return data as Pago;
@@ -243,6 +226,15 @@ export class PagosService {
       .single();
 
     if (error) throw error;
+
+    const { data: detalles } = await this.supabase
+      .from("payment_detail")
+      .select("payment_type")
+      .eq("payment_id", pagoId);
+    if (detalles?.some((d) => d.payment_type === "inscripcion")) {
+      await recalcularInscripcion(this.supabase, data.user_id);
+    }
+
     return data;
   }
 
@@ -322,7 +314,7 @@ export class PagosService {
 
     const tieneInscripcion = detalles.some((d) => d.payment_type === "inscripcion");
     if (tieneInscripcion) {
-      await this.actualizarInscripcion(input.user_id);
+      await recalcularInscripcion(this.supabase, input.user_id);
     }
 
     return { ...pago, detail: detalles as unknown as DetallePago[] };

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, beforeAll } from "vitest";
 import { createSupabaseFake, type SupabaseFake } from "./helpers/supabase-fake";
+import { recalcularInscripcion } from "@/lib/features/pagos/inscripcion";
 
 let authFake: SupabaseFake;
 let serviceFake: SupabaseFake;
@@ -12,8 +13,8 @@ vi.mock("@supabase/supabase-js", () => ({
   createClient: vi.fn(() => serviceFake.client),
 }));
 
-vi.mock("@/lib/features/pagos/inscription-amount", () => ({
-  calcularMontoInscripcionAprobado: vi.fn(async () => 25),
+vi.mock("@/lib/features/pagos/inscripcion", () => ({
+  recalcularInscripcion: vi.fn(async () => ({ cubierta: false, montoPagado: 0 })),
 }));
 
 const PAGO_ID = "pago-1";
@@ -28,13 +29,11 @@ interface Escenario {
   pago: { status: string; user_id: string };
   ultimoId: string;
   detalles?: { payment_type: string }[];
-  otroInscripcion?: { id: string }[] | null;
-  detalleOtro?: { id: string }[];
   /** Rutas image_url de payment_bolivares (pago BS) a borrar del Storage. */
   imagenesBs?: string[];
 }
 
-function preparar({ rol, pago, ultimoId, detalles, otroInscripcion, detalleOtro, imagenesBs }: Escenario) {
+function preparar({ rol, pago, ultimoId, detalles, imagenesBs }: Escenario) {
   authFake.setUser({ id: rol === "miembro" ? MIEMBRO_ID : "admin-1" });
   authFake.on("profiles", "select").reply({ data: { role: rol } });
 
@@ -55,12 +54,6 @@ function preparar({ rol, pago, ultimoId, detalles, otroInscripcion, detalleOtro,
       }
     }
     serviceFake.on("payments", "delete").reply({ error: null });
-    if (otroInscripcion !== undefined) {
-      serviceFake.on("payments", "select").reply({ data: otroInscripcion });
-      if (detalleOtro !== undefined) {
-        serviceFake.on("payment_detail", "select").reply({ data: detalleOtro });
-      }
-    }
     serviceFake.on("profiles", "update").reply({ error: null });
   }
 }
@@ -238,41 +231,37 @@ describe("DELETE /api/pagos", () => {
     expect(serviceFake.callsTo("payments", "delete")).toHaveLength(0);
   });
 
-  it("resetea la inscripción cuando no queda otra aprobada", async () => {
+  it("recalcula la inscripción al borrar un pago con inscripción", async () => {
+    const recalcular = vi.mocked(recalcularInscripcion);
+    recalcular.mockClear();
     preparar({
       rol: "super_admin",
       pago: { status: "aprobado", user_id: MIEMBRO_ID },
       ultimoId: PAGO_ID,
       detalles: [{ payment_type: "inscripcion" }],
-      otroInscripcion: [],
     });
 
     const { status } = await borrar();
 
     expect(status).toBe(200);
-    const update = serviceFake.callsTo("profiles", "update")[0];
-    expect(update.payload).toEqual({
-      inscription_paid: false,
-      inscription_date: null,
-      inscription_amount_paid: 0,
-    });
+    expect(recalcular).toHaveBeenCalledTimes(1);
+    expect(recalcular).toHaveBeenCalledWith(serviceFake.client, MIEMBRO_ID);
   });
 
-  it("recalcula el monto de inscripción cuando queda otra aprobada", async () => {
+  it("no recalcula si el pago no tenía inscripción", async () => {
+    const recalcular = vi.mocked(recalcularInscripcion);
+    recalcular.mockClear();
     preparar({
       rol: "super_admin",
       pago: { status: "aprobado", user_id: MIEMBRO_ID },
       ultimoId: PAGO_ID,
-      detalles: [{ payment_type: "inscripcion" }],
-      otroInscripcion: [{ id: "pago-otro" }],
-      detalleOtro: [{ id: "detalle-1" }],
+      detalles: [{ payment_type: "mensualidad" }],
     });
 
     const { status } = await borrar();
 
     expect(status).toBe(200);
-    const update = serviceFake.callsTo("profiles", "update")[0];
-    expect(update.payload).toEqual({ inscription_amount_paid: 25 });
+    expect(recalcular).not.toHaveBeenCalled();
   });
 
   it("401 sin sesión", async () => {

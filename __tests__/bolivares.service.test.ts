@@ -467,3 +467,51 @@ describe("BolivaresService.crearPago — montos exactos y validaciones", () => {
     expect(fake.callsTo("payments", "insert")).toHaveLength(1);
   });
 });
+
+describe("BolivaresService.crearPago — flag de inscripción (super-admin)", () => {
+  beforeEach(() => {
+    fake = createSupabaseFake();
+    service = new BolivaresService(fake.client);
+    fake.setUser({ id: ADMIN_ID });
+  });
+
+  it("un pago Bs nacido aprobado que completa la inscripción marca el flag", async () => {
+    fake.on("profiles", "select").reply({ data: { role: "super_admin" } });
+    fake.on("exchange_rates", "select").reply({ data: { rate_bs: 100 } });
+    const config = [{ payment_method: "bs", amount_monthly: 35, amount_inscription: 50 }];
+    fake.on("gym_config_payment_methods", "select").reply({ data: config });
+    fake.on("payments", "insert").reply({ data: { id: PAGO_ID, status: "aprobado" } });
+    fake.on("payment_detail", "insert").reply({
+      data: [{ id: "det-1", month_number: 1, year_number: 2026, payment_type: "inscripcion", payment_amount: 50 }],
+    });
+    fake.on("payment_bolivares", "insert").reply({ data: null });
+    // validarMetodoUnicoPorMes: sin pagos previos del mes
+    fake.on("payment_detail", "select").reply({ data: [] });
+    // recalcularInscripcion: inscripción cubierta + config
+    fake.on("payment_detail", "select").reply({
+      data: [
+        {
+          month_number: 1,
+          year_number: 2026,
+          payment_type: "inscripcion",
+          payment_amount: 50,
+          expected_amount_usd: 50,
+          payments: { status: "aprobado", payment_method: "bs", created_at: "2026-01-01T00:00:00Z" },
+        },
+      ],
+    });
+    fake.on("gym_config_payment_methods", "select").reply({ data: config });
+
+    await service.crearPago({
+      user_id: USER_ID,
+      detalles: [{ month_number: 1, year_number: 2026, payment_type: "inscripcion", payment_amount: 50 }],
+      amount_bs: 5000,
+      bank: BANCO,
+      reference_number: REFERENCIA,
+    });
+
+    const [upd] = fake.callsTo("profiles", "update");
+    expect(upd.payload).toMatchObject({ inscription_paid: true, inscription_amount_paid: 50 });
+    expect(upd.filters).toContainEqual(["eq", "id", USER_ID]);
+  });
+});

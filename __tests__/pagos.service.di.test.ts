@@ -22,7 +22,8 @@ describe("PagosService — client injection", () => {
     await service.mesesPendientes("u1", 2026);
 
     expect(fake.callsTo("payments", "update")).toHaveLength(1);
-    expect(fake.callsTo("payment_detail", "select")).toHaveLength(1);
+    // rechazarPago consulta los detalles (inscripción) + mesesPendientes consulta cobertura
+    expect(fake.callsTo("payment_detail", "select")).toHaveLength(2);
     expect(h.createClient).not.toHaveBeenCalled();
   });
 

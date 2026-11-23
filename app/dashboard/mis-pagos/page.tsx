@@ -1204,18 +1204,38 @@ function MisPagosContent() {
                   )}
                 </div>
               )}
-              {metodosPago.filter(m => m.is_active).length > 0 && (
-                <div className="flex flex-wrap gap-3 mt-3">
-                  {metodosPago.filter(m => m.is_active).map(m => (
-                    <div key={m.payment_method} className="flex items-center gap-1.5 text-xs text-gym-muted">
-                      <CreditCard className="w-3.5 h-3.5 text-gym-secondary" />
-                      <span>{m.amount_monthly > 0 ? formatCurrency(m.amount_monthly) : "Gratis"}/mes</span>
+              {metodosHabilitados.length > 0 ? (
+                <div className="flex flex-col gap-1.5 mt-3">
+                  {metodosHabilitados.map((m) => (
+                    <div
+                      key={m.payment_method}
+                      className="flex flex-wrap items-center gap-x-2 gap-y-0.5 px-2.5 py-1.5 rounded-lg bg-gym-surface/60 border border-gym-border text-xs"
+                    >
+                      <span className="flex items-center gap-1 font-medium text-gym-text">
+                        {m.payment_method === "efectivo" ? "💵" : m.payment_method === "bs" ? <FlagVe className="inline-block w-4 h-3" /> : "🟡"}
+                        {metodoLabels[m.payment_method]}
+                      </span>
+                      <span className="text-gym-muted">·</span>
+                      <span className="text-gym-muted">
+                        {messages.configuracion.mensualidad}:{" "}
+                        <span className="font-medium text-gym-text">
+                          {m.amount_monthly > 0 ? formatCurrency(m.amount_monthly) : messages.common.gratis}
+                        </span>
+                      </span>
                       {m.amount_inscription > 0 && (
-                        <span className="text-gym-success">+ {formatCurrency(m.amount_inscription)} insc.</span>
+                        <>
+                          <span className="text-gym-muted">·</span>
+                          <span className="text-gym-muted">
+                            {messages.configuracion.inscripcion}:{" "}
+                            <span className="font-medium text-gym-success">{formatCurrency(m.amount_inscription)}</span>
+                          </span>
+                        </>
                       )}
                     </div>
                   ))}
                 </div>
+              ) : (
+                <p className="mt-3 text-xs text-gym-muted">{messages.misPagos.metodosNoConfigurados}</p>
               )}
               {morosidad && morosidad.totalDeuda > 0 && (
                 <button

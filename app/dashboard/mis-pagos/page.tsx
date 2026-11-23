@@ -16,6 +16,7 @@ import { createClient } from "@/lib/supabase/client";
 import { formatCurrency, formatDate, getMonthName, getDiaCobro, metodoPrincipal } from "@/lib/utils";
 import { CreditCard, CheckCircle, Clock, Calendar, Eye, Trash2, FileText, Plus, Search, Gift, AlertTriangle, ChevronDown, ChevronRight, X, Save, Phone, Mail, MapPin, XCircle, BellRing, Landmark } from "lucide-react";
 import { showToast } from "@/components/ui/toast";
+import { confirmar } from "@/components/ui/confirm";
 import { Modal } from "@/components/ui/modal";
 import { messages } from "@/lib/messages";
 import { Avatar } from "@/components/ui/avatar";
@@ -717,7 +718,12 @@ function MisPagosContent() {
     }
     const metodoLabel = metodoLabels[formData.metodo_pago] || formData.metodo_pago;
     const confirmMsg = `Confirmar acción para ${nombreMiembro}:\n\n${acciones.join("\n")}\n\nMétodo de pago: ${metodoLabel}\n¿Continuar?`;
-    if (!confirm(confirmMsg)) return;
+    const confirmado = await confirmar({
+      titulo: messages.misPagos.confirmarPagoTitulo,
+      mensaje: confirmMsg,
+      textoConfirmar: messages.common.continuar,
+    });
+    if (!confirmado) return;
 
     setSavingPago(true);
     try {
@@ -877,7 +883,17 @@ function MisPagosContent() {
     const miembro = isSuperAdmin && miembroSeleccionado
       ? miembroSeleccionado.full_name || miembroSeleccionado.email
       : profile?.full_name || profile?.email;
-    if (!confirm(`¿Eliminar pago de ${miembro}?\n${label} — ${monto}\nÚltimo registro (${pago.status})`)) return;
+    const confirmado = await confirmar({
+      titulo: messages.misPagos.eliminarPagoTitulo,
+      mensaje: messages.misPagos.confirmarEliminarPago
+        .replace("{miembro}", miembro ?? "")
+        .replace("{label}", label)
+        .replace("{monto}", monto)
+        .replace("{estado}", pago.status),
+      textoConfirmar: messages.common.eliminar,
+      tono: "peligro",
+    });
+    if (!confirmado) return;
     setDeleting(pago.id);
     try {
       await pagosService.eliminarPago(pago.id);

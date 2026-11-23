@@ -18,6 +18,7 @@ import {
   Send,
 } from "lucide-react";
 import { showToast } from "@/components/ui/toast";
+import { confirmar } from "@/components/ui/confirm";
 import { Loader } from "@/components/ui/loader";
 import { messages } from "@/lib/messages";
 import { horarioNotificaciones } from "@/lib/features/notificaciones/horario";
@@ -134,7 +135,11 @@ export default function NotificacionesPage() {
   };
 
   const handleEjecutarAhora = async () => {
-    if (!confirm("¿Ejecutar notificaciones ahora? Se enviarán los correos pendientes según la frecuencia configurada.")) return;
+    const confirmado = await confirmar({
+      mensaje: "¿Ejecutar notificaciones ahora? Se enviarán los correos pendientes según la frecuencia configurada.",
+      textoConfirmar: messages.common.ejecutar,
+    });
+    if (!confirmado) return;
     setExecuting(true);
     try {
       const resultado = await notificacionesService.procesarTodasLasNotificaciones(undefined, true);
@@ -171,7 +176,11 @@ export default function NotificacionesPage() {
   };
 
   const handleDiagnostico = async () => {
-    if (!confirm("¿Enviar diagnóstico? Se enviará un correo de prueba con el estado del sistema.")) return;
+    const confirmado = await confirmar({
+      mensaje: "¿Enviar diagnóstico? Se enviará un correo de prueba con el estado del sistema.",
+      textoConfirmar: messages.common.enviar,
+    });
+    if (!confirmado) return;
     setDiagnosticing(true);
     try {
       await notificacionesService.ejecutarDiagnostico();

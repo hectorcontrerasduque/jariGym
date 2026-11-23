@@ -16,6 +16,7 @@ import { Loader } from "@/components/ui/loader";
 import { Pagination } from "@/components/ui/pagination";
 import { usePagination } from "@/hooks/usePagination";
 import { showToast } from "@/components/ui/toast";
+import { confirmar } from "@/components/ui/confirm";
 import { messages } from "@/lib/messages";
 import type { Profile, Membership } from "@/lib/types";
 import { getAdminLevel, isFullAdmin, type AdminLevel } from "@/lib/admin-level";
@@ -478,7 +479,13 @@ export default function MiembrosPage() {
     const msg = activar
       ? messages.miembros.confirmarReactivar.replace("{nombre}", miembro.full_name)
       : messages.miembros.confirmarInactivar.replace("{nombre}", miembro.full_name);
-    if (!confirm(msg)) return;
+    const confirmado = await confirmar({
+      titulo: activar ? messages.miembros.reactivar : messages.miembros.inactivar,
+      mensaje: msg,
+      textoConfirmar: activar ? messages.miembros.reactivar : messages.miembros.inactivar,
+      tono: activar ? "normal" : "peligro",
+    });
+    if (!confirmado) return;
     setTogglingActivar(true);
     try {
       const res = await fetch("/api/miembros/toggle-status", {

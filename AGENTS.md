@@ -182,6 +182,20 @@ import { showToast } from "@/components/ui/toast";
 showToast(messages.toast.success, "success"); // or "error", "warning", "info"
 ```
 
+### Confirm Dialog (reemplaza `window.confirm`)
+```tsx
+import { confirmar } from "@/components/ui/confirm";
+const ok = await confirmar({
+  titulo: "Eliminar pago",           // opcional (default: "Confirmar acción")
+  mensaje: "¿Seguro?",               // admite \n
+  textoConfirmar: messages.common.eliminar,
+  tono: "peligro",                   // "normal" | "peligro"
+});
+if (!ok) return;
+```
+- Modal centrado y bloqueante (z-90), Esc/overlay = cancelar; `ConfirmContainer` está montado en `Providers`.
+- Sin contenedor resuelve `false` (nunca cuelga).
+
 ### Modal Component
 - Auto-scrollable (`max-h-[90vh] overflow-y-auto`)
 - Escape key closes

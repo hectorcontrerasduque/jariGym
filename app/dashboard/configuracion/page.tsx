@@ -9,7 +9,7 @@ import { METODOS_PAGO_DEFAULT } from "@/lib/services/config/config.service";
 import { dedupeMetodos, metodoPorDefecto } from "@/lib/features/pagos/domain/metodos";
 import { BS_BANK_INFO_DEFAULT, validarBsBankInfo } from "@/lib/services/config/bank-info";
 import { createClient } from "@/lib/supabase/client";
-import { Save, Building2, User, CreditCard, Upload, Dumbbell, Trash2, Landmark, Palette } from "lucide-react";
+import { Save, Building2, User, CreditCard, Upload, Dumbbell, Trash2, Landmark, Palette, X } from "lucide-react";
 import { showToast } from "@/components/ui/toast";
 import { Loader } from "@/components/ui/loader";
 import { FlagVe } from "@/components/ui/flag-ve";
@@ -53,6 +53,7 @@ export default function ConfiguracionPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [logoAmpliado, setLogoAmpliado] = useState(false);
   const [tasas, setTasas] = useState<TasaFila[]>([]);
   const [modalBcvAbierta, setModalBcvAbierta] = useState(false);
   const [modalPersonalizacionAbierta, setModalPersonalizacionAbierta] = useState(false);
@@ -308,15 +309,23 @@ export default function ConfiguracionPage() {
             <div className="relative">
               <div className="w-20 h-20 rounded-xl bg-gym-surface border-2 border-dashed border-gym-border flex items-center justify-center overflow-hidden">
                 {config.logo_url ? (
-                  <Image src={config.logo_url} alt="Logo" width={80} height={80} className="w-full h-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => setLogoAmpliado(true)}
+                    aria-label={messages.configuracion.verLogoGrande}
+                    title={messages.configuracion.verLogoGrande}
+                    className="w-full h-full cursor-zoom-in"
+                  >
+                    <Image src={config.logo_url} alt="Logo" width={80} height={80} className="w-full h-full object-cover" />
+                  </button>
                 ) : (
                   <Dumbbell className="w-8 h-8 text-gym-muted" />
                 )}
               </div>
               {config.logo_url && (
                 <button
-                  onClick={handleDeleteLogo}
-                  className="absolute -top-2 -right-2 w-6 h-6 bg-gym-danger text-white rounded-full flex items-center justify-center hover:bg-gym-danger/80 transition-colors"
+                  onClick={(e) => { e.stopPropagation(); void handleDeleteLogo(); }}
+                  className="absolute -top-2 -right-2 z-10 w-6 h-6 bg-gym-danger text-white rounded-full flex items-center justify-center hover:bg-gym-danger/80 transition-colors"
                 >
                   <Trash2 className="w-3 h-3" />
                 </button>
@@ -651,6 +660,33 @@ export default function ConfiguracionPage() {
           <Save className="w-6 h-6" />
         )}
       </button>
+
+      {/* Logo ampliado */}
+      {logoAmpliado && config.logo_url && (
+        <div
+          className="fixed inset-0 z-[80] bg-black/90 flex items-center justify-center p-4 cursor-zoom-out"
+          onClick={() => setLogoAmpliado(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-label={messages.configuracion.verLogoGrande}
+        >
+          <button
+            type="button"
+            className="absolute top-4 right-4 p-2 text-white/80 hover:text-white"
+            onClick={() => setLogoAmpliado(false)}
+            aria-label={messages.common.Close}
+          >
+            <X className="w-6 h-6" />
+          </button>
+          {/* eslint-disable-next-line @next/next/no-img-element -- vista ampliada del logo */}
+          <img
+            src={config.logo_url}
+            alt="Logo"
+            className="max-w-full max-h-[90vh] object-contain"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
 
       <ModalBcv isOpen={modalBcvAbierta} onClose={() => setModalBcvAbierta(false)} />
       <ModalPersonalizacionApp

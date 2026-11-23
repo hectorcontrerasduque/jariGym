@@ -198,6 +198,7 @@ export const messages = {
     notifDuenoActualizacionTitulo: "Datos del propietario actualizados",
     notifDuenoActualizacionCuerpo: "Tus datos de propietario fueron actualizados en {gym}.",
     logoDelGym: "Logo del Gym",
+    verLogoGrande: "Ver logo en grande",
     subirLogo: "Subir logo",
     cambiarLogo: "Cambiar",
     metodoBinance: "Binance USDT",

@@ -305,15 +305,39 @@ describe("BolivaresService.crearPago — super-admin y excedente", () => {
     expect(bol[0].reconciled).toBe(false);
   });
 
-  it("bloquea el pago si el monto supera la necesidad (sin vuelto en Bs)", async () => {
+  it("registra exactamente el monto en Bs aunque exceda la necesidad", async () => {
     fake.setUser({ id: USER_ID });
     fake.on("profiles", "select").reply({ data: { role: "miembro" } });
     fake.on("exchange_rates", "select").reply({ data: { rate_bs: 100 } });
+    fake.on("payments", "insert").reply({ data: { id: PAGO_ID, status: "pendiente" } });
+    fake.on("payment_detail", "insert").reply({
+      data: [{ id: "det-1", month_number: 1, year_number: 2026, payment_type: "mensualidad", payment_amount: 50 }],
+    });
+    fake.on("payment_bolivares", "insert").reply({ data: null });
+
+    await service.crearPago({
+      user_id: USER_ID,
+      detalles,
+      amount_bs: 5000,
+      bank: BANCO,
+      reference_number: "0009999999",
+    });
+
+    const bol = fake.callsTo("payment_bolivares", "insert")[0].payload as Array<Record<string, unknown>>;
+    expect(bol[0].amount_bs).toBe(5000);
+  });
+
+  it("mapea el error de referencia duplicada del indice unico", async () => {
+    fake.setUser({ id: USER_ID });
+    fake.on("profiles", "select").reply({ data: { role: "miembro" } });
+    fake.on("exchange_rates", "select").reply({ data: { rate_bs: 100 } });
+    fake.on("payments", "insert").reply({
+      error: { code: "23505", message: 'duplicate key value violates unique constraint "idx_payments_bs_referencia_unica"' },
+    });
 
     await expect(
-      service.crearPago({ user_id: USER_ID, detalles, amount_bs: 5000, bank: BANCO, reference_number: "0009999999" })
-    ).rejects.toThrow("Sobra");
-    expect(fake.callsTo("payments", "insert")).toHaveLength(0);
+      service.crearPago({ user_id: USER_ID, detalles, amount_bs: 1000, bank: BANCO, reference_number: "0012345678" })
+    ).rejects.toThrow(messages.bolivares.referenciaDuplicada);
   });
 });
 

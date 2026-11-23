@@ -148,15 +148,10 @@ export class BolivaresService {
     const necesidadesBs = input.detalles.map(
       (d) => Math.round(Math.max(0, Number(d.payment_amount) || 0) * rateBcv * 100) / 100
     );
-    const { aplicados: aplicadosBs, excedente } = distribuirSecuencial(
+    const { aplicados: aplicadosBs } = distribuirSecuencial(
       input.amount_bs,
       necesidadesBs
     );
-    if (excedente > 0.05) {
-      throw new Error(
-        messages.bolivares.excedenteMontoBs.replace("{monto}", excedente.toFixed(2))
-      );
-    }
     const reparto = input.detalles
       .map((d, i) => {
         // eslint-disable-next-line security/detect-object-injection -- índice numérico de array controlado
@@ -171,6 +166,18 @@ export class BolivaresService {
       })
       .filter((r) => r.amount_bs > 0);
     if (!reparto.length) throw new Error(messages.bolivares.detalleRequerido);
+
+    // Lo transferido es la fuente de verdad: si el reparto por fracciones deja
+    // un residuo (redondeo del precio en USD→Bs o redondeo del miembro), se
+    // suma al último detalle. Así `payment_bolivares.amount_bs` suma EXACTO el
+    // monto en Bs ingresado, sin conversiones de vuelta.
+    const asignadoBs = reparto.reduce((total, r) => total + r.amount_bs, 0);
+    const residuo = Math.round((input.amount_bs - asignadoBs) * 100) / 100;
+    if (residuo >= 0.01) {
+      const ultimo = reparto[reparto.length - 1];
+      ultimo.amount_bs = Math.round((ultimo.amount_bs + residuo) * 100) / 100;
+      ultimo.amount_usd = Math.round((ultimo.amount_bs / rateBcv) * 100) / 100;
+    }
 
     // Precio congelado por método (snapshot) para cada detalle.
     const { data: metodos } = await this.supabase
@@ -201,7 +208,13 @@ export class BolivaresService {
       .select()
       .single();
     if (pagoError || !pago) {
-      throw new Error(pagoError?.message || messages.toast.pagoError);
+      const mensaje = pagoError?.message ?? "";
+      const esDuplicada =
+        (pagoError as { code?: string } | null)?.code === "23505" ||
+        /duplicate key|idx_payments_bs_referencia_unica/i.test(mensaje);
+      throw new Error(
+        esDuplicada ? messages.bolivares.referenciaDuplicada : mensaje || messages.toast.pagoError
+      );
     }
 
     // Fuera del try: el catch de rollback necesita ver estas rutas si la subida

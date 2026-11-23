@@ -245,6 +245,50 @@ export function pendienteUsd(
   return redondear2(Math.max(0, estado.fraccionPendiente) * precio);
 }
 
+export interface DeudaMetodo {
+  metodo: string;
+  totalUsd: number;
+}
+
+type ConceptoDeuda = Pick<EstadoCobertura, "fraccionPendiente" | "preciosPorMetodo" | "metodoPago">;
+
+/**
+ * Monto pendiente (USD) **por cada método de pago activo**.
+ *
+ * Regla de un método por concepto: un mes/inscripción ya iniciado con un método
+ * solo se completa con ese método (precio congelado). Un concepto sin pagos se
+ * puede pagar con cualquiera, así que se suma a todos los métodos al precio de
+ * cada uno. Solo cuentan conceptos con fracción pendiente > 0.
+ */
+export function deudaPorMetodo(
+  meses: ConceptoDeuda[],
+  inscripcion: ConceptoDeuda | null,
+  precios: PreciosPorMetodo
+): DeudaMetodo[] {
+  return Object.keys(precios).map((metodo) => {
+    let total = 0;
+
+    for (const mes of meses) {
+      if (mes.fraccionPendiente <= 0) continue;
+      if (mes.metodoPago && mes.metodoPago !== metodo) continue;
+      const precio = mes.preciosPorMetodo[metodo] ?? precioMetodo(precios, metodo, "mensual");
+      total += mes.fraccionPendiente * precio;
+    }
+
+    if (
+      inscripcion &&
+      inscripcion.fraccionPendiente > 0 &&
+      (!inscripcion.metodoPago || inscripcion.metodoPago === metodo)
+    ) {
+      const precio =
+        inscripcion.preciosPorMetodo[metodo] ?? precioMetodo(precios, metodo, "inscripcion");
+      total += inscripcion.fraccionPendiente * precio;
+    }
+
+    return { metodo, totalUsd: redondear2(total) };
+  });
+}
+
 /**
  * Distribución secuencial: llena cada necesidad en orden (mes más viejo
  * primero) con el total disponible. El sobrante se devuelve como `excedente`.

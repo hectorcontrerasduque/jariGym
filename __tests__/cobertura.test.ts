@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   calcularCoberturaGrupos,
   calcularCoberturaTipo,
+  deudaPorMetodo,
   distribuirSecuencial,
   pendienteUsd,
   preciosDesdeMetodos,
@@ -143,6 +144,67 @@ describe("calcularCoberturaTipo (inscripción)", () => {
     if (!cobertura) throw new Error("sin cobertura");
     expect(pendienteUsd(cobertura, "bs", 999)).toBeCloseTo(0.6 * 50, 2);
     expect(pendienteUsd(cobertura, "efectivo", 999)).toBeCloseTo(0.6 * 50, 2);
+  });
+});
+
+describe("deudaPorMetodo", () => {
+  const concepto = (
+    overrides: Partial<{ fraccionPendiente: number; preciosPorMetodo: Record<string, number>; metodoPago: string | null }> = {}
+  ) => ({
+    fraccionPendiente: 1,
+    preciosPorMetodo: {},
+    metodoPago: null as string | null,
+    ...overrides,
+  });
+
+  function totales(resultado: ReturnType<typeof deudaPorMetodo>) {
+    return Object.fromEntries(resultado.map((d) => [d.metodo, d.totalUsd]));
+  }
+
+  it("un mes iniciado en Bs solo suma al método Bs (precio congelado)", () => {
+    const r = deudaPorMetodo(
+      [concepto({ fraccionPendiente: 0.5, preciosPorMetodo: { bs: 35 }, metodoPago: "bs" })],
+      null,
+      precios
+    );
+    expect(totales(r)).toEqual({ efectivo: 0, bs: 17.5 });
+  });
+
+  it("un mes libre suma a cada método activo su precio", () => {
+    const r = deudaPorMetodo([concepto()], null, precios);
+    expect(totales(r)).toEqual({ efectivo: 30, bs: 35 });
+  });
+
+  it("la inscripción parcial se imputa solo a su método", () => {
+    const r = deudaPorMetodo(
+      [],
+      concepto({ fraccionPendiente: 0.4, preciosPorMetodo: { bs: 50 }, metodoPago: "bs" }),
+      precios
+    );
+    expect(totales(r)).toEqual({ efectivo: 0, bs: 20 });
+  });
+
+  it("la inscripción sin pagos suma a cada método", () => {
+    const r = deudaPorMetodo([], concepto(), precios);
+    expect(totales(r)).toEqual({ efectivo: 50, bs: 50 });
+  });
+
+  it("sin fracción pendiente no hay deuda", () => {
+    const r = deudaPorMetodo([concepto({ fraccionPendiente: 0 })], concepto({ fraccionPendiente: 0 }), precios);
+    expect(totales(r)).toEqual({ efectivo: 0, bs: 0 });
+  });
+
+  it("mezcla: mes libre + mes Bs parcial + inscripción efectivo parcial", () => {
+    const r = deudaPorMetodo(
+      [
+        concepto(),
+        concepto({ fraccionPendiente: 0.5, preciosPorMetodo: { bs: 35 }, metodoPago: "bs" }),
+      ],
+      concepto({ fraccionPendiente: 0.5, preciosPorMetodo: { efectivo: 50 }, metodoPago: "efectivo" }),
+      precios
+    );
+    // efectivo: mes libre 30 + inscripción 25 = 55 · bs: mes libre 35 + mes Bs 17.5 = 52.5
+    expect(totales(r)).toEqual({ efectivo: 55, bs: 52.5 });
   });
 });
 

@@ -8,12 +8,18 @@ import { Badge } from "@/components/ui/badge";
 import { pagosService } from "@/lib/features/pagos/service";
 import { bolivaresService } from "@/lib/features/pagos/bolivares.service";
 import { dedupeMetodos, metodosActivos, metodoPorDefecto } from "@/lib/features/pagos/domain/metodos";
-import { distribuirSecuencial, pendienteUsd, type CoberturaGrupo } from "@/lib/features/pagos/domain/cobertura";
+import {
+  deudaPorMetodo,
+  distribuirSecuencial,
+  pendienteUsd,
+  preciosDesdeMetodos,
+  type CoberturaGrupo,
+} from "@/lib/features/pagos/domain/cobertura";
 import type { MesConCobertura } from "@/lib/features/pagos/domain/types";
 import { comprimirImagen, esImagenComprimible } from "@/lib/features/pagos/comprimir-imagen";
 import { leerComprobante, parseNumero } from "@/lib/features/pagos/ocr";
 import { createClient } from "@/lib/supabase/client";
-import { formatCurrency, formatDate, getMonthName, getDiaCobro, metodoPrincipal } from "@/lib/utils";
+import { formatCurrency, formatDate, getMonthName, getDiaCobro } from "@/lib/utils";
 import { CreditCard, CheckCircle, Clock, Calendar, Eye, Trash2, FileText, Plus, Search, Gift, AlertTriangle, ChevronDown, ChevronRight, X, Save, Phone, Mail, MapPin, XCircle, BellRing, Landmark } from "lucide-react";
 import { showToast } from "@/components/ui/toast";
 import { confirmar } from "@/components/ui/confirm";
@@ -1013,44 +1019,46 @@ function MisPagosContent() {
     if (anioDeuda > anioActual) return null;
     const primerMesDeuda = anioDeuda === anioActual ? mesDeuda : 1;
 
-    // Meses que NO son deuda:
-    // - payment_type='suspension': el miembro solicitó suspensión (cualquier status)
-    // - payment_type='mensualidad'/'inscripcion' con status='aprobado': ya pagó
-    const mesesCubiertos = new Set(
-      pagos.flatMap(p => (p.detail || [])
-        .filter(d => {
-          if (d.year_number !== anioActual) return false;
-          if (d.payment_type === "suspension") return true;
-          if (d.payment_type === "mensualidad" || d.payment_type === "inscripcion") {
-            return p.status === "aprobado";
-          }
-          return false;
-        })
-        .map(d => d.month_number!))
-    );
-
-    const mesesDeuda: number[] = [];
+    // Ventana de deuda: desde el inicio hasta el mes actual (respeta día de cobro).
+    const mesesVentana = new Set<string>();
     for (let mes = primerMesDeuda; mes <= mesActual; mes++) {
-      if (mesesCubiertos.has(mes)) continue;
       const diaCobro = getDiaCobro(profile.start_date, mes, anioActual, modoCobro);
       if (mes === mesActual && hoy.getDate() < diaCobro) continue;
-      mesesDeuda.push(mes);
+      mesesVentana.add(`${mes}-${anioActual}`);
     }
 
-    // Inscripción es deuda si profile dice NO pagado Y NO existe pago aprobado tipo inscripcion
-    const tieneInscripcionAprobada = pagos.some(p =>
-      p.status === "aprobado" &&
-      (p.detail || []).some(d => d.payment_type === "inscripcion")
+    // Meses con cobertura parcial (pagos aprobados) dentro de la ventana.
+    // Los meses con pagos en revisión (pendiente) no cuentan como deuda.
+    const mesesDeuda = mesesPendientes.filter(
+      (m) =>
+        m.year_number === anioActual &&
+        mesesVentana.has(`${m.month_number}-${m.year_number}`) &&
+        m.fraccionPendiente > 0
     );
-    const debeInscripcion = !profile.inscription_paid && !tieneInscripcionAprobada;
-    const activeMetodo = metodoPrincipal(metodosPago.filter((m) => m.is_active));
-    const montoMensual = activeMetodo?.amount_monthly || 0;
-    const montoInscripcion = activeMetodo?.amount_inscription || 0;
-    const totalDeuda = mesesDeuda.length * montoMensual + (debeInscripcion ? montoInscripcion : 0);
 
-    if (!debeInscripcion && mesesDeuda.length === 0) return null;
-    return { mesesDeuda, debeInscripcion, totalDeuda, montoMensual, montoInscripcion, anioActual };
-  }, [profile, gymConfig, pagos, metodosPago]);
+    // Inscripción: cobertura real; sin pagos → pendiente completa.
+    const inscripcionConcepto = inscripcionCobertura ?? {
+      fraccionPagada: profile.inscription_paid ? 1 : 0,
+      fraccionPendiente: profile.inscription_paid ? 0 : 1,
+      porcentaje: profile.inscription_paid ? 100 : 0,
+      montoPagado: 0,
+      preciosPorMetodo: {},
+      metodoPago: null,
+    };
+
+    const precios = preciosDesdeMetodos(metodosHabilitados);
+    const porMetodo = deudaPorMetodo(mesesDeuda, inscripcionConcepto, precios);
+    const hayDeuda = porMetodo.some((d) => d.totalUsd > 0);
+
+    if (!hayDeuda) return null;
+    return {
+      mesesDeuda,
+      porMetodo,
+      inscripcion: inscripcionConcepto,
+      debeInscripcion: inscripcionConcepto.fraccionPendiente > 0,
+      anioActual,
+    };
+  }, [profile, gymConfig, mesesPendientes, inscripcionCobertura, metodosHabilitados]);
 
   const filteredMiembros = miembros.filter(m => {
     const s = miembroSearch.toLowerCase();
@@ -1237,15 +1245,46 @@ function MisPagosContent() {
               ) : (
                 <p className="mt-3 text-xs text-gym-muted">{messages.misPagos.metodosNoConfigurados}</p>
               )}
-              {morosidad && morosidad.totalDeuda > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setExpandedMoroso(true)}
-                  className="mt-3 inline-flex items-center gap-1.5 text-xs font-medium text-gym-danger hover:underline"
-                >
-                  <AlertTriangle className="w-3.5 h-3.5" />
-                  Tienes {formatCurrency(morosidad.totalDeuda)} pendiente
-                </button>
+              {tasaBcv && tasaBcv > 0 && (
+                <div className="mt-3 inline-flex flex-col rounded-xl border border-gym-primary/30 bg-gym-primary/10 px-3 py-1.5">
+                  <span className="text-[10px] uppercase tracking-widest text-gym-primary font-medium">
+                    {messages.bolivares.tasaBcvTitulo}
+                  </span>
+                  <span className="text-xl font-display font-bold text-gym-text">
+                    {messages.tasas.tasaVigenteFormato.replace(
+                      "{tasa}",
+                      tasaBcv.toLocaleString("es-VE", { maximumFractionDigits: 4 })
+                    )}
+                  </span>
+                </div>
+              )}
+              {morosidad && (
+                <div className="mt-3">
+                  <button
+                    type="button"
+                    onClick={() => setExpandedMoroso(true)}
+                    className="inline-flex items-center gap-1.5 text-xs font-medium text-gym-danger hover:underline"
+                  >
+                    <AlertTriangle className="w-3.5 h-3.5" />
+                    {messages.misPagos.tienesPendiente}
+                  </button>
+                  <div className="flex flex-col gap-0.5 mt-1">
+                    {morosidad.porMetodo
+                      .filter((d) => d.totalUsd > 0)
+                      .map((d) => (
+                        <span key={d.metodo} className="flex items-center gap-1.5 text-xs text-gym-muted">
+                          {d.metodo === "efectivo" ? "💵" : d.metodo === "bs" ? <FlagVe className="inline-block w-4 h-3" /> : "🟡"}
+                          <span className="font-medium text-gym-text">{metodoLabels[d.metodo as MetodoPago]}:</span>
+                          <span className="text-gym-danger font-semibold">{formatCurrency(d.totalUsd)}</span>
+                          {d.metodo === "bs" && tasaBcv && tasaBcv > 0 && (
+                            <span className="text-gym-muted">
+                              (≈ {Math.round(d.totalUsd * tasaBcv).toLocaleString("es-VE")} Bs)
+                            </span>
+                          )}
+                        </span>
+                      ))}
+                  </div>
+                </div>
               )}
             </div>
           </div>
@@ -1384,7 +1423,7 @@ function MisPagosContent() {
 
           {/* Morosidad */}
           {morosidad && (
-            <Card className={`neon-card overflow-hidden ${morosidad.totalDeuda > 0 ? "border-gym-danger/40 shadow-[0_0_15px_rgba(239,68,68,0.15)]" : ""}`}>
+            <Card className="neon-card overflow-hidden border-gym-danger/40 shadow-[0_0_15px_rgba(239,68,68,0.15)]">
               <div className="absolute inset-0 bg-gradient-to-br from-gym-danger/5 to-transparent pointer-events-none" />
               <button
                 type="button"
@@ -1397,36 +1436,89 @@ function MisPagosContent() {
                       <div className="w-7 h-7 rounded-lg bg-gym-danger/15 flex items-center justify-center">
                         <AlertTriangle className="w-4 h-4 text-gym-danger" />
                       </div>
-                      <span className={morosidad.totalDeuda > 0 ? "text-gym-danger font-semibold" : ""}>Morosidad</span>
+                      <span className="text-gym-danger font-semibold">Morosidad</span>
                       <Badge variant="danger" className="text-[10px]">{morosidad.mesesDeuda.length} mes(es)</Badge>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-semibold text-gym-danger">{formatCurrency(morosidad.totalDeuda)}</span>
-                      {expandedMoroso ? <ChevronDown className="w-4 h-4 text-gym-muted" /> : <ChevronRight className="w-4 h-4 text-gym-muted" />}
-                    </div>
+                    {expandedMoroso ? <ChevronDown className="w-4 h-4 text-gym-muted" /> : <ChevronRight className="w-4 h-4 text-gym-muted" />}
                   </CardTitle>
+                  <div className="flex flex-col gap-0.5 mt-2">
+                    {morosidad.porMetodo
+                      .filter((d) => d.totalUsd > 0)
+                      .map((d) => (
+                        <div key={d.metodo} className="flex items-center justify-between gap-2 text-xs">
+                          <span className="flex items-center gap-1.5 text-gym-muted">
+                            {d.metodo === "efectivo" ? "💵" : d.metodo === "bs" ? <FlagVe className="inline-block w-4 h-3" /> : "🟡"}
+                            <span className="font-medium text-gym-text">{metodoLabels[d.metodo as MetodoPago]}</span>
+                          </span>
+                          <span className="text-gym-danger font-semibold">
+                            {formatCurrency(d.totalUsd)}
+                            {d.metodo === "bs" && tasaBcv && tasaBcv > 0 && (
+                              <span className="text-gym-muted font-normal">
+                                {" "}(≈ {Math.round(d.totalUsd * tasaBcv).toLocaleString("es-VE")} Bs)
+                              </span>
+                            )}
+                          </span>
+                        </div>
+                      ))}
+                  </div>
                 </CardHeader>
               </button>
               {expandedMoroso && (
                 <CardContent className="relative">
                   <div className="space-y-2">
-                    {morosidad.mesesDeuda.map(mes => (
-                      <div key={mes} className="flex items-center justify-between p-2.5 bg-gym-bg/60 rounded-xl">
-                        <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full bg-gym-danger" />
-                          <span className="text-sm text-gym-text">{getMonthName(mes)} {morosidad.anioActual}</span>
-                          <span className="text-[10px] text-gym-muted">— Mensualidad</span>
+                    {morosidad.mesesDeuda.map((mes) => {
+                      const metodoMes = (mes.metodoPago as MetodoPago | null);
+                      const pendienteMes = metodoMes
+                        ? pendienteUsd(mes, metodoMes, getMontoByMetodo(metodoMes, "mensual"))
+                        : null;
+                      return (
+                        <div
+                          key={`${mes.year_number}-${mes.month_number}`}
+                          className="flex items-center justify-between gap-2 p-2.5 bg-gym-bg/60 rounded-xl"
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div className="w-2 h-2 rounded-full bg-gym-danger shrink-0" />
+                            <span className="text-sm text-gym-text">{getMonthName(mes.month_number)} {mes.year_number}</span>
+                            {mes.porcentaje > 0 && (
+                              <span className="text-[10px] text-gym-success font-semibold">
+                                {messages.bolivares.pagadoPorcentaje.replace("{porcentaje}", String(mes.porcentaje))}
+                              </span>
+                            )}
+                            <span className="text-[10px] text-gym-muted">— Mensualidad</span>
+                          </div>
+                          <span className="text-sm font-medium text-gym-text text-right">
+                            {pendienteMes !== null
+                              ? messages.bolivares.faltaPorPagar.replace("{monto}", formatCurrency(pendienteMes))
+                              : messages.misPagos.faltaSegunMetodo}
+                          </span>
                         </div>
-                        <span className="text-sm font-medium text-gym-text">{formatCurrency(morosidad.montoMensual)}</span>
-                      </div>
-                    ))}
+                      );
+                    })}
                     {morosidad.debeInscripcion && (
-                      <div className="flex items-center justify-between p-2.5 bg-gym-bg/60 rounded-xl border border-gym-danger/20">
-                        <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full bg-gym-danger" />
+                      <div className="flex items-center justify-between gap-2 p-2.5 bg-gym-bg/60 rounded-xl border border-gym-danger/20">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className="w-2 h-2 rounded-full bg-gym-danger shrink-0" />
                           <span className="text-sm text-gym-danger font-medium">Inscripción</span>
+                          {morosidad.inscripcion.porcentaje > 0 && (
+                            <span className="text-[10px] text-gym-success font-semibold">
+                              {messages.bolivares.pagadoPorcentaje.replace("{porcentaje}", String(morosidad.inscripcion.porcentaje))}
+                            </span>
+                          )}
                         </div>
-                        <span className="text-sm font-medium text-gym-danger">{formatCurrency(morosidad.montoInscripcion)}</span>
+                        <span className="text-sm font-medium text-gym-danger text-right">
+                          {morosidad.inscripcion.metodoPago
+                            ? messages.bolivares.faltaPorPagar.replace(
+                                "{monto}",
+                                formatCurrency(
+                                  pendienteUsd(
+                                    morosidad.inscripcion,
+                                    morosidad.inscripcion.metodoPago,
+                                    getMontoByMetodo(morosidad.inscripcion.metodoPago as MetodoPago, "inscripcion")
+                                  )
+                                )
+                              )
+                            : messages.misPagos.faltaSegunMetodo}
+                        </span>
                       </div>
                     )}
                   </div>

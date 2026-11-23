@@ -70,9 +70,11 @@ export async function validarMetodoUnicoPorMes(
     if (!metodos || metodos.size === 0) continue;
     if (!metodos.has(metodo)) {
       const existente = Array.from(metodos)[0] ?? "efectivo";
-      throw new Error(
-        messages.bolivares.mesOtroMetodo.replace("{metodo}", etiquetaMetodo(existente))
-      );
+      const plantilla =
+        detalle.payment_type === "inscripcion"
+          ? messages.bolivares.inscripcionOtroMetodo
+          : messages.bolivares.mesOtroMetodo;
+      throw new Error(plantilla.replace("{metodo}", etiquetaMetodo(existente)));
     }
   }
 }

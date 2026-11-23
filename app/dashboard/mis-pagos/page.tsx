@@ -665,7 +665,7 @@ function MisPagosContent() {
         metodoInscripcion !== formData.metodo_pago
       ) {
         showToast(
-          messages.bolivares.mesOtroMetodo.replace(
+          messages.bolivares.inscripcionOtroMetodo.replace(
             "{metodo}",
             metodoLabels[metodoInscripcion as MetodoPago] ?? metodoInscripcion
           ),

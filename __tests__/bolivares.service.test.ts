@@ -420,6 +420,29 @@ describe("BolivaresService.crearPago — montos exactos y validaciones", () => {
     ).rejects.toThrow(/ya se está pagando con/);
   });
 
+  it("usa un mensaje propio cuando la inscripción se paga con otro método", async () => {
+    fake.on("payment_detail", "select").reply({
+      data: [
+        {
+          month_number: 1,
+          year_number: 2026,
+          payment_type: "inscripcion",
+          payments: { user_id: USER_ID, payment_method: "efectivo" },
+        },
+      ],
+    });
+
+    await expect(
+      service.crearPago({
+        user_id: USER_ID,
+        detalles: [{ month_number: 1, year_number: 2026, payment_type: "inscripcion", payment_amount: 50 }],
+        amount_bs: 1000,
+        bank: BANCO,
+        reference_number: REFERENCIA,
+      })
+    ).rejects.toThrow(/inscripción ya se está pagando/i);
+  });
+
   it("permite continuar un mes que ya se paga con el mismo método", async () => {
     fake.on("exchange_rates", "select").reply({ data: { rate_bs: 100 } });
     fake.on("payment_detail", "select").reply({

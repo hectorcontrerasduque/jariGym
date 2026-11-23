@@ -572,6 +572,7 @@ export const messages = {
     referenciaDuplicada: "Ya existe un pago con esa referencia bancaria",
     excedenteMontoBs: "Sobra {monto} Bs. Selecciona más meses para cubrir el monto.",
     mesOtroMetodo: "Un mes seleccionado ya se está pagando con {metodo}. Completa ese mes con el mismo método de pago.",
+    inscripcionOtroMetodo: "La inscripción ya se está pagando con {metodo}. Complétala con el mismo método de pago.",
     completarConMetodo: "Completar con {metodo}",
     sinResultados: "Sin resultados",
     tasaBcvLabel: "Tasa BCV aplicada",

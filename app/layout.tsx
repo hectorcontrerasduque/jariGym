@@ -16,11 +16,6 @@ const spaceGrotesk = Space_Grotesk({
 export const metadata: Metadata = {
   title: "hcontrer.org — Sistemas a la Medida",
   description: "Desarrollo de páginas web, aplicaciones móviles, sistemas de facturación, contabilidad, nómina y más. Soluciones tecnológicas a la medida.",
-  manifest: "/manifest.webmanifest",
-  icons: {
-    icon: "/favicon.svg",
-    apple: "/icons/apple-touch-icon.png",
-  },
   appleWebApp: {
     capable: true,
     title: "GymApp",

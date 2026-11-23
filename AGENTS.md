@@ -277,6 +277,7 @@ status: "pendiente" | "aprobado" | "rechazado"
 
 ### Logo Management
 - Upload → bucket `logos` + `gym_config.logo_url`; delete = trash icon-only + storage + `logo_url: ""`; fallback icono `Dumbbell`.
+- Favicon/PWA: `app/icon.tsx`, `app/apple-icon.tsx` y `app/manifest.ts` sirven `gym_config.logo_url` (helper `lib/features/config/icono.ts`); sin logo → `public/favicon.svg` / `public/icons/*`. Cache 5 min.
 
 ### Member Self-Migration
 - Login → link "Ya soy miembro" → modal: buscar nombre (fuzzy: prefijo sin último char por palabra) → crear auth + profile + pagos + detalle_pago + inscripción; email de bienvenida al final.

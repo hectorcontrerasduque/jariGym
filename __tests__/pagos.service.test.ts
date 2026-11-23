@@ -515,6 +515,40 @@ describe("mesesPendientes", () => {
     expect(await service.mesesPendientes("u1", 2026)).toEqual([]);
   });
 
+  it("inscripcionCobertura acumula abonos parciales del miembro", async () => {
+    fake.on("payment_detail", "select").reply({
+      data: [
+        {
+          month_number: 1,
+          year_number: 2026,
+          payment_type: "inscripcion",
+          payment_amount: 20,
+          expected_amount_usd: 50,
+          payments: { status: "aprobado", payment_method: "bs", created_at: "2026-01-01T00:00:00Z" },
+        },
+        {
+          month_number: 2,
+          year_number: 2026,
+          payment_type: "inscripcion",
+          payment_amount: 10,
+          expected_amount_usd: 50,
+          payments: { status: "aprobado", payment_method: "bs", created_at: "2026-02-01T00:00:00Z" },
+        },
+      ],
+    });
+    const r = await service.inscripcionCobertura("u1");
+    expect(r?.porcentaje).toBe(60);
+    expect(r?.fraccionPendiente).toBeCloseTo(0.4, 2);
+    expect(r?.metodoPago).toBe("bs");
+    const [call] = fake.callsTo("payment_detail", "select");
+    expect(call.filters).toContainEqual(["eq", "payment_type", "inscripcion"]);
+  });
+
+  it("inscripcionCobertura sin pagos devuelve null", async () => {
+    fake.on("payment_detail", "select").reply({ data: [] });
+    expect(await service.inscripcionCobertura("u1")).toBeNull();
+  });
+
   it("mesesPendientesAdmin delega con los mismos argumentos", async () => {
     fake.on("payment_detail", "select").reply({ data: [] });
     expect(soloMeses(await service.mesesPendientesAdmin("u1", 2026, undefined, "2026-11-15"))).toEqual(

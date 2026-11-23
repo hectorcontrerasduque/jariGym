@@ -68,8 +68,9 @@ export interface MesPendiente {
  * calcula como Σ (payment_amount / expected_amount_usd) de los pagos aprobados,
  * usando el precio congelado del método para ese mes (prorated por método).
  */
-export interface MesConCobertura extends MesPendiente {
-  /** Fracción cubierta (0..N; >= 1 = mes pagado). */
+/** Estado de cobertura por monto de un concepto (mes o inscripción). */
+export interface EstadoCobertura {
+  /** Fracción cubierta (0..N; >= 1 = pagado). */
   fraccionPagada: number;
   /** Fracción que falta (>= 0). */
   fraccionPendiente: number;
@@ -77,8 +78,10 @@ export interface MesConCobertura extends MesPendiente {
   porcentaje: number;
   /** USD efectivamente pagados (solo aprobados). */
   montoPagado: number;
-  /** Precio congelado por método de pago para este mes. */
+  /** Precio congelado por método de pago. */
   preciosPorMetodo: Record<string, number>;
-  /** Método con el que arrancó el pago del mes (null si no tiene pagos). */
+  /** Método con el que arrancó el pago (null si no tiene pagos). */
   metodoPago: string | null;
 }
+
+export interface MesConCobertura extends MesPendiente, EstadoCobertura {}

@@ -618,6 +618,8 @@ export const messages = {
     montoAplicado: "Monto aplicado",
     pagadoPorcentaje: "Pag {porcentaje}%",
     pendienteMonto: "Pend: {monto}",
+    faltaPorPagar: "Falta: {monto}",
+    pagadoDe: "Pagado: {monto}",
     placeholderMonto: "Ej: {monto}",
     tasaActualizada: "Tasa BCV actualizada",
     datosPago: {

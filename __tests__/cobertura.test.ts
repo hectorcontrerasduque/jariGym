@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   calcularCoberturaGrupos,
+  calcularCoberturaTipo,
   distribuirSecuencial,
   pendienteUsd,
   preciosDesdeMetodos,
@@ -107,6 +108,41 @@ describe("cobertura — prorated por método", () => {
     ]);
     expect(mapa.efectivo).toEqual({ mensual: 30, inscripcion: 50 });
     expect(mapa.bs).toEqual({ mensual: 35, inscripcion: 0 });
+  });
+});
+
+describe("calcularCoberturaTipo (inscripción)", () => {
+  it("acumula abonos de inscripción de meses distintos", () => {
+    const cobertura = calcularCoberturaTipo(
+      [
+        fila({ payment_type: "inscripcion", payment_amount: 20, expected_amount_usd: 50, created_at: "2026-01-01T00:00:00Z" }),
+        fila({ payment_type: "inscripcion", payment_amount: 10, expected_amount_usd: 50, created_at: "2026-02-01T00:00:00Z" }),
+        fila({ payment_type: "mensualidad", payment_amount: 99, expected_amount_usd: 30 }),
+      ],
+      "inscripcion",
+      precios
+    );
+    expect(cobertura).not.toBeNull();
+    expect(cobertura?.fraccionPagada).toBeCloseTo(0.6, 2);
+    expect(cobertura?.fraccionPendiente).toBeCloseTo(0.4, 2);
+    expect(cobertura?.porcentaje).toBe(60);
+    expect(cobertura?.montoPagado).toBe(30);
+    expect(cobertura?.metodoPago).toBe("bs");
+  });
+
+  it("devuelve null si no hay pagos de ese tipo", () => {
+    expect(calcularCoberturaTipo([fila({ payment_type: "mensualidad" })], "inscripcion", precios)).toBeNull();
+  });
+
+  it("pendienteUsd usa el precio congelado del método para la inscripción", () => {
+    const cobertura = calcularCoberturaTipo(
+      [fila({ payment_type: "inscripcion", payment_amount: 20, expected_amount_usd: 50 })],
+      "inscripcion",
+      precios
+    );
+    if (!cobertura) throw new Error("sin cobertura");
+    expect(pendienteUsd(cobertura, "bs", 999)).toBeCloseTo(0.6 * 50, 2);
+    expect(pendienteUsd(cobertura, "efectivo", 999)).toBeCloseTo(0.6 * 50, 2);
   });
 });
 

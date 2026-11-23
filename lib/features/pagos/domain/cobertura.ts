@@ -1,5 +1,5 @@
 /* eslint-disable security/detect-object-injection -- claves controladas (métodos de pago) */
-import type { MesConCobertura } from "./types";
+import type { EstadoCobertura } from "./types";
 
 /**
  * Cobertura de meses por monto (pagos parciales), sin Supabase.
@@ -32,16 +32,12 @@ export interface FilaCobertura {
 /** Precio actual por método y tipo (fallback cuando no hay snapshot). */
 export type PreciosPorMetodo = Record<string, { mensual: number; inscripcion: number }>;
 
-export interface CoberturaGrupo {
+export interface CoberturaGrupo extends EstadoCobertura {
   month_number: number;
   year_number: number;
   payment_type: string;
-  fraccionPagada: number;
-  montoPagado: number;
+  /** Hay pagos pendientes (bloquea el mes mientras se revisan). */
   tienePendiente: boolean;
-  preciosPorMetodo: Record<string, number>;
-  /** Método del primer pago del grupo (con el que se "contrató" el mes). */
-  metodoPago: string | null;
 }
 
 function tiempo(iso: string | null | undefined): number {
@@ -112,48 +108,82 @@ export function calcularCoberturaGrupos(
   const resultado: CoberturaGrupo[] = [];
   for (const filas of grupos.values()) {
     const primera = filas[0];
-    const tipo = primera.payment_type;
-    const preciosPorMetodo = precioCongelado(filas, tipo, precios);
-    // Método "contratado": el del pago más antiguo del grupo.
-    const ordenadas = [...filas].sort((a, b) => tiempo(a.created_at) - tiempo(b.created_at));
-    const metodoPago = ordenadas[0]?.payment_method || "efectivo";
-
-    let fraccion = 0;
-    let montoPagado = 0;
-    let tienePendiente = false;
-
-    for (const fila of filas) {
-      if (tipo === "suspension") break;
-      if (fila.status === "pendiente") tienePendiente = true;
-      if (fila.status !== "aprobado") continue;
-
-      const metodo = fila.payment_method || "efectivo";
-      const precio = preciosPorMetodo[metodo] ?? precioMetodo(precios, metodo, tipo);
-      const pagado = Number(fila.payment_amount || 0);
-      montoPagado += pagado;
-      if (precio > 0) fraccion += pagado / precio;
-      else if (pagado > 0) fraccion += 1; // precio 0/desconocido: cuenta como cubierto
-    }
-
-    // La suspensión cubre el mes completo (monto 0).
-    if (tipo === "suspension") {
-      fraccion = 1;
-      tienePendiente = false;
-    }
-
     resultado.push({
       month_number: primera.month_number as number,
       year_number: primera.year_number as number,
-      payment_type: tipo,
-      fraccionPagada: redondear2(fraccion),
-      montoPagado: redondear2(montoPagado),
-      tienePendiente,
-      preciosPorMetodo,
-      metodoPago,
+      payment_type: primera.payment_type,
+      ...calcularGrupo(filas, primera.payment_type, precios),
     });
   }
 
   return resultado;
+}
+
+/** Agrega la cobertura de un conjunto de filas de un mismo tipo. */
+function calcularGrupo(
+  filas: FilaCobertura[],
+  tipo: string,
+  precios: PreciosPorMetodo
+): EstadoCobertura & { tienePendiente: boolean } {
+  const preciosPorMetodo = precioCongelado(filas, tipo, precios);
+  // Método "contratado": el del pago más antiguo.
+  const ordenadas = [...filas].sort((a, b) => tiempo(a.created_at) - tiempo(b.created_at));
+  const metodoPago = ordenadas[0]?.payment_method || "efectivo";
+
+  let fraccion = 0;
+  let montoPagado = 0;
+  let tienePendiente = false;
+
+  for (const fila of filas) {
+    if (tipo === "suspension") break;
+    if (fila.status === "pendiente") tienePendiente = true;
+    if (fila.status !== "aprobado") continue;
+
+    const metodo = fila.payment_method || "efectivo";
+    const precio = preciosPorMetodo[metodo] ?? precioMetodo(precios, metodo, tipo);
+    const pagado = Number(fila.payment_amount || 0);
+    montoPagado += pagado;
+    if (precio > 0) fraccion += pagado / precio;
+    else if (pagado > 0) fraccion += 1; // precio 0/desconocido: cuenta como cubierto
+  }
+
+  // La suspensión cubre el mes completo (monto 0).
+  if (tipo === "suspension") {
+    fraccion = 1;
+    tienePendiente = false;
+  }
+
+  const fraccionPagada = redondear2(fraccion);
+  return {
+    fraccionPagada,
+    fraccionPendiente: redondear2(Math.max(0, 1 - fraccionPagada)),
+    porcentaje: Math.min(100, Math.round(fraccionPagada * 100)),
+    montoPagado: redondear2(montoPagado),
+    preciosPorMetodo,
+    metodoPago,
+    tienePendiente,
+  };
+}
+
+/**
+ * Cobertura agregada de un TIPO de pago (p. ej. `inscripcion`), sin importar
+ * mes/año: la inscripción es un único concepto por miembro cuyos abonos pueden
+ * caer en meses distintos. Devuelve null si no hay pagos de ese tipo.
+ */
+export function calcularCoberturaTipo(
+  detalles: FilaCobertura[],
+  tipo: string,
+  precios: PreciosPorMetodo = {}
+): CoberturaGrupo | null {
+  const filas = detalles.filter((f) => f.payment_type === tipo);
+  if (filas.length === 0) return null;
+  const primera = filas[0];
+  return {
+    month_number: primera.month_number ?? 0,
+    year_number: primera.year_number ?? 0,
+    payment_type: tipo,
+    ...calcularGrupo(filas, tipo, precios),
+  };
 }
 
 /** Convierte filas de la query en el formato del dominio (tolerante a tipos). */
@@ -206,13 +236,13 @@ export function preciosDesdeMetodos(
 
 /** USD necesarios para completar un mes al precio del método indicado. */
 export function pendienteUsd(
-  mes: MesConCobertura,
+  estado: Pick<EstadoCobertura, "fraccionPendiente" | "preciosPorMetodo">,
   metodo: string,
   precioActual: number
 ): number {
-  const precio = mes.preciosPorMetodo[metodo] ?? precioActual;
+  const precio = estado.preciosPorMetodo[metodo] ?? precioActual;
   if (!(precio > 0)) return 0;
-  return redondear2(Math.max(0, mes.fraccionPendiente) * precio);
+  return redondear2(Math.max(0, estado.fraccionPendiente) * precio);
 }
 
 /**

@@ -8,8 +8,10 @@ import { calcularStats, calcularMonthlyStats } from "./domain/stats";
 import { filtrarElegibles, type ElegiblesInput } from "./domain/elegibles";
 import { calcularMesesPendientes } from "./domain/meses-pendientes";
 import {
+  calcularCoberturaTipo,
   filasCoberturaDesdeQuery,
   preciosDesdeMetodos,
+  type CoberturaGrupo,
   type PreciosPorMetodo,
 } from "./domain/cobertura";
 import { calcularMontoInscripcionAprobado, precioInscripcionActual } from "./inscription-amount";
@@ -486,6 +488,34 @@ export class PagosService {
     precios?: PreciosPorMetodo
   ): Promise<MesConCobertura[]> {
     return this.mesesPendientes(usuarioId, anio, supabaseClient, startDate, precios);
+  }
+
+  /**
+   * Cobertura de la inscripción del miembro (concepto global, sin importar el
+   * mes): fracción pagada, saldo y método con el que se empezó a pagar.
+   */
+  async inscripcionCobertura(
+    usuarioId: string,
+    supabaseClient?: ReturnType<typeof createClient>,
+    precios?: PreciosPorMetodo
+  ): Promise<CoberturaGrupo | null> {
+    const supabase = supabaseClient || this.supabase;
+    const { data: detalles, error } = await supabase
+      .from("payment_detail")
+      .select(
+        "month_number, year_number, payment_type, payment_amount, expected_amount_usd, payments!inner(status, user_id, payment_method, created_at)"
+      )
+      .eq("payment_type", "inscripcion")
+      .eq("payments.user_id", usuarioId)
+      .in("payments.status", ["aprobado", "pendiente"]);
+
+    if (error || !detalles) return null;
+
+    const preciosFinales = precios ?? (await this.preciosActuales());
+    const filas = filasCoberturaDesdeQuery(
+      detalles as unknown as Parameters<typeof filasCoberturaDesdeQuery>[0]
+    );
+    return calcularCoberturaTipo(filas, "inscripcion", preciosFinales);
   }
 
   async tieneInscripcionPendiente(usuarioId: string, supabaseClient?: ReturnType<typeof createClient>): Promise<boolean> {

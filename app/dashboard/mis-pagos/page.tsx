@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { pagosService } from "@/lib/features/pagos/service";
 import { bolivaresService } from "@/lib/features/pagos/bolivares.service";
 import { dedupeMetodos, metodosActivos, metodoPorDefecto } from "@/lib/features/pagos/domain/metodos";
-import { distribuirSecuencial, pendienteUsd } from "@/lib/features/pagos/domain/cobertura";
+import { distribuirSecuencial, pendienteUsd, type CoberturaGrupo } from "@/lib/features/pagos/domain/cobertura";
 import type { MesConCobertura } from "@/lib/features/pagos/domain/types";
 import { comprimirImagen, esImagenComprimible } from "@/lib/features/pagos/comprimir-imagen";
 import { leerComprobante, parseNumero } from "@/lib/features/pagos/ocr";
@@ -140,6 +140,8 @@ function MisPagosContent() {
   const [mesesPendientes, setMesesPendientes] = useState<MesConCobertura[]>([]);
   const [inscripcionPagada, setInscripcionPagada] = useState(false);
   const [inscripcionPendiente, setInscripcionPendiente] = useState(false);
+  /** Cobertura por monto de la inscripción (abonos parciales). */
+  const [inscripcionCobertura, setInscripcionCobertura] = useState<CoberturaGrupo | null>(null);
   const [membresiaLibre, setMembresiaLibre] = useState(false);
   const [fechaInicioMiembro, setFechaInicioMiembro] = useState<string | null>(null);
   const [savingPago, setSavingPago] = useState(false);
@@ -324,15 +326,17 @@ function MisPagosContent() {
   const loadMiembroPendientes = useCallback(async (miembroId: string, anio?: number) => {
     setLoadingPendientes(true);
     try {
-      const [profile, membresia, tienePendiente] = await Promise.all([
+      const [profile, membresia, tienePendiente, coberturaInscripcion] = await Promise.all([
         createClient().from("profiles").select("inscription_paid, start_date").eq("id", miembroId).single(),
         createClient().from("memberships").select("id, start_date").eq("user_id", miembroId).eq("status", "activa").is("end_date", null).maybeSingle(),
         pagosService.tieneInscripcionPendiente(miembroId),
+        pagosService.inscripcionCobertura(miembroId),
       ]);
       const fechaInicio = profile.data?.start_date || membresia.data?.start_date;
       setFechaInicioMiembro(fechaInicio || null);
       const meses = await pagosService.mesesPendientesAdmin(miembroId, anio, undefined, fechaInicio);
       setMesesPendientes(meses);
+      setInscripcionCobertura(coberturaInscripcion);
       if (profile.data) setInscripcionPagada(profile.data.inscription_paid);
       setInscripcionPendiente(tienePendiente);
       setMembresiaLibre(!!membresia.data);
@@ -346,15 +350,17 @@ function MisPagosContent() {
     const loadSelfPendientes = useCallback(async (userId: string, anio?: number) => {
     setLoadingPendientes(true);
     try {
-      const [profile, membresia, tienePendiente] = await Promise.all([
+      const [profile, membresia, tienePendiente, coberturaInscripcion] = await Promise.all([
         createClient().from("profiles").select("inscription_paid, start_date").eq("id", userId).single(),
         createClient().from("memberships").select("id, start_date").eq("user_id", userId).eq("status", "activa").is("end_date", null).maybeSingle(),
         pagosService.tieneInscripcionPendiente(userId),
+        pagosService.inscripcionCobertura(userId),
       ]);
       const fechaInicio = profile.data?.start_date || membresia.data?.start_date;
       setFechaInicioMiembro(fechaInicio || null);
       const meses = await pagosService.mesesPendientes(userId, anio, undefined, fechaInicio);
       setMesesPendientes(meses);
+      setInscripcionCobertura(coberturaInscripcion);
       if (profile.data) setInscripcionPagada(profile.data.inscription_paid);
       setInscripcionPendiente(tienePendiente);
       setMembresiaLibre(!!membresia.data);
@@ -429,6 +435,15 @@ function MisPagosContent() {
     return parseNumero(formData.monto_usd);
   }, [formData.metodo_pago, formData.amount_bs, formData.monto_usd, tasaBcv]);
 
+  /** Saldo de inscripción al precio del método seleccionado (abonos parciales). */
+  const precioInscripcionActual = getMontoByMetodo(formData.metodo_pago, "inscripcion");
+  const inscripcionFalta = inscripcionCobertura
+    ? pendienteUsd(inscripcionCobertura, formData.metodo_pago, precioInscripcionActual)
+    : precioInscripcionActual;
+  const inscripcionParcial =
+    (inscripcionCobertura?.fraccionPagada ?? 0) > 0 &&
+    (inscripcionCobertura?.fraccionPagada ?? 0) < 1 - 1e-9;
+
   /** Necesidad en USD por concepto: inscripción primero, luego meses (viejo→nuevo). */
   const necesidades = useMemo(() => {
     const items: Array<{
@@ -441,12 +456,15 @@ function MisPagosContent() {
 
     if (formData.pagar_inscripcion && !inscripcionPagada) {
       const precio = getMontoByMetodo(formData.metodo_pago, "inscripcion");
-      if (precio > 0) {
+      const necesidad = inscripcionCobertura
+        ? pendienteUsd(inscripcionCobertura, formData.metodo_pago, precio)
+        : precio;
+      if (necesidad > 0) {
         items.push({
           tipo: "inscripcion",
           month_number: new Date().getMonth() + 1,
           year_number: new Date().getFullYear(),
-          necesidad: precio,
+          necesidad,
         });
       }
     }
@@ -464,7 +482,7 @@ function MisPagosContent() {
       }
     }
     return items;
-  }, [formData, inscripcionPagada, getMontoByMetodo, mesesSeleccionados, mesesPendientes]);
+  }, [formData, inscripcionPagada, inscripcionCobertura, getMontoByMetodo, mesesSeleccionados, mesesPendientes]);
 
   /** Reparto secuencial del monto entre los conceptos seleccionados. */
   const reparto = useMemo(
@@ -639,6 +657,22 @@ function MisPagosContent() {
           }
         }
       }
+      // La inscripción también se completa con un solo método.
+      const metodoInscripcion = inscripcionCobertura?.metodoPago;
+      if (
+        formData.pagar_inscripcion &&
+        metodoInscripcion &&
+        metodoInscripcion !== formData.metodo_pago
+      ) {
+        showToast(
+          messages.bolivares.mesOtroMetodo.replace(
+            "{metodo}",
+            metodoLabels[metodoInscripcion as MetodoPago] ?? metodoInscripcion
+          ),
+          "warning"
+        );
+        return;
+      }
       if (esBs) {
         montoBsNum = parseNumero(formData.amount_bs);
         if (!(montoBsNum > 0)) {
@@ -667,7 +701,7 @@ function MisPagosContent() {
       const mesesStr = formData.meses.map(m => `${getMonthName(m.month_number)} ${m.year_number}`).join(", ");
       acciones.push(`Solicitar suspensión de: ${mesesStr}`);
     } else {
-      if (formData.pagar_inscripcion) acciones.push(`Inscripción: ${formatCurrency(getMontoByMetodo(formData.metodo_pago, "inscripcion"))}`);
+      if (formData.pagar_inscripcion) acciones.push(`Inscripción: ${formatCurrency(inscripcionFalta)}`);
       if (formData.pagar_mensualidad && formData.meses.length > 0) {
         const mesesStr = formData.meses.map(m => `${getMonthName(m.month_number)} ${m.year_number}`).join(", ");
         const aplicadoTotal = reparto.aplicados.reduce((t, a) => t + a, 0);
@@ -1580,9 +1614,41 @@ function MisPagosContent() {
                           onChange={(e) => setFormData({ ...formData, pagar_inscripcion: e.target.checked, solicitar_suspension: false })}
                           className="w-5 h-5 rounded border-gym-border text-gym-primary focus:ring-gym-primary"
                         />
-                        <div className="flex-1">
+                        <div className="flex-1 min-w-0">
                           <p className="font-medium text-gym-text">Inscripción</p>
-                          <p className="text-xs text-gym-muted">{formatCurrency(getMontoByMetodo(formData.metodo_pago, "inscripcion"))}</p>
+                          {inscripcionParcial ? (
+                            <div className="mt-1 space-y-1">
+                              <div className="h-1.5 w-full max-w-[160px] rounded-full bg-gym-border/50 overflow-hidden">
+                                <div
+                                  className="h-full bg-gym-success rounded-full"
+                                  style={{ width: `${inscripcionCobertura?.porcentaje ?? 0}%` }}
+                                />
+                              </div>
+                              <p className="text-[11px] font-semibold text-gym-success flex items-center gap-1 flex-wrap">
+                                {messages.bolivares.pagadoPorcentaje.replace(
+                                  "{porcentaje}",
+                                  String(inscripcionCobertura?.porcentaje ?? 0)
+                                )}
+                                <span className="text-gym-muted font-normal">·</span>
+                                {messages.bolivares.faltaPorPagar.replace(
+                                  "{monto}",
+                                  formatCurrency(inscripcionFalta)
+                                )}
+                                <span className="text-gym-muted font-normal">·</span>
+                                {inscripcionCobertura?.metodoPago === "efectivo" ? (
+                                  "💵"
+                                ) : inscripcionCobertura?.metodoPago === "bs" ? (
+                                  <FlagVe className="inline-block w-3 h-2" />
+                                ) : (
+                                  "🟡"
+                                )}
+                              </p>
+                            </div>
+                          ) : (
+                            <p className="text-xs text-gym-muted">
+                              {formatCurrency(getMontoByMetodo(formData.metodo_pago, "inscripcion"))}
+                            </p>
+                          )}
                         </div>
                         <Badge variant="warning">Pendiente</Badge>
                       </label>

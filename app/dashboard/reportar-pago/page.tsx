@@ -10,6 +10,7 @@ import { bolivaresService } from "@/lib/features/pagos/bolivares.service";
 import { parseNumero } from "@/lib/features/pagos/ocr";
 import { dedupeMetodos, metodosActivos, metodoPorDefecto } from "@/lib/features/pagos/domain/metodos";
 import { datosPagoBs } from "@/lib/features/pagos/domain/banco";
+import { pendienteUsd, type CoberturaGrupo } from "@/lib/features/pagos/domain/cobertura";
 import { miembrosService } from "@/lib/services/miembros/miembros.service";
 import { createClient } from "@/lib/supabase/client";
 import { CheckCircle, DollarSign, User, FileText, Gift, Calendar, ArrowLeft, AlertTriangle, Send } from "lucide-react";
@@ -58,6 +59,7 @@ function ReportarPagoForm() {
   const [miembroSeleccionado, setMiembroSeleccionado] = useState<string>(memberParam || "");
   const [inscripcionPagada, setInscripcionPagada] = useState(false);
   const [inscripcionPendiente, setInscripcionPendiente] = useState(false);
+  const [inscripcionCobertura, setInscripcionCobertura] = useState<CoberturaGrupo | null>(null);
   const [mesesPendientes, setMesesPendientes] = useState<{ month_number: number; year_number: number }[]>([]);
   const [membresiaLibreInfo, setMembresiaLibreInfo] = useState<MembresiaLibreInfo | null>(null);
 
@@ -131,13 +133,15 @@ function ReportarPagoForm() {
               .maybeSingle();
 
             const fechaInicio = profile?.start_date || membresiaData?.start_date;
-            const [meses, tienePendiente] = await Promise.all([
+            const [meses, tienePendiente, coberturaInscripcion] = await Promise.all([
               pagosService.mesesPendientes(user.id, undefined, undefined, fechaInicio),
               pagosService.tieneInscripcionPendiente(user.id),
+              pagosService.inscripcionCobertura(user.id),
             ]);
             if (!cancelled) {
               setMesesPendientes(meses);
               setInscripcionPendiente(tienePendiente);
+              setInscripcionCobertura(coberturaInscripcion);
             }
 
             const { data: libreData } = await supabase
@@ -177,16 +181,18 @@ function ReportarPagoForm() {
     let cancelled = false;
     const loadMiembroPendientes = async (miembroId: string) => {
       try {
-        const [profile, libreData, tienePendiente] = await Promise.all([
+        const [profile, libreData, tienePendiente, coberturaInscripcion] = await Promise.all([
           createClient().from("profiles").select("inscription_paid, start_date").eq("id", miembroId).single(),
           createClient().from("memberships").select("start_date, end_date, assigned_by, profiles!assigned_by(full_name)").eq("user_id", miembroId).order("created_at", { ascending: false }).limit(1).maybeSingle(),
           pagosService.tieneInscripcionPendiente(miembroId),
+          pagosService.inscripcionCobertura(miembroId),
         ]);
         const fechaInicio = profile.data?.start_date || libreData.data?.start_date;
         const meses = await pagosService.mesesPendientesAdmin(miembroId, undefined, undefined, fechaInicio);
 
         if (!cancelled) {
           setMesesPendientes(meses);
+          setInscripcionCobertura(coberturaInscripcion);
           if (profile.data) setInscripcionPagada(profile.data.inscription_paid);
           setInscripcionPendiente(tienePendiente);
 
@@ -234,16 +240,24 @@ function ReportarPagoForm() {
     return tipo === "mensual" ? config.amount_monthly : config.amount_inscription;
   }, [metodosPago]);
 
+  const precioInscripcionActual = getMontoByMetodo(formData.metodo_pago, "inscripcion");
+  const inscripcionFalta = inscripcionCobertura
+    ? pendienteUsd(inscripcionCobertura, formData.metodo_pago, precioInscripcionActual)
+    : precioInscripcionActual;
+  const inscripcionParcial =
+    (inscripcionCobertura?.fraccionPagada ?? 0) > 0 &&
+    (inscripcionCobertura?.fraccionPagada ?? 0) < 1 - 1e-9;
+
   const montoTotal = useMemo(() => {
     let total = 0;
-    if (formData.pagar_inscripcion && !inscripcionPagada && getMontoByMetodo(formData.metodo_pago, "inscripcion") > 0) {
-      total += getMontoByMetodo(formData.metodo_pago, "inscripcion");
+    if (formData.pagar_inscripcion && !inscripcionPagada && inscripcionFalta > 0) {
+      total += inscripcionFalta;
     }
     if (formData.pagar_mensualidad && formData.meses.length > 0) {
       total += formData.meses.length * getMontoByMetodo(formData.metodo_pago, "mensual");
     }
     return total;
-  }, [formData.metodo_pago, formData.pagar_inscripcion, formData.pagar_mensualidad, formData.meses, inscripcionPagada, getMontoByMetodo]);
+  }, [formData.metodo_pago, formData.pagar_inscripcion, formData.pagar_mensualidad, formData.meses, inscripcionPagada, inscripcionFalta, getMontoByMetodo]);
 
   const needsComprobante = (metodo: MetodoPago): boolean => {
     return metodo !== "efectivo";
@@ -291,12 +305,12 @@ function ReportarPagoForm() {
 
       const detalles: Array<{ month_number: number | null; year_number: number | null; payment_type: "mensualidad" | "inscripcion"; payment_amount: number }> = [];
 
-      if (formData.pagar_inscripcion && !inscripcionPagada && getMontoByMetodo(formData.metodo_pago, "inscripcion") > 0) {
+      if (formData.pagar_inscripcion && !inscripcionPagada && inscripcionFalta > 0) {
         detalles.push({
           month_number: new Date().getMonth() + 1,
           year_number: new Date().getFullYear(),
           payment_type: "inscripcion",
-          payment_amount: getMontoByMetodo(formData.metodo_pago, "inscripcion"),
+          payment_amount: inscripcionFalta,
         });
       }
 
@@ -517,9 +531,27 @@ function ReportarPagoForm() {
                       onChange={(e) => setFormData({ ...formData, pagar_inscripcion: e.target.checked })}
                       className="w-5 h-5 rounded border-gym-border text-gym-primary focus:ring-gym-primary"
                     />
-                    <div className="flex-1">
+                    <div className="flex-1 min-w-0">
                       <p className="font-medium text-gym-text">Inscripción</p>
-                      <p className="text-xs text-gym-muted">{formatCurrency(getMontoByMetodo(formData.metodo_pago, "inscripcion"))}</p>
+                      {inscripcionParcial ? (
+                        <div className="mt-1 space-y-1">
+                          <div className="h-1.5 w-full max-w-[160px] rounded-full bg-gym-border/50 overflow-hidden">
+                            <div
+                              className="h-full bg-gym-success rounded-full"
+                              style={{ width: `${inscripcionCobertura?.porcentaje ?? 0}%` }}
+                            />
+                          </div>
+                          <p className="text-[11px] font-semibold text-gym-success flex items-center gap-1 flex-wrap">
+                            {messages.bolivares.pagadoPorcentaje.replace("{porcentaje}", String(inscripcionCobertura?.porcentaje ?? 0))}
+                            <span className="text-gym-muted font-normal">·</span>
+                            {messages.bolivares.faltaPorPagar.replace("{monto}", formatCurrency(inscripcionFalta))}
+                            <span className="text-gym-muted font-normal">·</span>
+                            {inscripcionCobertura?.metodoPago === "efectivo" ? "💵" : inscripcionCobertura?.metodoPago === "bs" ? <FlagVe className="inline-block w-3 h-2" /> : "🟡"}
+                          </p>
+                        </div>
+                      ) : (
+                        <p className="text-xs text-gym-muted">{formatCurrency(getMontoByMetodo(formData.metodo_pago, "inscripcion"))}</p>
+                      )}
                     </div>
                     <Badge variant="warning">Pendiente</Badge>
                   </label>
@@ -786,7 +818,7 @@ function ReportarPagoForm() {
               </div>
               <div className="text-xs text-gym-muted mt-2 space-y-1">
                 {formData.pagar_inscripcion && !inscripcionPagada && gymConfig && (
-                  <p>Inscripción: {formatCurrency(getMontoByMetodo(formData.metodo_pago, "inscripcion"))}</p>
+                  <p>Inscripción: {formatCurrency(inscripcionFalta)}</p>
                 )}
                 {formData.pagar_mensualidad && formData.meses.length > 0 && (
                   <p>Mensualidad: {formData.meses.length} mes(es) × {formatCurrency(getMontoByMetodo(formData.metodo_pago, "mensual"))}</p>

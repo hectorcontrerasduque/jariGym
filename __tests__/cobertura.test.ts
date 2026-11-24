@@ -2,14 +2,17 @@ import { describe, it, expect } from "vitest";
 import {
   calcularCoberturaGrupos,
   calcularCoberturaTipo,
+  coberturasPorUsuario,
   deudaPorMetodo,
   distribuirSecuencial,
+  filasCoberturaDesdePagos,
+  indexarGrupos,
   pendienteUsd,
   preciosDesdeMetodos,
   type FilaCobertura,
   type PreciosPorMetodo,
 } from "@/lib/features/pagos/domain/cobertura";
-import type { MesConCobertura } from "@/lib/features/pagos/domain/types";
+import type { MesConCobertura, PagoRPCRow } from "@/lib/features/pagos/domain/types";
 
 function fila(overrides: Partial<FilaCobertura> = {}): FilaCobertura {
   return {
@@ -144,6 +147,55 @@ describe("calcularCoberturaTipo (inscripción)", () => {
     if (!cobertura) throw new Error("sin cobertura");
     expect(pendienteUsd(cobertura, "bs", 999)).toBeCloseTo(0.6 * 50, 2);
     expect(pendienteUsd(cobertura, "efectivo", 999)).toBeCloseTo(0.6 * 50, 2);
+  });
+});
+
+describe("dashboard: filasCoberturaDesdePagos / coberturasPorUsuario / indexarGrupos", () => {
+  const rpc = (overrides: Partial<PagoRPCRow> = {}): PagoRPCRow => ({
+    id: "p",
+    user_id: "u1",
+    status: "aprobado",
+    payment_note: null,
+    payment_method: "efectivo",
+    bill_code: null,
+    receipt_url: null,
+    created_at: "2026-01-01T00:00:00Z",
+    month_number: 1,
+    year_number: 2026,
+    payment_amount: 10,
+    payment_type: "mensualidad",
+    expected_amount_usd: 10,
+    ...overrides,
+  });
+
+  it("agrupa la cobertura por usuario con fracción prorated", () => {
+    const filas = filasCoberturaDesdePagos([
+      rpc({ user_id: "u1", payment_amount: 5 }),
+      rpc({ user_id: "u2", payment_amount: 10 }),
+    ]);
+    const mapa = coberturasPorUsuario(filas, precios);
+    expect(mapa.get("u1")?.[0].fraccionPagada).toBe(0.5);
+    expect(mapa.get("u2")?.[0].fraccionPagada).toBe(1);
+  });
+
+  it("indexarGrupos fusiona abonos de inscripción de meses distintos", () => {
+    const filas = filasCoberturaDesdePagos([
+      rpc({ payment_type: "inscripcion", month_number: 1, payment_amount: 25, expected_amount_usd: 50 }),
+      rpc({ payment_type: "inscripcion", month_number: 2, payment_amount: 25, expected_amount_usd: 50 }),
+    ]);
+    const idx = indexarGrupos(calcularCoberturaGrupos(filas, precios));
+    expect(idx.inscripcion?.fraccionPagada).toBe(1);
+    expect(idx.mensualidad.size).toBe(0);
+  });
+
+  it("indexarGrupos separa mensualidad y suspensiones", () => {
+    const filas = filasCoberturaDesdePagos([
+      rpc({ month_number: 3 }),
+      rpc({ payment_type: "suspension", month_number: 4, payment_amount: 0 }),
+    ]);
+    const idx = indexarGrupos(calcularCoberturaGrupos(filas, precios));
+    expect(idx.mensualidad.has("3-2026")).toBe(true);
+    expect(idx.suspensiones.has("4-2026")).toBe(true);
   });
 });
 

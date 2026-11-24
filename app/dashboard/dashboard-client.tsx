@@ -32,22 +32,43 @@ import { formatCurrency, getMonthName } from "@/lib/utils";
 import type { Payment, Profile } from "@/lib/types";
 import { showToast } from "@/components/ui/toast";
 import { Loader } from "@/components/ui/loader";
+import { FlagVe } from "@/components/ui/flag-ve";
+import { bolivaresService } from "@/lib/features/pagos/bolivares.service";
+import type { DeudaMetodo } from "@/lib/features/pagos/domain/types";
 import { messages } from "@/lib/messages";
 import { getAdminLevel, isFullAdmin, type AdminLevel } from "@/lib/admin-level";
 import { ReporteMorosos } from "@/components/reporte-morosos";
 import type { GymConfig } from "@/lib/types";
 import { FloatingParticles } from "@/components/ui/floating-particles";
 
+function IconoMetodo({ metodo }: { metodo: string }) {
+  if (metodo === "bs") return <FlagVe className="inline-block w-3.5 h-2.5" />;
+  return <span className="leading-none">{metodo === "binance" ? "🟡" : "💵"}</span>;
+}
+
+function etiquetaMetodo(metodo: string): string {
+  if (metodo === "bs") return messages.metodoPago.bs;
+  if (metodo === "binance") return messages.metodoPago.binance;
+  return messages.metodoPago.efectivo;
+}
+
+function equivalenciaBs(usd: number, tasa: number | null): string | null {
+  if (!tasa || tasa <= 0) return null;
+  return `${Math.round(usd * tasa).toLocaleString("es-VE")} Bs`;
+}
+
 interface MonthlyStat {
   month_number: number;
   year_number: number;
   nombre: string;
   pagados: number;
+  parciales: number;
   pendientes: number;
   sinPago: number;
   libres: number;
   montoAcumulado: number;
   montoAdeudado: number;
+  adeudadoPorMetodo: DeudaMetodo[];
   montoPendiente: number;
 }
 
@@ -60,6 +81,8 @@ interface DashboardStats {
   deudoresInscripcion: number;
   deudoresMensualidad: number;
   alDiaMensualidad: number;
+  parcialesMensualidad: number;
+  deudaPorMetodo: DeudaMetodo[];
   montoDeuda: number;
   montoDeudaInscripcion: number;
   montoDeudaMensualidad: number;
@@ -100,6 +123,16 @@ export function DashboardClient({ datosIniciales }: { datosIniciales: Promise<Da
   const [showReporteMorosos, setShowReporteMorosos] = useState(false);
   const [morososData, setMorososData] = useState<Array<{ id: string; full_name: string; mesesDeuda: number[]; totalDeuda: number; debeInscripcion: boolean; pagosPendientes: number; montoPendiente: number; esMigrado: boolean }>>([]);
   const [loadingReporte, setLoadingReporte] = useState(false);
+  const [tasaBcv, setTasaBcv] = useState<number | null>(null);
+
+  useEffect(() => {
+    let cancelado = false;
+    bolivaresService
+      .obtenerTasaVigente()
+      .then((t) => { if (!cancelado) setTasaBcv(t); })
+      .catch(() => undefined);
+    return () => { cancelado = true; };
+  }, []);
 
   useEffect(() => {
     if (isSuperAdmin) {
@@ -496,9 +529,31 @@ export function DashboardClient({ datosIniciales }: { datosIniciales: Promise<Da
                   <span className="text-[9px] sm:text-[10px] text-gym-warning">{stats?.deudoresInscripcion || 0} inscr.</span>
                 </div>
               </div>
-              <div className="mt-2 sm:mt-4 flex items-center justify-between">
-                <span className="text-xs sm:text-sm font-bold text-gym-danger">{formatCurrency(stats?.montoDeuda || 0)}</span>
-                <span className="text-[9px] sm:text-[10px] text-gym-muted">deuda</span>
+              <div className="mt-2 sm:mt-4 space-y-0.5">
+                {(stats?.deudaPorMetodo ?? []).filter((d) => d.totalUsd > 0).length === 0 ? (
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs sm:text-sm font-bold text-gym-danger">{formatCurrency(stats?.montoDeuda || 0)}</span>
+                    <span className="text-[9px] sm:text-[10px] text-gym-muted">{messages.dashboard.adeudado}</span>
+                  </div>
+                ) : (
+                  (stats?.deudaPorMetodo ?? [])
+                    .filter((d) => d.totalUsd > 0)
+                    .map((d) => {
+                      const bs = d.metodo === "bs" ? equivalenciaBs(d.totalUsd, tasaBcv) : null;
+                      return (
+                        <div key={d.metodo} className="flex items-center justify-between gap-2 text-[11px] sm:text-xs">
+                          <span className="flex items-center gap-1 text-gym-muted">
+                            <IconoMetodo metodo={d.metodo} />
+                            <span className="font-medium text-gym-text">{etiquetaMetodo(d.metodo)}</span>
+                          </span>
+                          <span className="font-semibold text-gym-danger text-right">
+                            {formatCurrency(d.totalUsd)}
+                            {bs && <span className="text-gym-muted font-normal"> (≈ {bs})</span>}
+                          </span>
+                        </div>
+                      );
+                    })
+                )}
               </div>
             </CardContent>
             {isSuperAdmin && (
@@ -537,6 +592,9 @@ export function DashboardClient({ datosIniciales }: { datosIniciales: Promise<Da
                 <div className="text-right">
                   <p className="text-xs sm:text-sm font-bold text-gym-text truncate" title={formatCurrency(stats?.montoPagado || 0)}>{formatCurrency(stats?.montoPagado || 0)}</p>
                   <p className="text-[9px] sm:text-[10px] text-gym-muted">cobrado</p>
+                  {(stats?.parcialesMensualidad || 0) > 0 && (
+                    <p className="text-[9px] sm:text-[10px] text-gym-warning">{stats?.parcialesMensualidad} {messages.dashboard.parciales}</p>
+                  )}
                 </div>
               </div>
               <div className="mt-2 sm:mt-4 progress-bar">
@@ -597,8 +655,9 @@ export function DashboardClient({ datosIniciales }: { datosIniciales: Promise<Da
               <CardContent>
                 <div className="space-y-4">
                   {(showAllMonths ? [...monthlyStats.meses].reverse() : [...monthlyStats.meses].reverse().slice(0, 3)).map((m) => {
-                    const total = m.pagados + m.sinPago + m.pendientes;
+                    const total = m.pagados + m.parciales + m.sinPago + m.pendientes;
                     const pagadosWidth = total > 0 ? (m.pagados / maxMiembros) * 100 : 0;
+                    const parcialesWidth = total > 0 ? (m.parciales / maxMiembros) * 100 : 0;
                     const sinPagoWidth = total > 0 ? (m.sinPago / maxMiembros) * 100 : 0;
                     const pendientesWidth = total > 0 ? (m.pendientes / maxMiembros) * 100 : 0;
 
@@ -610,6 +669,10 @@ export function DashboardClient({ datosIniciales }: { datosIniciales: Promise<Da
                             <span className="flex items-center gap-1.5">
                               <span className="w-2.5 h-2.5 rounded-sm bg-gym-success" />
                               {m.pagados}
+                            </span>
+                            <span className="flex items-center gap-1.5">
+                              <span className="w-2.5 h-2.5 rounded-sm bg-gym-primary" />
+                              {m.parciales}
                             </span>
                             <span className="flex items-center gap-1.5">
                               <span className="w-2.5 h-2.5 rounded-sm bg-gym-danger" />
@@ -625,6 +688,9 @@ export function DashboardClient({ datosIniciales }: { datosIniciales: Promise<Da
                           {pagadosWidth > 0 && (
                             <div className="progress-bar-fill bg-gradient-to-r from-gym-success to-gym-success/70" style={{ width: `${pagadosWidth}%` }} />
                           )}
+                          {parcialesWidth > 0 && (
+                            <div className="progress-bar-fill bg-gradient-to-r from-gym-primary to-gym-primary/70" style={{ width: `${parcialesWidth}%` }} />
+                          )}
                           {sinPagoWidth > 0 && (
                             <div className="progress-bar-fill bg-gradient-to-r from-gym-danger to-gym-danger/70" style={{ width: `${sinPagoWidth}%` }} />
                           )}
@@ -634,10 +700,23 @@ export function DashboardClient({ datosIniciales }: { datosIniciales: Promise<Da
                         </div>
                         <div className="flex items-center justify-between text-xs">
                           <span className="text-gym-success font-medium">{formatCurrency(m.montoAcumulado)} cobrado</span>
-                          <div className="flex items-center gap-3">
-                            {m.sinPago > 0 && (
-                              <span className="text-gym-danger">{formatCurrency(m.montoAdeudado)} adeudado</span>
-                            )}
+                          <div className="flex items-center gap-3 flex-wrap justify-end">
+                            {(m.adeudadoPorMetodo ?? []).filter((d) => d.totalUsd > 0).length === 0
+                              ? m.montoAdeudado > 0 && (
+                                  <span className="text-gym-danger">{formatCurrency(m.montoAdeudado)} {messages.dashboard.adeudado}</span>
+                                )
+                              : (m.adeudadoPorMetodo ?? [])
+                                  .filter((d) => d.totalUsd > 0)
+                                  .map((d) => {
+                                    const bs = d.metodo === "bs" ? equivalenciaBs(d.totalUsd, tasaBcv) : null;
+                                    return (
+                                      <span key={d.metodo} className="text-gym-danger flex items-center gap-1">
+                                        <IconoMetodo metodo={d.metodo} />
+                                        {formatCurrency(d.totalUsd)}
+                                        {bs && <span className="text-gym-muted">(≈ {bs})</span>}
+                                      </span>
+                                    );
+                                  })}
                             {m.pendientes > 0 && (
                               <span className="text-gym-warning">{formatCurrency(m.montoPendiente)} pendiente</span>
                             )}
@@ -649,6 +728,7 @@ export function DashboardClient({ datosIniciales }: { datosIniciales: Promise<Da
                 </div>
                 <div className="flex items-center justify-center gap-6 mt-4 text-xs text-gym-muted">
                   <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-gym-success" /> Pagado</span>
+                  <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-gym-primary" /> {messages.dashboard.parcial}</span>
                   <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-gym-danger" /> Sin pago</span>
                   <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-gym-warning" /> Pendiente</span>
                 </div>
@@ -691,10 +771,22 @@ export function DashboardClient({ datosIniciales }: { datosIniciales: Promise<Da
                         return d.month_number ? `${mes} ${anio} (${tipo})` : tipo;
                       }).join(" | ") || "—";
                       const statusLabel = pago.status === "aprobado" ? "Aprobado" : pago.status === "rechazado" ? "Rechazado" : "Pendiente";
+                      const metodo = pago.payment_method ?? "efectivo";
+                      const totalPago = pago.detail?.reduce((s, d) => s + d.payment_amount, 0) || 0;
+                      const bsEquiv = metodo === "bs" ? equivalenciaBs(totalPago, tasaBcv) : null;
+                      const esParcial = (pago.detail ?? []).some(
+                        (d) =>
+                          typeof d.expected_amount_usd === "number" &&
+                          d.expected_amount_usd > 0 &&
+                          d.payment_amount < d.expected_amount_usd - 1e-9
+                      );
                       return (
                         <div key={pago.id} className="flex items-center justify-between p-3 bg-gym-bg rounded-xl hover:bg-gym-surface/80 transition-colors">
                           <div className="min-w-0">
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span title={etiquetaMetodo(metodo)} className="flex-shrink-0">
+                                <IconoMetodo metodo={metodo} />
+                              </span>
                               <p className="font-medium text-gym-text text-sm truncate">{getNombreMiembro(pago)}</p>
                               <Badge
                                 variant={pago.status === "aprobado" ? "success" : pago.status === "rechazado" ? "danger" : "warning"}
@@ -702,12 +794,18 @@ export function DashboardClient({ datosIniciales }: { datosIniciales: Promise<Da
                               >
                                 {statusLabel}
                               </Badge>
+                              {esParcial && (
+                                <Badge variant="warning" className="text-[10px] px-1.5 py-0 flex-shrink-0">
+                                  {messages.dashboard.parcial}
+                                </Badge>
+                              )}
                             </div>
                             <p className="text-xs text-gym-muted truncate">{detailInfo}</p>
                           </div>
-                          <p className="font-semibold text-gym-text text-sm flex-shrink-0 ml-3">
-                            {formatCurrency(pago.detail?.reduce((s, d) => s + d.payment_amount, 0) || 0)}
-                          </p>
+                          <div className="text-right flex-shrink-0 ml-3">
+                            <p className="font-semibold text-gym-text text-sm">{formatCurrency(totalPago)}</p>
+                            {bsEquiv && <p className="text-[10px] text-gym-muted">≈ {bsEquiv}</p>}
+                          </div>
                         </div>
                       );
                     })}

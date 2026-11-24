@@ -1,5 +1,11 @@
 import { getDiaCobro } from "@/lib/utils";
-import type { ElegiblesResult, Moroso, PagoRPCRow } from "./types";
+import {
+  coberturasPorUsuario,
+  deudaPorMetodo,
+  filasCoberturaDesdePagos,
+  indexarGrupos,
+} from "./cobertura";
+import type { ElegiblesResult, EstadoCobertura, Moroso, PagoRPCRow } from "./types";
 
 /**
  * Members whose inscription is paid: an approved `inscripcion` line in the year's
@@ -19,7 +25,17 @@ export function miembrosConInscripcionPagada(
   return ids;
 }
 
-/** Spec: "Cálculo de miembros morosos". */
+function redondear2(valor: number): number {
+  return Math.round(valor * 100) / 100;
+}
+
+/**
+ * Spec: "Cálculo de miembros morosos" — ahora parcial-aware.
+ *
+ * Un mes es deuda si su cobertura aprobada es < 1 (fracción pendiente × precio).
+ * La deuda se calcula por método (`deudaPorMetodo`) y `totalDeuda` queda como
+ * referencia al precio del método principal (parcial-aware).
+ */
 export function calcularMorosos(
   elegibles: ElegiblesResult,
   pagosDelAnio: PagoRPCRow[],
@@ -27,12 +43,12 @@ export function calcularMorosos(
   hoy: Date
 ): Moroso[] {
   const mesActual = anio === hoy.getFullYear() ? hoy.getMonth() + 1 : 12;
-  const { miembros, miembrosLibresIds, fechaInicioMap, ownerEmail, modoCobro, montoMensual, montoInscripcion } = elegibles;
+  const { miembros, miembrosLibresIds, fechaInicioMap, ownerEmail, modoCobro, montoMensual, montoInscripcion, preciosPorMetodo } =
+    elegibles;
 
   if (miembros.length === 0) return [];
 
-  const pagosAprobados = pagosDelAnio.filter((p) => p.status === "aprobado");
-  const conInscripcion = miembrosConInscripcionPagada(miembros, pagosDelAnio);
+  const coberturas = coberturasPorUsuario(filasCoberturaDesdePagos(pagosDelAnio), preciosPorMetodo);
 
   const morosos: Moroso[] = [];
 
@@ -40,7 +56,9 @@ export function calcularMorosos(
     if (miembrosLibresIds.has(miembro.id)) continue;
     if (miembro.email?.toLowerCase() === ownerEmail) continue;
 
-    const debeInscripcion = !conInscripcion.has(miembro.id);
+    const { mensualidad, suspensiones, inscripcion } = indexarGrupos(
+      coberturas.get(miembro.id) ?? []
+    );
 
     const fechaInicioMembresia = fechaInicioMap.get(miembro.id);
     const fechaInscripcion = miembro.start_date;
@@ -66,43 +84,86 @@ export function calcularMorosos(
       }
     }
 
-    const mesesCubiertos = new Set(
-      pagosAprobados.filter((p) => p.user_id === miembro.id).map((p) => p.month_number)
-    );
-
     const mesesDeuda: number[] = [];
+    const deudas: Moroso["deudas"] = [];
+    const conceptosMeses: EstadoCobertura[] = [];
+
     for (let mes = primerMesDeuda; mes <= mesActual; mes++) {
-      if (mesesCubiertos.has(mes)) continue;
+      const key = `${mes}-${anio}`;
+      if (suspensiones.has(key)) continue;
+
+      const grupo = mensualidad.get(key);
+      const fraccion = grupo?.fraccionPagada ?? 0;
+      if (fraccion >= 1 - 1e-9) continue;
 
       const diaCobro = getDiaCobro(fechaInicioStr || "2000-01-01", mes, anio, modoCobro);
-
       if (mes === mesActual && hoy.getDate() < diaCobro) continue;
 
+      const pendiente = Math.max(0, 1 - fraccion);
       mesesDeuda.push(mes);
+      deudas.push({
+        month_number: mes,
+        year_number: anio,
+        payment_amount: redondear2(pendiente * montoMensual),
+      });
+      conceptosMeses.push({
+        fraccionPagada: fraccion,
+        fraccionPendiente: pendiente,
+        porcentaje: Math.min(100, Math.round(fraccion * 100)),
+        montoPagado: grupo?.montoPagado ?? 0,
+        preciosPorMetodo: grupo?.preciosPorMetodo ?? {},
+        metodoPago: grupo?.metodoPago ?? null,
+      });
     }
 
-    const pagosPendientesMiembro = pagosDelAnio.filter(
-      (p) => p.user_id === miembro.id && p.year_number === anio &&
-        p.payment_type === "mensualidad" && p.status === "pendiente"
+    const fraccionInscripcion = miembro.inscription_paid
+      ? 1
+      : (inscripcion?.fraccionPagada ?? 0);
+    const debeInscripcion = fraccionInscripcion < 1 - 1e-9;
+
+    const conceptoInscripcion: EstadoCobertura | null = debeInscripcion
+      ? {
+          fraccionPagada: fraccionInscripcion,
+          fraccionPendiente: Math.max(0, 1 - fraccionInscripcion),
+          porcentaje: Math.min(100, Math.round(fraccionInscripcion * 100)),
+          montoPagado: inscripcion?.montoPagado ?? 0,
+          preciosPorMetodo: inscripcion?.preciosPorMetodo ?? {},
+          metodoPago: inscripcion?.metodoPago ?? null,
+        }
+      : null;
+
+    const deudaPorMetodoMiembro = deudaPorMetodo(
+      conceptosMeses,
+      conceptoInscripcion,
+      preciosPorMetodo
     );
-    const montoPendiente = pagosPendientesMiembro.reduce((sum, p) => sum + (p.payment_amount || montoMensual), 0);
+
+    const pagosPendientesMiembro = pagosDelAnio.filter(
+      (p) =>
+        p.user_id === miembro.id &&
+        p.year_number === anio &&
+        p.payment_type === "mensualidad" &&
+        p.status === "pendiente"
+    );
+    const montoPendiente = pagosPendientesMiembro.reduce(
+      (sum, p) => sum + (p.payment_amount || montoMensual),
+      0
+    );
 
     if (!debeInscripcion && mesesDeuda.length === 0 && pagosPendientesMiembro.length === 0) continue;
 
-    const deudas = mesesDeuda.map((mes) => ({
-      month_number: mes,
-      year_number: anio,
-      payment_amount: montoMensual,
-    }));
-
-    const totalDeuda = mesesDeuda.length * montoMensual + (debeInscripcion ? montoInscripcion : 0);
+    const totalInscripcion = conceptoInscripcion
+      ? redondear2(conceptoInscripcion.fraccionPendiente * montoInscripcion)
+      : 0;
+    const totalMeses = redondear2(deudas.reduce((sum, d) => sum + d.payment_amount, 0));
 
     morosos.push({
       id: miembro.id,
       email: miembro.email!,
       full_name: miembro.full_name || "",
       deudas,
-      totalDeuda,
+      totalDeuda: redondear2(totalMeses + totalInscripcion),
+      deudaPorMetodo: deudaPorMetodoMiembro,
       debeInscripcion,
       mesesDeuda,
       pagosPendientes: pagosPendientesMiembro.length,

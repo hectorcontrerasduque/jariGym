@@ -1,4 +1,4 @@
-import type { ElegiblesResult, MiembroElegible, ModoCobro } from "./types";
+import type { ElegiblesResult, MiembroElegible, ModoCobro, PreciosPorMetodo } from "./types";
 
 export interface ElegiblesInput {
   /** profiles with role miembro/super_admin and non-null email */
@@ -8,6 +8,8 @@ export interface ElegiblesInput {
   /** active memberships without end date */
   membresias: Array<{ user_id: string; start_date: string | null }> | null;
   gymConfig: { owner_email: string | null; billing_mode: string | null } | null;
+  /** Precios de todos los métodos activos. */
+  preciosPorMetodo?: PreciosPorMetodo;
 }
 
 /** Spec: "Miembros elegibles para cobro". */
@@ -40,5 +42,6 @@ export function filtrarElegibles(input: ElegiblesInput, hoy: Date): ElegiblesRes
     modoCobro,
     montoMensual,
     montoInscripcion,
+    preciosPorMetodo: input.preciosPorMetodo ?? {},
   };
 }

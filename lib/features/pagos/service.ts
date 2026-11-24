@@ -631,6 +631,7 @@ export class PagosService {
       metodoPago: metodoPrincipal(configResult.data || []),
       membresias: libresResult.data,
       gymConfig: ownerResult.data,
+      preciosPorMetodo: preciosDesdeMetodos(configResult.data || []),
     };
   }
 

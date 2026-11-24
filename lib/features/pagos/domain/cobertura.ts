@@ -1,5 +1,7 @@
 /* eslint-disable security/detect-object-injection -- claves controladas (métodos de pago) */
-import type { EstadoCobertura } from "./types";
+import type { DeudaMetodo, EstadoCobertura, PagoRPCRow, PreciosPorMetodo } from "./types";
+
+export type { DeudaMetodo, PreciosPorMetodo };
 
 /**
  * Cobertura de meses por monto (pagos parciales), sin Supabase.
@@ -19,6 +21,7 @@ import type { EstadoCobertura } from "./types";
 
 /** Fila de payment_detail con los datos necesarios para calcular cobertura. */
 export interface FilaCobertura {
+  user_id?: string;
   month_number: number | null;
   year_number: number | null;
   payment_type: string;
@@ -28,9 +31,6 @@ export interface FilaCobertura {
   payment_method: string | null;
   created_at: string;
 }
-
-/** Precio actual por método y tipo (fallback cuando no hay snapshot). */
-export type PreciosPorMetodo = Record<string, { mensual: number; inscripcion: number }>;
 
 export interface CoberturaGrupo extends EstadoCobertura {
   month_number: number;
@@ -98,8 +98,10 @@ export function calcularCoberturaGrupos(
 ): CoberturaGrupo[] {
   const grupos = new Map<string, FilaCobertura[]>();
   for (const fila of detalles) {
-    if (fila.month_number === null || fila.year_number === null || !fila.payment_type) continue;
-    const key = `${fila.payment_type}|${fila.month_number}|${fila.year_number}`;
+    if (!fila.payment_type) continue;
+    // La inscripción es un concepto global: puede no traer mes/año.
+    if (fila.month_number === null && fila.payment_type !== "inscripcion") continue;
+    const key = `${fila.payment_type}|${fila.month_number ?? ""}|${fila.year_number ?? ""}`;
     const lista = grupos.get(key);
     if (lista) lista.push(fila);
     else grupos.set(key, [fila]);
@@ -215,6 +217,87 @@ export function filasCoberturaDesdeQuery(
   });
 }
 
+export interface GruposIndexados {
+  mensualidad: Map<string, CoberturaGrupo>;
+  suspensiones: Set<string>;
+  inscripcion: CoberturaGrupo | null;
+}
+
+/** Indexa los grupos de un usuario por tipo (mes-año para meses, global para inscripción). */
+export function indexarGrupos(grupos: CoberturaGrupo[]): GruposIndexados {
+  const mensualidad = new Map<string, CoberturaGrupo>();
+  const suspensiones = new Set<string>();
+  let inscripcion: CoberturaGrupo | null = null;
+
+  for (const grupo of grupos) {
+    const key = `${grupo.month_number}-${grupo.year_number}`;
+    if (grupo.payment_type === "suspension") suspensiones.add(key);
+    else if (grupo.payment_type === "mensualidad") mensualidad.set(key, grupo);
+    else if (grupo.payment_type === "inscripcion") {
+      // La inscripción es global: se acumula (puede haber abonos en meses distintos).
+      inscripcion = inscripcion === null ? grupo : fusionarGrupos(inscripcion, grupo);
+    }
+  }
+  return { mensualidad, suspensiones, inscripcion };
+}
+
+/** Fusiona dos grupos de inscripción (suma fracciones y pagos). */
+function fusionarGrupos(a: CoberturaGrupo, b: CoberturaGrupo): CoberturaGrupo {
+  const fraccion = a.fraccionPagada + b.fraccionPagada;
+  return {
+    ...a,
+    fraccionPagada: redondear2(fraccion),
+    fraccionPendiente: redondear2(Math.max(0, 1 - fraccion)),
+    porcentaje: Math.min(100, Math.round(fraccion * 100)),
+    montoPagado: redondear2(a.montoPagado + b.montoPagado),
+    tienePendiente: a.tienePendiente || b.tienePendiente,
+    preciosPorMetodo: { ...b.preciosPorMetodo, ...a.preciosPorMetodo },
+    metodoPago: a.metodoPago ?? b.metodoPago,
+  };
+}
+
+/** Convierte las filas del RPC del dashboard al formato de cobertura. */
+export function filasCoberturaDesdePagos(pagos: PagoRPCRow[]): FilaCobertura[] {
+  return pagos.map((p) => ({
+    user_id: p.user_id,
+    month_number: p.month_number,
+    year_number: p.year_number,
+    payment_type: p.payment_type,
+    payment_amount: Number(p.payment_amount ?? 0),
+    expected_amount_usd:
+      p.expected_amount_usd === null || p.expected_amount_usd === undefined
+        ? null
+        : Number(p.expected_amount_usd),
+    status: p.status,
+    payment_method: p.payment_method,
+    created_at: p.created_at,
+  }));
+}
+
+/**
+ * Cobertura por usuario: `Map<userId, CoberturaGrupo[]>` con los grupos
+ * (tipo, mes, año) de cada miembro (fracciones prorated, precio congelado).
+ */
+export function coberturasPorUsuario(
+  detalles: FilaCobertura[],
+  precios: PreciosPorMetodo = {}
+): Map<string, CoberturaGrupo[]> {
+  const porUsuario = new Map<string, FilaCobertura[]>();
+  for (const fila of detalles) {
+    const clave = fila.user_id;
+    if (!clave) continue;
+    const lista = porUsuario.get(clave);
+    if (lista) lista.push(fila);
+    else porUsuario.set(clave, [fila]);
+  }
+
+  const resultado = new Map<string, CoberturaGrupo[]>();
+  for (const [userId, filas] of porUsuario) {
+    resultado.set(userId, calcularCoberturaGrupos(filas, precios));
+  }
+  return resultado;
+}
+
 /** Precios por método a partir de las filas activas de config. */
 export function preciosDesdeMetodos(
   metodos: Array<{
@@ -245,11 +328,6 @@ export function pendienteUsd(
   return redondear2(Math.max(0, estado.fraccionPendiente) * precio);
 }
 
-export interface DeudaMetodo {
-  metodo: string;
-  totalUsd: number;
-}
-
 type ConceptoDeuda = Pick<EstadoCobertura, "fraccionPendiente" | "preciosPorMetodo" | "metodoPago">;
 
 /**
@@ -263,9 +341,9 @@ type ConceptoDeuda = Pick<EstadoCobertura, "fraccionPendiente" | "preciosPorMeto
 export function deudaPorMetodo(
   meses: ConceptoDeuda[],
   inscripcion: ConceptoDeuda | null,
-  precios: PreciosPorMetodo
+  precios: PreciosPorMetodo = {}
 ): DeudaMetodo[] {
-  return Object.keys(precios).map((metodo) => {
+  return Object.keys(precios ?? {}).map((metodo) => {
     let total = 0;
 
     for (const mes of meses) {

@@ -18,14 +18,16 @@ RETURNS TABLE (
   month_number integer,
   year_number integer,
   payment_amount numeric,
-  payment_type text
+  payment_type text,
+  expected_amount_usd numeric
 )
 LANGUAGE sql
 STABLE
 SECURITY INVOKER
 AS $$
   SELECT p.id, p.user_id, p.status::text, p.payment_note, p.payment_method::text, p.bill_code,
-         p.receipt_url, p.created_at, d.month_number, d.year_number, d.payment_amount, d.payment_type::text
+         p.receipt_url, p.created_at, d.month_number, d.year_number, d.payment_amount, d.payment_type::text,
+         d.expected_amount_usd
   FROM public.payments p
   JOIN public.payment_detail d ON d.payment_id = p.id
   WHERE d.year_number = p_anio;

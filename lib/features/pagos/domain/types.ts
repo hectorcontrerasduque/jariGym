@@ -12,6 +12,8 @@ export interface PagoRPCRow {
   year_number: number;
   payment_amount: number;
   payment_type: string;
+  /** Precio congelado del método al momento del pago (migración 065). */
+  expected_amount_usd: number | null;
 }
 
 export type ModoCobro = "dia_uno" | "fecha_inscripcion";
@@ -38,6 +40,16 @@ export interface ElegiblesResult {
   modoCobro: ModoCobro;
   montoMensual: number;
   montoInscripcion: number;
+  /** Precios de TODOS los métodos activos (para deuda por método). */
+  preciosPorMetodo: PreciosPorMetodo;
+}
+
+/** Precio actual por método y tipo (fallback cuando no hay snapshot). */
+export type PreciosPorMetodo = Record<string, { mensual: number; inscripcion: number }>;
+
+export interface DeudaMetodo {
+  metodo: string;
+  totalUsd: number;
 }
 
 export interface Deuda {
@@ -51,7 +63,10 @@ export interface Moroso {
   email: string;
   full_name: string;
   deudas: Deuda[];
+  /** Deuda al precio del método principal (referencia, parcial-aware). */
   totalDeuda: number;
+  /** Deuda desglosada por método activo. */
+  deudaPorMetodo: DeudaMetodo[];
   debeInscripcion: boolean;
   mesesDeuda: number[];
   pagosPendientes: number;

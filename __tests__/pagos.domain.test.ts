@@ -167,6 +167,7 @@ function eleg(overrides: Partial<ElegiblesResult> = {}): ElegiblesResult {
     modoCobro: "dia_uno",
     montoMensual: 10,
     montoInscripcion: 5,
+    preciosPorMetodo: { efectivo: { mensual: 10, inscripcion: 5 } },
     ...overrides,
   };
 }
@@ -175,7 +176,7 @@ function pago(overrides: Partial<PagoRPCRow> = {}): PagoRPCRow {
   return {
     id: "p", user_id: "m1", status: "aprobado", payment_note: null, payment_method: "efectivo",
     bill_code: null, receipt_url: null, created_at: "2026-01-01", month_number: 1, year_number: 2026,
-    payment_amount: 10, payment_type: "mensualidad", ...overrides,
+    payment_amount: 10, payment_type: "mensualidad", expected_amount_usd: null, ...overrides,
   };
 }
 
@@ -259,6 +260,36 @@ describe("calcularStats", () => {
     });
   });
 
+  it("pagos parciales: mes parcial sigue en deuda y la deuda se desglosa por método", () => {
+    const e = eleg({
+      miembros: [perfil({ id: "a", start_date: "2026-09-01" })],
+      montoMensual: 10,
+      montoInscripcion: 5,
+      preciosPorMetodo: {
+        efectivo: { mensual: 10, inscripcion: 5 },
+        bs: { mensual: 14, inscripcion: 5 },
+      },
+    });
+    const pagos = [
+      pago({ user_id: "a", month_number: 9, payment_amount: 5, expected_amount_usd: 10, payment_method: "efectivo" }),
+    ];
+    const morosos = calcularMorosos(e, pagos, 2026, HOY);
+    expect(morosos[0].mesesDeuda).toEqual([9]);
+    expect(morosos[0].deudas).toEqual([{ month_number: 9, year_number: 2026, payment_amount: 5 }]);
+    expect(morosos[0].deudaPorMetodo).toEqual([
+      { metodo: "efectivo", totalUsd: 5 },
+      { metodo: "bs", totalUsd: 0 },
+    ]);
+
+    const r = calcularStats(e, pagos, morosos, 2026, HOY);
+    expect(r.alDiaMensualidad).toBe(0);
+    expect(r.parcialesMensualidad).toBe(1);
+    expect(r.deudaPorMetodo).toEqual([
+      { metodo: "efectivo", totalUsd: 5 },
+      { metodo: "bs", totalUsd: 0 },
+    ]);
+  });
+
   it("el mes de 'al día' es el mes calendario de hoy", () => {
     const e = eleg({ miembros: [perfil()] });
     const pagos = [pago({ month_number: 3 })];
@@ -268,6 +299,29 @@ describe("calcularStats", () => {
 });
 
 describe("calcularMonthlyStats", () => {
+  it("mes parcial: cuenta en parciales y su adeudado va al método del mes", () => {
+    const e = eleg({
+      miembros: [perfil({ id: "a", start_date: null })],
+      preciosPorMetodo: {
+        efectivo: { mensual: 10, inscripcion: 5 },
+        bs: { mensual: 14, inscripcion: 5 },
+      },
+    });
+    const pagos = [
+      pago({ user_id: "a", month_number: 5, payment_amount: 5, expected_amount_usd: 10, payment_method: "efectivo" }),
+    ];
+    const r = calcularMonthlyStats(e, pagos, 2026, HOY);
+    const mayo = r.meses.find((m) => m.month_number === 5)!;
+    expect(mayo.pagados).toBe(0);
+    expect(mayo.parciales).toBe(1);
+    expect(mayo.sinPago).toBe(0);
+    expect(mayo.montoAcumulado).toBe(5);
+    expect(mayo.adeudadoPorMetodo).toEqual([
+      { metodo: "efectivo", totalUsd: 5 },
+      { metodo: "bs", totalUsd: 0 },
+    ]);
+  });
+
   it("un mes por mes transcurrido; sinPago y monto adeudado", () => {
     const e = eleg({ miembros: [perfil({ id: "a", start_date: null }), perfil({ id: "m", start_date: "2026-05-10" })] });
     const r = calcularMonthlyStats(e, [pago({ user_id: "a", month_number: 5 })], 2026, HOY);

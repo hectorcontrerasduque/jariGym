@@ -48,6 +48,7 @@ function elegibles(overrides: Partial<ElegiblesResult> = {}): ElegiblesResult {
     modoCobro: "dia_uno",
     montoMensual: 10,
     montoInscripcion: 5,
+    preciosPorMetodo: { efectivo: { mensual: 10, inscripcion: 5 } },
     ...overrides,
   };
 }
@@ -180,6 +181,7 @@ describe("getMiembrosMorosos", () => {
         full_name: "Miembro Uno",
         deudas: [1, 2, 3, 4, 5, 6, 7, 8, 9].map((m) => ({ month_number: m, year_number: 2026, payment_amount: 10 })),
         totalDeuda: 90,
+        deudaPorMetodo: [{ metodo: "efectivo", totalUsd: 90 }],
         debeInscripcion: false,
         mesesDeuda: [1, 2, 3, 4, 5, 6, 7, 8, 9],
         pagosPendientes: 0,
@@ -345,6 +347,8 @@ describe("stats", () => {
       deudoresInscripcion: 1,
       deudoresMensualidad: 2,
       alDiaMensualidad: 0,
+      parcialesMensualidad: 0,
+      deudaPorMetodo: [{ metodo: "efectivo", totalUsd: 35 }],
       montoDeuda: 35,
       montoDeudaInscripcion: 5,
       montoDeudaMensualidad: 30,
@@ -377,6 +381,8 @@ describe("stats", () => {
       deudoresInscripcion: 1,
       deudoresMensualidad: 0,
       alDiaMensualidad: 1,
+      parcialesMensualidad: 0,
+      deudaPorMetodo: [{ metodo: "efectivo", totalUsd: 5 }],
       montoDeuda: 5,
       montoDeudaInscripcion: 5,
       montoDeudaMensualidad: 0,
@@ -435,16 +441,18 @@ describe("monthlyStats", () => {
     expect(r.meses).toHaveLength(9);
     expect(r.meses[0]).toEqual({
       month_number: 1, year_number: 2026, nombre: getMonthName(1),
-      pagados: 0, pendientes: 0, sinPago: 1, libres: 0,
-      montoAcumulado: 0, montoAdeudado: 10, montoPendiente: 0,
+      pagados: 0, parciales: 0, pendientes: 0, sinPago: 1, libres: 0,
+      montoAcumulado: 0, montoAdeudado: 10,
+      adeudadoPorMetodo: [{ metodo: "efectivo", totalUsd: 10 }], montoPendiente: 0,
     });
     // Marzo: "m" aún no inicia → su pendiente no cuenta en el grupo, pero sí en el monto
     expect(r.meses[2]).toMatchObject({ pendientes: 0, sinPago: 1, montoPendiente: 10 });
     // Mayo: "m" ya cuenta; "a" con aprobado y pendiente cuenta en ambos
     expect(r.meses[4]).toEqual({
       month_number: 5, year_number: 2026, nombre: getMonthName(5),
-      pagados: 1, pendientes: 1, sinPago: 0, libres: 0,
-      montoAcumulado: 17, montoAdeudado: 0, montoPendiente: 10,
+      pagados: 1, parciales: 0, pendientes: 0, sinPago: 1, libres: 0,
+      montoAcumulado: 17, montoAdeudado: 10,
+      adeudadoPorMetodo: [{ metodo: "efectivo", totalUsd: 10 }], montoPendiente: 10,
     });
   });
 

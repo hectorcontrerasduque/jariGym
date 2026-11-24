@@ -69,6 +69,8 @@ export interface PaymentDetail {
   year_number: number | null;
   payment_type: TipoPago;
   payment_amount: number;
+  /** Precio congelado del método al momento del pago (migración 065). */
+  expected_amount_usd?: number | null;
 }
 
 // PaymentWithDetail = cabecera con detalle incluido (para queries con JOIN)

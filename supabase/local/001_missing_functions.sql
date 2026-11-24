@@ -5,6 +5,9 @@
 
 -- Used by lib/features/pagos/service.ts (getPagosPorAnio): one row per payment
 -- detail line of the given year, joined with its payment header.
+-- Postgres no permite cambiar el RETURNS TABLE con CREATE OR REPLACE: drop previo.
+DROP FUNCTION IF EXISTS public.get_pagos_por_anio(integer);
+
 CREATE OR REPLACE FUNCTION public.get_pagos_por_anio(p_anio integer)
 RETURNS TABLE (
   id uuid,

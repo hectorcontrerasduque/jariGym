@@ -121,7 +121,7 @@ export function DashboardClient({ datosIniciales }: { datosIniciales: Promise<Da
   const fullAdmin = isFullAdmin(adminLevel);
   const [gymConfig, setGymConfig] = useState<GymConfig | null>(null);
   const [showReporteMorosos, setShowReporteMorosos] = useState(false);
-  const [morososData, setMorososData] = useState<Array<{ id: string; full_name: string; mesesDeuda: number[]; totalDeuda: number; debeInscripcion: boolean; pagosPendientes: number; montoPendiente: number; esMigrado: boolean }>>([]);
+  const [morososData, setMorososData] = useState<Array<{ id: string; full_name: string; mesesDeuda: number[]; totalDeuda: number; deudaPorMetodo: DeudaMetodo[]; debeInscripcion: boolean; pagosPendientes: number; montoPendiente: number; esMigrado: boolean }>>([]);
   const [loadingReporte, setLoadingReporte] = useState(false);
   const [tasaBcv, setTasaBcv] = useState<number | null>(null);
 
@@ -328,7 +328,8 @@ export function DashboardClient({ datosIniciales }: { datosIniciales: Promise<Da
         supabase.from("profiles").select("full_name").not("full_name", "is", null),
       ]);
       const migradosData = await migradosRes.json();
-      const migrados: Array<{ id: string; full_name: string; mesesDeuda: number[]; totalDeuda: number; debeInscripcion: boolean; pagosPendientes: number; montoPendiente: number; esMigrado: boolean }> = migradosData.morosos || [];
+      const migradosBase: Array<{ id: string; full_name: string; mesesDeuda: number[]; totalDeuda: number; debeInscripcion: boolean; pagosPendientes: number; montoPendiente: number; esMigrado: boolean }> = migradosData.morosos || [];
+      const migrados = migradosBase.map((m) => ({ ...m, deudaPorMetodo: [] as DeudaMetodo[] }));
       const nombresRegistrados = new Set(
         (profilesRes.data || []).map((p) => p.full_name?.trim().replace(/\s+/g, " ").toUpperCase())
       );

@@ -5,20 +5,51 @@ import { toPng } from "html-to-image";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { Button } from "@/components/ui/button";
+import { FlagVe } from "@/components/ui/flag-ve";
 import { Download, FileDown, X } from "lucide-react";
 import { formatCurrency, getMonthName } from "@/lib/utils";
 import { messages } from "@/lib/messages";
 import { showToast } from "@/components/ui/toast";
+import type { DeudaMetodo } from "@/lib/features/pagos/domain/types";
 
 interface Moroso {
   id: string;
   full_name: string;
   mesesDeuda: number[];
   totalDeuda: number;
+  deudaPorMetodo: DeudaMetodo[];
   debeInscripcion: boolean;
   pagosPendientes: number;
   montoPendiente: number;
   esMigrado: boolean;
+}
+
+function etiquetaMetodo(metodo: string): string {
+  if (metodo === "bs") return messages.metodoPago.bs;
+  if (metodo === "binance") return messages.metodoPago.binance;
+  return messages.metodoPago.efectivo;
+}
+
+function IconoMetodo({ metodo }: { metodo: string }) {
+  if (metodo === "bs") return <FlagVe className="inline-block w-3.5 h-2.5" />;
+  return <span className="leading-none">{metodo === "binance" ? "🟡" : "💵"}</span>;
+}
+
+/** Desglose de deuda por método (todos los métodos activos). */
+function DesgloseDeuda({ deudaPorMetodo }: { deudaPorMetodo: DeudaMetodo[] }) {
+  const filas = deudaPorMetodo ?? [];
+  if (filas.length === 0) return <span>—</span>;
+  return (
+    <span className="flex flex-col items-end gap-0.5">
+      {filas.map((d) => (
+        <span key={d.metodo} className="flex items-center gap-1.5 whitespace-nowrap text-gym-danger font-bold">
+          <IconoMetodo metodo={d.metodo} />
+          <span className="text-gray-400 font-normal">{etiquetaMetodo(d.metodo)}</span>
+          <span>{formatCurrency(d.totalUsd)}</span>
+        </span>
+      ))}
+    </span>
+  );
 }
 
 interface ReporteMorososProps {
@@ -56,10 +87,15 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
 
   const totalDeuda = morososOrdenados.reduce((sum, m) => sum + m.totalDeuda, 0);
 
-  const morososReportados = morososOrdenados.filter((m) => !m.esMigrado);
-  const morososNoReportados = morososOrdenados.filter((m) => m.esMigrado);
-  const totalDeudaReportados = morososReportados.reduce((sum, m) => sum + m.totalDeuda, 0);
-  const totalDeudaNoReportados = morososNoReportados.reduce((sum, m) => sum + m.totalDeuda, 0);
+  const totalesPorMetodo = (data: Moroso[]): DeudaMetodo[] => {
+    const mapa = new Map<string, number>();
+    for (const m of data) {
+      for (const d of m.deudaPorMetodo ?? []) {
+        mapa.set(d.metodo, (mapa.get(d.metodo) ?? 0) + d.totalUsd);
+      }
+    }
+    return Array.from(mapa.entries()).map(([metodo, totalUsd]) => ({ metodo, totalUsd }));
+  };
 
   const totalPages = Math.min(MAX_PAGES, Math.ceil(morososOrdenados.length / ROWS_PER_PAGE));
   const pages: Moroso[][] = [];
@@ -67,6 +103,13 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
     pages.push(morososOrdenados.slice(i * ROWS_PER_PAGE, (i + 1) * ROWS_PER_PAGE));
   }
   const isLastPage = (pageIdx: number) => pageIdx === totalPages - 1;
+
+  /** Deuda por método en texto plano (jsPDF no renderiza emojis). */
+  const deudaTexto = (m: Moroso): string => {
+    const filas = m.deudaPorMetodo ?? [];
+    if (filas.length === 0) return formatCurrency(m.totalDeuda);
+    return filas.map((d) => `${etiquetaMetodo(d.metodo)} ${formatCurrency(d.totalUsd)}`).join("\n");
+  };
 
   const handleDescargar = useCallback(async () => {
     if (downloadingRef.current) return;
@@ -154,14 +197,13 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
         const startIdx = p * PDF_ROWS;
         const pageData = allSorted.slice(startIdx, startIdx + PDF_ROWS);
 
-        const tableHeaders = [["#", "Nombre", "Rep.", "Insc.", ...monthsNames, "Deuda"]];
+        const tableHeaders = [["#", "Nombre", "Insc.", ...monthsNames, "Deuda"]];
         const tableBody = pageData.map((m, i) => [
           String(startIdx + i + 1),
           m.full_name,
-          m.esMigrado ? "No" : "Si",
           m.debeInscripcion ? "No" : "Si",
           ...todosLosMeses.map((mes) => (m.mesesDeuda.includes(mes) ? "X" : "")),
-          formatCurrency(m.totalDeuda),
+          deudaTexto(m),
         ]);
 
         autoTable(doc, {
@@ -196,12 +238,11 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
             0: { cellWidth: 9, halign: "center", textColor: [100, 116, 139] },
             1: { cellWidth: "auto", halign: "left", fontStyle: "bold", textColor: [15, 23, 42] },
             2: { cellWidth: 12 },
-            3: { cellWidth: 12 },
-            [4 + monthsNames.length]: { halign: "right", fontStyle: "bold", textColor: [220, 38, 38], cellWidth: 24 },
+            [3 + monthsNames.length]: { halign: "right", fontStyle: "bold", textColor: [220, 38, 38], cellWidth: 34 },
           },
           didParseCell: (data) => {
             // X marks: red background + white bold text
-            if (data.section === "body" && data.column.index >= 4 && data.column.index < 4 + monthsNames.length) {
+            if (data.section === "body" && data.column.index >= 3 && data.column.index < 3 + monthsNames.length) {
               if (data.cell.raw === "X") {
                 data.cell.styles.fillColor = [220, 38, 38];
                 data.cell.styles.textColor = [255, 255, 255];
@@ -210,8 +251,8 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
                 data.cell.styles.textColor = [203, 213, 225];
               }
             }
-            // Si/No badges
-            if (data.section === "body" && (data.column.index === 2 || data.column.index === 3)) {
+            // Si/No badges (Insc.)
+            if (data.section === "body" && data.column.index === 2) {
               if (data.cell.raw === "No") {
                 data.cell.styles.textColor = [220, 38, 38];
                 data.cell.styles.fontStyle = "bold";
@@ -258,13 +299,12 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
   }
 
   const fechaStr = new Date().toLocaleDateString("es-VE", { day: "numeric", month: "long", year: "numeric" });
-  const colCount = 4 + todosLosMeses.length;
+  const colCount = 3 + todosLosMeses.length;
 
   const renderTableHeader = (
     <tr className="border-b-2 border-gym-primary/30">
       <th className="text-left py-3 px-3 text-gray-400 font-medium w-8">#</th>
       <th className="text-left py-3 px-3 text-gray-400 font-semibold">Nombre</th>
-      <th className="text-center py-3 px-3 text-gray-400 font-medium">{messages.reporteMorosos.reportado}</th>
       <th className="text-center py-3 px-3 text-gray-400 font-medium">Insc.</th>
       {todosLosMeses.map((mes) => (
         <th key={mes} className="text-center py-3 px-3 text-gray-400 font-medium">
@@ -279,11 +319,6 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
     <tr key={m.id} className="border-b border-gray-800/50">
       <td className="py-3 px-3 text-gray-500">{startIndex + i + 1}</td>
       <td className="py-3 px-3 text-white font-semibold whitespace-nowrap">{m.full_name}</td>
-      <td className="text-center py-3 px-3">
-        <span className={`inline-block px-3 py-1 rounded-full font-medium ${m.esMigrado ? "bg-red-500/20 text-red-400" : "bg-green-500/20 text-green-400"}`}>
-          {m.esMigrado ? messages.reporteMorosos.no : messages.reporteMorosos.si}
-        </span>
-      </td>
       <td className="text-center py-3 px-3">
         <span className={`inline-block px-3 py-1 rounded-full font-medium ${
           m.debeInscripcion ? "bg-red-500/20 text-red-400" : "bg-green-500/20 text-green-400"
@@ -300,50 +335,35 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
           )}
         </td>
       ))}
-      <td className="py-3 px-3 text-right text-gym-danger font-bold whitespace-nowrap">
-        {formatCurrency(m.totalDeuda)}
+      <td className="py-3 px-3 text-right align-top">
+        <DesgloseDeuda deudaPorMetodo={m.deudaPorMetodo} />
       </td>
     </tr>
   ));
 
   const renderTableFooter = (data: Moroso[], grandTotal: boolean) => {
-    const dr = data.filter((m) => !m.esMigrado);
-    const dnr = data.filter((m) => m.esMigrado);
     const td = data.reduce((s, m) => s + m.totalDeuda, 0);
-    const tdr = dr.reduce((s, m) => s + m.totalDeuda, 0);
-    const tdnr = dnr.reduce((s, m) => s + m.totalDeuda, 0);
 
     return (
-      <>
-        {dnr.length > 0 && (
-          <tr className="border-t border-gym-primary/20">
-            <td colSpan={colCount} className="py-3 px-3 text-gray-400">
-              Reportado (No): {dnr.length} moroso(s)
-            </td>
-            <td className="py-3 px-3 text-right text-gym-danger font-bold whitespace-nowrap">
-              {formatCurrency(tdnr)}
-            </td>
-          </tr>
-        )}
-        {dr.length > 0 && (
-          <tr className="border-t border-gray-800/30">
-            <td colSpan={colCount} className="py-3 px-3 text-gray-400">
-              Reportado (Sí): {dr.length} moroso(s)
-            </td>
-            <td className="py-3 px-3 text-right text-gym-danger font-bold whitespace-nowrap">
-              {formatCurrency(tdr)}
-            </td>
-          </tr>
-        )}
-        <tr className="border-t-2 border-gym-primary/40">
-          <td colSpan={colCount} className="py-4 px-3 text-gray-400 font-medium">
-            {grandTotal ? `${messages.reporteMorosos.totalMorosos}: ${morososOrdenados.length}` : `Subtotal: ${data.length} moroso(s)`}
-          </td>
-          <td className="py-4 px-3 text-right text-gym-danger font-bold whitespace-nowrap">
-            {formatCurrency(grandTotal ? totalDeuda : td)}
-          </td>
-        </tr>
-      </>
+      <tr className="border-t-2 border-gym-primary/40">
+        <td colSpan={colCount} className="py-4 px-3 text-gray-400 font-medium align-top">
+          {grandTotal ? `${messages.reporteMorosos.totalMorosos}: ${morososOrdenados.length}` : `Subtotal: ${data.length} moroso(s)`}
+        </td>
+        <td className="py-4 px-3 text-right align-top">
+          <span className="flex flex-col items-end gap-0.5 whitespace-nowrap">
+            {totalesPorMetodo(data).map((d) => (
+              <span key={d.metodo} className="flex items-center gap-1.5 text-gym-danger font-bold">
+                <IconoMetodo metodo={d.metodo} />
+                <span className="text-gray-400 font-normal">{etiquetaMetodo(d.metodo)}</span>
+                <span>{formatCurrency(d.totalUsd)}</span>
+              </span>
+            ))}
+            <span className="text-gym-danger font-bold text-base border-t border-gray-700/50 pt-1 mt-0.5">
+              {formatCurrency(grandTotal ? totalDeuda : td)}
+            </span>
+          </span>
+        </td>
+      </tr>
     );
   };
 
@@ -478,9 +498,6 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
                         <span className="text-gray-500 text-xs">{i + 1}.</span>
                         <span className="text-white font-medium text-sm truncate">{m.full_name}</span>
                       </div>
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium flex-shrink-0 ml-2 ${m.esMigrado ? "bg-red-500/20 text-red-400" : "bg-green-500/20 text-green-400"}`}>
-                        {m.esMigrado ? messages.reporteMorosos.no : messages.reporteMorosos.si}
-                      </span>
                     </div>
                     <div className="flex items-center gap-2 mb-2">
                       <span className={`text-[10px] px-1.5 py-0.5 rounded ${
@@ -498,25 +515,15 @@ export function ReporteMorosos({ morosos, gymName, gymLogo, anio, onClose }: Rep
                         ))}
                       </div>
                     )}
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-start justify-between gap-2">
                       <span className="text-[10px] text-gray-500">Deuda</span>
-                      <span className="text-gym-danger font-bold text-sm">{formatCurrency(m.totalDeuda)}</span>
+                      <span className="text-sm">
+                        <DesgloseDeuda deudaPorMetodo={m.deudaPorMetodo} />
+                      </span>
                     </div>
                   </div>
                 ))}
                 <div className="space-y-2 pt-2 border-t border-gray-700/50">
-                  {morososNoReportados.length > 0 && (
-                    <div className="flex justify-between text-xs text-gray-400">
-                      <span>Reportado (No): {morososNoReportados.length}</span>
-                      <span className="text-gym-danger font-bold">{formatCurrency(totalDeudaNoReportados)}</span>
-                    </div>
-                  )}
-                  {morososReportados.length > 0 && (
-                    <div className="flex justify-between text-xs text-gray-400">
-                      <span>Reportado (Sí): {morososReportados.length}</span>
-                      <span className="text-gym-danger font-bold">{formatCurrency(totalDeudaReportados)}</span>
-                    </div>
-                  )}
                   <div className="flex justify-between text-sm text-gray-400 font-medium border-t border-gym-primary/30 pt-2">
                     <span>Total: {morososOrdenados.length} moroso(s)</span>
                     <span className="text-gym-danger font-bold">{formatCurrency(totalDeuda)}</span>

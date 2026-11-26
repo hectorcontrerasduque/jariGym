@@ -49,6 +49,7 @@ function LoginForm() {
   const [migCorreo, setMigCorreo] = useState("");
   const [migPassword, setMigPassword] = useState("");
   const [migPasswordConfirm, setMigPasswordConfirm] = useState("");
+  const [migCurrentPassword, setMigCurrentPassword] = useState("");
   const [migEmailExists, setMigEmailExists] = useState(false);
   const [migEmailStatus, setMigEmailStatus] = useState<"idle" | "checking" | "valid" | "exists" | "invalid">("idle");
   const [hasPendingMigration, setHasPendingMigration] = useState(true);
@@ -154,14 +155,6 @@ function LoginForm() {
           setMigEmailStatus("exists");
           setMigEmailExists(true);
         } else {
-          const query = migCorreo.toLowerCase().trim();
-          const match = allRecords.find((r) =>
-            r.correos.some((c) => c.toLowerCase() === query) && r.migrado === "no"
-          );
-          if (match) {
-            setMigNombre(match.nombre);
-            setSelectedNombre(match.nombre);
-          }
           setMigEmailStatus("valid");
           setMigEmailExists(false);
         }
@@ -170,7 +163,7 @@ function LoginForm() {
       }
     }, 500);
     return () => clearTimeout(timeout);
-  }, [migCorreo, allRecords]);
+  }, [migCorreo]);
 
   const isAuthorizedUser = async (userEmail: string, userId: string): Promise<{ authorized: boolean; role?: string }> => {
     const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL;
@@ -291,7 +284,12 @@ function LoginForm() {
       return;
     }
     const isGmail = migCorreo.toLowerCase().endsWith("@gmail.com");
-    if (!isGmail) {
+    if (migEmailExists) {
+      if (!migCurrentPassword) {
+        showToast(messages.migracion.currentPasswordRequired, "error");
+        return;
+      }
+    } else if (!isGmail) {
       if (!migPassword || migPassword.length < 6) {
         showToast(messages.migracion.passwordMinError, "error");
         return;
@@ -315,8 +313,7 @@ function LoginForm() {
     try {
       const pingResult = await migracionService.pingEmail(migCorreo);
       if (pingResult.alreadyMigrated) {
-        const nombre = pingResult.nombre || migCorreo;
-        showToast(messages.migracion.correoYaMigrado(nombre), "error");
+        showToast(messages.migracion.correoYaMigrado(migCorreo), "error");
         return;
       }
     } catch {
@@ -339,6 +336,7 @@ function LoginForm() {
         correo: migCorreo,
         password: finalPassword,
         selectedNombre,
+        currentPassword: migEmailExists ? migCurrentPassword : undefined,
       });
       setMigIsExistingUser(!!result.existingUser);
       setMigWelcomeEmailSent(result.welcomeEmailSent !== false);
@@ -359,6 +357,7 @@ function LoginForm() {
     setMigCorreo("");
     setMigPassword("");
     setMigPasswordConfirm("");
+    setMigCurrentPassword("");
     setMigEmailExists(false);
     setMigEmailStatus("idle");
     setMigIsExistingUser(false);
@@ -588,29 +587,20 @@ function LoginForm() {
                         {searchResults.length === 0 && (
                           <p className="p-2 text-center text-gym-muted text-xs">{messages.migracion.nombreNoEncontrado}</p>
                         )}
-                        {searchResults.map((name) => {
-                          const record = allRecords.find((r) => r.nombre === name);
-                          return (
-                            <button
-                              key={name}
-                              type="button"
-                              className="w-full text-left px-4 py-2.5 text-sm text-gym-text hover:bg-gym-primary/10 transition-colors first:rounded-t-xl last:rounded-b-xl"
-                              onMouseDown={(e) => {
-                                e.preventDefault();
-                                setMigNombre(name);
-                                setSelectedNombre(name);
-                                if (record && record.correos.length > 0) {
-                                  setMigCorreo(record.correos[0]);
-                                }
-                              }}
-                            >
-                              <span className="block truncate">{name}</span>
-                              {record && record.correos.length > 0 && (
-                                <span className="block text-[10px] text-gym-muted">{record.correos[0]}</span>
-                              )}
-                            </button>
-                          );
-                        })}
+                        {searchResults.map((name) => (
+                          <button
+                            key={name}
+                            type="button"
+                            className="w-full text-left px-4 py-2.5 text-sm text-gym-text hover:bg-gym-primary/10 transition-colors first:rounded-t-xl last:rounded-b-xl"
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              setMigNombre(name);
+                              setSelectedNombre(name);
+                            }}
+                          >
+                            <span className="block truncate">{name}</span>
+                          </button>
+                        ))}
                       </div>
                     )}
                   </div>
@@ -653,21 +643,33 @@ function LoginForm() {
                       value={migWhatsapp}
                       onChange={(e) => { const val = e.target.value.replace(/[^0-9]/g, ""); setMigWhatsapp(val); }}
                     />
-                  <PasswordInput
-                    label={messages.migracion.password + (migCorreo && migCorreo.toLowerCase().endsWith("@gmail.com") ? " (opcional)" : " *")}
-                    placeholder="••••••••"
-                    value={migPassword}
-                    onChange={(e) => setMigPassword(e.target.value)}
-                    required={!!migCorreo && !migCorreo.toLowerCase().endsWith("@gmail.com")}
-                  />
-                  <PasswordInput
-                    label={messages.migracion.passwordConfirm + (migCorreo && migCorreo.toLowerCase().endsWith("@gmail.com") ? " (opcional)" : " *")}
-                    placeholder="••••••••"
-                    value={migPasswordConfirm}
-                    onChange={(e) => setMigPasswordConfirm(e.target.value)}
-                    error={migPasswordConfirm && migPassword !== migPasswordConfirm ? messages.migracion.passwordMismatchError : undefined}
-                    required={!!migCorreo && !migCorreo.toLowerCase().endsWith("@gmail.com")}
-                  />
+                  {migEmailExists ? (
+                    <PasswordInput
+                      label={messages.migracion.currentPassword + " *"}
+                      placeholder="••••••••"
+                      value={migCurrentPassword}
+                      onChange={(e) => setMigCurrentPassword(e.target.value)}
+                      required
+                    />
+                  ) : (
+                    <>
+                      <PasswordInput
+                        label={messages.migracion.password + (migCorreo && migCorreo.toLowerCase().endsWith("@gmail.com") ? " (opcional)" : " *")}
+                        placeholder="••••••••"
+                        value={migPassword}
+                        onChange={(e) => setMigPassword(e.target.value)}
+                        required={!!migCorreo && !migCorreo.toLowerCase().endsWith("@gmail.com")}
+                      />
+                      <PasswordInput
+                        label={messages.migracion.passwordConfirm + (migCorreo && migCorreo.toLowerCase().endsWith("@gmail.com") ? " (opcional)" : " *")}
+                        placeholder="••••••••"
+                        value={migPasswordConfirm}
+                        onChange={(e) => setMigPasswordConfirm(e.target.value)}
+                        error={migPasswordConfirm && migPassword !== migPasswordConfirm ? messages.migracion.passwordMismatchError : undefined}
+                        required={!!migCorreo && !migCorreo.toLowerCase().endsWith("@gmail.com")}
+                      />
+                    </>
+                  )}
                   <div className="sticky bottom-0 bg-gym-surface pt-3 border-t border-gym-border flex gap-2">
                     <Button
                       type="button"

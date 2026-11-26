@@ -2,7 +2,6 @@ import { messages } from "@/lib/messages";
 
 export interface MigracionRecord {
   nombre: string;
-  correos: string[];
   migrado: string;
 }
 
@@ -25,7 +24,7 @@ export class MigracionService {
     return data.matches || [];
   }
 
-  async pingEmail(email: string): Promise<{ exists: boolean; alreadyMigrated: boolean; nombre: string | null }> {
+  async pingEmail(email: string): Promise<{ exists: boolean; alreadyMigrated: boolean }> {
     const res = await fetch(`/api/migracion/ping?email=${encodeURIComponent(email)}`);
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || messages.migracion.error);
@@ -38,6 +37,8 @@ export class MigracionService {
     correo: string;
     password: string;
     selectedNombre?: string;
+    /** Contraseña de la cuenta existente: prueba de propiedad para asociarle pagos. */
+    currentPassword?: string;
   }): Promise<{ success: boolean; email: string; existingUser?: boolean; welcomeEmailSent?: boolean }> {
     const res = await fetch("/api/migracion", {
       method: "POST",

@@ -186,9 +186,11 @@ export async function createOrUpdateUser(
       }
     }
 
-    // Email update (super_admin only)
+    // Email update (super_admin only). Comparación sin distinguir mayúsculas
+    // para no rechazar perfiles legacy cuyo correo no está normalizado.
     let emailUpdated = false;
-    if (params.email && params.email !== (existingProfile.email as string)) {
+    const emailActual = typeof existingProfile.email === "string" ? existingProfile.email : "";
+    if (params.email && params.email.toLowerCase() !== emailActual.toLowerCase()) {
       if (!params.isSuperAdmin) {
         throw new Error("email_update_not_allowed");
       }

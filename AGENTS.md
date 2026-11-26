@@ -284,6 +284,8 @@ status: "pendiente" | "aprobado" | "rechazado"
 ### Member Self-Migration
 - Login → link "Ya soy miembro" → modal: buscar nombre (fuzzy: prefijo sin último char por palabra) → crear auth + profile + pagos + detalle_pago + inscripción; email de bienvenida al final.
 - Requisitos: `gym_config` + método de pago activo con monto > 0; solo procesa registros `pagado` (→ aprobado) y `suspendido` de la tabla `migracion`.
+- **Prueba de propiedad:** el `correo` enviado debe coincidir con un `migracion.correo` del nombre exacto; si no, `403` y no se migra nada (solo se usan esas filas para el RPC). Si el correo ya tiene perfil, además exige `currentPassword` (`409` si falta, `401` si es incorrecta).
+- `/api/migracion/list` no devuelve correos y `/ping` no devuelve `nombre`; `/api/migracion/morosos` exige sesión `super_admin`.
 
 ## Known Issues / TODO
 

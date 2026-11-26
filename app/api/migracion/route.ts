@@ -17,7 +17,8 @@ export async function POST(request: Request) {
   if (rateLimitResponse) return rateLimitResponse;
   
   try {
-    const { nombreCompleto, phone_number, correo, password, selectedNombre } = await request.json();
+    const { nombreCompleto, phone_number, correo, password, selectedNombre, currentPassword } =
+      await request.json();
 
     if (!nombreCompleto || !correo) {
       return NextResponse.json({ error: messages.migracion.camposRequeridos }, { status: 400 });
@@ -41,6 +42,39 @@ export async function POST(request: Request) {
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!
     );
+
+    // Solo el dueño de una cuenta existente puede asociarle pagos de migración.
+    // Sin esta prueba, un anónimo podría actualizar el perfil de otro miembro
+    // (por correo) y ejecutar el RPC de pagos sobre su user_id.
+    const { data: perfilExistente } = await supabase
+      .from("profiles")
+      .select("id")
+      .ilike("email", email)
+      .maybeSingle();
+
+    if (perfilExistente) {
+      if (typeof currentPassword !== "string" || currentPassword.length === 0) {
+        return NextResponse.json(
+          { error: messages.migracion.cuentaExistente },
+          { status: 409 }
+        );
+      }
+
+      const anonClient = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+        { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } }
+      );
+      const { data: verificacion, error: verificacionError } =
+        await anonClient.auth.signInWithPassword({ email, password: currentPassword });
+
+      if (verificacionError || !verificacion?.user) {
+        return NextResponse.json(
+          { error: messages.migracion.currentPasswordIncorrect },
+          { status: 401 }
+        );
+      }
+    }
 
     const { data: configCheck } = await supabase
       .from("gym_config")
@@ -89,7 +123,7 @@ export async function POST(request: Request) {
       
       const { data, error: migracionError } = await supabase
         .from("migracion")
-        .select("*")
+        .select("id, nombre, correo, estado, mes_pagar, anio_pagar, migrado")
         .or(orFilter)
         .eq("migrado", "no")
         .order("mes_pagar", { ascending: true });
@@ -127,6 +161,20 @@ export async function POST(request: Request) {
         }
         return NextResponse.json({ error: messages.migracion.noResults }, { status: 404 });
       }
+
+      // Solo se migran los registros cuyo correo es el que se está reclamando.
+      // Evita usar un nombre público con un correo propio para quedarse con los
+      // pagos de otra persona con el mismo nombre.
+      migracionRecords = migracionRecords.filter(
+        (r) => typeof r.correo === "string" && r.correo.trim().toLowerCase() === email
+      );
+
+      if (migracionRecords.length === 0) {
+        return NextResponse.json(
+          { error: messages.migracion.correoNoRegistrado },
+          { status: 403 }
+        );
+      }
     } else {
       return NextResponse.json({ error: messages.migracion.noResults }, { status: 404 });
     }
@@ -156,24 +204,17 @@ export async function POST(request: Request) {
           password: password || undefined,
           phone_number: whatsappFormatted,
           start_date: fechaInicioCalc,
-          isSuperAdmin: true,
           sendWelcome: false,
         });
         isNewUser = result.isNewAuthUser;
       } catch (err: unknown) {
         if (err instanceof Error && err.message === "email_duplicate") {
-          const { data: existingProfile } = await supabase
-            .from("profiles")
-            .select("id")
-            .ilike("email", email)
-            .maybeSingle();
-          if (!existingProfile) {
-            return NextResponse.json({ error: messages.migracion.errorServidor }, { status: 500 });
-          }
-          isNewUser = false;
-        } else {
-          return NextResponse.json({ error: messages.migracion.errorServidor }, { status: 500 });
+          return NextResponse.json(
+            { error: messages.migracion.cuentaExistente },
+            { status: 409 }
+          );
         }
+        return NextResponse.json({ error: messages.migracion.errorServidor }, { status: 500 });
       }
 
       // Mark debe records as migrated (no pagos created)
@@ -232,26 +273,18 @@ export async function POST(request: Request) {
         password: password || undefined,
         phone_number: whatsappFormatted,
         start_date: fechaInicioCalc,
-        isSuperAdmin: true,
         sendWelcome: false,
       });
       userId = result.userId;
       isNewUser = result.isNewAuthUser;
     } catch (err: unknown) {
       if (err instanceof Error && err.message === "email_duplicate") {
-        const { data: existingProfile } = await supabase
-          .from("profiles")
-          .select("id")
-          .ilike("email", email)
-          .maybeSingle();
-        if (!existingProfile) {
-          return NextResponse.json({ error: messages.migracion.errorServidor }, { status: 500 });
-        }
-        userId = existingProfile.id;
-        isNewUser = false;
-      } else {
-        return NextResponse.json({ error: messages.migracion.errorServidor }, { status: 500 });
+        return NextResponse.json(
+          { error: messages.migracion.cuentaExistente },
+          { status: 409 }
+        );
       }
+      return NextResponse.json({ error: messages.migracion.errorServidor }, { status: 500 });
     }
 
     // Sort records by year and month

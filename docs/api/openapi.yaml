@@ -393,6 +393,8 @@ paths:
       description: |
         Público (lo usa el login). Busca al miembro en la tabla `migracion`, crea o reutiliza el usuario de Auth y el
         perfil, y convierte sus meses `pagado`/`suspendido` en pagos + inscripción. Envía correo de bienvenida.
+        Solo migra las filas de `migracion` cuyo `correo` coincide con el `correo` enviado; si no coincide, responde 403.
+        Si el correo ya está registrado, exige `currentPassword` (prueba de propiedad) antes de asociarle pagos.
         Requisitos: `gym_config` existente y método `efectivo` activo con monto mensual > 0.
         Teléfonos sin `+` se prefijan con `+58`.
         Límite: 5 peticiones cada 20 min por IP.
@@ -410,6 +412,9 @@ paths:
                 phone_number: { type: string }
                 password: { type: string, minLength: 6 }
                 selectedNombre: { type: string, description: "Nombre elegido entre varias coincidencias de /api/migracion/search." }
+                currentPassword:
+                  type: string
+                  description: "Contraseña actual de la cuenta; obligatoria si el correo ya está registrado."
       responses:
         "200":
           description: Migración realizada.
@@ -431,6 +436,21 @@ paths:
               schema: { $ref: "#/components/schemas/Error" }
         "404":
           description: No hay registros de migración para ese nombre.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "401":
+          description: El correo ya está registrado y `currentPassword` no es correcta.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "409":
+          description: El correo ya está registrado y falta `currentPassword` para probar la propiedad de la cuenta.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "403":
+          description: El correo no coincide con ningún registro `migracion` del nombre indicado.
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Error" }
@@ -478,9 +498,8 @@ paths:
       operationId: listarMigracion
       summary: Lista las personas de la tabla de migración
       description: |
-        Una entrada por nombre, con todos sus correos; `migrado = "si"` si cualquiera de sus filas está migrada.
-
-        ⚠️ Público, sin autenticación ni límite, con service role: expone nombres y correos de todos los miembros antiguos.
+        Una entrada por nombre (sin correos); `migrado = "si"` si cualquiera de sus filas está migrada.
+        Público, con service role, solo para el buscador del login. Límite: 30 por hora por IP.
       security: []
       responses:
         "200":
@@ -496,8 +515,8 @@ paths:
                       type: object
                       properties:
                         nombre: { type: string }
-                        correos: { type: array, items: { type: string } }
                         migrado: { type: string, enum: [si, "no", migrado] }
+        "429": { $ref: "#/components/responses/RateLimited" }
         "500": { $ref: "#/components/responses/Error" }
 
   /api/migracion/morosos:
@@ -507,9 +526,9 @@ paths:
       summary: Miembros antiguos (no migrados) con meses en deuda
       description: |
         Usado por el reporte de morosos del dashboard. Agrupa por nombre las filas `estado = 'debe'` del año.
-
-        ⚠️ Público, sin autenticación ni límite, con service role: expone nombres, correos y deudas.
-      security: []
+        Requiere sesión de `super_admin`. Límite: 30 por hora por usuario.
+      security:
+        - sesion: []
       parameters:
         - name: anio
           in: query
@@ -527,6 +546,17 @@ paths:
                   morosos:
                     type: array
                     items: { $ref: "#/components/schemas/MorosoMigrado" }
+        "401":
+          description: Sin sesión.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "403":
+          description: El usuario no es `super_admin`.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+        "429": { $ref: "#/components/responses/RateLimited" }
         "500": { $ref: "#/components/responses/Error" }
 
   /api/migracion/pending:
@@ -552,9 +582,8 @@ paths:
       operationId: pingMigracion
       summary: Comprueba si un email ya tiene perfil o ya migró
       description: |
-        Público. Ante cualquier error responde `{ exists: false }`.
-
-        ⚠️ Sin autenticación ni límite: permite comprobar si un email está registrado y obtener el nombre completo (enumeración de usuarios).
+        Público. Ante cualquier error responde `{ exists: false }`. No devuelve el nombre del perfil.
+        Límite: 60 por hora por IP.
       security: []
       parameters:
         - name: email
@@ -571,8 +600,8 @@ paths:
                 properties:
                   exists: { type: boolean }
                   alreadyMigrated: { type: boolean }
-                  nombre: { type: [string, "null"] }
                   invalid: { type: boolean }
+        "429": { $ref: "#/components/responses/RateLimited" }
 
   /api/notificaciones:
     get:

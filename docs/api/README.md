@@ -34,10 +34,10 @@ También se puede abrir `openapi.yaml` en VS Code (extensión "OpenAPI (Swagger)
 | POST | `/api/miembros/toggle-status` | sesión super_admin | Activar/desactivar miembro ⚠️ |
 | POST | `/api/migracion` | pública | "Ya soy miembro": migrar datos del Excel |
 | POST | `/api/migracion/search` | pública | Buscar nombres por migrar |
-| GET | `/api/migracion/list` | pública ⚠️ | Listar personas de migración |
-| GET | `/api/migracion/morosos?anio=` | pública ⚠️ | Morosos de migración |
+| GET | `/api/migracion/list` | pública | Listar personas de migración (sin correos) |
+| GET | `/api/migracion/morosos?anio=` | sesión super_admin | Morosos de migración |
 | GET | `/api/migracion/pending` | pública | ¿Quedan personas por migrar? |
-| GET | `/api/migracion/ping?email=` | pública ⚠️ | ¿Existe el email / ya migró? |
+| GET | `/api/migracion/ping?email=` | pública | ¿Existe el email / ya migró? (sin nombre) |
 | GET | `/api/notificaciones` | `CRON_SECRET` o token super_admin | Vercel Cron diario de correos |
 | POST | `/api/notificaciones` | `CRON_SECRET` o token super_admin | Cron diario de correos |
 | POST | `/api/notificaciones/procesar` | token super_admin | "Ejecutar ahora" |

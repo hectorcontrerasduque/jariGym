@@ -4,6 +4,7 @@ const mockSupabase = {
   from: vi.fn(),
   rpc: vi.fn(),
   auth: {
+    signInWithPassword: vi.fn(),
     admin: {
       createUser: vi.fn(),
       deleteUser: vi.fn(),
@@ -131,7 +132,7 @@ describe("Migración API", () => {
         // 1st call: fuzzy search with migrado="no" → empty (no unmigrated records)
         // 2nd call: check migrado="si" → found (already migrated)
         if (migracionCallCount === 1) return chainReturn([]);
-        return chainReturn([{ nombre: "HAIDEE" }]);
+        return chainReturn([{ nombre: "HAIDEE", correo: "haidee@test.com" }]);
       }
       return chainReturn(null);
     });
@@ -149,8 +150,8 @@ describe("Migración API", () => {
       if (table === "gym_config") return chainReturn({ id: "1" });
       if (table === "gym_config_payment_methods") return chainReturn({ amount_monthly: 10, amount_inscription: 5 });
       if (table === "migracion") return chainReturn([
-        { id: "m1", nombre: "HAIDEE", mes_pagar: 1, anio_pagar: 2026, estado: "pagado", migrado: "no" },
-        { id: "m2", nombre: "HAIDEE", mes_pagar: 2, anio_pagar: 2026, estado: "pagado", migrado: "no" },
+        { id: "m1", nombre: "HAIDEE", correo: "haidee@test.com", mes_pagar: 1, anio_pagar: 2026, estado: "pagado", migrado: "no" },
+        { id: "m2", nombre: "HAIDEE", correo: "haidee@test.com", mes_pagar: 2, anio_pagar: 2026, estado: "pagado", migrado: "no" },
       ]);
       if (table === "payment_detail") return chainReturn([{ payment_amount: 5 }]);
       if (table === "profiles") {
@@ -194,7 +195,7 @@ describe("Migración API", () => {
       if (table === "gym_config") return chainReturn({ id: "1" });
       if (table === "gym_config_payment_methods") return chainReturn({ amount_monthly: 10, amount_inscription: 5 });
       if (table === "migracion") return chainReturn([
-        { id: "m1", nombre: "HAIDEE LOPEZ", mes_pagar: 1, anio_pagar: 2026, estado: "pagado", migrado: "no" },
+        { id: "m1", nombre: "HAIDEE LOPEZ", correo: "haidee@test.com", mes_pagar: 1, anio_pagar: 2026, estado: "pagado", migrado: "no" },
       ]);
       if (table === "profiles") return chainReturn(null);
       if (table === "password_reset_tokens") return chainReturn(null);
@@ -222,23 +223,27 @@ describe("Migración API", () => {
     expect(_body.success).toBe(true);
   });
 
-  it("exitoso: usuario existente actualiza profile y pagos", async () => {
+  it("exitoso: usuario existente actualiza profile y pagos con su contraseña", async () => {
     mockSupabase.from.mockImplementation((table: string) => {
       if (table === "gym_config") return chainReturn({ id: "1" });
       if (table === "gym_config_payment_methods") return chainReturn({ amount_monthly: 10, amount_inscription: 5 });
       if (table === "migracion") return chainReturn([
-        { id: "m1", nombre: "HAIDEE", mes_pagar: 1, anio_pagar: 2026, estado: "pagado", migrado: "no" },
+        { id: "m1", nombre: "HAIDEE", correo: "haidee@test.com", mes_pagar: 1, anio_pagar: 2026, estado: "pagado", migrado: "no" },
       ]);
-      if (table === "profiles") return chainReturn({ id: "existing-user" });
+      if (table === "profiles") return chainReturn({ id: "existing-user", email: "haidee@test.com" });
       if (table === "password_reset_tokens") return chainReturn(null);
       return chainReturn(null);
+    });
+    mockSupabase.auth.signInWithPassword.mockResolvedValue({
+      data: { user: { id: "existing-user" }, session: {} },
+      error: null,
     });
     mockSupabase.rpc.mockResolvedValue({
       data: { pagos_creados: 1, pagos_actualizados: 0 },
       error: null,
     });
 
-    const req = makeReq(baseBody);
+    const req = makeReq({ ...baseBody, currentPassword: "actual123" });
     const { POST } = await import("@/app/api/migracion/route");
     const res = await POST(req);
     const _body = await res.json();
@@ -246,6 +251,47 @@ describe("Migración API", () => {
     expect(res.status).toBe(200);
     expect(_body.success).toBe(true);
     expect(_body.existingUser).toBe(true);
+    expect(mockSupabase.auth.signInWithPassword).toHaveBeenCalledWith({
+      email: baseBody.correo,
+      password: "actual123",
+    });
+  });
+
+  it("rechaza asociar pagos a un perfil existente sin su contraseña actual", async () => {
+    mockSupabase.from.mockImplementation((table: string) => {
+      if (table === "profiles") return chainReturn({ id: "existing-user" });
+      return chainReturn(null);
+    });
+
+    const req = makeReq(baseBody);
+    const { POST } = await import("@/app/api/migracion/route");
+    const res = await POST(req);
+    await res.json();
+
+    expect(res.status).toBe(409);
+    expect(mockSupabase.auth.signInWithPassword).not.toHaveBeenCalled();
+    expect(mockSupabase.auth.admin.createUser).not.toHaveBeenCalled();
+    expect(mockSupabase.rpc).not.toHaveBeenCalled();
+  });
+
+  it("rechaza un perfil existente si la contraseña actual es incorrecta", async () => {
+    mockSupabase.from.mockImplementation((table: string) => {
+      if (table === "profiles") return chainReturn({ id: "existing-user" });
+      return chainReturn(null);
+    });
+    mockSupabase.auth.signInWithPassword.mockResolvedValue({
+      data: { user: null, session: null },
+      error: { message: "Invalid login credentials" },
+    });
+
+    const req = makeReq({ ...baseBody, currentPassword: "incorrecta" });
+    const { POST } = await import("@/app/api/migracion/route");
+    const res = await POST(req);
+    await res.json();
+
+    expect(res.status).toBe(401);
+    expect(mockSupabase.auth.admin.createUser).not.toHaveBeenCalled();
+    expect(mockSupabase.rpc).not.toHaveBeenCalled();
   });
 
   it("solo procesa registros pagado y suspendido, no debe", async () => {
@@ -253,9 +299,9 @@ describe("Migración API", () => {
       if (table === "gym_config") return chainReturn({ id: "1" });
       if (table === "gym_config_payment_methods") return chainReturn({ amount_monthly: 10, amount_inscription: 0 });
       if (table === "migracion") return chainReturn([
-        { id: "m1", nombre: "HAIDEE", mes_pagar: 1, anio_pagar: 2026, estado: "pagado", migrado: "no" },
-        { id: "m2", nombre: "HAIDEE", mes_pagar: 2, anio_pagar: 2026, estado: "debe", migrado: "no" },
-        { id: "m3", nombre: "HAIDEE", mes_pagar: 3, anio_pagar: 2026, estado: "suspendido", migrado: "no" },
+        { id: "m1", nombre: "HAIDEE", correo: "haidee@test.com", mes_pagar: 1, anio_pagar: 2026, estado: "pagado", migrado: "no" },
+        { id: "m2", nombre: "HAIDEE", correo: "haidee@test.com", mes_pagar: 2, anio_pagar: 2026, estado: "debe", migrado: "no" },
+        { id: "m3", nombre: "HAIDEE", correo: "haidee@test.com", mes_pagar: 3, anio_pagar: 2026, estado: "suspendido", migrado: "no" },
       ]);
       if (table === "profiles") return chainReturn(null);
       if (table === "password_reset_tokens") return chainReturn(null);
@@ -291,7 +337,7 @@ describe("Migración API", () => {
       if (table === "gym_config_payment_methods") return chainReturn({ amount_monthly: 10, amount_inscription: 5 });
       if (table === "migracion") {
         const chain = chainReturn([
-          { id: "m1", nombre: "HAIDEE", mes_pagar: 1, anio_pagar: 2026, estado: "pagado", migrado: "no" },
+          { id: "m1", nombre: "HAIDEE", correo: "haidee@test.com", mes_pagar: 1, anio_pagar: 2026, estado: "pagado", migrado: "no" },
         ]);
         const originalUpdate = chain.update;
         chain.update = vi.fn((...args: unknown[]) => {
@@ -324,5 +370,81 @@ describe("Migración API", () => {
     expect(res.status).toBe(500);
     expect(migracionUpdateSpy).not.toHaveBeenCalled();
     expect(body.error).toBeDefined();
+  });
+
+  it("rechaza un correo que no está en los registros del nombre", async () => {
+    mockSupabase.from.mockImplementation((table: string) => {
+      if (table === "gym_config") return chainReturn({ id: "1" });
+      if (table === "gym_config_payment_methods") return chainReturn({ amount_monthly: 10, amount_inscription: 5 });
+      if (table === "migracion") return chainReturn([
+        { id: 1, nombre: "HAIDEE", correo: "otra@test.com", mes_pagar: 1, anio_pagar: 2026, estado: "pagado", migrado: "no" },
+      ]);
+      return chainReturn(null);
+    });
+
+    const req = makeReq(baseBody);
+    const { POST } = await import("@/app/api/migracion/route");
+    const res = await POST(req);
+    await res.json();
+
+    expect(res.status).toBe(403);
+    expect(mockSupabase.auth.admin.createUser).not.toHaveBeenCalled();
+    expect(mockSupabase.rpc).not.toHaveBeenCalled();
+  });
+
+  it("rechaza registros sin correo registrado", async () => {
+    mockSupabase.from.mockImplementation((table: string) => {
+      if (table === "gym_config") return chainReturn({ id: "1" });
+      if (table === "gym_config_payment_methods") return chainReturn({ amount_monthly: 10, amount_inscription: 5 });
+      if (table === "migracion") return chainReturn([
+        { id: 1, nombre: "HAIDEE", correo: null, mes_pagar: 1, anio_pagar: 2026, estado: "pagado", migrado: "no" },
+      ]);
+      return chainReturn(null);
+    });
+
+    const req = makeReq(baseBody);
+    const { POST } = await import("@/app/api/migracion/route");
+    const res = await POST(req);
+    await res.json();
+
+    expect(res.status).toBe(403);
+    expect(mockSupabase.rpc).not.toHaveBeenCalled();
+  });
+
+  it("solo migra las filas cuyo correo es el reclamado", async () => {
+    mockSupabase.from.mockImplementation((table: string) => {
+      if (table === "gym_config") return chainReturn({ id: "1" });
+      if (table === "gym_config_payment_methods") return chainReturn({ amount_monthly: 10, amount_inscription: 0 });
+      if (table === "migracion") return chainReturn([
+        { id: 101, nombre: "HAIDEE", correo: "haidee@test.com", mes_pagar: 1, anio_pagar: 2026, estado: "pagado", migrado: "no" },
+        { id: 102, nombre: "HAIDEE", correo: "HAIDEE@test.com", mes_pagar: 2, anio_pagar: 2026, estado: "pagado", migrado: "no" },
+        { id: 999, nombre: "HAIDEE", correo: "otra@test.com", mes_pagar: 3, anio_pagar: 2026, estado: "pagado", migrado: "no" },
+      ]);
+      if (table === "payment_detail") return chainReturn([{ payment_amount: 10 }]);
+      if (table === "profiles") return chainReturn(null);
+      return chainReturn(null);
+    });
+    mockSupabase.rpc.mockResolvedValue({
+      data: { pagos_creados: 2, pagos_actualizados: 0 },
+      error: null,
+    });
+    mockSupabase.auth.admin.createUser.mockResolvedValue({
+      data: { user: { id: "user-1" } },
+      error: null,
+    });
+    mockSupabase.auth.admin.listUsers.mockResolvedValue({
+      data: { users: [] },
+      error: null,
+    });
+
+    const req = makeReq(baseBody);
+    const { POST } = await import("@/app/api/migracion/route");
+    const res = await POST(req);
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    const rpcCall = mockSupabase.rpc.mock.calls.find((c) => c[0] === "migrar_miembro_pago");
+    expect(rpcCall?.[1]?.p_migracion_ids).toEqual([101, 102]);
+    expect(body.pagosCreados).toBe(2);
   });
 });

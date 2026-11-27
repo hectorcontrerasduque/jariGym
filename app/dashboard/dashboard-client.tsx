@@ -38,6 +38,7 @@ import type { DeudaMetodo } from "@/lib/features/pagos/domain/types";
 import { messages } from "@/lib/messages";
 import { getAdminLevel, isFullAdmin, type AdminLevel } from "@/lib/admin-level";
 import { ReporteMorosos } from "@/components/reporte-morosos";
+import { StatBar, StatCard, StatRow } from "@/components/dashboard/stat-card";
 import type { GymConfig } from "@/lib/types";
 import { FloatingParticles } from "@/components/ui/floating-particles";
 
@@ -314,7 +315,7 @@ export function DashboardClient({ datosIniciales }: { datosIniciales: Promise<Da
     }
   };
 
-  const handleClickMorosos = () => openModal("Morosos", async () => {
+  const handleClickMorosos = () => openModal(messages.dashboard.morosos, async () => {
     const morosos = await pagosService.getMiembrosMorosos(anioSeleccionado);
     return morosos.map((m) => ({
       id: m.id,
@@ -352,14 +353,14 @@ export function DashboardClient({ datosIniciales }: { datosIniciales: Promise<Da
     }
   };
 
-  const handleClickAlDia = () => openModal("Al día", async () => {
+  const handleClickAlDia = () => openModal(messages.dashboard.alDia, async () => {
     const idsAlDia = await pagosService.getMiembrosAlDia(anioSeleccionado);
     return miembros
       .filter((m) => idsAlDia.includes(m.id))
       .map((m) => ({ id: m.id, nombre: m.full_name }));
   });
 
-  const handleClickMembresiaLibre = () => openModal("Membresía Libre", async () => {
+  const handleClickMembresiaLibre = () => openModal(messages.dashboard.membresiaLibre, async () => {
     const libresIds = await pagosService.getMiembrosLibres();
     return miembros
       .filter((m) => libresIds.includes(m.id))
@@ -368,7 +369,7 @@ export function DashboardClient({ datosIniciales }: { datosIniciales: Promise<Da
 
   const handleClickActivos = () => {
     setModalData({
-      title: "Miembros Activos",
+      title: messages.dashboard.miembrosActivos,
       members: miembros.map((m) => ({
         id: m.id,
         nombre: m.full_name,
@@ -463,198 +464,142 @@ export function DashboardClient({ datosIniciales }: { datosIniciales: Promise<Da
         {/* Stats Grid */}
         <div className="stats-grid section-gap">
           {!isSuperAdmin && (
-            <Card className="stat-card">
-              <CardContent className="p-3 sm:p-5">
-                <div className="flex items-start justify-between mb-2 sm:mb-4">
-                  <div className="stat-icon" style={{ background: "rgba(251, 191, 36, 0.15)" }}>
-                    <Hourglass className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-500" />
-                  </div>
-                  <div className="hidden sm:flex items-center gap-1.5 px-2 py-1 rounded-full bg-yellow-500/10 border border-yellow-500/20">
-                    <Clock className="w-3 h-3 text-yellow-500" />
-                    <span className="text-[10px] font-medium text-yellow-500">Pendiente</span>
-                  </div>
-                </div>
-                <div className="flex items-end justify-between">
-                  <div>
-                    <p className="text-[10px] sm:text-xs text-gym-muted mb-0.5 sm:mb-1 uppercase tracking-wider">{messages.dashboard.pagosPendientes}</p>
-                    <div className="stat-number text-yellow-500">{misPagosPendientes}</div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+            <StatCard
+              tone="warning"
+              icon={<Hourglass className="w-4 h-4 sm:w-5 sm:h-5 text-yellow-500" />}
+              badge={{ label: messages.dashboard.badgePendiente, icon: <Clock className="w-3 h-3" /> }}
+              title={messages.dashboard.pagosPendientes}
+              value={misPagosPendientes}
+              valueClassName="text-yellow-500"
+              subline={messages.dashboard.porConfirmar}
+            />
           )}
 
-          <Card className="stat-card" onClick={handleClickActivos}>
-            <CardContent className="p-3 sm:p-5">
-              <div className="flex items-start justify-between mb-2 sm:mb-4">
-                <div className="stat-icon stat-icon-primary">
-                  <Users className="w-4 h-4 sm:w-5 sm:h-5 text-gym-primary" />
-                </div>
-                <div className="hidden sm:flex items-center gap-1.5 px-2 py-1 rounded-full bg-gym-success/10 border border-gym-success/20">
-                  <CheckCircle className="w-3 h-3 text-gym-success" />
-                  <span className="text-[10px] font-medium text-gym-success">Activo</span>
-                </div>
-              </div>
-              <div className="flex items-end justify-between">
-                <div>
-                  <p className="text-[10px] sm:text-xs text-gym-muted mb-0.5 sm:mb-1 uppercase tracking-wider">Miembros Activos</p>
-                  <div className="stat-number text-gym-text">{stats?.miembrosActivos || 0}</div>
-                </div>
-                <div className="flex flex-col items-end gap-0.5">
-                  <span className="text-[9px] sm:text-[10px] text-gym-muted">{stats?.inscritosPagados || 0} inscritos</span>
-                  <span className="text-[9px] sm:text-[10px] text-gym-warning">{stats?.inscritosPendientes || 0} pendientes</span>
-                </div>
-              </div>
-              <div className="mt-2 sm:mt-4 progress-bar">
-                <div
-                  className="progress-bar-fill bg-gradient-to-r from-gym-success to-gym-success/60"
-                  style={{ width: `${stats?.miembrosActivos ? (stats.inscritosPagados / stats.miembrosActivos) * 100 : 0}%` }}
-                />
-              </div>
-            </CardContent>
-          </Card>
+          <StatCard
+            tone="primary"
+            icon={<Users className="w-4 h-4 sm:w-5 sm:h-5 text-gym-primary" />}
+            badge={{ label: messages.dashboard.badgeActivo, icon: <CheckCircle className="w-3 h-3" /> }}
+            title={messages.dashboard.miembrosActivos}
+            value={stats?.miembrosActivos || 0}
+            subline={
+              <>
+                {stats?.inscritosPagados || 0} {messages.dashboard.inscritosCorta}
+                <span className="text-gym-warning">
+                  {" "}· {stats?.inscritosPendientes || 0} {messages.dashboard.pendientesCorta}
+                </span>
+              </>
+            }
+            onClick={handleClickActivos}
+            footer={
+              <StatBar
+                percent={stats?.miembrosActivos ? (stats.inscritosPagados / stats.miembrosActivos) * 100 : 0}
+                tone="success"
+              />
+            }
+          />
 
-          <Card className="stat-card">
-            <CardContent className="p-3 sm:p-5" onClick={handleClickMorosos}>
-              <div className="flex items-start justify-between mb-2 sm:mb-4">
-                <div className="stat-icon stat-icon-danger">
-                  <AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5 text-gym-danger" />
-                </div>
-                <div className="hidden sm:flex items-center gap-1.5 px-2 py-1 rounded-full bg-gym-danger/10 border border-gym-danger/20">
-                  <Clock className="w-3 h-3 text-gym-danger" />
-                  <span className="text-[10px] font-medium text-gym-danger">Deuda</span>
-                </div>
-              </div>
-              <div className="flex items-end justify-between">
-                <div>
-                  <p className="text-[10px] sm:text-xs text-gym-muted mb-0.5 sm:mb-1 uppercase tracking-wider">Morosos</p>
-                  <div className="stat-number text-gym-danger">{stats?.deudoresTotal || 0}</div>
-                </div>
-              </div>
-              <p className="text-[9px] sm:text-[10px] text-gym-muted">
-                {stats?.deudoresMensualidad || 0} {messages.dashboard.mensualidadCorta} · {stats?.deudoresInscripcion || 0} {messages.dashboard.inscripcionCorta}
-              </p>
-              {deudaPorMetodoVisible.length === 0 ? (
-                <div className="mt-2 sm:mt-4 flex items-center justify-between">
-                  <span className="text-xs sm:text-sm font-bold text-gym-danger">{formatCurrency(stats?.montoDeuda || 0)}</span>
-                  <span className="text-[9px] sm:text-[10px] text-gym-muted">{messages.dashboard.adeudado}</span>
-                </div>
-              ) : (
-                <div className="mt-2 sm:mt-3">
-                  <div className="flex items-center gap-1">
-                    <span className="text-[9px] sm:text-[10px] uppercase tracking-wider text-gym-muted">
-                      {messages.dashboard.deudaPorMetodo}
-                    </span>
-                    <span
-                      title={messages.dashboard.deudaPorMetodoAyuda}
-                      className="inline-flex h-3 w-3 items-center justify-center rounded-full border border-gym-border text-[8px] leading-none text-gym-muted cursor-help"
-                    >
-                      ?
-                    </span>
-                  </div>
-                  <div className="mt-1 space-y-0.5">
-                    {deudaPorMetodoVisible.map((d) => {
-                      const bs = d.metodo === "bs" ? equivalenciaBs(d.totalUsd, tasaBcv) : null;
-                      return (
-                        <div key={d.metodo} className="flex items-baseline justify-between gap-2 text-[11px] sm:text-xs">
-                          <span className="flex min-w-0 items-center gap-1 text-gym-muted">
-                            <IconoMetodo metodo={d.metodo} />
-                            <span className="truncate font-medium text-gym-text">{etiquetaMetodo(d.metodo)}</span>
-                          </span>
-                          <span className="whitespace-nowrap text-right tabular-nums">
-                            <span className="font-semibold text-gym-danger">{formatCurrency(d.totalUsd)}</span>
-                            {bs && <span className="block text-[9px] font-normal text-gym-muted">≈ {bs}</span>}
-                          </span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <p className="mt-1 text-[9px] leading-tight text-gym-muted">{messages.dashboard.deudaNoSumar}</p>
-                </div>
-              )}
-            </CardContent>
-            {isSuperAdmin && (
-              <div className="px-3 sm:px-5 pb-3 sm:pb-5">
+          <StatCard
+            tone="danger"
+            icon={<AlertTriangle className="w-4 h-4 sm:w-5 sm:h-5 text-gym-danger" />}
+            badge={{ label: messages.dashboard.badgeDeuda, icon: <Clock className="w-3 h-3" /> }}
+            title={messages.dashboard.morosos}
+            value={stats?.deudoresTotal || 0}
+            valueClassName="text-gym-danger"
+            subline={`${stats?.deudoresMensualidad || 0} ${messages.dashboard.mensualidadCorta} · ${stats?.deudoresInscripcion || 0} ${messages.dashboard.inscripcionCorta}`}
+            onClick={handleClickMorosos}
+            footer={
+              isSuperAdmin ? (
                 <button
                   onClick={(e) => { e.stopPropagation(); handleOpenReporteMorosos(); }}
                   disabled={loadingReporte}
                   className="w-full text-[10px] sm:text-xs text-gym-primary hover:text-gym-primary/80 font-medium py-1.5 rounded-lg border border-gym-primary/20 hover:bg-gym-primary/10 transition-colors disabled:opacity-50"
                 >
-                  {loadingReporte ? "Cargando..." : messages.reporteMorosos.verReporte}
+                  {loadingReporte ? messages.common.cargar : messages.reporteMorosos.verReporte}
                 </button>
+              ) : undefined
+            }
+          >
+            {deudaPorMetodoVisible.length === 0 ? (
+              <div className="mt-2 sm:mt-4 flex items-center justify-between">
+                <span className="text-xs sm:text-sm font-bold text-gym-danger">{formatCurrency(stats?.montoDeuda || 0)}</span>
+                <span className="text-[9px] sm:text-[10px] text-gym-muted">{messages.dashboard.adeudado}</span>
+              </div>
+            ) : (
+              <div className="mt-2 sm:mt-3">
+                <div className="flex items-center gap-1">
+                  <span className="text-[9px] sm:text-[10px] uppercase tracking-wider text-gym-muted">
+                    {messages.dashboard.deudaPorMetodo}
+                  </span>
+                  <span
+                    title={messages.dashboard.deudaPorMetodoAyuda}
+                    className="inline-flex h-3 w-3 items-center justify-center rounded-full border border-gym-border text-[8px] leading-none text-gym-muted cursor-help"
+                  >
+                    ?
+                  </span>
+                </div>
+                <div className="mt-1 space-y-0.5">
+                  {deudaPorMetodoVisible.map((d) => {
+                    const bs = d.metodo === "bs" ? equivalenciaBs(d.totalUsd, tasaBcv) : null;
+                    return (
+                      <StatRow
+                        key={d.metodo}
+                        icon={<IconoMetodo metodo={d.metodo} />}
+                        label={etiquetaMetodo(d.metodo)}
+                        value={formatCurrency(d.totalUsd)}
+                        valueClassName="text-gym-danger"
+                        hint={bs ? `≈ ${bs}` : undefined}
+                      />
+                    );
+                  })}
+                </div>
+                <p className="mt-1 text-[9px] leading-tight text-gym-muted">{messages.dashboard.deudaNoSumar}</p>
               </div>
             )}
-          </Card>
+          </StatCard>
 
-          <Card className="stat-card" onClick={handleClickAlDia}>
-            <CardContent className="p-3 sm:p-5">
-              <div className="flex items-start justify-between mb-2 sm:mb-4">
-                <div className="stat-icon stat-icon-success">
-                  <UserCheck className="w-4 h-4 sm:w-5 sm:h-5 text-gym-success" />
-                </div>
-                <div className="hidden sm:flex items-center gap-1.5 px-2 py-1 rounded-full bg-gym-success/10 border border-gym-success/20">
-                  <Zap className="w-3 h-3 text-gym-success" />
-                  <span className="text-[10px] font-medium text-gym-success">Al día</span>
-                </div>
-              </div>
-              <div className="flex items-end justify-between">
-                <div>
-                  <p className="text-[10px] sm:text-xs text-gym-muted mb-0.5 sm:mb-1 uppercase tracking-wider">Al Día</p>
-                  <div className="stat-number text-gym-success">
-                    <span className="text-gym-text">{stats?.alDiaMensualidad || 0}</span>
-                    <span className="text-[length:inherit] text-gym-muted mx-0.5 sm:mx-1">/</span>
-                    <span className="text-gym-text">{stats?.miembrosActivos || 0}</span>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="text-xs sm:text-sm font-bold text-gym-text truncate" title={formatCurrency(stats?.montoPagado || 0)}>{formatCurrency(stats?.montoPagado || 0)}</p>
-                  <p className="text-[9px] sm:text-[10px] text-gym-muted">cobrado</p>
-                  {(stats?.parcialesMensualidad || 0) > 0 && (
-                    <p className="text-[9px] sm:text-[10px] text-gym-warning">{stats?.parcialesMensualidad} {messages.dashboard.parciales}</p>
-                  )}
-                </div>
-              </div>
-              <div className="mt-2 sm:mt-4 progress-bar">
-                <div
-                  className="progress-bar-fill bg-gradient-to-r from-gym-success to-gym-success/60"
-                  style={{ width: `${trendPercent}%` }}
-                />
-              </div>
-            </CardContent>
-          </Card>
+          <StatCard
+            tone="success"
+            icon={<UserCheck className="w-4 h-4 sm:w-5 sm:h-5 text-gym-success" />}
+            badge={{ label: messages.dashboard.alDia, icon: <Zap className="w-3 h-3" /> }}
+            title={messages.dashboard.alDiaTitulo}
+            value={
+              <>
+                <span className="text-gym-text">{stats?.alDiaMensualidad || 0}</span>
+                <span className="mx-0.5 text-[length:inherit] text-gym-muted sm:mx-1">/</span>
+                <span className="text-gym-text">{stats?.miembrosActivos || 0}</span>
+              </>
+            }
+            valueClassName="text-gym-success"
+            subline={
+              (stats?.parcialesMensualidad || 0) > 0
+                ? `${stats?.parcialesMensualidad} ${messages.dashboard.parciales}`
+                : undefined
+            }
+            onClick={handleClickAlDia}
+            footer={<StatBar percent={trendPercent} tone="success" />}
+          >
+            <div className="mt-2 sm:mt-3">
+              <StatRow label={messages.dashboard.cobrado} value={formatCurrency(stats?.montoPagado || 0)} />
+            </div>
+          </StatCard>
 
           {fullAdmin && (
-            <Card className="stat-card" onClick={handleClickMembresiaLibre}>
-              <CardContent className="p-3 sm:p-5">
-                <div className="flex items-start justify-between mb-2 sm:mb-4">
-                  <div className="stat-icon stat-icon-secondary">
-                    <Gift className="w-4 h-4 sm:w-5 sm:h-5 text-gym-secondary" />
-                  </div>
-                  <div className="hidden sm:flex items-center gap-1.5 px-2 py-1 rounded-full bg-gym-secondary/10 border border-gym-secondary/20">
-                    <span className="text-[10px] font-medium text-gym-secondary">Libre</span>
-                  </div>
-                </div>
-                <div className="flex items-end justify-between">
-                  <div>
-                    <p className="text-[10px] sm:text-xs text-gym-muted mb-0.5 sm:mb-1 uppercase tracking-wider">Membresía Libre</p>
-                    <div className="stat-number text-gym-secondary">{stats?.membresiaLibre || 0}</div>
-                  </div>
-                  <div className="flex flex-col items-end gap-0.5">
-                    <span className="text-[9px] sm:text-[10px] text-gym-secondary">{stats?.totalMiembros || 0} total</span>
-                    <span className="text-[9px] sm:text-[10px] text-gym-muted">miembros</span>
-                  </div>
-                </div>
-                <div className="mt-2 sm:mt-4 flex items-center gap-2">
-                  <div className="flex-1 h-1.5 sm:h-2 bg-gym-bg rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-gradient-to-r from-gym-secondary to-gym-secondary/60 rounded-full transition-all"
-                      style={{ width: `${stats?.totalMiembros ? (stats.membresiaLibre / stats.totalMiembros) * 100 : 0}%` }}
-                    />
-                  </div>
-                  <span className="text-[9px] sm:text-[10px] text-gym-muted">{stats?.totalMiembros ? Math.round((stats.membresiaLibre / stats.totalMiembros) * 100) : 0}%</span>
-                </div>
-              </CardContent>
-            </Card>
+            <StatCard
+              tone="secondary"
+              icon={<Gift className="w-4 h-4 sm:w-5 sm:h-5 text-gym-secondary" />}
+              badge={{ label: messages.dashboard.badgeLibre }}
+              title={messages.dashboard.membresiaLibre}
+              value={stats?.membresiaLibre || 0}
+              valueClassName="text-gym-secondary"
+              subline={messages.dashboard.libresSubline(stats?.membresiaLibre || 0, stats?.totalMiembros || 0)}
+              onClick={handleClickMembresiaLibre}
+              footer={
+                <StatBar
+                  percent={stats?.totalMiembros ? (stats.membresiaLibre / stats.totalMiembros) * 100 : 0}
+                  tone="secondary"
+                />
+              }
+            />
           )}
         </div>
 

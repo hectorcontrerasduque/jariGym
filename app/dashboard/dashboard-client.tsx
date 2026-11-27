@@ -293,6 +293,11 @@ export function DashboardClient({ datosIniciales }: { datosIniciales: Promise<Da
       : 0;
   }, [stats]);
 
+  const deudaPorMetodoVisible = useMemo(
+    () => (stats?.deudaPorMetodo ?? []).filter((d) => d.totalUsd > 0),
+    [stats]
+  );
+
   if (loading) {
     return <Loader show={true} message={messages.common.cargandoDashboard} />;
   }
@@ -525,37 +530,48 @@ export function DashboardClient({ datosIniciales }: { datosIniciales: Promise<Da
                   <p className="text-[10px] sm:text-xs text-gym-muted mb-0.5 sm:mb-1 uppercase tracking-wider">Morosos</p>
                   <div className="stat-number text-gym-danger">{stats?.deudoresTotal || 0}</div>
                 </div>
-                <div className="flex flex-col items-end gap-0.5">
-                  <span className="text-[9px] sm:text-[10px] text-gym-danger">{stats?.deudoresMensualidad || 0} mens.</span>
-                  <span className="text-[9px] sm:text-[10px] text-gym-warning">{stats?.deudoresInscripcion || 0} inscr.</span>
-                </div>
               </div>
-              <div className="mt-2 sm:mt-4 space-y-0.5">
-                {(stats?.deudaPorMetodo ?? []).filter((d) => d.totalUsd > 0).length === 0 ? (
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs sm:text-sm font-bold text-gym-danger">{formatCurrency(stats?.montoDeuda || 0)}</span>
-                    <span className="text-[9px] sm:text-[10px] text-gym-muted">{messages.dashboard.adeudado}</span>
+              <p className="text-[9px] sm:text-[10px] text-gym-muted">
+                {stats?.deudoresMensualidad || 0} {messages.dashboard.mensualidadCorta} · {stats?.deudoresInscripcion || 0} {messages.dashboard.inscripcionCorta}
+              </p>
+              {deudaPorMetodoVisible.length === 0 ? (
+                <div className="mt-2 sm:mt-4 flex items-center justify-between">
+                  <span className="text-xs sm:text-sm font-bold text-gym-danger">{formatCurrency(stats?.montoDeuda || 0)}</span>
+                  <span className="text-[9px] sm:text-[10px] text-gym-muted">{messages.dashboard.adeudado}</span>
+                </div>
+              ) : (
+                <div className="mt-2 sm:mt-3">
+                  <div className="flex items-center gap-1">
+                    <span className="text-[9px] sm:text-[10px] uppercase tracking-wider text-gym-muted">
+                      {messages.dashboard.deudaPorMetodo}
+                    </span>
+                    <span
+                      title={messages.dashboard.deudaPorMetodoAyuda}
+                      className="inline-flex h-3 w-3 items-center justify-center rounded-full border border-gym-border text-[8px] leading-none text-gym-muted cursor-help"
+                    >
+                      ?
+                    </span>
                   </div>
-                ) : (
-                  (stats?.deudaPorMetodo ?? [])
-                    .filter((d) => d.totalUsd > 0)
-                    .map((d) => {
+                  <div className="mt-1 space-y-0.5">
+                    {deudaPorMetodoVisible.map((d) => {
                       const bs = d.metodo === "bs" ? equivalenciaBs(d.totalUsd, tasaBcv) : null;
                       return (
-                        <div key={d.metodo} className="flex items-center justify-between gap-2 text-[11px] sm:text-xs">
-                          <span className="flex items-center gap-1 text-gym-muted">
+                        <div key={d.metodo} className="flex items-baseline justify-between gap-2 text-[11px] sm:text-xs">
+                          <span className="flex min-w-0 items-center gap-1 text-gym-muted">
                             <IconoMetodo metodo={d.metodo} />
-                            <span className="font-medium text-gym-text">{etiquetaMetodo(d.metodo)}</span>
+                            <span className="truncate font-medium text-gym-text">{etiquetaMetodo(d.metodo)}</span>
                           </span>
-                          <span className="font-semibold text-gym-danger text-right">
-                            {formatCurrency(d.totalUsd)}
-                            {bs && <span className="text-gym-muted font-normal"> (≈ {bs})</span>}
+                          <span className="whitespace-nowrap text-right tabular-nums">
+                            <span className="font-semibold text-gym-danger">{formatCurrency(d.totalUsd)}</span>
+                            {bs && <span className="block text-[9px] font-normal text-gym-muted">≈ {bs}</span>}
                           </span>
                         </div>
                       );
-                    })
-                )}
-              </div>
+                    })}
+                  </div>
+                  <p className="mt-1 text-[9px] leading-tight text-gym-muted">{messages.dashboard.deudaNoSumar}</p>
+                </div>
+              )}
             </CardContent>
             {isSuperAdmin && (
               <div className="px-3 sm:px-5 pb-3 sm:pb-5">
